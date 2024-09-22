@@ -27,10 +27,10 @@ import java.util.Optional;
  * @create 2025/2/3
  * @Version 1.0
  **/
-@SuppressWarnings("all")
 @Log4j2
 @Aspect
 @Component
+@SuppressWarnings("all")
 public class PermissionAspect {
 
     /**

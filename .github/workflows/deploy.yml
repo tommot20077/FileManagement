@@ -298,51 +298,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 檢查 Releases 中是否已有 setup.zip
-        id: check_release_asset
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 確認提交存在
         run: |
-          RELEASE_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/latest | jq -r '.id')
+          echo "檢查 github.event.before: ${{ github.event.before }}"
+          git rev-parse ${{ github.event.before }} || echo "警告：無法找到提交 ${{ github.event.before }}"
+          echo "檢查 github.sha: ${{ github.sha }}"
+          git rev-parse ${{ github.sha }} || echo "警告：無法找到提交 ${{ github.sha }}"
 
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
-            ASSET_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets | jq -r '.[] | select(.name == "setup.zip") | .id')
-
-            if [ -n "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
-              echo "GitHub Releases 中已存在 setup.zip (Asset ID: $ASSET_ID)"
-              echo "exists=true" >> $GITHUB_OUTPUT
-            else
-              echo "GitHub Releases 中不存在 setup.zip"
-              echo "exists=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "未找到 latest Release，視為 setup.zip 不存在"
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: 檢查 docker/src 是否有改動
-        id: check_changes
-        if: steps.check_release_asset.outputs.exists == 'true'
-        run: |
-          echo "比較 ${{ github.event.before }} 和 ${{ github.sha }}"
-          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '^docker/src/'; then
-            echo "docker/src 有改動"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "docker/src 無改動"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: 安裝 zip
-        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
         run: sudo apt-get install -y zip
 
       - name: 建立新的壓縮檔
-        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "建立新的壓縮檔..."
           if [ ! -d "docker/src" ]; then
@@ -354,7 +321,6 @@ jobs:
           echo "新的壓縮檔已建立 $(pwd)/setup.zip"
 
       - name: 清理 latest Release 中的所有舊資產
-        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -386,7 +352,6 @@ jobs:
           fi
 
       - name: 發佈新 setup.zip 到 GitHub Releases
-        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "latest"

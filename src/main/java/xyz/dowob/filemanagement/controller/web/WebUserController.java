@@ -30,6 +30,15 @@ import java.util.Set;
 @RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/web/v1/user")
 public class WebUserController extends BaseUserController {
+
+    /**
+     * 構造函數，初始化用戶控制器。
+     *
+     * @param fileServiceStrategy 文件服務策略
+     * @param userService         用戶服務
+     * @param securityProperties  安全屬性配置
+     * @param validationService   驗證服務
+     */
     public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
         super(fileServiceStrategy, userService, securityProperties, validationService);
     }

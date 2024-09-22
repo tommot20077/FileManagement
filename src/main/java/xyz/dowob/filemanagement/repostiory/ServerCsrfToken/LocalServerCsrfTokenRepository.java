@@ -56,7 +56,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<CsrfToken> generateToken(ServerWebExchange exchange) {
         String uuid = java.util.UUID.randomUUID().toString();
         CsrfToken csrfToken = new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, uuid);
-        long expireTime = Instant.now().plus(EXPIRE_TIME, ChronoUnit.MINUTES).getEpochSecond();
+        long expireTime = Instant.now().plus(EXPIRE_TIME.toMillis(), ChronoUnit.MILLIS).getEpochSecond();
         csrfTokenMap.put(uuid, expireTime);
         return Mono.just(csrfToken);
     }
@@ -113,4 +113,6 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
             csrfTokenMap.entrySet().removeIf(entry -> entry.getValue() < expireTime);
         });
     }
+
+    //todo 更改為 CacheConcurrentHashMap
 }

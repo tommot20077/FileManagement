@@ -1,7 +1,6 @@
 package xyz.dowob.filemanagement.unity;
 
 import lombok.Getter;
-import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @create 2025/3/20
  * @Version 1.0
  **/
-@Log4j2
 @SuppressWarnings("all")
 public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
     /**
@@ -184,7 +182,8 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
 
             if (taskQueueSize > workQueueCapacity * HIGH_TASK_THRESHOLD && remainingSystemThreads > 2) {
                 int newPoolSize = Math.min(maxPoolSize, currentPoolSize + 1);
-                log.info("當前任務隊列負載較高 (" + (int) (queueLoadRatio * 100) + "%)，增加線程池大小: " + currentPoolSize + " -> " + newPoolSize);
+                String percentage = String.format("%.2f", queueLoadRatio * 100);
+                LogUnity.info(null, "當前任務隊列負載較高 ( %s %%)，增加線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
@@ -192,7 +191,8 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
 
             if (taskQueueSize < workQueueCapacity * LOW_TASK_THRESHOLD && currentPoolSize > minPoolSize) {
                 int newPoolSize = Math.max(currentPoolSize - 1, minPoolSize);
-                log.info("任務隊列負載較低 (" + (int) (queueLoadRatio * 100) + "%)，有 " + idleThreads + " 個空閒線程，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize);
+                String percentage = String.format("%.2f", queueLoadRatio * 100);
+                LogUnity.info(null, "當前任務隊列負載較低 ( %s%%)，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
@@ -200,14 +200,16 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
 
             if (remainingSystemThreads < 2 && taskQueueSize > workQueueCapacity * (HIGH_TASK_THRESHOLD + LOW_TASK_THRESHOLD) / 2) {
                 int newPoolSize = Math.max(currentPoolSize - 1, minPoolSize);
-                log.warn("系統資源緊張，剩餘可用線程數: " + remainingSystemThreads + "，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize);
+
+                String format = "當前系統資源緊張，剩餘可用線程數: %s，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize;
+                LogUnity.warn(null, format, remainingSystemThreads);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
             }
 
             if (taskQueueSize == 0 && activeThreads == 0) {
-                log.debug("任務隊列為空，且沒有任務在執行，將線程池大小調整為 0");
+                LogUnity.debug(null, "當前任務隊列為空，且沒有任務在執行，將線程池大小調整為 0");
                 setCorePoolSize(0);
                 setMaximumPoolSize(minPoolSize);
             }

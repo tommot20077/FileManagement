@@ -16,7 +16,6 @@ import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -81,11 +80,6 @@ public abstract class BaseFileController implements ResponseUnity {
     protected final PermissionService<UserFileMetadata> permissionService;
 
     /**
-     * 用戶限額策略，用於控制用戶的操作限制。
-     */
-    protected final UserLimiterStrategy userLimiterStrategy;
-
-    /**
      * 對象轉換工具，用於將 Java 對象與 JSON 之間進行轉換。
      */
     protected final ObjectMapper objectMapper;
@@ -114,6 +108,7 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return 返回用戶文件列表，包含文件基本信息及文件路徑。
      */
+    //todo 處理分享用戶名稱顯示當前用戶
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page, Integer size, List<FileEnum> types) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
@@ -269,7 +264,7 @@ public abstract class BaseFileController implements ResponseUnity {
         }
 
         if (enableCache) {
-            String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime());
+            String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime().toSeconds());
             headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
         }
 

@@ -40,10 +40,10 @@ public class GridFsProvider {
     /**
      * GridFSUploadOptions 用於設置 GridFS 上傳的選項
      * chunkSizeBytes 用於設置每個分塊的大小，默認為 255KB
-     * 此處設置為 1022KB，因為元數據需要空間儲存，故略小於1MB
+     * 此處設置為 1020KB，因為元數據需要空間儲存，故略小於1MB
      * 並從設定類中獲取設定大小
      *
-     * @see GridFSUploadOptions
+     * @see GridFSUploadOptions GridFS上傳選項
      */
     private final GridFSUploadOptions uploadOptions;
 
@@ -55,7 +55,7 @@ public class GridFsProvider {
      */
     public GridFsProvider(ReactiveGridFsTemplate gridFsTemplate, FileProperties fileProperties) {
         this.gridFsTemplate = gridFsTemplate;
-        this.uploadOptions = new GridFSUploadOptions().chunkSizeBytes(1022 * 1024 * fileProperties.getUpload().getPayloadLength());
+        this.uploadOptions = new GridFSUploadOptions().chunkSizeBytes((int) (fileProperties.getUpload().getPayloadLength().toKilobytes() * 1020));
     }
 
 

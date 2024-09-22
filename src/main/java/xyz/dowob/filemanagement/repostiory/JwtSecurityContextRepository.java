@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.JwtAuthenticationManager;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -50,14 +51,20 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     private static final Pattern JWT_PATTERN = Pattern.compile("jwtToken=([^;]+)");
 
     /**
+     * 遊客用戶對象
+     */
+    private static final User GUEST_USER = new User();
+
+    /**
      * JWT 驗證管理器
      */
     private final JwtAuthenticationManager authenticationManager;
 
     /**
-     * 遊客用戶對象
+     * 安全配置屬性
      */
-    private static final User GUEST_USER = new User();
+    private final SecurityProperties securityProperties;
+
 
     @PostConstruct
     public void init() {
@@ -116,10 +123,16 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
             Authentication auth = new UsernamePasswordAuthenticationToken(token.get(), token.get());
             return authenticationManager
                     .authenticate(auth)
-                    .map(authentication -> (SecurityContext) new SecurityContextImpl(authentication))
-                    .switchIfEmpty(createGuestSecurityContext());
+                    .map(authentication -> (SecurityContext) new SecurityContextImpl(authentication)).switchIfEmpty(Mono.defer(() -> {
+                        if (securityProperties.getGuestUser().isEnable()) {
+                            return createGuestSecurityContext();
+                        }
+                        return Mono.empty();
+                    }));
+        } else if (securityProperties.getGuestUser().isEnable()) {
+            return createGuestSecurityContext();
         }
-        return createGuestSecurityContext();
+        return Mono.empty();
     }
 
 

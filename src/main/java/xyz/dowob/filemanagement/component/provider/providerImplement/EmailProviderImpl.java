@@ -1,15 +1,17 @@
 package xyz.dowob.filemanagement.component.provider.providerImplement;
 
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.mail.MailProperties;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.exception.ProcessException;
 
 /**
  * 電子郵件提供者實現類，可以發送電子郵件
@@ -51,13 +53,20 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
     @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> sendEmail(String sendToEmail, String subject, String content) {
         return Mono.defer(() -> {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailProperties.getUsername());
-            message.setTo(sendToEmail);
-            message.setSubject(subject);
-            message.setText(content);
-            javaMailSender.send(message);
-            return Mono.empty();
+            try {
+                MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+                helper.setFrom(mailProperties.getUsername(), "帳號安全管理組");
+                helper.setTo(sendToEmail);
+                helper.setSubject(subject);
+                helper.setText(content, false);
+
+                javaMailSender.send(mimeMessage);
+                return Mono.empty();
+            } catch (Exception e) {
+                return Mono.error(new ProcessException(ProcessException.ErrorCode.SEND_MAIL_FAILED, e));
+            }
         });
     }
 }

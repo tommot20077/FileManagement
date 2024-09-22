@@ -172,7 +172,7 @@ public abstract class AbstractFileService implements FileService {
      */
     @PostConstruct
     public void init() {
-        CHUNK_SIZE = (long) fileProperties.getUpload().getChunkSize() * 1024 * 1024;
+        CHUNK_SIZE = fileProperties.getUpload().getChunkSize().toBytes();
     }
 
 
@@ -743,7 +743,9 @@ public abstract class AbstractFileService implements FileService {
                             if (rateLimiter.acquirePermission()) {
                                 return chunkOperation;
                             }
-                            return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT));
+                            return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT,
+                                                                      "上傳檔案超出了請求限制，請稍後再試"
+                            ));
                         })
                         .retryWhen(Retry
                                            .backoff(5, Duration.ofSeconds(1))
@@ -1092,7 +1094,7 @@ public abstract class AbstractFileService implements FileService {
      */
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> userFileMetadataIterable, User user) {
         return Mono.defer(() -> {
-            LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime());
+            LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
             Set<FileTrashRecord> fileTrashRecords = new HashSet<>();
             Set<Long> problemFileIdsSet = new HashSet<>();
             userFileMetadataIterable.forEach(userFile -> {

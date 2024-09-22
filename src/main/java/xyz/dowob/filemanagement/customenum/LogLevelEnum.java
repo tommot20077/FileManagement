@@ -42,6 +42,11 @@ public enum LogLevelEnum {
      * ERROR 日誌級別
      */
     ERROR(Level.ERROR),
+
+    /**
+     * FATAL 日誌級別
+     */
+    FATAL(Level.FATAL),
     ;
 
     /**

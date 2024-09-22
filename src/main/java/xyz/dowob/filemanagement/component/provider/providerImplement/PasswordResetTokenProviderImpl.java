@@ -63,7 +63,7 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
 
         return tokenMono.flatMap(token -> {
             token.setResetVerificationCode(verificationCode);
-            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(securityProperties.getResetPasswordToken().getExpiration());
+            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(securityProperties.getResetPasswordToken().getExpiration().toMinutes());
             token.setResetVerificationCodeExpireTime(expireTime);
             return tokenRepository.save(token).thenReturn(verificationCode);
         });

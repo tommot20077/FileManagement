@@ -100,8 +100,7 @@ public abstract class BaseGuestController implements ResponseUnity {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", token)
                         .httpOnly(securityProperties.getCookie().isHttpOnly())
-                        .secure(securityProperties.getCookie().isSecure())
-                        .maxAge((long) securityProperties.getJwtToken().getExpiration() * 60)
+                        .secure(securityProperties.getCookie().isSecure()).maxAge(securityProperties.getJwtToken().getExpiration().toSeconds())
                         .sameSite(securityProperties.getCookie().getSameSite())
                         .path("/")
                         .build();

@@ -20,10 +20,10 @@ import xyz.dowob.filemanagement.controller.exception.ExceptionController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -73,7 +73,7 @@ public class LoggerAspect {
 
 
     /**
-     * 環繞通知，用於記錄 Component 和 ServiceInterface 層的日誌
+     * 環繞通知，用於記錄 Component 、 Service 和 Controller 層的日誌
      * 當業務方法執行或發生異常時，記錄請求者、所屬類、使用方法、返回值等信息到日誌中
      * 區分2種情況：
      * 1. 方法返回值為 Mono 或 Flux，因為這兩種類型是非阻塞的，所以需要特別處理
@@ -203,17 +203,16 @@ public class LoggerAspect {
      * @param error      錯誤
      */
     private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, LogInfo info, Throwable error) {
-        String[] usernameAndUserId = getRequestIdAndUsernameAndUserId(exchange);
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
 
         if (error != null) {
             boolean isValidationException = error instanceof ValidationException;
             if (isValidationException && log.isDebugEnabled()) {
-                String format = "[請求ID: %s] 請求者: %s %s| 所屬類: %s | 使用方法: %s | 警告訊息: %s";
-                Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, error.getMessage()};
+                String format = "所屬類: %s | 使用方法: %s | 警告訊息: %s";
+                Object[] args = new Object[]{className, methodName, error.getMessage()};
 
-                log.debug(String.format(format, args));
+                LogUnity.debug(exchange, String.format(format, args));
             } else if (!isValidationException && log.isErrorEnabled()) {
                 String formattedArgs = Arrays
                         .stream(joinPoint.getArgs())
@@ -221,44 +220,24 @@ public class LoggerAspect {
                         .map(argStr -> argStr.length() > 500 ? argStr.substring(0, 500) + "..." : argStr)
                         .collect(Collectors.joining(", "));
 
-                String format = "[請求ID: %s] 請求者: %s %s| 所屬類: %s | 使用方法: %s | 傳入參數: %s | 錯誤訊息: %s";
-                Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, formattedArgs, error.getMessage(), error};
-
-                log.error(String.format(format, args));
+                String format = "所屬類: %s | 使用方法: %s | 傳入參數: %s | 錯誤訊息: %s";
+                Object[] args = new Object[]{className, methodName, formattedArgs, error.getMessage(), error};
+                LogUnity.error(exchange, String.format(format, args));
             }
         } else {
             if (info == null) {
                 return;
             }
-            String format = "請求ID: %s 請求者: %s %s| 所屬類: %s | 使用方法: %s | 返回值: %s";
-            Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, info.message()};
+            String format = "所屬類: %s | 使用方法: %s | 返回值: %s";
+            Object[] args = new Object[]{className, methodName, info.message()};
 
             switch (info.logLevel()) {
-                case TRACE -> {
-                    if (log.isTraceEnabled()) {
-                        log.trace(String.format(format, args));
-                    }
-                }
-                case DEBUG -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug(String.format(format, args));
-                    }
-                }
-                case INFO -> {
-                    if (log.isInfoEnabled()) {
-                        log.info(String.format(format, args));
-                    }
-                }
-                case WARN -> {
-                    if (log.isWarnEnabled()) {
-                        log.warn(String.format(format, args));
-                    }
-                }
-                case ERROR -> {
-                    if (log.isErrorEnabled()) {
-                        log.error(String.format(format, args));
-                    }
-                }
+                case TRACE -> LogUnity.trace(exchange, format, args);
+                case DEBUG -> LogUnity.debug(exchange, format, args);
+                case INFO -> LogUnity.info(exchange, format, args);
+                case WARN -> LogUnity.warn(exchange, format, args);
+                case ERROR -> LogUnity.error(exchange, format, args);
+                case FATAL -> LogUnity.fatal(exchange, format, args);
             }
         }
     }
@@ -282,38 +261,23 @@ public class LoggerAspect {
 
 
     /**
-     * 獲取請求ID、請求者名稱和用戶ID
-     * 當前請求如果為空，則其為伺服器端請求
-     * 如果請求者名稱為空，則其為尚未登錄的用戶請求
-     * 如果請求者名稱不為空，則其為用戶請求
-     *
-     * @param exchange ServerWebExchange 對象
-     *
-     * @return String[] 請求ID、請求者名稱和用戶ID
+     * 用戶請求信息類，用於存儲請求ID、請求者名稱和請求IP
      */
-    private String[] getRequestIdAndUsernameAndUserId(ServerWebExchange exchange) {
-        String requestId;
-        String requestUsername;
-        String requsetUserId;
+    private class UserRequestInfo {
+        /**
+         * 請求者的辨識名稱
+         */
+        private String identify;
 
-        if (exchange == null) {
-            requestId = "無";
-            requestUsername = "server";
-            requsetUserId = null;
-        } else {
-            boolean isVisitorRequest = Objects.equals(exchange.getAttribute("userId"), "0");
+        /**
+         * 請求ID
+         */
+        private String requestId;
 
-            if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null || isVisitorRequest) {
-                requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
-                requestUsername = "IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
-                requsetUserId = null;
-            } else {
-                requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
-                requestUsername = (String) exchange.getAttribute("username");
-                requsetUserId = ((Long) exchange.getAttribute("userId")).toString();
-            }
-        }
-        return new String[]{requestId, requestUsername, requsetUserId};
+        /**
+         * 請求IP
+         */
+        private String requestIp;
     }
 
 

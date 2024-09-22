@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import xyz.dowob.filemanagement.customenum.CsrfTokenRepositoryEnum;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -53,6 +54,11 @@ public class SecurityProperties {
      */
     private Hsts hsts = new Hsts();
 
+    /**
+     * 遊客用戶配置
+     */
+    private GuestUser guestUser = new GuestUser();
+
 
     /**
      * 驗證 JWT 密鑰是否配置
@@ -71,14 +77,14 @@ public class SecurityProperties {
     @Data
     public static class JwtToken {
         /**
-         * JWT 密鑰
+         * JWT 加密密鑰
          */
         private String secret;
 
         /**
-         * JWT 令牌過期時間，單位為分鐘，默認為 1440 分鐘
+         * JWT 令牌過期時間，默認為 1 天
          */
-        private int expiration = 1440;
+        private Duration expiration = Duration.ofDays(1);
     }
 
 
@@ -93,9 +99,9 @@ public class SecurityProperties {
         private int length = 6;
 
         /**
-         * 重置密碼憑證的過期時間，單位為分鐘，默認為 30 分鐘
+         * 重置密碼憑證的過期時間，默認為 30 分鐘
          */
-        private int expiration = 30;
+        private Duration expiration = Duration.ofMinutes(30);
     }
 
     @Data
@@ -145,9 +151,9 @@ public class SecurityProperties {
         private List<String> allowedHeaders = List.of("*");
 
         /**
-         * 跨域請求的暫存時間，默認為 3600 秒
+         * 跨域請求預檢的暫存時間，默認為 1 小時
          */
-        private long maxAge = 3600;
+        private Duration maxAge = Duration.ofHours(1);
 
         /**
          * 跨域請求是否允許憑證，默認為 true
@@ -172,12 +178,12 @@ public class SecurityProperties {
          * CSRF 憑證的過期時間，默認為 5 分鐘
          * 此值不應該設置過長，否則會導致 CSRF 憑證的安全性降低
          */
-        private long expiration = 5;
+        private Duration expiration = Duration.ofMinutes(5);
 
         /**
          * CSRF 憑證的存儲方式，默認為 LOCAL， 可選值為 LOCAL 和 REDIS
          */
-        private CsrfTokenRepositoryEnum csrfTokenRepository = CsrfTokenRepositoryEnum.LOCAL;
+        private CsrfTokenRepositoryEnum csrfTokenRepository = CsrfTokenRepositoryEnum.REDIS;
 
         /**
          * 允許的參考來源的正則表達式，默認允許所有的 http和 https來源
@@ -190,9 +196,9 @@ public class SecurityProperties {
     @Data
     public static class Hsts {
         /**
-         * HSTS 的最大時間，默認為 1 年， 單位為分鐘
+         * HSTS 的最大時間，默認為 365 天
          */
-        private long maxAge = 60 * 24 * 365;
+        private Duration maxAge = Duration.ofDays(365);
 
         /**
          * 是否啟用 includeSubDomains，默認為 true
@@ -205,5 +211,11 @@ public class SecurityProperties {
         private boolean preload = true;
     }
 
-
+    @Data
+    public static class GuestUser {
+        /**
+         * 是否啟用訪客用戶，默認為 true
+         */
+        private boolean enable = true;
+    }
 }

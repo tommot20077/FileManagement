@@ -323,7 +323,8 @@ public class FolderListTreeProvider {
         private final Map<Long, List<FolderNode>> pendingNodes;
 
         /**
-         * 最大資料夾深度
+         * 最大資料夾深度，當資料夾深度超過此值時，將拋出異常
+         * 此值小於等於 0 時，表示不限制資料夾深度
          */
         private final int maxFolderDepthLimit;
 
@@ -364,7 +365,7 @@ public class FolderListTreeProvider {
             FolderNode parentFolder = folderMap.get(parentFolderId);
 
             int maxFolderDepth = Objects.requireNonNullElse(parentFolder, root).getCurrentDepth() + 1;
-            if (parentFolder != null && maxFolderDepth > maxFolderDepthLimit) {
+            if (parentFolder != null && maxFolderDepthLimit > 0 && maxFolderDepth > maxFolderDepthLimit) {
                 throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, maxFolderDepth);
             }
 
@@ -412,7 +413,7 @@ public class FolderListTreeProvider {
 
             if (newParent != null) {
                 int potentialDepth = newParent.getCurrentDepth() + 1 + node.getMaxSubTreeDepth();
-                if (potentialDepth > maxFolderDepthLimit) {
+                if (maxFolderDepthLimit > 0 && potentialDepth > maxFolderDepthLimit) {
                     throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, potentialDepth);
                 }
             }
@@ -638,6 +639,7 @@ public class FolderListTreeProvider {
          *
          * @return 資料夾的路徑列表
          */
+        @SkipRecord
         private List<FolderNode> getPath(Long folderId) {
             List<FolderNode> path = new ArrayList<>();
             FolderNode current = folderMap.get(folderId);

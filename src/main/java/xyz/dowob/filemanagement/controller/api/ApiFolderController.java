@@ -47,23 +47,23 @@ public class ApiFolderController extends BaseFolderController {
     /**
      * 依賴注入的構造方法，用於初始化資料夾控制器。
      *
-     * @param userService           用戶服務，負責用戶相關操作。
-     * @param permissionService     權限服務，處理用戶操作的權限校驗。
-     * @param fileServiceStrategy   文件服務策略，根據不同的文件操作提供相應的文件服務。
-     * @param fileProperties        文件屬性配置，用於加載系統層級的文件屬性配置。
-     * @param validationService     驗證服務，對請求參數進行校驗。
-     * @param folderService         資料夾業務層服務。
-     * @param userLimiterStrategy   用戶限額策略，控制用戶的操作限制。
-     * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
-     * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param userService               用戶服務，負責用戶相關操作。
+     * @param permissionService         權限服務，處理用戶操作的權限校驗。
+     * @param fileServiceStrategy       文件服務策略，根據不同的文件操作提供相應的文件服務。
+     * @param fileProperties            文件屬性配置，用於加載系統層級的文件屬性配置。
+     * @param validationService         驗證服務，對請求參數進行校驗。
+     * @param folderService             資料夾業務層服務。
+     * @param userLimiterStrategy       用戶限額策略，控制用戶的操作限制。
+     * @param objectMapper              對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
+     * @param folderListTreeManager     資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param filePermissionRuleManager 文件權限規則管理器，處理文件的權限規則。
      */
     public ApiFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                @Nullable FolderListTreeManager folderListTreeManager) {
         super(userService,
               permissionService,
               fileServiceStrategy,
-              fileProperties,
-              validationService, folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
+              fileProperties, validationService, folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }

@@ -62,30 +62,30 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      */
     private final TransmissionEnum defaultUploadType;
 
+    /**
+     * 用戶限額策略，用於控制用戶的操作限制。
+     */
+    private final UserLimiterStrategy userLimiterStrategy;
+
 
     /**
      * 構造函數，初始化基本的業務層服務
      *
-     * @param userService         用戶服務層對象
-     * @param fileServiceStrategy 文件服務策略對象，用於選擇適當的文件服務
-     * @param fileProperties      文件屬性設置
-     * @param validationService   驗證服務對象
-     * @param permissionService   用戶文件元數據授權服務
-     * @param userLimiterStrategy 用戶限制策略
-     * @param objectMapper        用於處理對象映射的工具
+     * @param userService               用戶服務層對象
+     * @param fileServiceStrategy       文件服務策略對象，用於選擇適當的文件服務
+     * @param fileProperties            文件屬性設置
+     * @param validationService         驗證服務對象
+     * @param permissionService         用戶文件元數據授權服務
+     * @param objectMapper              用於處理對象映射的工具
+     * @param filePermissionRuleManager 文件權限規則管理器
+     * @param userLimiterStrategy       用戶限制策略
      */
     public BaseGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
-        super(userService,
-              fileServiceStrategy,
-              fileProperties,
-              validationService,
-              permissionService,
-              userLimiterStrategy,
-              objectMapper,
-              filePermissionRuleManager
-        );
+        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
+
         this.isForceUseServerConfig = fileProperties.getUpload().isForceUseServerConfig();
         this.defaultUploadType = fileProperties.getUpload().getDefaultUploadType();
+        this.userLimiterStrategy = userLimiterStrategy;
     }
 
 
@@ -329,7 +329,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         });
     }
 
-    
+
     /**
      * 此方法為分塊上傳的處理方法
      *
@@ -377,7 +377,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         });
     }
 
-    
+
     /**
      * 此方法為Multipart上傳的處理方法
      *

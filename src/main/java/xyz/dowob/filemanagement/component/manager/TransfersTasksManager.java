@@ -79,8 +79,8 @@ public class TransfersTasksManager {
                 ValidationException error = new ValidationException(ValidationException.ErrorCode.EXISTING_TRANSFER_TASK, md5, alreadyTransferTaskId);
                 return Mono.error(error);
             }
-            boolean isLimitSize = fileProperties.getUpload().getMaxUploadFileSize() > 0;
-            if (isLimitSize && fileMetadataDTO.getFileSize() > fileProperties.getUpload().getMaxUploadFileSize()) {
+            boolean isLimitSize = fileProperties.getUpload().getMaxUploadFileSize().toBytes() > 0;
+            if (isLimitSize && fileMetadataDTO.getFileSize() > fileProperties.getUpload().getMaxUploadFileSize().toBytes()) {
                 ValidationException error = new ValidationException(ValidationException.ErrorCode.FILE_SIZE_LIMIT,
                                                                     fileMetadataDTO.getFileSize(),
                                                                     fileProperties.getUpload().getMaxUploadFileSize()

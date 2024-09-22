@@ -169,7 +169,13 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1218
          * 錯誤信息: 寫入緩存到 Redis 失敗
          */
-        WRITE_CACHE_TO_REDIS_FAILED(1218, "寫入緩存到 Redis 失敗")
+        WRITE_CACHE_TO_REDIS_FAILED(1218, "寫入緩存到 Redis 失敗"),
+
+        /**
+         * 錯誤碼: 1219
+         * 錯誤信息: 發送郵件失敗
+         */
+        SEND_MAIL_FAILED(1219, "發送郵件失敗")
 
         ;
 

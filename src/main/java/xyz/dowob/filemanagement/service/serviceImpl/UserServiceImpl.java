@@ -221,8 +221,7 @@ public class UserServiceImpl implements UserService {
                             .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
                             .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
                                 String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
-                                                               token,
-                                                               securityProperties.getResetPasswordToken().getExpiration()
+                                                               token, securityProperties.getResetPasswordToken().getExpiration().toMinutes()
                                 );
                                 return provider.sendEmail(user.getEmail(), "重置密碼", content);
                             }))));
@@ -271,7 +270,7 @@ public class UserServiceImpl implements UserService {
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getUser(ServerWebExchange exchange) {
         return Mono.defer(() -> ReactiveSecurityContextHolder
-                .getContext()
+                .getContext().switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
                 .map(SecurityContext::getAuthentication)
                 .map(auth -> (Long) auth.getPrincipal())
                 .flatMap(userId -> {

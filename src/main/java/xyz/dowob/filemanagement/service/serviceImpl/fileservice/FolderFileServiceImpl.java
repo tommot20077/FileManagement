@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.gridfs.ReactiveGridFsResource;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.util.Assert;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -123,8 +124,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               objectMapper,
               cacheManager
         );
-        int maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
-        this.maxConcurrentLimit = maxConcurrentLimit > 0 ? maxConcurrentLimit : 5;
+        Assert.isTrue(fileProperties.getDownload().getFolderDownloadConcurrentLimit() > 0, "資料夾下載併發限制必須大於0");
+        this.maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
 
         String tempDownloadPath = fileProperties.getDownload().getFolderTempDownloadPath();
         if (!tempDownloadPath.endsWith("/")) {
@@ -138,7 +139,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         }
 
 
-        int bs = fileProperties.getDownload().getZipBufferSize();
+        int bs = (int) fileProperties.getDownload().getZipBufferSize().toBytes();
         if (bs <= 0) {
             bs = 4096;
         }
@@ -384,7 +385,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                 return Mono.just(false);
             }
             return Mono.defer(() -> {
-                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime());
+                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
                 FileTrashRecord fileTrashRecord = new FileTrashRecord(childFolderList.getFirst(), deleteTime);
                 childFolderList.forEach(userFile -> userFile.setIsDeleted(true));
                 Mono<Boolean> result = fileTrashRecordRepository

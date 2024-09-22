@@ -5,6 +5,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
@@ -64,18 +65,12 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @param redisProvider Redis操作提供者
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
+        Assert.isTrue(cacheProperties.getChunkSize().toBytes() > 0, "下載流緩存塊大小必須大於0");
+        Assert.isTrue(cacheProperties.getDownloadCacheExpireTime().isPositive(), "下載流緩存過期時間必須大於0");
         this.redisProvider = redisProvider;
         this.CACHE_PREFIX = cacheProperties.getDownloadCachePrefix();
-
-        if (cacheProperties.getChunkSize() <= 0) {
-            throw new IllegalArgumentException("下載流緩存塊大小必須大於0");
-        }
-        //this.CHUNK_SIZE = cacheProperties.getChunkSize();
-        this.CHUNK_SIZE = 1024 * 1024; // 1MB
-        if (cacheProperties.getDownloadCacheExpireTime() <= 0) {
-            throw new IllegalArgumentException("下載流緩存過期時間必須大於0");
-        }
-        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
+        this.CHUNK_SIZE = (int) cacheProperties.getChunkSize().toBytes();
+        this.DEFAULT_EXPIRE_TIME = cacheProperties.getDownloadCacheExpireTime();
     }
 
 

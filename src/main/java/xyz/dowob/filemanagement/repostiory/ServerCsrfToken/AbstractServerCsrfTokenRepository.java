@@ -3,6 +3,8 @@ package xyz.dowob.filemanagement.repostiory.ServerCsrfToken;
 import jakarta.annotation.PostConstruct;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 
+import java.time.Duration;
+
 /**
  * 自定義的 CSRF Token 存儲庫，用於CSRF 的相關操作
  * 主要實現 CustomServerCsrfTokenRepository 接口
@@ -35,7 +37,7 @@ public abstract class AbstractServerCsrfTokenRepository implements CustomServerC
     /**
      * CSRF Token 過期時間
      */
-    protected Long EXPIRE_TIME;
+    protected Duration EXPIRE_TIME;
 
     public AbstractServerCsrfTokenRepository(SecurityProperties securityProperties) {
         this.securityProperties = securityProperties;

@@ -97,7 +97,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         return tokenMono.flatMap(tokenEntity -> {
             String tokenVersion = Token.generateJwtTokenVersion();
 
-            long expirationMs = (long) securityProperties.getJwtToken().getExpiration() * 1000 * 60;
+            long expirationMs = securityProperties.getJwtToken().getExpiration().toMillis();
             Date expirationDate = new Date(now.getTime() + expirationMs);
             String jwtToken = Jwts
                     .builder()

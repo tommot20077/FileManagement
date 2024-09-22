@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.component.provider.providerImplement.cacheprovi
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.CacheProviderType;
@@ -46,11 +47,9 @@ public class FileListCacheProviderImpl implements CacheProvider {
      * @param cacheProperties 緩存配置
      */
     public FileListCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
+        Assert.isTrue(cacheProperties.getFileListCacheExpireTime().isPositive(), "文件列表緩存過期時間必須大於0");
         this.redisProvider = redisProvider;
-        if (cacheProperties.getFileListCacheExpireTime() <= 0) {
-            throw new IllegalArgumentException("文件列表緩存過期時間必須大於0");
-        }
-        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getFileListCacheExpireTime());
+        this.DEFAULT_EXPIRE_TIME = cacheProperties.getFileListCacheExpireTime();
     }
 
 
