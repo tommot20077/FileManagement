@@ -1,4 +1,3 @@
-HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -31,3 +30,15 @@ build/
 
 ### VS Code ###
 .vscode/
+/src/main/resources/application.yml
+/src/main/resources/application-prod.yml
+/docker-compose.yml
+/Dockerfile
+/logs/
+/config/application.yml
+/mongo/init/initMongo.js
+/mysql/init/initMySQL.sql
+/mongo/conf/mongod.conf
+/mysql/conf/my.cnf
+/redis/conf/redis.conf
+/wait-init.sh
