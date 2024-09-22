@@ -1,0 +1,63 @@
+package xyz.dowob.filemanagement.component.manager;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
+import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.TokenEnum;
+
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * 此類用於管理 JWT 憑證的驗證
+ * 主要應用在Web Security中，用於驗證用戶請求頭中的 JWT 憑證並返回驗證結果
+ * 繼承 ReactiveAuthenticationManager 並實現 authenticate 方法
+ *
+ * @author yuan
+ * @program FileManagement
+ * @ClassName JwtAuthenticationManager
+ * @description
+ * @create 2024-09-25 00:30
+ * @Version 1.0
+ **/
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
+    /**
+     * token的策略工廠
+     */
+    private final TokenStrategy tokenStrategy;
+
+    /**
+     * 實現 ReactiveAuthenticationManager 的 authenticate 方法
+     *
+     * @param authentication 用戶請求頭中的 JWT 憑證
+     *
+     * @return 當 JWT 憑證驗證成功時，返回一個 UsernamePasswordAuthenticationToken 對象
+     * 用戶的 id 作為 principal，用戶的角色作為 authorities
+     * 當 JWT 憑證驗證失敗時，返回 Mono.empty()
+     */
+    @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
+    public Mono<Authentication> authenticate(Authentication authentication) {
+        String token = authentication.getCredentials().toString();
+        JwtTokenProviderImpl jwtTokenProvider = (JwtTokenProviderImpl) tokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
+        return Mono.defer(() -> {
+            Mono<Long> userId = jwtTokenProvider.validateToken(token, null);
+            return userId.flatMap(id -> jwtTokenProvider.getClaimsFromToken(token).map(claims -> claims.get("role")).map(roles -> {
+                List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority((String) roles));
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(id, token, authorities);
+                return (Authentication) auth;
+            }));
+        });
+    }
+}

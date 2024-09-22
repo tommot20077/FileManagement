@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+    <Properties>
+        <Property name="log4j2.messageFactory">org.apache.logging.log4j.message.ReusableMessageFactory</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-30.30c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
+        </Console>
+
+        <RollingFile name="InfoLogger" fileName="logs/info/info.log"
+                     filePattern="logs/info/info-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="5MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30">
+                <Delete basePath="logs/info" maxDepth="1">
+                    <IfFileName glob="info-*.log.gz"/>
+                    <IfLastModified age="14d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+            <Filters>
+                <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="NEUTRAL"/>
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <RollingFile name="ErrorLogger" fileName="logs/error/error.log"
+                     filePattern="logs/error/error-%d{yyyy-MM-dd}.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="5MB"/>
+            </Policies>
+            <Filters>
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <RollingFile name="DebugLogger" fileName="logs/debug/debug.log"
+                     filePattern="logs/debug/debug-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="5MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="14">
+                <Delete basePath="logs/debug" maxDepth="1">
+                    <IfFileName glob="debug-*.log.gz"/>
+                    <IfLastModified age="7d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+            <Filters>
+                <LevelRangeFilter minLevel="DEBUG" maxLevel="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+        <RollingFile name="TraceLogger" fileName="logs/trace/trace.log"
+                     filePattern="logs/trace/trace-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="5MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="7">
+                <Delete basePath="logs/trace" maxDepth="1">
+                    <IfFileName glob="trace-*.log.gz"/>
+                    <IfLastModified age="3d"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+            <Filters>
+                <LevelRangeFilter minLevel="TRACE" maxLevel="TRACE" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
+        </RollingFile>
+
+
+        <Async name="AsyncConsole">
+            <AppenderRef ref="Console"/>
+        </Async>
+        <Async name="AsyncInfoLogger">
+            <AppenderRef ref="InfoLogger"/>
+        </Async>
+        <Async name="AsyncErrorLogger">
+            <AppenderRef ref="ErrorLogger"/>
+        </Async>
+        <Async name="AsyncDebugLogger">
+            <AppenderRef ref="DebugLogger"/>
+        </Async>
+        <Async name="AsyncTraceLogger">
+            <AppenderRef ref="TraceLogger"/>
+        </Async>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncInfoLogger" level="info"/>
+            <AppenderRef ref="AsyncErrorLogger" level="error"/>
+        </Root>
+
+        <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncTraceLogger" level="trace"/>
+            <AppenderRef ref="AsyncDebugLogger" level="debug"/>
+            <AppenderRef ref="AsyncInfoLogger" level="info"/>
+            <AppenderRef ref="AsyncErrorLogger" level="error"/>
+        </Logger>
+    </Loggers>
+</Configuration>

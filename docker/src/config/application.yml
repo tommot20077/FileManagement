@@ -1,0 +1,100 @@
+# 這是 Spring Boot 的設定檔，請根據你的環境進行修改，若需要使用郵件發送功能，請將 mail 的相關設定取消註解並填入正確的值
+# 若需要更詳細的說明可以參考 https://github.com/tommot20077/FileManagement/blob/develop/src/main/resources/application-demo.yml 裡面有更詳細的說明
+
+spring:
+  r2dbc:
+    # 請確認 mongodb 服務名稱、密碼、資料庫名稱是否跟 docker-compose.yml 一致
+    url: r2dbc:mysql://filemanager_mysql/file_management
+    username: root
+    password: password
+  # 信件相關設定，用於發送郵件，若此處無配置則不啟用使用郵件發送功能
+  # mail:
+  #   發送郵件的用戶名
+  #   username: your_email
+  #
+  #   發送郵件的用戶密碼
+  #   password: your_password
+  #
+  #   發送郵件的參數
+  #   properties:
+  #     mail:
+  #       smtp:
+  #        #是否啟用 SSL，默認為 true
+  #         auth: true
+  #
+  #       #是否啟用 STARTTLS，默認為 true
+  #         starttls:
+  #           enable: true
+  #
+  #   SMTP 伺服器的主機名稱
+  #   host: smtp.host
+  #
+  #   SMTP 伺服器的端口號
+  #   port: 587
+  data:
+    mongodb:
+      # 請確認 mongodb 服務名稱、帳號、密碼、資料庫名稱是否跟 docker-compose.yml 一致
+      uri: mongodb://username:password@filemanager_mongo/file_management
+    redis:
+      # 請確認 redis 服務名稱、端口、密碼是否跟 docker-compose.yml 一致
+      # 如果有需要更動的話，需要到/redis/conf/redis.conf 檔案裡面去修改
+      host: filemanager_redis
+      port: 6381
+      password: foobared
+      database: 0
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 100
+          max-idle: 10
+          min-idle: 5
+          max-wait: 1s
+      timeout: 10s
+  main:
+    lazy-initialization: true
+  servlet:
+    multipart:
+      max-request-size: 10GB
+      max-file-size: 5GB
+  codec:
+    max-in-memory-size: 16MB
+
+security:
+  reset-password-token:
+    expiration: 10m
+    length: 6
+  jwt-token:
+    # 需修改這邊的 secret ，需要大於 128 字元，否則會報錯
+    secret: YourJwtSecretLengthNeedOver128BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    expiration: 1d
+  cookie:
+    secure: false
+  cors:
+    # 這邊的設定是允許 localhost 的請求，如果有前端的話，請把這邊的 localhost 改成前端的網址
+    allowed-origins-pattern: "*localhost*"
+    allow-credentials: true
+
+springdoc:
+  api-docs:
+    path: /docs/api-docs
+  swagger-ui:
+    path: /docs/swagger-ui/index.html
+  paths-to-match: /api/**
+server:
+  servlet:
+    session:
+      timeout: 3h
+logging:
+  pattern:
+    dateformat: yyyy-MM-dd HH:mm:ss.SSS
+file:
+  upload:
+    # 這邊需要依照需求修改，設置越大請求的次數會越少但記憶體的使用量會越大
+    chunk-size: 2MB
+
+  security:
+    # 這邊的設定是用來檢查上傳的檔案是否有病毒，請確認這邊的服務名稱、端口是否跟 docker-compose.yml 一致
+    host: filemanager_clamav
+    port: 3310
+
+

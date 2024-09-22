@@ -1,0 +1,418 @@
+# 檔案相關設定
+file:
+  # 上傳相關設定
+  upload:
+    # Websocket最大允許分塊大小，默認為 20MB
+    # 注意如果有設定nginx的client_max_body_size，這個值必須小於nginx的設定
+    payload-length: 20MB
+
+    # 上傳分塊大小限制，默認為 10MB
+    # 此參數需小於 payloadLength
+    chunk-size: 10MB
+
+    # 單一位用戶上傳的最大文件數量限制，默認為 3
+    # 此值設定過高容易導致導致資料庫處理不及而使得處理性能下降
+    max-upload-task-limit: 3
+
+    # 單一位用戶合併檔案分塊的最大數量限制，默認為 3
+    # 建議此值設定為與 maxUploadTaskLimit 相同
+    combine-process-count-limit: 3
+
+    # 文件傳輸類型，默認為 CHUNK 進行文件傳輸
+    # 可以選擇的值可參考 TransmissionEnum
+    default-upload-type: chunk
+
+    # 是否啟用強制使用伺服器配置，默認為 false
+    # 當設置為 true 時，會強制使用伺服器指定 default-upload-type 進行文件傳輸
+    force-use-server-config: false
+
+    # 上傳檔案的最大大小，默認為 10GB
+    # 當設置值小於等於0時，則不限制上傳檔案的大小
+    max-upload-file-size: 10GB
+
+    # 上傳檔案最大的時間限制，默認為 6 小時
+    # 當超過這個時間限制時，會自動終止上傳檔案的請求
+    max-upload-duration: 6h
+
+    # WebSocket 上傳的路徑，默認為 /file/upload
+    # 此參數加入 /ws 會組合成最終的 WebSocket 路徑如 (/ws/file/upload)
+    upload-web-socket-path: /file/upload
+
+    # WebSocket 編輯線上檔案的 路徑，默認為 /file/editing
+    # 此參數加入/ws 會組合成最終的 WebSocket 路徑如 (/ws/file/editing)
+    edit-online-file-web-socket-path: /file/editing
+
+  # 下載相關設定
+  download:
+    # 設定瀏覽器緩存的過期時間，默認為 1 小時
+    download-cache-header-expire-time: 1h
+
+    # 設定資料夾壓縮檔下載的緩衝區大小，默認為 256KB
+    zip-buffer-size: 256KB
+
+    # 下載資料夾的壓縮檔案暫存路徑，默認為 ./temp/folder-zip
+    folder-temp-download-path: ./temp/folder-zip
+
+  # 全局設定
+  global:
+    # 是否啟用用戶文件列表樹，默認為 true
+    # 建議啟用，可以有效提升檔案路徑查詢效率。
+    # 若關閉時查詢檔案路徑時則不會顯示檔案路徑，以及無法啟用資料夾深度限制
+    enable-user-folder-list-tree: true
+
+    # 文件列表樹最大深度，默認為 20
+    # 當 enableUserFolderListTree 為 true 時，該參數才會生效
+    # 當設置值小於等於0時，則不限制資料夾深度
+    max-folder-depth: 20
+
+    # 文件列表每頁顯示數量，默認為 100
+    page-size: 100
+
+    # 顯示最近文件數量，默認為 20，當設置值小於等於0時，則不限制顯示數量
+    # 此參數用於用戶查詢最近使用的檔案所顯示的數量
+    show-recent-file-count: 20
+
+  # 備份相關設定
+  backup:
+    # 線上檔案歷程記錄備份保留數量，當設置值小於等於0時，則不限制保留數量，默認為 30
+    max-online-history-count: 30
+
+    # 回收桶文件保留時間，默認為 30 天
+    retention-time: 30d
+
+  # 檔案安全性相關設定
+  security:
+    # 是否啟用檔案安全性檢查，默認為 true
+    enable-security-check: true
+
+    # 檔案掃描服務的網址，默認為 localhost
+    host: your_scan_service_host
+
+    # 檔案掃描服務的端口，默認為 3310
+    port: 3310
+
+    # 掃描檔案的最大大小，默認為 10GB
+    # 當設置值小於等於0時，則不限制掃描檔案的大小
+    max-file-size: 10GB
+
+    # 掃描檔案的最小大小，默認為 0
+    # 當設置值小於等於0時，則不限制掃描檔案的大小
+    min-file-size: 0
+
+    # 掃描檔案的連接超時時間，默認為 30 秒
+    timeout: 30s
+
+# 安全性相關設定
+security:
+  # 重置密碼的 token 相關設定
+  reset-password-token:
+    # 重置密碼的 token 有效時間，默認為 30 分鐘
+    expiration: 30m
+
+    # 重置密碼的 token 長度，默認為 6
+    length: 6
+
+  # 用戶憑證相關設定
+  jwt-token:
+    # JWT 加密密鑰，需超過 128 字元以確保安全性，請確保這邊已經更改過
+    secret: YourJwtSecretLengthNeedOver128BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+    # JWT 有效時間，默認為 1 天
+    expiration: 1d
+
+    # websocket token 前綴，默認為 jwt.
+    # 確保連線時所附帶的 token 前綴與這邊一致
+    web-socket-token-prefix: jwt.
+
+  # 用戶Cookie相關設定
+  cookie:
+    # 是否啟用安全模式（HTTPS）
+    secure: true
+
+    # 是否啟用 HttpOnly，默認為 true
+    http-only: true
+
+    # 是否啟用 SameSite，默認為 Lax
+    same-site: Lax
+
+    # 憑證的名稱，默認為 jwt-token
+    token-name: jwt-token
+
+  # CSRF 相關設定
+  # 注意：如果使用了 nginx 反向代理，則需要在 nginx 中配置相應的 CORS 設置
+  cors:
+    # 允許的來源(origin)的正則表達式，默認為空
+    allowed-origins-pattern:
+
+    # 是否允許攜帶憑證，默認為 true
+    # 請注意如果這邊開啟的話，在設定跨域來源中就不可以使用 *，必須指定來源
+    allow-credentials: true
+
+    # 允許的 HTTP 方法，默認為 全部方法
+    # allowed-methods: *
+
+    # 允許的 HTTP 標頭，默認為全部標頭
+    # allowed-headers: *
+
+    # 預檢請求的最大過期時間，默認為 1 小時
+    max-age: 1h
+
+    # 允許的暴露標頭，默認為 空
+    # allow-exposed-headers:
+
+  # CSRF 相關設定
+  csrf:
+    # CSRF 憑證存儲庫，默認為 redis，可選值為 local 或 redis
+    csrf-token-repository: redis
+
+    # 允許的參考來源的正則表達式，默認允許所有的http和https來源，如果有需要保護獲取CSRF token的請求，則需要設置這個參數成你前端的域名
+    allow-referer-patten: "^https?://.*$"
+
+    # CSRF token 的過期時間，默認為 5 分鐘
+    # 此值不應該設置過長，否則會導致 CSRF 憑證的安全性降低
+    expiration: 5m
+
+    # CSRF憑證的參數名稱，用於前端表單驗證用，默認為 _csrf
+    parameter-name: _csrf
+
+    # CSRF憑證的標頭名稱，用於前端ajax或fetch請求驗證用，默認為 X-CSRF-TOKEN
+    header-name: X-CSRF-TOKEN
+
+  # HSTS 相關設定
+  hsts:
+    # 是否允許子域名，默認為 true
+    include-sub-domains: true
+
+    # 默認的 HSTS 頭部過期時間，默認為 365 天
+    max-age: 365d
+
+    # 預載 HSTS 頭部，默認為 true
+    preload: true
+
+  # 訪客用戶相關設定
+  guest-user:
+    # 是否啟用允許訪客用戶，默認為 true
+    enable: true
+
+  # 登錄安全性相關設定
+  login:
+    # 登錄請求限制的類型，默認為 redis
+    # 可選值為 local 、 redis 或 none
+    # 當設置值為 none 時，則不限制登錄請求
+    limiter-provider: redis
+
+    # 登錄鎖定時間，默認為 1 分鐘
+    lock-time: 1m
+
+    # 登錄請求的最大失敗次數，默認為 5
+    max-failure: 5
+
+#緩存相關設定
+cache:
+  # 是否開啟檔案下載流緩存，默認為 true
+  # 注意：如果開啟的話，根據用戶存處的檔案大小，會佔用大量的記憶體，需要根據實際情況進行調整
+  enable-file-download-stream-cache: true
+
+  # 檔案下載流緩存的緩存前綴，默認為 download_stream_cache
+  download-cache-prefix: download_stream_cache
+
+  # 檔案下載流緩存的過期時間，默認為 30 分鐘
+  # 此參數用於設置檔案下載流緩存的過期時間，當檔案下載流不再使用時，會自動清除緩存
+  # 此值需要大於0，否則會報錯
+  download-cache-expire-time: 30m
+
+  # 是否啟用用戶檔案列表緩存，默認為 true
+  # 建議開啟，這樣可以有效提升檔案列表的查詢效率
+  enable-user-file-list-cache: true
+
+  # 用戶列表緩存過期時間，默認為 60 分鐘
+  # 此值需要大於0，否則會報錯
+  file-list-cache-expire-time: 60m
+
+  # 是否啟用用戶資訊緩存，默認為 true
+  enable-user-info-cache: true
+
+  # 用戶資訊緩存的緩存前綴，默認為 user_info_cache
+  user-info-cache-prefix: user_info_cache
+
+  # 用戶資訊緩存的過期時間，默認為 1 天
+  # 此值需要大於0，否則會報錯
+  user-info-cache-expire-time: 1d
+
+  # 緩存分塊大小，默認為 5MB，用於處理大文件的緩存
+  # 用於大檔案的緩存，當檔案大小超過這個值時，會自動分割成多個小檔案進行緩存
+  chunk-size: 5MB
+
+# 全局設定
+global:
+  # 請求限制器的配置
+  request-limiter:
+    # 限制器的類型，默認為 redis
+    # 可選值為 local 、 redis 或 none
+    type: redis
+
+    # 每個IP地址的在 duration 時間內的請求次數限制，默認為 500
+    # 當設置值小於等於0時，則不限制請求次數
+    limit: 500
+
+    # 憑證補充的數量，在 duration 時間會補充到這個數量，默認為 -1
+    # 當設置值小於等於0時，則補充到 limit 數量
+    refill: -1
+
+    # 憑證補充週期的時間，，默認為 1 分鐘
+    refillDuration: 1m
+
+    # 是否允許暫時禁止過度請求的 IP 地址，默認為 true
+    enable-ban-ip: true
+
+    # 計算禁止 IP 地址的週期，默認為 10分鐘
+    ban-ip-duration: 10m
+
+    # 禁止 IP 地址的時間，默認為 1小時
+    ban-expire-duration: 1h
+
+    # 計算禁止 IP 地址的最大失敗次數，默認為 5
+    failure-count: 5
+
+    # 請求限制的清除時間，在超過設定時間後，會清除用戶的請求限制，默認為 10 分鐘
+    clean-interval: 10m
+
+  # 轉發請求的配置，若無使用 反向代理則不需要配置
+  forwarded:
+    # 真實的 IP 地址的標頭名稱，默認為 X-Real-IP
+    XReal-ip-header: X-Real-IP
+
+    # 轉發的 IP 地址的標頭名稱，默認為 X-Forwarded-For
+    XForwarded-header: X-Forwarded-For
+
+  # netty 線程池的配置
+  netty-pool:
+    # netty 線程池的最大線程數量，默認為 10
+    max-connections: 10
+
+    # netty 線程池的閒置時間，默認為 1 分鐘
+    max-idle-time: 1m
+
+    # netty 線程池的生命週期，默認為 1 小時
+    max-life-time: 1h
+
+    # netty 線程池的請求佇列的最長等待時間，默認為 30 秒
+    pending-acquire-timeout: 30s
+
+
+# Spring 相關設定
+spring:
+  # 資料庫相關設定
+  r2dbc:
+    # 用於連接 MySQL 的 R2DBC 驅動程式
+    # 請確認資料庫的Ip、Port、資料庫名稱、用戶名和密碼已經正確設置
+    url: r2dbc:mysql://your_mysql_host/db_name
+
+    # 用於連接 MySQL 的用戶名
+    username: username
+
+    # 用於連接 MySQL 的密碼
+    password: password
+
+
+  # 信件相關設定，用於發送郵件，若此處無配置則不啟用使用郵件發送功能
+  # mail:
+  #   發送郵件的用戶名
+  #   username: your_email
+  #
+  #   發送郵件的用戶密碼
+  #   password: your_password
+  #
+  #   發送郵件的參數
+  #   properties:
+  #     mail:
+  #       smtp:
+  #        #是否啟用 SSL，默認為 true
+  #         auth: true
+  #
+  #       #是否啟用 STARTTLS，默認為 true
+  #         starttls:
+  #           enable: true
+  #
+  #   SMTP 伺服器的主機名稱
+  #   host: smtp.host
+  #
+  #   SMTP 伺服器的端口號
+  #   port: 587
+
+  # 資料庫相關設定
+  data:
+    # MongoDB 相關設定
+    mongodb:
+      # 這邊需要確認資料庫的Ip、Port、資料庫名稱、用戶名和密碼已經正確設置
+      uri: mongodb://username:password@your_mongodb_host/db_name
+
+    # Redis 相關設定
+    redis:
+      # 這邊需要確認資料庫的Ip是否正確設置
+      host: your_redis_host
+
+      # Redis 伺服器的端口號
+      port: 6379
+
+      # Redis 伺服器的密碼
+      password: your_redis_password
+
+      # Redis 伺服器的資料庫編號，默認為 0
+      database: 0
+
+      # Redis 伺服器的連接池設定
+      lettuce:
+        pool:
+          # 是否啟用連接池，默認為 true
+          enabled: true
+
+          # 連接池的最大連接數量，默認為 100
+          max-active: 100
+
+          # 連接池的最大閒置連接數量，默認為 10
+          max-idle: 10
+
+          # 連接池的最小閒置連接數量，默認為 5
+          min-idle: 5
+
+          # 連接池的最大等待時間，默認為 1 秒
+          max-wait: 1s
+      # Redis 伺服器的連接超時時間，默認為 10 秒
+      timeout: 10s
+
+  # Spring Boot 相關設定
+  main:
+    # 是否延遲加載，默認為 true
+    lazy-initialization: true
+
+  # servlet 相關設定
+  servlet:
+    # 上傳檔案的相關設定
+    multipart:
+      # 最大請求大小，默認為 10GB
+      max-request-size: 10GB
+
+      # 上傳檔案的最大大小，默認為 5GB
+      max-file-size: 5GB
+
+  # Codec 相關設定
+  codec:
+    # 設定編碼器的緩存大小，默認為 16MB
+    max-in-memory-size: 16MB
+
+# API Docs 相關設定
+springdoc:
+  api-docs:
+    # 查看 API Docs 的路徑，默認為 /docs/api-docs
+    path: /docs/api-docs
+
+  # Swagger UI的相關設定
+  swagger-ui:
+    # Swagger UI 的路徑，默認為 /docs/swagger-ui/index.html
+    path: /docs/swagger-ui/index.html
+
+  # 需要加入的 API Docs 的路徑，默認為 /api/**
+  paths-to-match: /api/**
+
+

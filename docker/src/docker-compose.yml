@@ -1,0 +1,163 @@
+services:
+  filemanager-end:
+    build:
+      dockerfile: Dockerfile-end
+      # 這邊的會是 Dockerfile-end 的路徑，請確認這邊的路徑是否正確
+      context: .
+    container_name: filemanager_end
+    image: filemanager_end
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      # 這邊的 10891 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 如果需要外部連線的話，可以將前面的127.0.0.1去掉或是使用反向代理
+      - "127.0.0.1:10891:8080"
+    networks:
+      - my_network
+    volumes:
+      # 這邊的 ./config 是存放自定義的配置檔案的地方，請不要修改，
+      - ./config:/app/config
+      - ./logs:/app/logs
+
+    # MySQL 服務
+  mysql:
+    image: mysql:8.0
+    # 這邊的容器名稱是 filemanager_mysql，如果更動的話，請記得到 application.yml 裡面也需要更動
+    container_name: filemanager_mysql
+    restart: always
+    environment:
+      # 記得這邊的 root 密碼要跟 application.yml 裡面的一致
+      MYSQL_ROOT_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/conf/my.cnf:/etc/mysql/my.cnf
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    ports:
+      # 這邊的 10892 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 3306 是 mysql 的預設 port 此參數不建議更動
+      - "127.0.0.1:10892:3306"
+    command:
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+    networks:
+      - my_network
+    healthcheck:
+      # 這邊的健康檢查是檢查 mysql 是否可以連線，請確認這邊的密碼跟 application.yml 裡面的一致
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # MongoDB 服務
+  mongodb:
+    image: mongo:6.0
+    # 這邊的容器名稱是 filemanager_mongo，如果更動的話，請記得到 application.yml 裡面也需要更動
+    container_name: filemanager_mongo
+    restart: always
+    environment:
+      # 這邊的 用戶名、 密碼要跟 application.yml 裡面的一致
+      MONGO_INITDB_ROOT_USERNAME: username
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/conf/mongod.conf:/etc/mongod.conf
+      - ./mongo/init/initMongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      # 這邊的 10893 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 27017 是 mongodb 的預設 port 此參數不建議更動
+      - "127.0.0.1:10893:27017"
+    networks:
+      - my_network
+    healthcheck:
+      # 這邊的健康檢查是檢查 mongodb 是否可以連線，請確認這邊的密碼跟 application.yml 裡面的一致
+      test: [ "CMD", "mongosh", "--eval", "'db.adminCommand(\"ping\")'", "-u", "username", "-p", "password", "--authenticationDatabase", "admin" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Redis 服務
+  redis:
+    image: redis:alpine
+    # 這邊的容器名稱是 filemanager_redis，如果更動的話，請記得到 application.yml 裡面也需要更動
+    container_name: filemanager_redis
+    restart: always
+    volumes:
+      - redis_data:/data/db
+      # 這邊的 redis.conf 是自定義的配置檔案，如果有更動的話，請記得到 application.yml 裡面也需要更動
+      - ./redis/conf/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - my_network
+    ports:
+      # 這邊的 10894 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 6381 是 redis 的預設 port 此參數不建議更動
+      - "127.0.0.1:10894:6381"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      # 這邊的健康檢查是檢查 redis 是否可以連線，請確認這邊的密碼跟 application.yml 裡面的一致
+      test: [ "CMD", "redis-cli", "-h", "localhost", "-p", "6381", "-a", "foobared", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ClamAV 服務
+  clamav:
+    image: clamav/clamav-debian:latest
+    container_name: filemanager_clamav
+    restart: always
+    ports:
+      # 這邊的 10895 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 3310 是 clamav 的預設 port 此參數不建議更動
+      # 如果需要外部連線的話，可以將前面的 127.0.0.1 去掉或是使用反向代理
+      - "127.0.0.1:10895:3310"
+    networks:
+      - my_network
+    environment:
+      - CLAMD_STARTUP=true
+    healthcheck:
+      test: [ "CMD", "clamdscan", "--version" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+#  前端服務，如果需要的話可以將這段註解取消
+#  filemanager_front:
+#    build:
+#      dockerfile: Dockerfile-front
+#      context: .
+#    container_name: filemanager_front
+#    image: filemanager_front
+#    restart: on-failure:3
+#    ports:
+#      - "10890:5180"
+#    networks:
+#      - my_network
+#    volumes:
+#      - ./front-config:/app/config
+#    entrypoint: |
+#      sh -c '
+#      if [ ! -f /app/config/config.js ]; then
+#        echo "配置文件不存在，正在複製預設配置...";
+#        cp -v /app/temp/config.js /app/config/config.js;
+#      fi
+#      echo "啟動前端應用...";
+#      exec npm run main
+#      '
+
+
+networks:
+  my_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  mongo_data:
+  redis_data:
