@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+    <!-- 定義 Appenders -->
+    <Appenders>
+        <!-- 同步控制台輸出 -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-40.40c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
+
+        </Console>
+
+        <!-- 文件輸出 -->
+        <RollingFile name="FileLogger" fileName="logs/app.log"
+                     filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="20"/>
+        </RollingFile>
+
+        <!-- 異步 Appender -->
+        <Async name="AsyncConsole">
+            <AppenderRef ref="Console"/>
+        </Async>
+        <Async name="AsyncFileLogger">
+            <AppenderRef ref="FileLogger"/>
+        </Async>
+    </Appenders>
+
+    <!-- 定義 Loggers -->
+    <Loggers>
+        <!-- 使用異步 Appenders 的 Root Logger -->
+        <Root level="info">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncFileLogger"/>
+        </Root>
+
+        <!-- 定義具體的 Logger，根據需要設置級別和 Appender -->
+        <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
+            <AppenderRef ref="AsyncConsole"/>
+            <AppenderRef ref="AsyncFileLogger"/>
+        </Logger>
+    </Loggers>
+</Configuration>
