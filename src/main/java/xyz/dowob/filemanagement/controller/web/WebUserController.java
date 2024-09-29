@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 /**
  * 用於處理用戶相關的Web請求的控制器
@@ -21,6 +22,10 @@ import xyz.dowob.filemanagement.controller.base.BaseUserController;
 @RestController
 @RequestMapping("/web/user")
 public class WebUserController extends BaseUserController {
+    public WebUserController(UserService userService) {
+        super(userService);
+    }
+
     /**
      * 用戶登出的Web請求
      *

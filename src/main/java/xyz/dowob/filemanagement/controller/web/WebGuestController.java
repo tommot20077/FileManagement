@@ -12,6 +12,8 @@ import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.dto.user.UserEmailDTO;
+import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 /**
  * 用於處理訪客相關的Web請求的控制器
@@ -26,6 +28,10 @@ import xyz.dowob.filemanagement.dto.user.UserEmailDTO;
 @RestController
 @RequestMapping("/web/guest")
 public class WebGuestController extends BaseGuestController {
+    public WebGuestController(UserService userService, AuthorizationService authorizationService) {
+        super(userService, authorizationService);
+    }
+
     /**
      * 訪客註冊的Web請求
      *

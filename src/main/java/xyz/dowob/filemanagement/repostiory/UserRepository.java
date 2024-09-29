@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.repostiory;
 
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -14,6 +15,7 @@ import xyz.dowob.filemanagement.entity.User;
  * @create 2024-09-23 14:01
  * @Version 1.0
  **/
+@Repository
 public interface UserRepository extends ReactiveCrudRepository<User, Long> {
     Mono<User> findByUsername(String username);
     Mono<User> findByEmail(String email);

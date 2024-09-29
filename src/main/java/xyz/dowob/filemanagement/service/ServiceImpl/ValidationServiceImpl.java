@@ -7,7 +7,7 @@ import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
-import xyz.dowob.filemanagement.service.ServiceInterFace.ValidationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
 import java.util.regex.Pattern;
 

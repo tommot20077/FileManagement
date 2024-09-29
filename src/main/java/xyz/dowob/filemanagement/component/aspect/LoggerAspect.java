@@ -15,10 +15,11 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.controller.exception.WebExceptionController;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * 用於記錄 Component 和 ServiceInterFace 層的日誌切面
+ * 用於記錄 Component 和 ServiceInterface 層的日誌切面
  * 當業務方法執行或發生異常時，記錄請求者、所屬類、使用方法、返回值等信息到日誌中
  *
  * @author yuan
@@ -32,10 +33,11 @@ import java.lang.reflect.Method;
 @Component
 @Log4j2
 @NoArgsConstructor
+@SuppressWarnings("all")
 public class LoggerAspect {
 
     /**
-     * 定義 ServiceInterFace 層切入點
+     * 定義 ServiceInterface 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.service..*)")
     public void serviceLayerPointcut() {}
@@ -53,7 +55,7 @@ public class LoggerAspect {
     public void controllerLayerPointcut() {}
 
     /**
-     * 環繞通知，用於記錄 Component 和 ServiceInterFace 層的日誌
+     * 環繞通知，用於記錄 Component 和 ServiceInterface 層的日誌
      * 當業務方法執行或發生異常時，記錄請求者、所屬類、使用方法、返回值等信息到日誌中
      * 區分2種情況：
      * 1. 方法返回值為 Mono 或 Flux，因為這兩種類型是非阻塞的，所以需要特別處理
@@ -90,32 +92,24 @@ public class LoggerAspect {
             if (result instanceof Mono<?>) {
                 return ((Mono<?>) result).doOnSuccess(resp -> {
                     String value = processMethodSignature(method, resp);
-                    log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, value);
+                    infoLog(requestUsername, className, methodName, value);
                 }).doOnError(e -> {
-                    log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
-                              requestUsername,
-                              className,
-                              methodName,
-                              e.getMessage());
+                    createErrorLog(requestUsername, className, methodName, e);
                 });
             } else if (result instanceof Flux<?>) {
                 return ((Flux<?>) result).doOnNext(resp -> {
                     String value = processMethodSignature(method, resp);
-                    log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, value);
+                    infoLog(requestUsername, className, methodName, value);
                 }).doOnError(e -> {
-                    log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
-                              requestUsername,
-                              className,
-                              methodName,
-                              e.getMessage());
+                    createErrorLog(requestUsername, className, methodName, e);
                 });
             } else {
                 String value = processMethodSignature(method, result);
-                log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, value);
+                infoLog(requestUsername, className, methodName, value);
                 return result;
             }
         } catch (Throwable e) {
-            log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}", requestUsername, className, methodName, e.getMessage());
+            createErrorLog(requestUsername, className, methodName, e);
             throw e;
         }
     }
@@ -142,15 +136,21 @@ public class LoggerAspect {
      * @return String 處理後的日誌顯示的返回值
      */
     private String processMethodSignature(Method method, Object result) {
-
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
-
         if (isSensitive) {
-            return "[HIDDEN]";
+            return "[隱藏敏感訊息]";
         }
         if (result == null) {
             return "無返回值";
         }
         return result.toString();
+    }
+
+    private void infoLog(String requestUsername, String className, String methodName, Object result) {
+        log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, result);
+    }
+
+    private void createErrorLog(String requestUsername, String className, String methodName, Throwable e) {
+        log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}", requestUsername, className, methodName, e.getMessage());
     }
 }

@@ -9,10 +9,17 @@ package xyz.dowob.filemanagement.controller.base;
  * @Version 1.0
  **/
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 import java.time.LocalDateTime;
 
@@ -27,7 +34,11 @@ import java.time.LocalDateTime;
  * @create 2024-09-17 00:26
  * @Version 1.0
  **/
-public interface BaseController {
+@RequiredArgsConstructor
+public abstract class BaseController {
+    protected final UserService userService;
+
+
     /**
      * 用於創建返回Mono<ResponseEntity>的方法，根據請求的結果創建對應的控制器可以處理的3位數狀態碼
      *
@@ -36,7 +47,7 @@ public interface BaseController {
      *
      * @return Mono<ResponseEntity> 返回對應的Mono<ResponseEntity>
      */
-    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, int responseCode) {
+    protected Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, int responseCode) {
         return Mono.just(ResponseEntity.status(responseCode).body(apiResponse));
     }
 
@@ -48,7 +59,7 @@ public interface BaseController {
      *
      * @return ResponseEntity 返回對應的ResponseEntity
      */
-    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse) {
+    protected Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse) {
         int responseCode = apiResponse.getStatus() == 200 ? 200 : 400;
         return createResponseEntity(apiResponse, responseCode);
     }
@@ -64,7 +75,7 @@ public interface BaseController {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, int status, String message, T data) {
+    protected <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -78,8 +89,36 @@ public interface BaseController {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, String message, T data) {
+    protected <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, request.getRequest().getURI().getPath(), message, data);
+    }
+
+
+    /**
+     * 用於獲取用戶的方法，根據請求對象獲取用戶對象
+     * 先從Session中獲取用戶ID，如果Session中沒有則從SecurityContext中獲取
+     * 當其中一個獲取到用戶ID時，則根據用戶ID獲取用戶對象
+     * 如果都沒有獲取到用戶ID，則返回空
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<User> 返回用戶對象
+     */
+    protected Mono<User> getUser(ServerWebExchange exchange) {
+        final Object[] userId = new Object[1];
+        return exchange.getSession().flatMap(webSession -> {
+            userId[0] = webSession.getAttributes().get("userId");
+            if (userId[0] == null) {
+                return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
+                    if (authentication != null && authentication.isAuthenticated()) {
+                        userId[0] = Long.valueOf(authentication.getPrincipal().toString());
+                        return userService.getById((Long) userId[0]);
+                    }
+                    return Mono.empty();
+                });
+            }
+            return userService.getById((Long) userId[0]);
+        }).switchIfEmpty(Mono.empty());
     }
 
 }

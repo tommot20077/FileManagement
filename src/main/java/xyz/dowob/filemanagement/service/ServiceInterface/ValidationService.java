@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.service.ServiceInterFace;
+package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;

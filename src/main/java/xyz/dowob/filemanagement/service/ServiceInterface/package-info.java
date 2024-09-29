@@ -8,4 +8,4 @@
  * 5. UserService 用於定義用戶相關的方法
  * 6. ValidationService 用於定義驗證相關的方法
  */
-package xyz.dowob.filemanagement.service.ServiceInterFace;
+package xyz.dowob.filemanagement.service.ServiceInterface;

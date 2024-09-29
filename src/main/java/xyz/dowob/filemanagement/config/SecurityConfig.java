@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.config;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -10,10 +11,7 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.csrf.CsrfTokenRepository;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
 import org.springframework.security.web.server.csrf.WebSessionServerCsrfTokenRepository;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
@@ -22,7 +20,6 @@ import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.manager.JwtAuthenticationManager;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
 
@@ -40,19 +37,16 @@ import java.util.List;
  * @create 2024-09-23 14:28
  * @Version 1.0
  **/
+
 @Configuration
 @RequiredArgsConstructor
 @EnableWebFluxSecurity
+@Log4j2
 public class SecurityConfig {
     /**
      * JwtSecurityContextRepository 用於操作安全上下文的數據庫操作類
      */
     private final JwtSecurityContextRepository securityContextRepository;
-
-    /**
-     * JwtAuthenticationManager 用於管理 JWT 認證的類
-     */
-    private final JwtAuthenticationManager authenticationManager;
 
     /**
      * ObjectMapper 用於對象與 JSON 之間的轉換
@@ -66,6 +60,7 @@ public class SecurityConfig {
      *
      * @return 返回配置好的安全過濾器鏈
      */
+
     // todo 補上HSTS
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
@@ -86,7 +81,6 @@ public class SecurityConfig {
                         .hasRole("ADMIN")
                         .anyExchange()
                         .authenticated())
-                .authenticationManager(authenticationManager)
                 .securityContextRepository(securityContextRepository)
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                         .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, "請先登入", HttpStatus.UNAUTHORIZED.value()))
@@ -125,8 +119,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        configuration.addAllowedOriginPattern("http://*localhost:*");
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -157,5 +152,3 @@ public class SecurityConfig {
         }
     }
 }
-
-

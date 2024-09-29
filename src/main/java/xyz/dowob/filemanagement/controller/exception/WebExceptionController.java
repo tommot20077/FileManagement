@@ -3,18 +3,18 @@ package xyz.dowob.filemanagement.controller.exception;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.reactive.resource.NoResourceFoundException;
-import org.springframework.web.server.MethodNotAllowedException;
-import org.springframework.web.server.MissingRequestValueException;
-import org.springframework.web.server.ServerWebExchange;
-import org.springframework.web.server.ServerWebInputException;
+import org.springframework.web.server.*;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.controller.base.BaseController;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -34,7 +34,11 @@ import java.util.*;
  **/
 @Log4j2
 @RestControllerAdvice
-public class WebExceptionController implements BaseController {
+public class WebExceptionController extends BaseController {
+    public WebExceptionController(UserService userService) {
+        super(userService);
+    }
+
     /**
      * 處理 404 錯誤，當請求的位置不存在時，返回一個 404 錯誤
      *
@@ -76,6 +80,19 @@ public class WebExceptionController implements BaseController {
                                                                    null);
         return createResponseEntity(apiResponseDTO, HttpStatus.METHOD_NOT_ALLOWED.value());
     }
+
+    @ExceptionHandler(UnsupportedMediaTypeStatusException.class)
+    public Mono<ResponseEntity<?>> handleUnsupportedMediaTypeStatusException(
+            UnsupportedMediaTypeStatusException ex, ServerWebExchange exchange) {
+        log.debug("不支持的媒體類型: {}", ex.getMessage());
+        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
+                                                                   HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
+                                                                   exchange.getRequest().getURI().getPath(),
+                                                                   "不支持的媒體類型",
+                                                                   null);
+        return createResponseEntity(apiResponseDTO, HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+    }
+
 
     /**
      * 處理資料驗證錯誤，此錯誤是由 @Validated 或 @Valid 注解引起的
@@ -139,7 +156,6 @@ public class WebExceptionController implements BaseController {
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
 
-
     /**
      * 處理未知錯誤，當發生未知錯誤時，返回一個 500 錯誤
      *
@@ -152,6 +168,8 @@ public class WebExceptionController implements BaseController {
     public Mono<ResponseEntity<?>> handleException(Throwable ex, ServerWebExchange exchange) {
         log.error("錯誤類型: {}", ex.getClass().getName());
         log.error("發生未知錯誤: {}", ex.getMessage());
+        log.error("錯誤起因: ", ex.getCause());
+        log.error("錯誤堆棧: ", ex);
         ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
                                                                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
                                                                    exchange.getRequest().getURI().getPath(),
