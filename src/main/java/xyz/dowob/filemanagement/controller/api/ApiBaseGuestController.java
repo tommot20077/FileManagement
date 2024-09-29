@@ -1,10 +1,7 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
@@ -12,20 +9,26 @@ import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.dto.user.UserEmailDTO;
+import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 /**
  * 用於處理訪客相關的API請求的控制器
  *
  * @author yuan
  * @program File-Management
- * @ClassName ApiGuestController
+ * @ClassName ApiBaseGuestController
  * @description
  * @create 2024-09-14 20:22
  * @Version 1.0
  **/
 @RestController
 @RequestMapping("/api/guest")
-public class ApiGuestController extends BaseGuestController {
+public class ApiBaseGuestController extends BaseGuestController {
+    public ApiBaseGuestController(UserService userService, AuthorizationService authorizationService) {
+        super(authorizationService, userService);
+    }
+
     /**
      * 訪客註冊的API請求
      *

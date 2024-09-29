@@ -5,21 +5,27 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
 /**
  * 用於處理用戶相關的API請求的控制器
  *
  * @author yuan
  * @program File-Management
- * @ClassName WebUserController
+ * @ClassName WebBaseUserController
  * @description
  * @create 2024-09-16 19:49
  * @Version 1.0
  **/
 @RestController
 @RequestMapping("/api/user")
-public class ApiUserController extends BaseUserController {
+public class ApiBaseUserController extends BaseUserController {
+    public ApiBaseUserController(FileStrategy fileStrategy, UserService userService) {
+        super(fileStrategy, userService);
+    }
+
     /**
      * 用戶登出的API請求
      *
@@ -58,4 +64,5 @@ public class ApiUserController extends BaseUserController {
     public Flux<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
     }
+
 }

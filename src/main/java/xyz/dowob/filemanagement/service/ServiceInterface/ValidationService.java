@@ -1,10 +1,13 @@
-package xyz.dowob.filemanagement.service.ServiceInterFace;
+package xyz.dowob.filemanagement.service.ServiceInterface;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -40,9 +43,9 @@ public interface ValidationService {
      *
      * @param fileMetadataDTO 文件元數據DTO
      *
-     * @throws ValidationException 當數據不合法時拋出異常
      */
-    //Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO);
+    Mono<Void> validateFileMetadataDTO(FileMetadata fileMetadataDTO);
+
 
     /**
      * 驗證數據傳輸對象是否為空

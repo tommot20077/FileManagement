@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.service.ServiceInterFace;
+package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;

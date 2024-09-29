@@ -1,6 +1,7 @@
-package xyz.dowob.filemanagement.service.ServiceInterFace;
+package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
@@ -24,6 +25,7 @@ public interface TokenService extends CrudService<Token, Long> {
      *
      * @return 返回憑證
      */
+    @HideSensitive
     Mono<String> generateToken(User user, TokenEnum tokenType);
 
     /**

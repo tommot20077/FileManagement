@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
@@ -18,10 +19,10 @@ import xyz.dowob.filemanagement.dto.user.UserEmailDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
-import xyz.dowob.filemanagement.service.ServiceInterFace.AuthorizationService;
-import xyz.dowob.filemanagement.service.ServiceInterFace.TokenService;
-import xyz.dowob.filemanagement.service.ServiceInterFace.UserService;
-import xyz.dowob.filemanagement.service.ServiceInterFace.ValidationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.TokenService;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
 /**
  * 用戶業務邏輯實現類，主要用於處理用戶相關的業務邏輯
@@ -62,11 +63,12 @@ public class UserServiceImpl implements UserService {
      */
     private final EmailProvider emailProvider;
 
+
     /**
-     * 驗證碼過期時間
+     * 安全配置屬性
+     * 1.用於獲取重置密碼憑證的過期時間
      */
-    @Value("${security.verificationcode.expiration}")
-    private int verificationCodeExpiration;
+    private final SecurityProperties securityProperties;
 
     /**
      * 此方法之後為UserService接口中的方法實現
@@ -159,7 +161,8 @@ public class UserServiceImpl implements UserService {
                         .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
                                                                           userEmailDTO.getEmail())))
                         .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
-                            String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼", token, verificationCodeExpiration);
+                            String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼", token, securityProperties
+                                    .getResetPasswordToken().getExpiration());
                             return emailProvider.sendEmail(user.getEmail(), "重置密碼", content);
                         }))));
     }
@@ -187,6 +190,34 @@ public class UserServiceImpl implements UserService {
                                             .save(user)
                                             .then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
                                 })))));
+    }
+
+    /**
+     * 用於獲取用戶的方法，根據請求對象獲取用戶對象
+     * 先從Session中獲取用戶ID，如果Session中沒有則從SecurityContext中獲取
+     * 當其中一個獲取到用戶ID時，則根據用戶ID獲取用戶對象
+     * 如果都沒有獲取到用戶ID，則返回空
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<User> 返回用戶對象
+     */
+    @Override
+    public Mono<User> getUser(ServerWebExchange exchange) {
+        final Object[] userId = new Object[1];
+        return exchange.getSession().flatMap(webSession -> {
+            userId[0] = webSession.getAttributes().get("userId");
+            if (userId[0] == null) {
+                return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
+                    if (authentication != null && authentication.isAuthenticated()) {
+                        userId[0] = Long.valueOf(authentication.getPrincipal().toString());
+                        return userRepository.findById((Long) userId[0]);
+                    }
+                    return Mono.empty();
+                });
+            }
+            return userRepository.findById((Long) userId[0]);
+        }).switchIfEmpty(Mono.empty());
     }
 
     /**

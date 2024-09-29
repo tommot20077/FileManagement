@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.entity;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 import xyz.dowob.filemanagement.customenum.FileEnum;
@@ -68,7 +69,8 @@ public class ServerFileMetadata {
     /**
      * 擁有文件的用戶
      */
-    private Set<User> owners;
+    @Transient
+    private Set<Long> owners;
 
     @Override
     public boolean equals(Object o) {

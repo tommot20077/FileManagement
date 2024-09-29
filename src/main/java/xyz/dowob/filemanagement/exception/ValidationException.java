@@ -17,7 +17,7 @@ import lombok.Getter;
 @Getter
 public class ValidationException extends Exception {
     /**
-     * 錯誤號碼
+     * 錯誤碼
      */
     private final ErrorCode errorCode;
 
@@ -76,7 +76,18 @@ public class ValidationException extends Exception {
          * 錯誤碼: 1109
          * 錯誤信息: 驗證碼錯誤
          */
-        VERIFICATION_CODE_ERROR(1109, "驗證碼錯誤");
+        VERIFICATION_CODE_ERROR(1109, "驗證碼錯誤"),
+        /**
+         * 錯誤碼: 1110
+         * 錯誤信息: 帳號驗證失敗
+         */
+        AUTHENTICATION_FAILED(1110, "驗證身分失敗"),
+        /**
+         * 錯誤碼: 1111
+         * 錯誤信息: 請求參數無效
+         */
+        REQUEST_IS_INVALID(1111, "請求參數無效: %s");
+
 
 
 
