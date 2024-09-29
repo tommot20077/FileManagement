@@ -1,26 +1,24 @@
 package xyz.dowob.filemanagement.controller.base;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
-import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
-import xyz.dowob.filemanagement.dto.user.RegisterDTO;
-import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
-import xyz.dowob.filemanagement.dto.user.UserEmailDTO;
+import xyz.dowob.filemanagement.dto.user.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.ServiceInterFace.AuthorizationService;
-import xyz.dowob.filemanagement.service.ServiceInterFace.UserService;
+import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
 
 /**
  * 訪客控制器的基礎類
  * 主要提供訪客控制器的基本方法，並交由子類繼承方法，減少代碼重複
- * 實現BaseController{@link BaseController}
+ * 實現BaseController{@link ResponseUnity}
  * 此類會處理請求中發生的ValidationException異常，並回傳對應的錯誤信息
  *
  * @author yuan
@@ -30,19 +28,14 @@ import java.util.HashMap;
  * @create 2024-09-17 00:23
  * @Version 1.0
  **/
-
-public abstract class BaseGuestController implements BaseController {
-    /**
-     * 用戶業務層對象
-     */
-    @Autowired
-    protected UserService userService;
-
+@RequiredArgsConstructor
+public abstract class BaseGuestController implements ResponseUnity {
     /**
      * 授權業務層對象
      */
-    @Autowired
-    protected AuthorizationService authorizationService;
+    protected final AuthorizationService authorizationService;
+
+    protected final UserService userService;
 
     /**
      * 訪客註冊的請求
@@ -74,9 +67,8 @@ public abstract class BaseGuestController implements BaseController {
      */
     public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
         return userService.login(authRequestDTO, exchange).flatMap(token -> {
-            HashMap<String, Object> data = new HashMap<>();
-            data.put("JWT 驗證令牌", token);
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", data);
+            AuthResponseDTO authResponseDTO = new AuthResponseDTO(token);
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", authResponseDTO);
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("登入失敗: %s", e.getMessage());
@@ -84,6 +76,12 @@ public abstract class BaseGuestController implements BaseController {
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });
     }
+    // todo 隱藏Token
+    // <200 OK OK,ApiResponseDTO(timestamp=2024-10-02T14:08:49.278291400, status=200, path=/api/guest/login, message=登入成功,
+    // data=AuthResponseDTO(jwtToken=eyJhbGciOiJIUzUxMiJ9
+    // .eyJzdWIiOiIxIiwiaWF0IjoxNzI3ODQ5MzI4LCJyb2xlIjoiVVNFUiIsInZlcnNpb24iOjksImV4cCI6MTcyNzkzNTcyOH0
+    // .A4B4sTVfCft7zyfPzTodCL3AmU1opdoDppNAFLVyFkD9BBY0et9IavnoKAf61tNY5TMyuSTwQX4AbCTCaGs7JQ)),[]>
+
 
     /**
      * 發送重置密碼郵件

@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN" monitorInterval="30">
+    <Properties>
+        <Property name="log4j2.messageFactory">org.apache.logging.log4j.message.ReusableMessageFactory</Property>
+    </Properties>
     <!-- 定義 Appenders -->
     <Appenders>
         <!-- 同步控制台輸出 -->
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-40.40c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
+            <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-30.30c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
 
         </Console>
 
@@ -35,13 +38,13 @@
         <!-- 使用異步 Appenders 的 Root Logger -->
         <Root level="info">
             <AppenderRef ref="AsyncConsole"/>
-            <AppenderRef ref="AsyncFileLogger"/>
+            <!--<AppenderRef ref="AsyncFileLogger"/>-->
         </Root>
 
         <!-- 定義具體的 Logger，根據需要設置級別和 Appender -->
         <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
             <AppenderRef ref="AsyncConsole"/>
-            <AppenderRef ref="AsyncFileLogger"/>
+            <!--<AppenderRef ref="AsyncFileLogger"/>-->
         </Logger>
     </Loggers>
 </Configuration>

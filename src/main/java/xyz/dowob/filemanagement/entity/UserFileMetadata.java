@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.entity;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -31,12 +32,14 @@ public class UserFileMetadata {
     /**
      * 文件擁有者
      */
-    private User user;
+    @Column("user_id")
+    private Long userId;
 
     /**
      * 文件類型
      */
-    private ServerFileMetadata serverFile;
+    @Column("server_file_id")
+    private Long serverFileId;
 
     /**
      * 文件名稱
@@ -62,16 +65,20 @@ public class UserFileMetadata {
     private LocalDateTime lastAccessTime;
 
     /**
-     * 文件是否被刪除
+     * 文件共享給的用戶
      */
-    private Set<User> sharedWithUsers;
+    @Transient
+    private Set<Long> sharedWithUsers;
+
+
+
 
     @Override
     public String toString() {
         HashMap<String, Object> map = new HashMap<>();
         map.put("id", id);
-        map.put("user", user.getId());
-        map.put("serverFile", serverFile.getId());
+        map.put("user", userId);
+        map.put("serverFile", serverFileId);
         map.put("filename", filename);
         map.put("filePath", filePath);
         map.put("uploadTime", uploadTime);

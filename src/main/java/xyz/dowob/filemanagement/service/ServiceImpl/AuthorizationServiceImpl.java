@@ -5,13 +5,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
-import xyz.dowob.filemanagement.service.ServiceInterFace.AuthorizationService;
-import xyz.dowob.filemanagement.service.ServiceInterFace.TokenService;
+import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.TokenService;
 
 /**
  * 授權業務邏輯實現類
@@ -78,6 +79,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      * @return 返回用戶JWT憑證
      */
     @Override
+    @HideSensitive
     public Mono<String> authenticate(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
         return userRepository
                 .findByUsername(authRequestDTO.getUsername())
@@ -101,7 +103,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      *
      * @return 返回用戶對象
      */
-    public Mono<String> passwordAuthenticate(AuthRequestDTO authRequestDTO) {
+    public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
         return authenticate(authRequestDTO, null);
     }
 }

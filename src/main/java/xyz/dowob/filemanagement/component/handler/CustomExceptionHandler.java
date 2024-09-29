@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.component.handler.handlerImplment;
+package xyz.dowob.filemanagement.component.handler;
 
 import org.springframework.boot.autoconfigure.web.WebProperties;
 import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler;

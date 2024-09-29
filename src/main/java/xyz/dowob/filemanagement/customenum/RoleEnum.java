@@ -53,7 +53,9 @@ public enum RoleEnum {
     /**
      * 訪客所擁有的權限: 讀取
      */
-    VISITOR(Set.of(PermissionEnum.READ));
+    VISITOR(Set.of(PermissionEnum.READ)),
+
+    ANONYMOUS(Set.of());
 
     /**
      * 角色名稱以及對應的權限

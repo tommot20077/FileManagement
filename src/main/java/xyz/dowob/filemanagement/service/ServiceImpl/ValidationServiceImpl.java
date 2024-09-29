@@ -1,14 +1,21 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
-import xyz.dowob.filemanagement.service.ServiceInterFace.ValidationService;
+import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
+import java.util.Arrays;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +37,11 @@ public class ValidationServiceImpl implements ValidationService {
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
+
+    /**
+     * JSON對象映射器
+     */
+    private final ObjectMapper objectMapper;
 
     /**
      * 驗證用戶註冊數據類RegisterDTO中的數據是否合法
@@ -66,16 +78,12 @@ public class ValidationServiceImpl implements ValidationService {
      * 驗證文件元數據DTO中的數據是否合法
      *
      * @param fileMetadataDTO 文件元數據DTO
-     *
-     * @throws ValidationException 當數據不合法時拋出異常
      */
-    /*
-    @Override
-    public void validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) throws ValidationException {
-        validateNotNull(fileMetadataDTO);
-    }
 
-     */
+    @Override
+    public Mono<Void> validateFileMetadataDTO(FileMetadata fileMetadataDTO) {
+        return validateNotNull(fileMetadataDTO);
+    }
 
     /**
      * 驗證用戶密碼與確認密碼是否一致
@@ -144,7 +152,6 @@ public class ValidationServiceImpl implements ValidationService {
      * 當檢測到回文時返回錯誤
      *
      * @param str 字符串
-     *
      */
     private Mono<Void> palindromeInspection(String str) {
         return Mono.defer(() -> {
@@ -163,12 +170,13 @@ public class ValidationServiceImpl implements ValidationService {
      * 當檢測到大寫字母、小寫字母和數字有一個不存在時回傳錯誤
      *
      * @param str 字符串
-     *
      */
     private Mono<Void> upperLetterAndLowerLetterAndNumberInspection(String str) {
         var ref = new Object() {
             boolean hasUpperLetter = false;
+
             boolean hasNumber = false;
+
             boolean hasLowerLetter = false;
         };
 

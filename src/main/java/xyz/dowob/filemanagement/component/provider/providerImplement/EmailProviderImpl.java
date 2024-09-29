@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.component.provider.providerImplement;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
@@ -28,10 +29,11 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
     private final JavaMailSender javaMailSender;
 
     /**
-     * 服務器發送郵件的郵箱
+     * 郵件配置，這裡使用了 Spring Boot 提供的 MailProperties
+     * 1. 獲取郵件發送的郵箱
      */
-    @Value("${spring.mail.username}")
-    private String serverSenderEmail;
+    private final MailProperties mailProperties;
+
 
     /**
      * 發送郵件
@@ -43,7 +45,7 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
     @Override
     public Mono<Void> sendEmail(String sendToEmail, String subject, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(serverSenderEmail);
+        message.setFrom(mailProperties.getUsername());
         message.setTo(sendToEmail);
         message.setSubject(subject);
         message.setText(content);

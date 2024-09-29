@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.component.manager;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -8,7 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.factory.TokenStrategyFactory;
+import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 
@@ -29,13 +30,16 @@ import java.util.List;
  **/
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
+@Log4j2
+public class JwtAuthenticationManager implements ReactiveAuthenticationManager{
     /**
      * token的策略工廠
      */
-    private final TokenStrategyFactory tokenStrategyFactory;
+    private final TokenStrategy tokenStrategy;
 
     /**
+     * 實現 ReactiveAuthenticationManager 的 authenticate 方法
+     *
      * @param authentication 用戶請求頭中的 JWT 憑證
      *
      * @return 當 JWT 憑證驗證成功時，返回一個 UsernamePasswordAuthenticationToken 對象
@@ -45,8 +49,7 @@ public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
         String token = authentication.getCredentials().toString();
-        JwtTokenProviderImpl jwtTokenProvider =
-                (JwtTokenProviderImpl) tokenStrategyFactory.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
+        JwtTokenProviderImpl jwtTokenProvider = (JwtTokenProviderImpl) tokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
         try {
             Mono<Long> userId = jwtTokenProvider.validateToken(token, null);
             return userId.flatMap(id -> jwtTokenProvider.getClaimsFromToken(token).map(claims -> claims.get("role")).map(roles -> {
@@ -57,4 +60,5 @@ public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
             return Mono.empty();
         }
     }
+
 }

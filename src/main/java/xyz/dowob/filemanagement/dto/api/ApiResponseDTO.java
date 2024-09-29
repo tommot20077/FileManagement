@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.dto.api;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -23,6 +24,7 @@ public class ApiResponseDTO <T> {
     /**
      * 返回的時間戳
      */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
     private LocalDateTime timestamp;
 
     /**

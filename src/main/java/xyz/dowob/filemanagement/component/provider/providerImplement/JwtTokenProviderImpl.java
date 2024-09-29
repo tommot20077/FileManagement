@@ -5,11 +5,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
@@ -35,6 +36,7 @@ import java.util.Date;
  **/
 @Component
 @RequiredArgsConstructor
+@Log4j2
 public class JwtTokenProviderImpl implements TokenProvider {
 
     /**
@@ -43,17 +45,10 @@ public class JwtTokenProviderImpl implements TokenProvider {
     private final TokenRepository tokenRepository;
 
     /**
-     * secret 用於生成 JWT 憑證的密鑰，從配置文件中獲取
+     *
      */
-    @Value("${security.jwt.secret}")
-    private String secret;
+    private final SecurityProperties securityProperties;
 
-    /**
-     * expiration 用於生成 JWT 憑證的過期時間，從配置文件中獲取
-     * 單位：分鐘
-     */
-    @Value("${security.jwt.expiration}")
-    private long expiration;
 
     /**
      * key 用於生成 JWT 憑證的密鑰
@@ -65,7 +60,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
      */
     @PostConstruct
     public void init() {
-        byte[] encodedSecret = Base64.getDecoder().decode(secret);
+        byte[] encodedSecret = Base64.getDecoder().decode(securityProperties.getJwtToken().getSecret());
         this.key = Keys.hmacShaKeyFor(encodedSecret);
     }
 
@@ -92,7 +87,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         return tokenMono.flatMap(tokenEntity -> {
             int tokenVersion = tokenEntity.increaseAndGetJwtTokenVersion();
 
-            long expirationMs = expiration * 1000 * 60;
+            long expirationMs = (long) securityProperties.getJwtToken().getExpiration() * 1000 * 60;
             Date expirationDate = new Date(now.getTime() + expirationMs);
             String jwtToken = Jwts
                     .builder()

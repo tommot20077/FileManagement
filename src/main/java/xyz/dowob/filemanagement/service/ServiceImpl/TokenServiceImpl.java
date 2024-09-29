@@ -5,11 +5,11 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
-import xyz.dowob.filemanagement.component.factory.TokenStrategyFactory;
+import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.service.ServiceInterFace.TokenService;
+import xyz.dowob.filemanagement.service.ServiceInterface.TokenService;
 
 /**
  * @author yuan
@@ -22,7 +22,10 @@ import xyz.dowob.filemanagement.service.ServiceInterFace.TokenService;
 @Service
 @RequiredArgsConstructor
 public class TokenServiceImpl implements TokenService {
-    private final TokenStrategyFactory tokenStrategyFactory;
+    /**
+     * 憑證策略，根據憑證類型選擇憑證提供者
+     */
+    private final TokenStrategy tokenStrategy;
 
     /**
      * 根據憑證類型，交由組件生成憑證
@@ -33,9 +36,8 @@ public class TokenServiceImpl implements TokenService {
      * @return 返回憑證
      */
     @Override
-    @HideSensitive
     public Mono<String> generateToken(User user, TokenEnum tokenType) {
-        return tokenStrategyFactory.getTokenProvider(tokenType).generateToken(user);
+        return tokenStrategy.getTokenProvider(tokenType).generateToken(user);
     }
 
     /**
@@ -50,7 +52,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Long> validateToken(String token, Long userId, TokenEnum tokenType) {
-        return tokenStrategyFactory.getTokenProvider(tokenType).validateToken(token, userId);
+        return tokenStrategy.getTokenProvider(tokenType).validateToken(token, userId);
     }
 
     /**
@@ -61,7 +63,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Void> revokeToken(Long userId, TokenEnum tokenType) {
-        return tokenStrategyFactory.getTokenProvider(tokenType).revokeToken(userId);
+        return tokenStrategy.getTokenProvider(tokenType).revokeToken(userId);
     }
 
     /**

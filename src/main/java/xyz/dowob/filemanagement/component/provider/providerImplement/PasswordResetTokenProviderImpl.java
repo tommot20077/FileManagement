@@ -1,11 +1,11 @@
 package xyz.dowob.filemanagement.component.provider.providerImplement;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -33,11 +33,11 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
     private final TokenRepository tokenRepository;
 
     /**
-     * 驗證碼過期時間，從配置文件中獲取
-     * 單位：分鐘
+     * SecurityProperties 用於獲取配置文件中的相關配置
+     * 1. 重置密碼憑證的長度
+     * 2. 重置密碼憑證的過期時間
      */
-    @Value("${common.security.verificationcode.expiration: 10}")
-    private int verificationCodeExpiration;
+    private final SecurityProperties securityProperties;
 
     /**
      * 生成重置密碼的6位驗證碼
@@ -49,7 +49,8 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
     @Override
     @HideSensitive
     public Mono<String> generateToken(User user) {
-        String verificationCode = String.valueOf((int) ((Math.random() * 9 + 1) * 100000));
+        double verificationCodeInit = Math.pow(10, securityProperties.getResetPasswordToken().getLength() - 1);
+        String verificationCode = String.valueOf((int) ((Math.random() * 9 + 1) * verificationCodeInit));
         Mono<Token> tokenMono = tokenRepository.findByUserId(user.getId()).switchIfEmpty(Mono.defer(() -> {
             Token newToken = new Token();
             newToken.setUserId(user.getId());
@@ -58,7 +59,7 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
 
         return tokenMono.flatMap(token -> {
             token.setResetVerificationCode(verificationCode);
-            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(verificationCodeExpiration);
+            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(securityProperties.getResetPasswordToken().getExpiration());
             token.setResetVerificationCodeExpireTime(expireTime);
             return tokenRepository.save(token).thenReturn(verificationCode);
         });
@@ -73,23 +74,23 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
      * @param userId 用戶ID
      *
      * @return 返回用戶ID
-     *
      */
     @Override
     public Mono<Long> validateToken(String token, Long userId) {
-        return tokenRepository.findByUserId(userId)
-                              .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR)))
-                              .flatMap(tokenEntity -> {
-                                  if (tokenEntity.getResetVerificationCode() == null || !tokenEntity.getResetVerificationCode()
-                                                                                                    .equals(token)) {
-                                      return Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR));
-                                  }
-                                  if (tokenEntity.getResetVerificationCodeExpireTime() == null || LocalDateTime.now()
-                                                                                                               .isAfter(tokenEntity.getResetVerificationCodeExpireTime())) {
-                                      return Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR));
-                                  }
-                                  return Mono.just(userId);
-                              });
+        return tokenRepository
+                .findByUserId(userId)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR)))
+                .flatMap(tokenEntity -> {
+                    if (tokenEntity.getResetVerificationCode() == null || !tokenEntity.getResetVerificationCode().equals(token)) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR));
+                    }
+                    if (tokenEntity.getResetVerificationCodeExpireTime() == null || LocalDateTime
+                            .now()
+                            .isAfter(tokenEntity.getResetVerificationCodeExpireTime())) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.VERIFICATION_CODE_ERROR));
+                    }
+                    return Mono.just(userId);
+                });
     }
 
     /**
