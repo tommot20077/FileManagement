@@ -38,7 +38,7 @@ import java.util.concurrent.ScheduledExecutorService;
 @Component
 @RequiredArgsConstructor
 public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUnity {
-    private static final ConcurrentHashMap<String, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
 
     static {
         clearInactiveSession();
@@ -51,8 +51,6 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     private final ValidationService validationService;
 
     private final UserService userService;
-
-
     /**
      * 清除未活躍的 WebSocket 會話
      */
@@ -76,25 +74,24 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     @Override
     @NonNull
     public Mono<Void> handle(@NonNull WebSocketSession session) {
+        CustomWebSocketSession customSession = (CustomWebSocketSession) session;
         return session.receive().flatMap(webSocketMessage -> {
             try {
                 JsonNode jsonNode = objectMapper.readTree(webSocketMessage.getPayloadAsText());
-                String userId = convertJsonToObject(jsonNode.get("userId"), String.class).orElseThrow(() -> new ValidationException(
-                        ValidationException.ErrorCode.REQUEST_IS_INVALID,
-                        "userId"));
+                Long userId = Long.parseLong(customSession.getUserId());
                 String type = convertJsonToObject(jsonNode.get("type"), String.class).orElseThrow(() -> new ValidationException(
                         ValidationException.ErrorCode.REQUEST_IS_INVALID,
                         "type"));
-                USER_SESSION_MAP.put(userId, session);
+                USER_SESSION_MAP.put(userId, customSession);
                 return switch (type) {
-                    case "initialUpload" -> handleInitialUpload(Long.valueOf(userId), session, jsonNode);
-                    case "bufferUpload" -> handleBufferUpload(session, jsonNode);
+                    case "initialUpload" -> handleInitialUpload(userId, customSession, jsonNode);
+                    case "bufferUpload" -> handleBufferUpload(customSession, jsonNode);
                     default -> {
-                        ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
+                        ApiResponseDTO<?> response = createResponse(customSession.getHandshakeInfo().getUri().getPath(),
                                                                     400,
                                                                     "未知的請求類型",
                                                                     null);
-                        yield sendMessage(session, response);
+                        yield sendMessage(customSession, response);
                     }
                 };
             } catch (JsonProcessingException | ValidationException e) {
@@ -136,9 +133,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
         return uploadChunkDTO
                 .map(chunkDTO -> fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
-                                                                null,
-                                                                transferResponseDTO);
+                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
                     if (transferResponseDTO.getIsFinished()) {
                         response.setMessage("上傳任務完成");
                     } else {
@@ -162,7 +157,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @return Mono<Void>
      */
     public Mono<Void> sendMessage(String userId, Object message) {
-        WebSocketSession session = USER_SESSION_MAP.get(userId);
+        WebSocketSession session = USER_SESSION_MAP.get(Long.parseLong(userId));
         return sendMessage(session, message);
     }
 
@@ -206,7 +201,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @param userId 用戶 ID
      */
     public Mono<Void> removeSession(String userId) {
-        WebSocketSession session = USER_SESSION_MAP.remove(userId);
+        WebSocketSession session = USER_SESSION_MAP.remove(Long.parseLong(userId));
         return session.close();
     }
 

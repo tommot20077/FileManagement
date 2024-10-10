@@ -49,6 +49,7 @@ public class FileMetadata {
         task.setMd5(this.getMd5());
         task.setUserId(this.userId);
         task.setMessage(message);
+        task.setFileSize(this.getFileSize());
         return task;
     }
 

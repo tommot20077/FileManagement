@@ -36,9 +36,8 @@ import java.util.Map;
 public class WebSocketConfig {
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
-    private final FileProperties fileProperties;
+    private final JwtWebSocketHandlerAdapter jwtWebSocketHandlerAdapter;
 
-    private final JwtTokenProviderImpl jwtTokenProvider;
 
     @Bean
     public HandlerMapping webSocketMapping() {
@@ -53,19 +52,6 @@ public class WebSocketConfig {
 
     @Bean
     public WebSocketHandlerAdapter handlerAdapter() {
-        return new WebSocketHandlerAdapter(webSocketService());
+        return new WebSocketHandlerAdapter(jwtWebSocketHandlerAdapter);
     }
-
-    @Bean
-    public RequestUpgradeStrategy requestUpgradeStrategy() {
-        WebsocketServerSpec.Builder builder = WebsocketServerSpec.builder();
-        builder.maxFramePayloadLength(fileProperties.getUpload().getMaxFramePayloadLength() * 1024 * 1024);
-        return new ReactorNettyRequestUpgradeStrategy(builder);
-    }
-
-    @Bean
-    public WebSocketService webSocketService() {
-        return new JwtWebSocketHandlerAdapter(requestUpgradeStrategy(), jwtTokenProvider);
-    }
-
 }
