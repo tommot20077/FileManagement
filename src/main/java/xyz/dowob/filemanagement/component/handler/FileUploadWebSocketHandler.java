@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketHandler;
@@ -38,7 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 @Component
 @RequiredArgsConstructor
 public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUnity {
-    private static final ConcurrentHashMap<String, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
 
     static {
         clearInactiveSession();
@@ -76,25 +78,24 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     @Override
     @NonNull
     public Mono<Void> handle(@NonNull WebSocketSession session) {
+        CustomWebSocketSession customSession = (CustomWebSocketSession) session;
         return session.receive().flatMap(webSocketMessage -> {
             try {
                 JsonNode jsonNode = objectMapper.readTree(webSocketMessage.getPayloadAsText());
-                String userId = convertJsonToObject(jsonNode.get("userId"), String.class).orElseThrow(() -> new ValidationException(
-                        ValidationException.ErrorCode.REQUEST_IS_INVALID,
-                        "userId"));
+                Long userId = Long.parseLong(customSession.getUserId());
                 String type = convertJsonToObject(jsonNode.get("type"), String.class).orElseThrow(() -> new ValidationException(
                         ValidationException.ErrorCode.REQUEST_IS_INVALID,
                         "type"));
-                USER_SESSION_MAP.put(userId, session);
+                USER_SESSION_MAP.put(userId, customSession);
                 return switch (type) {
-                    case "initialUpload" -> handleInitialUpload(Long.valueOf(userId), session, jsonNode);
-                    case "bufferUpload" -> handleBufferUpload(session, jsonNode);
+                    case "initialUpload" -> handleInitialUpload(userId, customSession, jsonNode);
+                    case "bufferUpload" -> handleBufferUpload(customSession, jsonNode);
                     default -> {
-                        ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
+                        ApiResponseDTO<?> response = createResponse(customSession.getHandshakeInfo().getUri().getPath(),
                                                                     400,
                                                                     "未知的請求類型",
                                                                     null);
-                        yield sendMessage(session, response);
+                        yield sendMessage(customSession, response);
                     }
                 };
             } catch (JsonProcessingException | ValidationException e) {
@@ -103,8 +104,10 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         }).then();
     }
 
+    Logger log = LoggerFactory.getLogger(FileUploadWebSocketHandler.class);
     private Mono<Void> handleInitialUpload(Long userId, WebSocketSession session, JsonNode jsonNode) {
         Optional<FileMetadata> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadata.class);
+        log.info("fileMetadataOptional: {}", fileMetadataOptional);
         return fileMetadataOptional
                 .map(fileMetadata -> userService
                         .getById(userId)
@@ -136,9 +139,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
         return uploadChunkDTO
                 .map(chunkDTO -> fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
-                                                                null,
-                                                                transferResponseDTO);
+                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
                     if (transferResponseDTO.getIsFinished()) {
                         response.setMessage("上傳任務完成");
                     } else {

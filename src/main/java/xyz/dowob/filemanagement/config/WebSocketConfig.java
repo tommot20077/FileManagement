@@ -52,12 +52,7 @@ public class WebSocketConfig {
     }
 
     @Bean
-    public WebSocketHandlerAdapter handlerAdapter() {
-        return new WebSocketHandlerAdapter(webSocketService());
-    }
-
-    @Bean
-    public RequestUpgradeStrategy requestUpgradeStrategy() {
+    public ReactorNettyRequestUpgradeStrategy requestUpgradeStrategy() {
         WebsocketServerSpec.Builder builder = WebsocketServerSpec.builder();
         builder.maxFramePayloadLength(fileProperties.getUpload().getMaxFramePayloadLength() * 1024 * 1024);
         return new ReactorNettyRequestUpgradeStrategy(builder);
@@ -65,7 +60,10 @@ public class WebSocketConfig {
 
     @Bean
     public WebSocketService webSocketService() {
-        return new JwtWebSocketHandlerAdapter(requestUpgradeStrategy(), jwtTokenProvider);
+        return new JwtWebSocketHandlerAdapter(requestUpgradeStrategy(), jwtTokenProvider, fileProperties);
     }
-
+    @Bean
+    public WebSocketHandlerAdapter handlerAdapter() {
+        return new WebSocketHandlerAdapter(webSocketService());
+    }
 }
