@@ -6,6 +6,7 @@ import lombok.Data;
 
 /**
  * 用於接收用戶信箱的數據傳輸對象
+ *
  * @author yuan
  * @program File-Management
  * @ClassName UserEmailDTO

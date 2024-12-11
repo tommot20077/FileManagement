@@ -86,9 +86,12 @@ public class ValidationException extends Exception {
          * 錯誤碼: 1111
          * 錯誤信息: 請求參數無效
          */
-        REQUEST_IS_INVALID(1111, "請求參數無效: %s");
-
-
+        REQUEST_IS_INVALID(1111, "請求參數無效: %s"),
+        /**
+         * 錯誤碼: 1112
+         * 錯誤信息: 已有相同文件正在上傳
+         */
+        EXISTING_TRANSFER_TASK(1112, "已有相同文件正在上傳，MD5: %s, 現有任務ID: %s");
 
 
         /**

@@ -14,6 +14,7 @@ import java.util.Set;
 
 /**
  * 用於定義以及映射伺服器文件元數據表
+ *
  * @author yuan
  * @program File-Management
  * @ClassName ServerFileMetadata

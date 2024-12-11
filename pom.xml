@@ -174,8 +174,8 @@
         </dependency>
         <dependency>
             <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-test</artifactId>
-            <scope>test</scope>
+            <artifactId>reactor-file</artifactId>
+            <scope>file</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

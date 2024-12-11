@@ -28,6 +28,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
+ * 文件上傳 WebSocket 處理器，用於處理文件上傳任務
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName FileUploadWebSocketHandler
@@ -38,19 +40,38 @@ import java.util.concurrent.ScheduledExecutorService;
 @Component
 @RequiredArgsConstructor
 public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUnity {
+    /**
+     * 當前用戶與 WebSocket 會話的映射
+     */
     private static final ConcurrentHashMap<Long, WebSocketSession> USER_SESSION_MAP = new ConcurrentHashMap<>();
 
+    /**
+     * 設定定期清除未活躍的 WebSocket 會話
+     */
     static {
         clearInactiveSession();
     }
 
+    /**
+     * ObjectMapper 用於 JSON 資料的序列化與反序列化
+     */
     private final ObjectMapper objectMapper;
 
+    /**
+     * 檔案處理策略模式
+     */
     private final FileStrategy fileStrategy;
 
+    /**
+     * 驗證服務
+     */
     private final ValidationService validationService;
 
+    /**
+     * 用戶服務
+     */
     private final UserService userService;
+
     /**
      * 清除未活躍的 WebSocket 會話
      */
@@ -100,26 +121,38 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         }).then();
     }
 
+    /**
+     * 處理初始化上傳任務，將文件元數據保存到數據庫
+     *
+     * @param userId   用戶 ID
+     * @param session  WebSocket 會話
+     * @param jsonNode JSON 資料
+     *
+     * @return Mono<Void>
+     */
     private Mono<Void> handleInitialUpload(Long userId, WebSocketSession session, JsonNode jsonNode) {
         Optional<FileMetadata> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadata.class);
         return fileMetadataOptional
                 .map(fileMetadata -> userService
                         .getById(userId)
                         .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userId.toString())))
-                        .flatMap(user -> validationService
-                                .validateFileMetadataDTO(fileMetadata)
-                                .then(fileStrategy.getFileService(FileEnum.IMAGE).uploadFile(fileMetadata, user))
-                                .flatMap(transferResponseDTO -> {
-                                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
-                                                                                null,
-                                                                                transferResponseDTO);
-                                    if (transferResponseDTO.getIsFinished()) {
-                                        response.setMessage("上傳任務完成");
-                                    } else {
-                                        response.setMessage("初始化上傳任務成功");
-                                    }
-                                    return sendMessage(session, response);
-                                })))
+                        .flatMap(user -> validationService.validateFileMetadataDTO(fileMetadata)
+                                                          // todo Image硬編碼
+                                                          .then(fileStrategy.getFileService(FileEnum.IMAGE).uploadFile(fileMetadata, user))
+                                                          .flatMap(transferResponseDTO -> {
+                                                              ApiResponseDTO<?> response = createResponse(session
+                                                                                                                  .getHandshakeInfo()
+                                                                                                                  .getUri()
+                                                                                                                  .getPath(),
+                                                                                                          null,
+                                                                                                          transferResponseDTO);
+                                                              if (transferResponseDTO.getIsFinished()) {
+                                                                  response.setMessage("上傳任務完成");
+                                                              } else {
+                                                                  response.setMessage("初始化上傳任務成功");
+                                                              }
+                                                              return sendMessage(session, response);
+                                                          })))
                 .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
                 .onErrorResume(ValidationException.class, e -> {
                     String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
@@ -129,9 +162,18 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                 });
     }
 
+    /**
+     * 處理分塊上傳任務
+     *
+     * @param session  WebSocket 會話
+     * @param jsonNode JSON 資料
+     *
+     * @return Mono<Void>
+     */
     private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
         return uploadChunkDTO
+                // todo Image硬編碼
                 .map(chunkDTO -> fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
                     ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
                     if (transferResponseDTO.getIsFinished()) {
@@ -142,7 +184,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                     return sendMessage(session, response);
                 }))
                 .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
-                .onErrorResume(ValidationException.class, e -> {
+                .onErrorResume(Exception.class, e -> {
                     String errorMessage = String.format("上傳失敗: %s", e.getMessage());
                     return sendMessage(session, createResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
                 });
@@ -205,6 +247,15 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         return session.close();
     }
 
+    /**
+     * 將 JSON 資料轉換為指定類型的物件
+     *
+     * @param node  JSON 資料
+     * @param clazz 類型
+     * @param <T>   類型
+     *
+     * @return Optional<T>
+     */
     private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
         try {
             return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
@@ -213,6 +264,15 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         }
     }
 
+    /**
+     * 將 JSON 字符串轉換為指定類型的物件
+     *
+     * @param json  JSON 字符串
+     * @param clazz 類型
+     * @param <T>   類型
+     *
+     * @return Optional<T>
+     */
     private <T> Optional<T> convertJsonToObject(String json, Class<T> clazz) {
         try {
             return Optional.ofNullable(objectMapper.readValue(json, clazz));
@@ -221,6 +281,11 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         }
     }
 
+    /**
+     * 初始化參數名稱
+     *
+     * @return Map<String, Class < ?>>
+     */
     private Map<String, Class<?>> initParameterNames() {
         Map<String, Class<?>> map = new HashMap<>();
         map.put("userId", String.class);

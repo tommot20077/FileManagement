@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
+ * 文件傳輸響應的數據傳輸對象，用於規範文件傳輸響應的數據傳輸對象，用於文件傳輸響應的數據
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName TransferResponseDTO
@@ -16,15 +18,33 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TransferResponseDTO {
+    /**
+     * 傳輸任務ID
+     */
     private String transferTaskId;
 
+    /**
+     * 分塊索引
+     */
     private Integer chunkIndex;
 
+    /**
+     * 進度
+     */
     private Double progress;
 
+    /**
+     * 是否成功
+     */
     private Boolean isSuccess;
 
+    /**
+     * 是否完成
+     */
     private Boolean isFinished;
 
+    /**
+     * 信息
+     */
     private String message;
 }

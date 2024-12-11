@@ -17,6 +17,8 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import java.time.LocalDateTime;
 
 /**
+ * 自定義異常處理器，用於處理全局異常，當內部發生未知異常時，返回統一的格式
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName CustomExceptionHandler
@@ -28,8 +30,18 @@ import java.time.LocalDateTime;
 @Order(-3)
 public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
 
+    /**
+     * 自定義異常處理器構造方法，繼承 AbstractErrorWebExceptionHandler 類
+     *
+     * @param errorAttributes       錯誤屬性
+     * @param webProperties         Web屬性
+     * @param applicationContext    應用上下文
+     * @param serverCodecConfigurer 服務器編解碼器
+     */
     public CustomExceptionHandler(
-            ErrorAttributes errorAttributes, WebProperties webProperties, ApplicationContext applicationContext,
+            ErrorAttributes errorAttributes,
+            WebProperties webProperties,
+            ApplicationContext applicationContext,
             ServerCodecConfigurer serverCodecConfigurer) {
         super(errorAttributes, webProperties.getResources(), applicationContext);
         super.setMessageWriters(serverCodecConfigurer.getWriters());
@@ -37,13 +49,25 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
 
     }
 
+    /**
+     * 獲取路由函數
+     *
+     * @param errorAttributes 錯誤屬性
+     *
+     * @return RouterFunction<ServerResponse> 路由函數
+     */
     @Override
     protected RouterFunction<ServerResponse> getRoutingFunction(ErrorAttributes errorAttributes) {
         return RouterFunctions.route(RequestPredicates.all(), this::handleException);
-
-
     }
 
+    /**
+     * 異常處理方法
+     *
+     * @param request 請求
+     *
+     * @return Mono<ServerResponse> 服務器響應
+     */
     private Mono<ServerResponse> handleException(ServerRequest request) {
         Throwable error = getError(request);
         ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),

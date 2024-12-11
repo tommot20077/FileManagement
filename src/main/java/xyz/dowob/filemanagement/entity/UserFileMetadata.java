@@ -71,8 +71,6 @@ public class UserFileMetadata {
     private Set<Long> sharedWithUsers;
 
 
-
-
     @Override
     public String toString() {
         HashMap<String, Object> map = new HashMap<>();

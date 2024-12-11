@@ -8,6 +8,7 @@ import lombok.Setter;
 
 /**
  * 用於規範用戶註冊的數據傳輸對象
+ *
  * @author yuan
  * @program File-Management
  * @ClassName RegisterDTO

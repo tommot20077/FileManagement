@@ -15,7 +15,6 @@ import java.lang.annotation.Target;
  * @description
  * @create 2024-09-23 15:19
  * @Version 1.0
- *
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.TYPE})

@@ -6,12 +6,12 @@ import lombok.RequiredArgsConstructor;
 /**
  * 文件類型的枚舉類，用於標記文件的類型
  *
+ * @author yuan
  * @program File-Management
  * @ClassName FileEnum
  * @description
  * @create 2024-09-20 22:30
  * @Version 1.0
- * @Author yuan
  */
 @Getter
 @RequiredArgsConstructor

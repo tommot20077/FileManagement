@@ -29,6 +29,9 @@ public enum TransmissionEnum {
      */
     MIXED("mixed");
 
+    /**
+     * 傳輸類型
+     */
     private final String type;
 
 }

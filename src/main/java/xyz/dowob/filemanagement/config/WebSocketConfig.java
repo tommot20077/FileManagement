@@ -8,21 +8,16 @@ import org.springframework.web.reactive.HandlerMapping;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.reactive.socket.WebSocketHandler;
-import org.springframework.web.reactive.socket.server.RequestUpgradeStrategy;
-import org.springframework.web.reactive.socket.server.WebSocketService;
-import org.springframework.web.reactive.socket.server.support.HandshakeWebSocketService;
 import org.springframework.web.reactive.socket.server.support.WebSocketHandlerAdapter;
-import org.springframework.web.reactive.socket.server.upgrade.ReactorNettyRequestUpgradeStrategy;
-import reactor.netty.http.server.WebsocketServerSpec;
 import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
 import xyz.dowob.filemanagement.component.manager.JwtWebSocketHandlerAdapter;
-import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
-import xyz.dowob.filemanagement.config.properties.FileProperties;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * WebSocket 配置類，用於配置 WebSocket 相關的配置
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName WebSocketConfig
@@ -34,11 +29,22 @@ import java.util.Map;
 @EnableWebFlux
 @RequiredArgsConstructor
 public class WebSocketConfig {
+    /**
+     * 文件上傳 WebSocket 處理器
+     */
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
+    /**
+     * JWT WebSocket 處理器適配器
+     */
     private final JwtWebSocketHandlerAdapter jwtWebSocketHandlerAdapter;
 
 
+    /**
+     * 配置 WebSocket 映射，將 WebSocket 請求映射到對應的處理器
+     *
+     * @return HandlerMapping
+     */
     @Bean
     public HandlerMapping webSocketMapping() {
         final Map<String, WebSocketHandler> map = new HashMap<>();
@@ -50,6 +56,11 @@ public class WebSocketConfig {
         return mapping;
     }
 
+    /**
+     * 配置 WebSocket 處理器適配器
+     *
+     * @return WebSocketHandlerAdapter
+     */
     @Bean
     public WebSocketHandlerAdapter handlerAdapter() {
         return new WebSocketHandlerAdapter(jwtWebSocketHandlerAdapter);

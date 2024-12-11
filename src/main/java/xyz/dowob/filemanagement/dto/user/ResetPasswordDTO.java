@@ -8,6 +8,7 @@ import lombok.Setter;
 
 /**
  * 用於規範用戶重置密碼的數據傳輸對象
+ *
  * @author yuan
  * @program File-Management
  * @ClassName ResetPasswordDTO

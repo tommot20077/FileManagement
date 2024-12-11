@@ -22,7 +22,6 @@ public interface UserService extends CrudService<User, Long> {
      * 用戶註冊
      *
      * @param registerUserDTO 用戶註冊數據傳輸對象
-     *
      */
     Mono<Void> register(RegisterDTO registerUserDTO);
 
@@ -31,6 +30,7 @@ public interface UserService extends CrudService<User, Long> {
      *
      * @param authRequestDTO 用戶登入數據傳輸對象
      * @param request        請求對象
+     *
      * @return 用戶
      */
     Mono<String> login(AuthRequestDTO authRequestDTO, ServerWebExchange request);
@@ -46,6 +46,7 @@ public interface UserService extends CrudService<User, Long> {
      * 用戶修改密碼
      *
      * @param user 用戶
+     *
      * @return 用戶
      */
     Mono<User> changePassword(User user);
@@ -54,6 +55,7 @@ public interface UserService extends CrudService<User, Long> {
      * 用戶修改信箱
      *
      * @param user 用戶
+     *
      * @return 用戶
      */
     Mono<User> changeEmail(User user);

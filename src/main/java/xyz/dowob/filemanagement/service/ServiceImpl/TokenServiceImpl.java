@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
@@ -12,6 +11,9 @@ import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.service.ServiceInterface.TokenService;
 
 /**
+ * 憑證業務邏輯實現類，實現接口 @see {@link TokenService}
+ * 主要當用戶需要進行憑證操作時，進行相應的業務邏輯處理，根據用戶的請求進行憑證操作，並返回結果
+ *
  * @author yuan
  * @program File-Management
  * @ClassName TokenServiceImpl
@@ -30,7 +32,7 @@ public class TokenServiceImpl implements TokenService {
     /**
      * 根據憑證類型，交由組件生成憑證
      *
-     * @param user    用戶ID
+     * @param user      用戶ID
      * @param tokenType 憑證類型
      *
      * @return 返回憑證

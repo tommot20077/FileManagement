@@ -2,7 +2,6 @@ package xyz.dowob.filemanagement.component.provider.providerInterface;
 
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.exception.ValidationException;
 
 /**
  * 憑證提供者接口，用於定義憑證提供者的方法

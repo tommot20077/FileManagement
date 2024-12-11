@@ -9,8 +9,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
+import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 
 import java.util.Collections;
@@ -31,7 +31,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Log4j2
-public class JwtAuthenticationManager implements ReactiveAuthenticationManager{
+public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
     /**
      * token的策略工廠
      */

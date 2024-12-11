@@ -9,6 +9,7 @@ import xyz.dowob.filemanagement.entity.User;
 /**
  * 憑證服務接口
  * 定義憑證會根據在工廠中的生成、驗證、刪除方法
+ *
  * @author yuan
  * @program File-Management
  * @ClassName TokenService
@@ -20,7 +21,7 @@ public interface TokenService extends CrudService<Token, Long> {
     /**
      * 根據憑證類型生成憑證
      *
-     * @param user    用戶實體
+     * @param user      用戶實體
      * @param tokenType 憑證類型
      *
      * @return 返回憑證

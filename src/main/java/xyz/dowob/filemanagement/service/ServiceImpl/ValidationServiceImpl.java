@@ -1,9 +1,6 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -14,8 +11,6 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
-import java.util.Arrays;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 /**

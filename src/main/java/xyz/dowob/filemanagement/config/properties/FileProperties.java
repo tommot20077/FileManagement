@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 
 /**
+ * 文件配置文件，用於配置文件處理的相關參數，在 application 中配置 file
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName FileProperties
@@ -17,14 +19,30 @@ import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 @ConfigurationProperties(prefix = "file")
 @Data
 public class FileProperties {
-
+    /**
+     * 文件傳輸類型，默認為 MULTIPART，即使用 Multipart 進行文件傳輸
+     */
     private TransmissionEnum transmissionType = TransmissionEnum.MULTIPART;
+
+    /**
+     * 建立文件上傳配置
+     */
     private Upload upload = new Upload();
 
+    /**
+     * 文件上傳配置
+     */
     @Data
     public static class Upload {
+        /**
+         * 文件上傳臨時目錄，默認為 ./temp/uploads/
+         */
         private String tempDirectory = "./temp/uploads/";
-        private Integer maxFramePayloadLength = 10;
+
+        /**
+         * 最大允許分塊大小，單位為 MB，默認為 10MB
+         */
+        private Integer payloadLength = 10;
     }
 
 }

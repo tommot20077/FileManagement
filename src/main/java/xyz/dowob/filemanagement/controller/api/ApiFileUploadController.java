@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.controller.test;
+package xyz.dowob.filemanagement.controller.api;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -8,21 +8,20 @@ import org.springframework.http.codec.multipart.Part;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
-import xyz.dowob.filemanagement.unity.ResponseUnity;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
+import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 /**
  * @author yuan
  * @program FileManagement
- * @ClassName FileUploadController
+ * @ClassName ApiFileUploadController
  * @description
  * @create 2024-09-30 16:00
  * @Version 1.0
@@ -30,10 +29,10 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 @RestController
 @RequestMapping("/api/file")
 @RequiredArgsConstructor
-public class FileUploadController implements ResponseUnity {
+public class ApiFileUploadController implements ResponseUnity {
     private final FileStrategy fileStrategy;
 
-    private final FileUploadWebSocketHandler webSocketHandler;
+    private final ValidationService validationService;
 
     private final UserService userService;
 
@@ -43,16 +42,21 @@ public class FileUploadController implements ResponseUnity {
                 .getUser(exchange)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
                 .flatMap(user -> {
-                    FileService fileService = fileStrategy.getFileService(FileEnum.IMAGE);
-                    return fileService.uploadFile(fileMetadata, user).flatMap(transferResponseDTO -> {
-                        ApiResponseDTO<?> apiResponse;
-                        if (transferResponseDTO.getIsFinished()) {
-                            apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                        } else {
-                            apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                        }
-                        return createResponseEntity(apiResponse);
-                    });
+                    // todo Image硬編碼
+                    return validationService
+                            .validateFileMetadataDTO(fileMetadata)
+                            .then(fileStrategy
+                                          .getFileService(FileEnum.IMAGE)
+                                          .uploadFile(fileMetadata, user)
+                                          .flatMap(transferResponseDTO -> {
+                                              ApiResponseDTO<?> apiResponse;
+                                              if (transferResponseDTO.getIsFinished()) {
+                                                  apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                                              } else {
+                                                  apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                                              }
+                                              return createResponseEntity(apiResponse);
+                                          }));
                 })
                 .onErrorResume(ValidationException.class, e -> {
                     String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
@@ -65,8 +69,8 @@ public class FileUploadController implements ResponseUnity {
     public Mono<ResponseEntity<?>> bufferUpload(
             @RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
         return Mono.just(uploadChunkDTO).flatMap(uploadChunk -> {
-            FileService fileService = fileStrategy.getFileService(FileEnum.IMAGE);
-            return fileService.uploadFileChunk(uploadChunkDTO);
+            // todo Image硬編碼
+            return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
         }).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsSuccess()) {
@@ -83,8 +87,8 @@ public class FileUploadController implements ResponseUnity {
             @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
         return formatPartToBytes(filePart).flatMap(bytes -> {
             UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
-            FileService fileService = fileStrategy.getFileService(FileEnum.IMAGE);
-            return fileService.uploadFileChunk(uploadChunkDTO);
+            // todo Image硬編碼
+            return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
         }).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsFinished()) {

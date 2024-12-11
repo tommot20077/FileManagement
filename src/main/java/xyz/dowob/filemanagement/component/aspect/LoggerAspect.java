@@ -70,7 +70,7 @@ public class LoggerAspect {
         Mono.deferContextual(context -> {
             ServerWebExchange exchange = context.get(ServerWebExchange.class);
             if (exchange != null) {
-                return exchange.getSession().flatMap(session ->{
+                return exchange.getSession().flatMap(session -> {
                     requestUsername[0] = session.getAttribute("username");
                     return Mono.empty();
                 }).switchIfEmpty(Mono.just("No Session")).then();

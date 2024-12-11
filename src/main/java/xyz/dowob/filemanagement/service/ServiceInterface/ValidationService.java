@@ -1,13 +1,11 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
 import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -26,7 +24,6 @@ public interface ValidationService {
      * 驗證用戶註冊數據類RegisterUserDTO中的數據是否合法
      *
      * @param registerDTO 用戶註冊數據傳輸對象
-     *
      */
     Mono<Void> validateRegisterDTO(RegisterDTO registerDTO);
 
@@ -34,7 +31,6 @@ public interface ValidationService {
      * 驗證重製密碼數據類ResetPasswordDTO中的數據是否合法
      *
      * @param resetPasswordDTO 重置密碼數據傳輸對象
-     *
      */
     Mono<Void> validateResetPasswordDTO(ResetPasswordDTO resetPasswordDTO);
 
@@ -42,7 +38,6 @@ public interface ValidationService {
      * 驗證文件元數據DTO中的數據是否合法
      *
      * @param fileMetadataDTO 文件元數據DTO
-     *
      */
     Mono<Void> validateFileMetadataDTO(FileMetadata fileMetadataDTO);
 
@@ -52,7 +47,6 @@ public interface ValidationService {
      *
      * @param <T> 數據傳輸對象類型
      * @param dto 數據傳輸對象
-     *
      */
     default <T> Mono<Void> validateNotNull(T dto) {
         return Mono.defer(() -> {

@@ -28,6 +28,7 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 @RequiredArgsConstructor
 public abstract class BaseUserController implements ResponseUnity {
     protected final FileStrategy fileStrategy;
+
     protected final UserService userService;
 
     /**

@@ -1,7 +1,6 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import org.bson.types.ObjectId;
-import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.file.TransferResponseDTO;
@@ -9,6 +8,9 @@ import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 /**
+ * 檔案服務的抽象類，用於定義檔案服務的基本操作，如初始化上傳任務、上傳文件分塊、合併文件分塊等，實現FileService接口
+ * 實現類需實現這些方法，並根據具體業務需求進行實現
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName FileService

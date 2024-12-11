@@ -1,19 +1,17 @@
 package xyz.dowob.filemanagement.config;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
+ * Redis 配置類，用於配置 Redis 相關的配置
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName RedisConfig
@@ -24,6 +22,13 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 @RequiredArgsConstructor
 public class RedisConfig {
+    /**
+     * 配置 ReactiveRedisTemplate，定義序列化方式，統一使用 GenericJackson2JsonRedisSerializer 進行序列化
+     *
+     * @param reactiveRedisConnectionFactory ReactiveRedisConnectionFactory 用於創建 ReactiveRedisTemplate
+     *
+     * @return ReactiveRedisTemplate
+     */
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
         RedisSerializationContext<String, Object> serializationContext = RedisSerializationContext

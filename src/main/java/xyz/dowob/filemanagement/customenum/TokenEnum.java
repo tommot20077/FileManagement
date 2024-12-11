@@ -7,7 +7,13 @@ import lombok.RequiredArgsConstructor;
  * 用於定義憑證類型
  *
  * @author yuan
+ * @program File-Management
+ * @ClassName TransfersStatusEnum
+ * @description
+ * @create 2024-012-11 17:09
+ * @Version 1.0
  */
+
 @Getter
 @RequiredArgsConstructor
 public enum TokenEnum {

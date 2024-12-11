@@ -6,6 +6,8 @@ import lombok.Data;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 
 /**
+ * 用於定義用戶登錄響應的數據傳輸對象，用於返回 JWT 驗證令牌
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName AuthResponseDTO
@@ -16,6 +18,9 @@ import xyz.dowob.filemanagement.annotation.HideSensitive;
 @Data
 @AllArgsConstructor
 public class AuthResponseDTO {
+    /**
+     * JWT 驗證令牌
+     */
     @HideSensitive
     @JsonProperty("JWT 驗證令牌")
     private String jwtToken;
