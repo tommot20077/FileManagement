@@ -55,7 +55,7 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
-    // 此方法為示例方法，後期需要移除會移動到管理員控制器中
+    //todo 改成管理員使用
     public Flux<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return userService.getAll().flatMap(user -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);

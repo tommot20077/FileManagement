@@ -27,7 +27,7 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
  * @Version 1.0
  **/
 @RestController
-@RequestMapping("/api/file")
+@RequestMapping("/api/file/upload")
 @RequiredArgsConstructor
 public class ApiFileUploadController implements ResponseUnity {
     private final FileStrategy fileStrategy;
@@ -36,8 +36,8 @@ public class ApiFileUploadController implements ResponseUnity {
 
     private final UserService userService;
 
-    @PostMapping("/initialUpload")
-    public Mono<ResponseEntity<?>> upload(@RequestBody FileMetadata fileMetadata, ServerWebExchange exchange) {
+    @PostMapping("/initialTask")
+    public Mono<ResponseEntity<?>> uploadFile (@RequestBody FileMetadata fileMetadata, ServerWebExchange exchange) {
         return userService
                 .getUser(exchange)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
@@ -66,8 +66,7 @@ public class ApiFileUploadController implements ResponseUnity {
     }
 
     @PostMapping("/bufferUpload")
-    public Mono<ResponseEntity<?>> bufferUpload(
-            @RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> bufferUpload (@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
         return Mono.just(uploadChunkDTO).flatMap(uploadChunk -> {
             // todo Image硬編碼
             return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
@@ -83,7 +82,7 @@ public class ApiFileUploadController implements ResponseUnity {
     }
 
     @PostMapping("/multipartUpload")
-    public Mono<ResponseEntity<?>> multipartUpload(
+    public Mono<ResponseEntity<?>> multipartUpload (
             @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
         return formatPartToBytes(filePart).flatMap(bytes -> {
             UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
@@ -104,7 +103,7 @@ public class ApiFileUploadController implements ResponseUnity {
         });
     }
 
-    public Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
+    public Mono<byte[]> formatPartToBytes (Mono<Part> multipartFile) {
         return multipartFile.flatMap(part -> part.content().reduce(DataBuffer::write)).map(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];
             dataBuffer.read(bytes);

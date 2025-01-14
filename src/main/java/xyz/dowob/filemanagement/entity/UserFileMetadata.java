@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
@@ -36,7 +37,7 @@ public class UserFileMetadata {
     private Long userId;
 
     /**
-     * 文件類型
+     * 文件所在伺服器的文件ID
      */
     @Column("server_file_id")
     private Long serverFileId;
@@ -56,12 +57,14 @@ public class UserFileMetadata {
      * 文件大小
      */
     @Column("upload_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadTime;
 
     /**
      * 最後訪問時間
      */
     @Column("last_access_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
 
     /**

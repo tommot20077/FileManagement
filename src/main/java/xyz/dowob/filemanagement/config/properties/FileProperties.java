@@ -40,9 +40,8 @@ public class FileProperties {
         private String tempDirectory = "./temp/uploads/";
 
         /**
-         * 最大允許分塊大小，單位為 MB，默認為 10MB
+         * 最大允許分塊大小，單位為 MB，默認為 20MB
          */
-        private Integer payloadLength = 10;
+        private Integer payloadLength = 20;
     }
-
 }

@@ -22,8 +22,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
  **/
 @RestController
 @RequestMapping("/web/user")
-public class WebBaseUserController extends BaseUserController {
-    public WebBaseUserController(FileStrategy fileStrategy, UserService userService) {
+public class WebUserController extends BaseUserController {
+    public WebUserController (FileStrategy fileStrategy, UserService userService) {
         super(fileStrategy, userService);
     }
 

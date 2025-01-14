@@ -18,10 +18,7 @@ import xyz.dowob.filemanagement.component.provider.providerImpl.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.providerImpl.RedisProvider;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.file.TransferResponseDTO;
-import xyz.dowob.filemanagement.dto.file.TransferTask;
-import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
+import xyz.dowob.filemanagement.dto.file.*;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -36,7 +33,9 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 圖片文件業務邏輯實現類，實現接口 @see {@link AbstractFileService}
@@ -83,6 +82,28 @@ public class ImageFileServiceImpl extends AbstractFileService {
 
 
     /**
+     * 獲取用戶文件列表的接口
+     *
+     * @param user 用戶信息
+     *
+     * @return 返回用戶文件列表
+     */
+    //todo 優化只顯示當前目錄下的文件
+    @Override
+    public Flux<UserFileListDTO> getUserFileList (User user) {
+        return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMapMany(userFileMetadataList -> {
+            Set<Long> serverFileIds = userFileMetadataList.stream().map(UserFileMetadata::getServerFileId).collect(Collectors.toSet());
+            return serverFileMetaRepository
+                    .findAllByIds(serverFileIds)
+                    .collectMap(ServerFileMetadata::getId)
+                    .flatMapMany(serverFileMetadataMap -> Flux.fromIterable(userFileMetadataList).map(userFileMetadata -> {
+                        ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
+                        return new UserFileListDTO(serverFileMetadata, userFileMetadata);
+                    }));
+        });
+    }
+
+    /**
      * 上傳文件的接口
      *
      * @param fileMetadata 文件元數據
@@ -92,13 +113,14 @@ public class ImageFileServiceImpl extends AbstractFileService {
      * @return Mono<ResponseEntity < ?>> 返回上傳結果
      */
     @Override
-    public Mono<TransferResponseDTO> uploadFile(FileMetadata fileMetadata, User user) {
+    public Mono<TransferResponseDTO> uploadFile (FileMetadata fileMetadata, User user) {
         fileMetadata.setUserId(user.getId());
         log.debug("FileMetadata: {}", fileMetadata.toString());
         return serverFileMetaRepository
                 .findByMd5(fileMetadata.getMd5())
                 .flatMap(existingFile -> associateUserFile(existingFile.getId(),
-                                                           fileMetadata).flatMap(userFileMetadata -> userFileMetaRepository
+                                                           fileMetadata
+                ).flatMap(userFileMetadata -> userFileMetaRepository
                         .save(userFileMetadata)
                         .flatMap(userFile -> Mono.just(new TransferResponseDTO(null, null, 100.0, true, true, "上傳成功")))))
                 .switchIfEmpty(initialUpload(fileMetadata));
@@ -113,7 +135,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      * @return Mono<String> taskId
      */
     @Override
-    protected Mono<TransferResponseDTO> initialUpload(FileMetadata fileMetadata) {
+    protected Mono<TransferResponseDTO> initialUpload (FileMetadata fileMetadata) {
         String uploadTaskId = UUID.randomUUID().toString();
         return transfersTasksManager.registerUploadTask(fileMetadata, uploadTaskId).flatMap(isRegisterSuccess -> {
             if (isRegisterSuccess) {
@@ -131,7 +153,8 @@ public class ImageFileServiceImpl extends AbstractFileService {
                                                           transfersTasksManager
                                                                   .getTransfersTask(md5, TransfersStatusEnum.UPLOADING)
                                                                   .getFirst()
-                                                                  .getTransferTaskId()));
+                                                                  .getTransferTaskId()
+                ));
             }
         });
 
@@ -147,7 +170,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      */
     // todo 對失敗的分塊進行重試
     @Override
-    public Mono<TransferResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO) {
+    public Mono<TransferResponseDTO> uploadFileChunk (UploadChunkDTO uploadChunkDTO) {
         String transferTaskId = uploadChunkDTO.getTransferTaskId();
         String key = "upload_task:" + transferTaskId;
         String pendingChunkKey = key + ":pending_chunks";
@@ -168,7 +191,9 @@ public class ImageFileServiceImpl extends AbstractFileService {
                                                                                   true,
                                                                                   false,
                                                                                   String.format("文件分塊: %d 已上傳",
-                                                                                                uploadChunkDTO.getChunkIndex()));
+                                                                                                uploadChunkDTO.getChunkIndex()
+                                                                                  )
+                            );
                             if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
                                 combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks())
                                         .subscribeOn(Schedulers.boundedElastic())
@@ -191,8 +216,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return Mono<TransferResponseDTO> 上傳結果
      */
-    private Mono<TransferResponseDTO> processChunk(
-            UploadChunkDTO uploadChunkDTO, String transferTaskId, String key, String pendingChunkKey) {
+    private Mono<TransferResponseDTO> processChunk (UploadChunkDTO uploadChunkDTO, String transferTaskId, String key, String pendingChunkKey) {
         int chunkIndex = uploadChunkDTO.getChunkIndex();
         int totalChunks = uploadChunkDTO.getTotalChunks();
 
@@ -231,7 +255,8 @@ public class ImageFileServiceImpl extends AbstractFileService {
                                                                      progress,
                                                                      false,
                                                                      false,
-                                                                     "文件分塊上傳失敗"));
+                                                                     "文件分塊上傳失敗"
+                                ));
                             });
                 }));
     }
@@ -248,8 +273,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return TransferResponseDTO
      */
-    private TransferResponseDTO generateResponseDTO(
-            int chunkIndex, String transferTaskId, double progress, boolean isSuccess, boolean isFinished, String message) {
+    private TransferResponseDTO generateResponseDTO (int chunkIndex, String transferTaskId, double progress, boolean isSuccess, boolean isFinished, String message) {
         TransferResponseDTO responseDTO = new TransferResponseDTO();
         responseDTO.setChunkIndex(chunkIndex);
         responseDTO.setTransferTaskId(transferTaskId);
@@ -268,11 +292,12 @@ public class ImageFileServiceImpl extends AbstractFileService {
      * @return Mono<Void>
      */
     @Override
-    protected Mono<ObjectId> combineChunks(String transferTaskId, int totalChunks) {
+    protected Mono<ObjectId> combineChunks (String transferTaskId, int totalChunks) {
         return redisProvider.getHashMap("upload_task:" + transferTaskId, "DTO").flatMap(task -> {
             TransferTask transferTask = (TransferTask) task;
             return Mono.defer(() -> {
-                record ChunkData(int index, byte[] data) {}
+                record ChunkData(int index, byte[] data) {
+                }
 
                 Flux<byte[]> chunkFiles = Flux
                         .range(1, totalChunks)
@@ -300,7 +325,8 @@ public class ImageFileServiceImpl extends AbstractFileService {
                                                      TransfersStatusEnum.FAILED,
                                                      "MD5校驗失敗",
                                                      null,
-                                                     false)
+                                                     false
+                                )
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .subscribe();
                         return Mono.defer(() -> removeTempData(transferTask).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
@@ -321,7 +347,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return Mono<byte [ ]> 合併後的數據
      */
-    private Mono<byte[]> combineBytes(List<byte[]> byteArrays) {
+    private Mono<byte[]> combineBytes (List<byte[]> byteArrays) {
         return Mono.fromCallable(() -> {
             int totalLength = byteArrays.stream().mapToInt(bytes -> bytes.length).sum();
             ByteBuffer buffer = ByteBuffer.allocate(totalLength);
@@ -338,10 +364,11 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return Mono<Void>
      */
-    private Mono<Void> processFileAfterMd5Check(TransferTask transferTask, byte[] combinedBytes) {
+    private Mono<Void> processFileAfterMd5Check (TransferTask transferTask, byte[] combinedBytes) {
         return gridFsProvider
                 .storeFile(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(combinedBytes)),
-                           String.format("%s_output", transferTask.getTransferTaskId()))
+                           String.format("%s_output", transferTask.getTransferTaskId())
+                )
                 .flatMap(fileGridFsId -> {
                     ServerFileMetadata serverFileMetadata = new ServerFileMetadata();
                     serverFileMetadata.setFileSize(transferTask.getFileSize());
@@ -371,7 +398,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      * @return Mono<String> 文件ID
      */
     @Override
-    protected Mono<UserFileMetadata> associateUserFile(Long serverFileMetadataId, FileMetadata fileMetadata) {
+    protected Mono<UserFileMetadata> associateUserFile (Long serverFileMetadataId, FileMetadata fileMetadata) {
         UserFileMetadata userFileMetadata = new UserFileMetadata();
         userFileMetadata.setUserId(fileMetadata.getUserId());
         userFileMetadata.setServerFileId(serverFileMetadataId);
@@ -389,7 +416,8 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return Mono<Void>
      */
-    private Mono<Void> removeTempData(TransferTask transferTask) {
+    //todo 合併完成後清除記憶體中的數據
+    private Mono<Void> removeTempData (TransferTask transferTask) {
         String key = "upload_task:" + transferTask.getTransferTaskId();
         return Flux
                 .range(1, transferTask.getTotalChunks())
@@ -404,7 +432,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return String 文件類型
      */
-    private String getExtension(String fileName) {
+    private String getExtension (String fileName) {
         int lastDotIndex = fileName.lastIndexOf('.');
         if (lastDotIndex == -1 || lastDotIndex == fileName.length() - 1) {
             return "";

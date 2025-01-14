@@ -8,6 +8,8 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
 
+import java.util.Set;
+
 /**
  * 伺服器檔案元數據操作介面，使用Spring Data R2DBC來操作數據庫，繼承ReactiveCrudRepository。
  *
@@ -47,4 +49,7 @@ public interface ServerFileMetaRepository extends ReactiveCrudRepository<ServerF
      */
     @Query("SELECT u.* FROM users u JOIN user_file_metadata ufm ON u.id = ufm.user_id WHERE ufm.server_file_id = :serverFileId;")
     Flux<User> findAllOwnersByServerFileMetaId(Long serverFileId);
+
+    @Query("SELECT * FROM server_file_metadata WHERE server_file_metadata.id IN (:serverFileId)")
+    Flux<ServerFileMetadata> findAllByIds(Set<Long> serverFileId);
 }

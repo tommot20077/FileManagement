@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
@@ -33,7 +34,7 @@ public class ServerFileMetadata {
     private Long id;
 
     /**
-     * 文件名稱
+     * 文件大小
      */
     @Column("file_size")
     private Long fileSize;
@@ -45,15 +46,17 @@ public class ServerFileMetadata {
     private FileEnum fileType;
 
     /**
-     * 文件名稱
+     * 文件上傳時間
      */
     @Column("upload_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadTime;
 
     /**
      * 文件最後訪問時間
      */
     @Column("last_access_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
 
     /**
@@ -74,7 +77,7 @@ public class ServerFileMetadata {
     private Set<Long> owners;
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals (Object o) {
         if (this == o) {
             return true;
         }
@@ -86,12 +89,12 @@ public class ServerFileMetadata {
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode () {
         return id.hashCode();
     }
 
     @Override
-    public String toString() {
+    public String toString () {
         HashMap<String, Object> fileMap = new HashMap<>();
         fileMap.put("id", id);
         fileMap.put("fileSize", fileSize);

@@ -21,8 +21,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
  **/
 @RestController
 @RequestMapping("/api/user")
-public class ApiBaseUserController extends BaseUserController {
-    public ApiBaseUserController(FileStrategy fileStrategy, UserService userService) {
+public class ApiUserController extends BaseUserController {
+    public ApiUserController (FileStrategy fileStrategy, UserService userService) {
         super(fileStrategy, userService);
     }
 
@@ -35,7 +35,7 @@ public class ApiBaseUserController extends BaseUserController {
      */
     @PostMapping("/logout")
     @Override
-    public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange) {
         return super.logout(exchange);
     }
 
@@ -48,9 +48,10 @@ public class ApiBaseUserController extends BaseUserController {
      */
     @GetMapping("/getUserInfo")
     @Override
-    public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange, @RequestParam Long userid) {
+    public Mono<ResponseEntity<?>> getUserInfo (ServerWebExchange exchange, @RequestParam Long userid) {
         return super.getUserInfo(exchange, userid);
     }
+
 
     /**
      * 獲取所有用戶信息的API請求
@@ -59,9 +60,10 @@ public class ApiBaseUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
+
     @GetMapping("/getAllUserInfo")
     @Override
-    public Flux<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
+    public Flux<ResponseEntity<?>> getAllUserInfo (ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
     }
 

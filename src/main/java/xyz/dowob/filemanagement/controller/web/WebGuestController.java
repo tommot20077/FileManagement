@@ -27,8 +27,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
  **/
 @RestController
 @RequestMapping("/web/guest")
-public class WebBaseGuestController extends BaseGuestController {
-    public WebBaseGuestController(UserService userService, AuthorizationService authorizationService) {
+public class WebGuestController extends BaseGuestController {
+    public WebGuestController (UserService userService, AuthorizationService authorizationService) {
         super(authorizationService, userService);
     }
 

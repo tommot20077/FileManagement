@@ -79,7 +79,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> register(RegisterDTO registerUserDTO) {
+    public Mono<Void> register (RegisterDTO registerUserDTO) {
         return validationService.validateRegisterDTO(registerUserDTO).then(Mono.defer(() -> {
             User user = new User();
             user.setUsername(registerUserDTO.getUsername());
@@ -99,7 +99,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     @HideSensitive
-    public Mono<String> login(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
+    public Mono<String> login (AuthRequestDTO authRequestDTO, ServerWebExchange request) {
         return validationService.validateNotNull(authRequestDTO).then(authorizationService.authenticate(authRequestDTO, request));
     }
 
@@ -111,7 +111,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> logout(Long userId, ServerWebExchange exchange) {
+    public Mono<Void> logout (Long userId, ServerWebExchange exchange) {
         return exchange
                 .getSession()
                 .flatMap(session -> userRepository
@@ -129,7 +129,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<User> changePassword(User user) {
+    public Mono<User> changePassword (User user) {
         return null;
     }
 
@@ -141,7 +141,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<User> changeEmail(User user) {
+    public Mono<User> changeEmail (User user) {
         return null;
     }
 
@@ -153,17 +153,19 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> sendResetPasswordMail(UserEmailDTO userEmailDTO) {
+    public Mono<Void> sendResetPasswordMail (UserEmailDTO userEmailDTO) {
         return validationService
                 .validateNotNull(userEmailDTO)
                 .then(Mono.defer(() -> userRepository
                         .findByEmail(userEmailDTO.getEmail())
                         .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
-                                                                          userEmailDTO.getEmail())))
+                                                                          userEmailDTO.getEmail()
+                        )))
                         .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
                             String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
                                                            token,
-                                                           securityProperties.getResetPasswordToken().getExpiration());
+                                                           securityProperties.getResetPasswordToken().getExpiration()
+                            );
                             return emailProvider.sendEmail(user.getEmail(), "重置密碼", content);
                         }))));
     }
@@ -176,13 +178,14 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> resetPassword(ResetPasswordDTO resetPasswordDTO) {
+    public Mono<Void> resetPassword (ResetPasswordDTO resetPasswordDTO) {
         return validationService
                 .validateResetPasswordDTO(resetPasswordDTO)
                 .then(Mono.defer(() -> userRepository
                         .findByEmail(resetPasswordDTO.getEmail())
                         .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
-                                                                          resetPasswordDTO.getEmail())))
+                                                                          resetPasswordDTO.getEmail()
+                        )))
                         .flatMap(user -> tokenService
                                 .validateToken(resetPasswordDTO.getVerificationCode(), user.getId(), TokenEnum.RESET_PASSWORD_TOKEN)
                                 .then(Mono.defer(() -> {
@@ -204,7 +207,7 @@ public class UserServiceImpl implements UserService {
      * @return Mono<User> 返回用戶對象
      */
     @Override
-    public Mono<User> getUser(ServerWebExchange exchange) {
+    public Mono<User> getUser (ServerWebExchange exchange) {
         final Object[] userId = new Object[1];
         return exchange.getSession().flatMap(webSession -> {
             userId[0] = webSession.getAttributes().get("userId");
@@ -228,7 +231,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回一個新的實體對象
      */
     @Override
-    public Mono<User> create() {
+    public Mono<User> create () {
         return null;
     }
 
@@ -240,7 +243,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回一個Optional對象
      */
     @Override
-    public Mono<User> getById(Long userId) {
+    public Mono<User> getById (Long userId) {
         return userRepository.findById(userId);
     }
 
@@ -248,7 +251,7 @@ public class UserServiceImpl implements UserService {
      * 獲取所有實體
      */
     @Override
-    public Flux<User> getAll() {
+    public Flux<User> getAll () {
         return userRepository.findAll();
     }
 
@@ -258,7 +261,7 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
-    public Mono<Void> update(User entity) {
+    public Mono<Void> update (User entity) {
         return null;
     }
 
@@ -268,7 +271,7 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
-    public Mono<Void> delete(User entity) {
+    public Mono<Void> delete (User entity) {
         return null;
     }
 

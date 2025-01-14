@@ -1,9 +1,12 @@
 package xyz.dowob.filemanagement.component.manager;
 
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.Nullable;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.HandshakeInfo;
@@ -22,6 +25,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -57,6 +61,8 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     /**
      * JwtWebSocketHandlerAdapter 構造方法
      *
@@ -70,6 +76,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         this.jwtTokenProvider = jwtTokenProvider;
         this.fileProperties = fileProperties;
         this.fileUploadWebSocketHandler = fileUploadWebSocketHandler;
+        this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     /**
@@ -152,11 +159,21 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED));
         }).onErrorResume(ValidationException.class, e -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), e.getMessage(), null);
-            Mono<ResponseEntity<?>> responseEntity = createResponseEntity(apiResponse);
-            return exchange
-                    .getResponse()
-                    .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(responseEntity.toString().getBytes())));
+            try {
+                ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), e.getMessage(), null);
+                byte[] responseBytes = objectMapper.writeValueAsBytes(apiResponse);
+
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+                return exchange
+                        .getResponse()
+                        .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(responseBytes)));
+            } catch (Exception jsonException) {
+                log.error("序列化結果時發生錯誤: ", jsonException);
+                return Mono.error(jsonException);
+            }
         });
     }
 }
+//todo 前端頁面顯示、檔案下載功能、用戶檔案的歷程記錄、用戶個人檔案的管理、檔案預覽、檔案分享、檔案容量上限

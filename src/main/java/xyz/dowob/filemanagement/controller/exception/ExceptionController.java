@@ -43,7 +43,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
-    @ExceptionHandler(NoResourceFoundException.class)
+    @ExceptionHandler({NoResourceFoundException.class, ResponseStatusException.class})
     public Mono<ResponseEntity<?>> handleNotFound(Exception ex, ServerWebExchange exchange) {
         String requestUrl = exchange.getRequest().getURI().getPath();
         log.debug("發生404錯誤: {}, 錯誤的請求位置: {}", ex.getMessage(), requestUrl);
@@ -171,7 +171,6 @@ public class ExceptionController implements ResponseUnity {
                                                                    exchange.getRequest().getURI().getPath(),
                                                                    "伺服器內部處理錯誤",
                                                                    null);
-
         return createResponseEntity(apiResponseDTO, HttpStatus.INTERNAL_SERVER_ERROR.value());
     }
 }

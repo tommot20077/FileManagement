@@ -1,10 +1,13 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.file.TransferResponseDTO;
 import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
+import xyz.dowob.filemanagement.dto.file.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 /**
  * @author yuan
@@ -17,17 +20,43 @@ import xyz.dowob.filemanagement.entity.User;
 public interface FileService {
 
     /**
+     * 獲取用戶文件列表的接口
+     *
+     * @param user 用戶信息
+     *
+     * @return 返回用戶文件列表
+     */
+    default Flux<UserFileListDTO> getUserFileList (User user) {
+        return null;
+    }
+
+    /**
+     * 獲取用戶文件列表的接口
+     *
+     * @param userId 用戶ID
+     *
+     * @return 返回用戶文件列表
+     */
+    default Flux<UserFileListDTO> getUserFileList(Long userId) {
+        return null;
+    };
+
+    /**
      * 上傳文件的接口
      *
      * @param fileMetadata 文件元數據
      *                     包含文件名、文件大小、文件類型等信息
      * @param user         用戶信息
      *
-     * @return Mono<ResponseEntity < ?>> 返回上傳結果
+     * @return 返回上傳結果
      */
-    Mono<TransferResponseDTO> uploadFile(FileMetadata fileMetadata, User user);
+    default Mono<TransferResponseDTO> uploadFile (FileMetadata fileMetadata, User user) {
+        return null;
+    }
 
-    Mono<TransferResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO);
+    default Mono<TransferResponseDTO> uploadFileChunk (UploadChunkDTO uploadChunkDTO) {
+        return null;
+    }
 
     // Mono<ResponseEntity<?>> downloadFile(ServerWebExchange exchange, String fileId);
 

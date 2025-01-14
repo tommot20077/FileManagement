@@ -27,8 +27,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
  **/
 @RestController
 @RequestMapping("/api/guest")
-public class ApiBaseGuestController extends BaseGuestController {
-    public ApiBaseGuestController(UserService userService, AuthorizationService authorizationService) {
+public class ApiGuestController extends BaseGuestController {
+    public ApiGuestController (UserService userService, AuthorizationService authorizationService) {
         super(authorizationService, userService);
     }
 
