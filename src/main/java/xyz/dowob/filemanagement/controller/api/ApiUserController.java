@@ -35,8 +35,8 @@ public class ApiUserController extends BaseUserController {
      */
     @PostMapping("/logout")
     @Override
-    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange) {
-        return super.logout(exchange);
+    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange, boolean isWeb) {
+        return super.logout(exchange, false);
     }
 
     /**

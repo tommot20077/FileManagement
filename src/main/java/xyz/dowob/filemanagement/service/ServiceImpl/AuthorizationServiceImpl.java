@@ -2,6 +2,8 @@ package xyz.dowob.filemanagement.service.ServiceImpl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.server.csrf.CsrfToken;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -43,6 +45,8 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      * 憑證服務
      */
     private final TokenService tokenService;
+
+    private final ServerCsrfTokenRepository csrfTokenRepository;
 
     /**
      * 根據用戶請求頭中的JWT憑證進行授權
@@ -105,5 +109,10 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      */
     public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
         return authenticate(authRequestDTO, null);
+    }
+
+    @Override
+    public Mono<CsrfToken> getCSRFToken (ServerWebExchange request) {
+        return csrfTokenRepository.generateToken(request);
     }
 }

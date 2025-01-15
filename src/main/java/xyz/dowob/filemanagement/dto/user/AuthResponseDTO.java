@@ -22,7 +22,7 @@ public class AuthResponseDTO {
      * JWT 驗證令牌
      */
     @HideSensitive
-    @JsonProperty("JWT Token")
+    @JsonProperty("token")
     private String jwtToken;
 
 }

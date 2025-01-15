@@ -121,11 +121,10 @@ public class JwtTokenProviderImpl implements TokenProvider {
                 Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
                 long subject = Long.parseLong(claims.getSubject());
                 return tokenRepository.findByUserId(subject).flatMap(tokenMono -> {
-                    if (tokenMono.getJwtTokenVersion() != (int) claims.get("version")) {
-                        return Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID));
-                    } else {
+                    if (tokenMono.getJwtTokenVersion() == (int) claims.get("version")) {
                         return Mono.just(subject);
                     }
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID));
                 });
             } catch (Exception e) {
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID));

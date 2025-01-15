@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
@@ -28,8 +30,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 @RestController
 @RequestMapping("/web/guest")
 public class WebGuestController extends BaseGuestController {
-    public WebGuestController (UserService userService, AuthorizationService authorizationService) {
-        super(authorizationService, userService);
+    public WebGuestController (UserService userService, AuthorizationService authorizationService, SecurityProperties securityProperties) {
+        super(authorizationService, userService, securityProperties);
     }
 
     /**
@@ -55,9 +57,10 @@ public class WebGuestController extends BaseGuestController {
      * @return Mono<ResponseEntity> 返回登入結果
      */
     @Override
+    @HideSensitive
     @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login(AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
-        return super.login(authRequestDTO, exchange);
+    public Mono<ResponseEntity<?>> login(AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
+        return super.login(authRequestDTO, exchange, true);
     }
 
     /**

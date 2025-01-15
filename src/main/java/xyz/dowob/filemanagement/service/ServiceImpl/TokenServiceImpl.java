@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
@@ -38,6 +39,7 @@ public class TokenServiceImpl implements TokenService {
      * @return 返回憑證
      */
     @Override
+    @HideSensitive
     public Mono<String> generateToken(User user, TokenEnum tokenType) {
         return tokenStrategy.getTokenProvider(tokenType).generateToken(user);
     }

@@ -13,6 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.controller.exception.ExceptionController;
+import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.lang.reflect.Method;
 
@@ -38,19 +39,22 @@ public class LoggerAspect {
      * 定義 ServiceInterface 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.service..*)")
-    public void serviceLayerPointcut() {}
+    public void serviceLayerPointcut () {
+    }
 
     /**
      * 定義 Component 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.component..*)")
-    public void componentLayerPointcut() {}
+    public void componentLayerPointcut () {
+    }
 
     /**
      * 定義 Controller 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.controller..*)")
-    public void controllerLayerPointcut() {}
+    public void controllerLayerPointcut () {
+    }
 
     /**
      * 環繞通知，用於記錄 Component 和 ServiceInterface 層的日誌
@@ -65,7 +69,7 @@ public class LoggerAspect {
      * @return Object 方法的返回值
      */
     @Around("serviceLayerPointcut() || componentLayerPointcut() || controllerLayerPointcut()")
-    public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
+    public Object logAround (ProceedingJoinPoint joinPoint) throws Throwable {
         final String[] requestUsername = new String[1];
         Mono.deferContextual(context -> {
             ServerWebExchange exchange = context.get(ServerWebExchange.class);
@@ -92,14 +96,22 @@ public class LoggerAspect {
                     String value = processMethodSignature(method, resp);
                     infoLog(requestUsername[0], className, methodName, value);
                 }).doOnError(e -> {
-                    createErrorLog(requestUsername[0], className, methodName, e);
+                    if (e instanceof ValidationException) {
+                        warnLog(requestUsername[0], className, methodName, e);
+                    } else {
+                        createErrorLog(requestUsername[0], className, methodName, e);
+                    }
                 });
             } else if (result instanceof Flux<?>) {
                 return ((Flux<?>) result).doOnNext(resp -> {
                     String value = processMethodSignature(method, resp);
                     infoLog(requestUsername[0], className, methodName, value);
                 }).doOnError(e -> {
-                    createErrorLog(requestUsername[0], className, methodName, e);
+                    if (e instanceof ValidationException) {
+                        warnLog(requestUsername[0], className, methodName, e);
+                    } else {
+                        createErrorLog(requestUsername[0], className, methodName, e);
+                    }
                 });
             } else {
                 String value = processMethodSignature(method, result);
@@ -120,7 +132,7 @@ public class LoggerAspect {
      *
      * @return String 處理後的日誌顯示的返回值
      */
-    private String processMethodSignature(Method method, Object result) {
+    private String processMethodSignature (Method method, Object result) {
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
         if (isSensitive) {
             return "[隱藏敏感訊息]";
@@ -131,11 +143,15 @@ public class LoggerAspect {
         return result.toString();
     }
 
-    private void infoLog(String requestUsername, String className, String methodName, Object result) {
+    private void infoLog (String requestUsername, String className, String methodName, Object result) {
         log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, result);
     }
 
-    private void createErrorLog(String requestUsername, String className, String methodName, Throwable e) {
+    private void warnLog (String requestUsername, String className, String methodName, Throwable e) {
+        log.warn("請求者: {} | 所屬類: {} | 使用方法: {} | 警告訊息: {}", requestUsername, className, methodName, e.getMessage());
+    }
+
+    private void createErrorLog (String requestUsername, String className, String methodName, Throwable e) {
         log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}", requestUsername, className, methodName, e.getMessage());
     }
 }

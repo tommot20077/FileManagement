@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.dto.user.RegisterDTO;
@@ -28,8 +30,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 @RestController
 @RequestMapping("/api/guest")
 public class ApiGuestController extends BaseGuestController {
-    public ApiGuestController (UserService userService, AuthorizationService authorizationService) {
-        super(authorizationService, userService);
+    public ApiGuestController (UserService userService, AuthorizationService authorizationService, SecurityProperties securityProperties) {
+        super(authorizationService, userService, securityProperties);
     }
 
     /**
@@ -42,7 +44,7 @@ public class ApiGuestController extends BaseGuestController {
      */
     @Override
     @PostMapping("/register")
-    public Mono<ResponseEntity<?>> register(RegisterDTO registerUserDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> register (RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return super.register(registerUserDTO, exchange);
     }
 
@@ -55,9 +57,10 @@ public class ApiGuestController extends BaseGuestController {
      * @return Mono<ResponseEntity> 返回登入結果
      */
     @Override
+    @HideSensitive
     @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login(AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
-        return super.login(authRequestDTO, exchange);
+    public Mono<ResponseEntity<?>> login (AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
+        return super.login(authRequestDTO, exchange, false);
     }
 
     /**
@@ -70,7 +73,7 @@ public class ApiGuestController extends BaseGuestController {
      */
     @Override
     @PostMapping("/sendResetPasswordMail")
-    public Mono<ResponseEntity<?>> sendResetPasswordMail(UserEmailDTO userMail, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> sendResetPasswordMail (UserEmailDTO userMail, ServerWebExchange exchange) {
         return super.sendResetPasswordMail(userMail, exchange);
     }
 
@@ -84,7 +87,7 @@ public class ApiGuestController extends BaseGuestController {
      */
     @Override
     @PutMapping("/resetPassword")
-    public Mono<ResponseEntity<?>> resetPassword(ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> resetPassword (ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return super.resetPassword(resetPasswordDTO, exchange);
     }
 }

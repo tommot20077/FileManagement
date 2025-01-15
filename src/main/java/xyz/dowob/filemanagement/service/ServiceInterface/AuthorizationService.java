@@ -4,6 +4,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
@@ -50,5 +51,9 @@ public interface AuthorizationService {
             attributes.put("username", user.getUsername());
             attributes.put("userId", user.getId());
         }).then();
+    }
+
+    default Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {
+        return request.getSession().mapNotNull(webSession -> webSession.getAttribute("csrfToken"));
     }
 }

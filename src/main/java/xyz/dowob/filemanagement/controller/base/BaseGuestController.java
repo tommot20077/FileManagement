@@ -1,11 +1,16 @@
 package xyz.dowob.filemanagement.controller.base;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.dto.user.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -37,6 +42,8 @@ public abstract class BaseGuestController implements ResponseUnity {
 
     protected final UserService userService;
 
+    protected final SecurityProperties securityProperties;
+
     /**
      * 訪客註冊的請求
      *
@@ -45,10 +52,10 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回註冊結果
      */
-    public Mono<ResponseEntity<?>> register(@Validated @RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> register (@Validated @RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return userService.register(registerUserDTO).then(Mono.defer(() -> {
             HashMap<String, Object> data = new HashMap<>();
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "註冊成功", data);
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, 201, "註冊成功", data);
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("註冊失敗: %s", e.getMessage());
@@ -65,10 +72,23 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回登入結果
      */
-    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> login (
+            @Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
         return userService.login(authRequestDTO, exchange).flatMap(token -> {
-            AuthResponseDTO authResponseDTO = new AuthResponseDTO(token);
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", authResponseDTO);
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
+            if (isWeb) {
+                ResponseCookie cookie = ResponseCookie
+                        .from("jwtToken", token)
+                        .httpOnly(true)
+                        .secure(true)
+                        .maxAge((long) securityProperties.getJwtToken().getExpiration() * 60)
+                        .sameSite("Strict")
+                        .build();
+
+                MultiValueMap<String, String> headers = new HttpHeaders();
+                headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+                return createResponseEntity(apiResponse, headers);
+            }
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("登入失敗: %s", e.getMessage());
@@ -76,12 +96,28 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });
     }
-    // todo 隱藏Token
-    // <200 OK OK,ApiResponseDTO(timestamp=2024-10-02T14:08:49.278291400, status=200, path=/api/guest/login, message=登入成功,
-    // data=AuthResponseDTO(jwtToken=eyJhbGciOiJIUzUxMiJ9
-    // .eyJzdWIiOiIxIiwiaWF0IjoxNzI3ODQ5MzI4LCJyb2xlIjoiVVNFUiIsInZlcnNpb24iOjksImV4cCI6MTcyNzkzNTcyOH0
-    // .A4B4sTVfCft7zyfPzTodCL3AmU1opdoDppNAFLVyFkD9BBY0et9IavnoKAf61tNY5TMyuSTwQX4AbCTCaGs7JQ)),[]>
+    @GetMapping("/checkAuthenticationStatus")
+    public Mono<ResponseEntity<?>> checkAuthenticationStatus (ServerWebExchange exchange) {
+        return userService.getUser(exchange).flatMap(user -> {
+            HashMap<String, Object> data = new HashMap<>();
+            HashMap<String, Object> userMap = new HashMap<>();
+            userMap.put("userId", user.getId());
+            userMap.put("userName", user.getUsername());
+            userMap.put("userMail", user.getEmail());
+            userMap.put("userRole", user.getRole());
+            data.put("user", userMap);
+            data.put("isAuthenticated", true);
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "用戶已授權", data);
+            return createResponseEntity(apiResponse);
+        }).switchIfEmpty(Mono.defer(() -> {
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
+            return createResponseEntity(apiResponse);
+        })).onErrorResume(ValidationException.class, e -> {
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
+            return createResponseEntity(apiResponse);
+        });
 
+    }
 
     /**
      * 發送重置密碼郵件
@@ -91,7 +127,7 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回發送結果
      */
-    public Mono<ResponseEntity<?>> sendResetPasswordMail(@RequestBody @Validated UserEmailDTO userMail, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> sendResetPasswordMail (@RequestBody @Validated UserEmailDTO userMail, ServerWebExchange exchange) {
         return userService.sendResetPasswordMail(userMail).then(Mono.defer(() -> {
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
             return createResponseEntity(apiResponse);
@@ -110,12 +146,27 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回重置密碼結果
      */
-    public Mono<ResponseEntity<?>> resetPassword(@Validated @RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> resetPassword (@Validated @RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "密碼重置成功", null);
             return createResponseEntity(apiResponse);
         })).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("密碼重置失敗: %s", e.getMessage());
+            int responseCode = e.getErrorCode().getCode();
+            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
+        });
+    }
+
+    // todo 下放到子類
+    @GetMapping("/getCSRFToken")
+    public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
+        return authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
+            HashMap<String, Object> data = new HashMap<>();
+            data.put("csrfToken", csrfToken.getToken());
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取CSRF Token成功", data);
+            return createResponseEntity(apiResponse);
+        }).onErrorResume(ValidationException.class, e -> {
+            String errorMessage = String.format("獲取CSRF Token失敗: %s", e.getMessage());
             int responseCode = e.getErrorCode().getCode();
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });

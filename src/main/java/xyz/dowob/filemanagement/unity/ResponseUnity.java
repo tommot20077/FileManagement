@@ -10,6 +10,7 @@ package xyz.dowob.filemanagement.unity;
  **/
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
@@ -36,7 +37,7 @@ public interface ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回對應的Mono<ResponseEntity>
      */
-    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, int responseCode) {
+    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse, int responseCode) {
         return Mono.just(ResponseEntity.status(responseCode).body(apiResponse));
     }
 
@@ -48,9 +49,23 @@ public interface ResponseUnity {
      *
      * @return ResponseEntity 返回對應的ResponseEntity
      */
-    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse) {
+    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse) {
         int responseCode = apiResponse.getStatus() == 200 ? 200 : 400;
         return createResponseEntity(apiResponse, responseCode);
+    }
+
+    /**
+     * 用於創建返回ResponseEntity的方法，此為重載方法
+     * 根據ApiResponseDTO的狀態碼創建對應的ResponseEntity
+     * 同時返回對應的頭部
+     *
+     * @param apiResponse 返回結果
+     * @param headers     返回頭部
+     *
+     * @return ResponseEntity 返回對應的ResponseEntity
+     */
+    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse, MultiValueMap<String, String> headers) {
+        return Mono.just(new ResponseEntity<>(apiResponse, headers, apiResponse.getStatus()));
     }
 
     /**
@@ -64,7 +79,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse (ServerWebExchange request, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -79,7 +94,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(String path, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse (String path, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
     }
 
@@ -93,7 +108,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse (ServerWebExchange request, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -106,7 +121,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(String path, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse (String path, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, path, message, data);
     }
 

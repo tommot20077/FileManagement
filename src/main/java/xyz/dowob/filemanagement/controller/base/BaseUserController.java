@@ -1,7 +1,10 @@
 package xyz.dowob.filemanagement.controller.base;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -38,13 +41,22 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回登出結果
      */
-    public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange) {
-        return userService
-                .getUser(exchange)
-                .flatMap(user -> userService
-                        .logout(user.getId(), exchange)
-                        .then(createResponseEntity(createResponse(exchange, "登出成功", null))))
-                .switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));
+    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange, boolean isWeb) {
+        return userService.getUser(exchange).flatMap(user -> userService.logout(user.getId(), exchange).then(Mono.defer(() -> {
+            if (isWeb) {
+                ResponseCookie cookie = ResponseCookie
+                        .from("jwtToken", "")
+                        .httpOnly(true)
+                        .secure(true)
+                        .maxAge(0)
+                        .sameSite("Strict")
+                        .build();
+                MultiValueMap<String, String> headers = new HttpHeaders();
+                headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+                return createResponseEntity(createResponse(exchange, "登出成功", null), headers);
+            }
+            return createResponseEntity(createResponse(exchange, "登出成功", null));
+        }))).switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));
 
     }
 
@@ -56,7 +68,7 @@ public abstract class BaseUserController implements ResponseUnity {
      * @return Mono<ResponseEntity> 返回用戶信息
      */
     //todo 改成管理員使用
-    public Flux<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
+    public Flux<ResponseEntity<?>> getAllUserInfo (ServerWebExchange exchange) {
         return userService.getAll().flatMap(user -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
             return createResponseEntity(responseEntity);
@@ -75,7 +87,7 @@ public abstract class BaseUserController implements ResponseUnity {
      * @return Mono<ResponseEntity> 返回用戶信息
      */
     // 此方法為示例方法
-    public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange, @RequestParam("userid") Long id) {
+    public Mono<ResponseEntity<?>> getUserInfo (ServerWebExchange exchange, @RequestParam("userid") Long id) {
         return userService.getById(id).flatMap(user -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
             return createResponseEntity(responseEntity);
