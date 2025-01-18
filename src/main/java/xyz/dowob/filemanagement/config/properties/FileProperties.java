@@ -22,7 +22,7 @@ public class FileProperties {
     /**
      * 文件傳輸類型，默認為 MULTIPART，即使用 Multipart 進行文件傳輸
      */
-    private TransmissionEnum transmissionType = TransmissionEnum.MULTIPART;
+    private TransmissionEnum transmissionType = TransmissionEnum.CHUNK;
 
     /**
      * 建立文件上傳配置
@@ -40,8 +40,13 @@ public class FileProperties {
         private String tempDirectory = "./temp/uploads/";
 
         /**
-         * 最大允許分塊大小，單位為 MB，默認為 20MB
+         * Websocket最大允許分塊大小，單位為 MB，默認為 20MB
          */
         private Integer payloadLength = 20;
+
+        /**
+         * 上傳分塊大小限制，單位為 MB，默認為 10MB，此參數需小於 payloadLength
+         */
+        private Integer chunkSize = 10;
     }
 }

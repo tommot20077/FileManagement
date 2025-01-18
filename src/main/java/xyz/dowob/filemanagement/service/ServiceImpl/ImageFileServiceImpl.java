@@ -16,6 +16,7 @@ import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.providerImpl.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.providerImpl.RedisProvider;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.dto.file.*;
@@ -48,10 +49,11 @@ import java.util.stream.Collectors;
  * @create 2024-09-27 00:48
  * @Version 1.0
  **/
-@Service
+
 @RequiredArgsConstructor
 @FileHandlerType(FileEnum.IMAGE)
 @Log4j2
+@Service
 public class ImageFileServiceImpl extends AbstractFileService {
     /**
      * 服務器文件元數據庫操作對象
@@ -80,6 +82,11 @@ public class ImageFileServiceImpl extends AbstractFileService {
      */
     private final TransfersTasksManager transfersTasksManager;
 
+    /**
+     * 文件屬性配置
+     */
+    private final FileProperties fileProperties;
+
 
     /**
      * 獲取用戶文件列表的接口
@@ -98,7 +105,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
                     .collectMap(ServerFileMetadata::getId)
                     .flatMapMany(serverFileMetadataMap -> Flux.fromIterable(userFileMetadataList).map(userFileMetadata -> {
                         ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
-                        return new UserFileListDTO(serverFileMetadata, userFileMetadata);
+                        return new UserFileListDTO(serverFileMetadata, userFileMetadata, user);
                     }));
         });
     }
@@ -115,14 +122,13 @@ public class ImageFileServiceImpl extends AbstractFileService {
     @Override
     public Mono<TransferResponseDTO> uploadFile (FileMetadata fileMetadata, User user) {
         fileMetadata.setUserId(user.getId());
-        log.debug("FileMetadata: {}", fileMetadata.toString());
         return serverFileMetaRepository
                 .findByMd5(fileMetadata.getMd5())
                 .flatMap(existingFile -> associateUserFile(existingFile.getId(),
                                                            fileMetadata
                 ).flatMap(userFileMetadata -> userFileMetaRepository
                         .save(userFileMetadata)
-                        .flatMap(userFile -> Mono.just(new TransferResponseDTO(null, null, 100.0, true, true, "上傳成功")))))
+                        .flatMap(userFile -> Mono.just(new TransferResponseDTO(null, null, null, null, 100.0, true, true, "上傳成功")))))
                 .switchIfEmpty(initialUpload(fileMetadata));
     }
 
@@ -139,13 +145,16 @@ public class ImageFileServiceImpl extends AbstractFileService {
         String uploadTaskId = UUID.randomUUID().toString();
         return transfersTasksManager.registerUploadTask(fileMetadata, uploadTaskId).flatMap(isRegisterSuccess -> {
             if (isRegisterSuccess) {
-                TransferTask task = fileMetadata.formatToTransferTask(uploadTaskId, "初始化任務成功");
+                TransferTaskDTO task = fileMetadata.formatToTransferTask(uploadTaskId, "初始化任務成功");
                 String key = "upload_task:" + uploadTaskId;
+                int totalChunks = getTotalChunks(fileMetadata.getFileSize());
+                long chunkSize = fileProperties.getUpload().getChunkSize() * 1024 * 1024;
                 return redisProvider
                         .setHashMap(key, "DTO", task, 6, ChronoUnit.HOURS)
                         .then(redisProvider.setHashMap(key, "uploaded_count", 0, 6, ChronoUnit.HOURS))
-                        .then(redisProvider.generateChunkSet(key + ":pending_chunks", fileMetadata.getTotalChunks()))
-                        .then(Mono.just(new TransferResponseDTO(uploadTaskId, null, 0.0, true, false, "初始化任務成功")));
+                        .then(redisProvider.setHashMap(key, "total_chunks", totalChunks, 6, ChronoUnit.HOURS))
+                        .then(redisProvider.generateChunkSet(key + ":pending_chunks", totalChunks))
+                        .then(Mono.just(new TransferResponseDTO(uploadTaskId, totalChunks, chunkSize, null, 0.0, true, false, "初始化任務成功")));
             } else {
                 String md5 = fileMetadata.getMd5();
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.EXISTING_TRANSFER_TASK,
@@ -294,7 +303,7 @@ public class ImageFileServiceImpl extends AbstractFileService {
     @Override
     protected Mono<ObjectId> combineChunks (String transferTaskId, int totalChunks) {
         return redisProvider.getHashMap("upload_task:" + transferTaskId, "DTO").flatMap(task -> {
-            TransferTask transferTask = (TransferTask) task;
+            TransferTaskDTO transferTaskDTO = (TransferTaskDTO) task;
             return Mono.defer(() -> {
                 record ChunkData(int index, byte[] data) {
                 }
@@ -317,11 +326,11 @@ public class ImageFileServiceImpl extends AbstractFileService {
                         .map(ChunkData::data);
                 return chunkFiles.collectList().flatMap(this::combineBytes).flatMap(combinedBytes -> {
                     String computedChunkMd5 = DigestUtils.md5Hex(combinedBytes);
-                    if (!transferTask.getMd5().equals(computedChunkMd5)) {
+                    if (!transferTaskDTO.getMd5().equals(computedChunkMd5)) {
                         log.error("任務:{} MD5校驗失敗", transferTaskId);
                         transfersTasksManager
-                                .updateTransfersTask(transferTask.getMd5(),
-                                                     transferTask.getTransferTaskId(),
+                                .updateTransfersTask(transferTaskDTO.getMd5(),
+                                                     transferTaskDTO.getTransferTaskId(),
                                                      TransfersStatusEnum.FAILED,
                                                      "MD5校驗失敗",
                                                      null,
@@ -329,13 +338,13 @@ public class ImageFileServiceImpl extends AbstractFileService {
                                 )
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .subscribe();
-                        return Mono.defer(() -> removeTempData(transferTask).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
+                        return Mono.defer(() -> removeTempData(transferTaskDTO).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
                     } else {
                         log.info("任務:{} MD5校驗成功 {}", transferTaskId, computedChunkMd5);
-                        processFileAfterMd5Check(transferTask, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                        processFileAfterMd5Check(transferTaskDTO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
                         return Mono.just(new ObjectId());
                     }
-                }).flatMap(id -> removeTempData(transferTask).thenReturn(id));
+                }).flatMap(id -> removeTempData(transferTaskDTO).thenReturn(id));
             });
         });
     }
@@ -359,33 +368,35 @@ public class ImageFileServiceImpl extends AbstractFileService {
     /**
      * MD5校驗成功後處理文件，將文件存儲到GridFs數據庫中，並將文件元數據存儲到數據庫中
      *
-     * @param transferTask  任務
-     * @param combinedBytes 合併後的數據
+     * @param transferTaskDTO 任務
+     * @param combinedBytes   合併後的數據
      *
      * @return Mono<Void>
      */
-    private Mono<Void> processFileAfterMd5Check (TransferTask transferTask, byte[] combinedBytes) {
+    private Mono<Void> processFileAfterMd5Check (TransferTaskDTO transferTaskDTO, byte[] combinedBytes) {
         return gridFsProvider
                 .storeFile(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(combinedBytes)),
-                           String.format("%s_output", transferTask.getTransferTaskId())
+                           String.format("%s_output", transferTaskDTO.getTransferTaskId())
                 )
                 .flatMap(fileGridFsId -> {
                     ServerFileMetadata serverFileMetadata = new ServerFileMetadata();
-                    serverFileMetadata.setFileSize(transferTask.getFileSize());
+                    serverFileMetadata.setFileSize(transferTaskDTO.getFileSize());
                     serverFileMetadata.setFileType(FileEnum.IMAGE);
-                    serverFileMetadata.setMd5(transferTask.getMd5());
+                    serverFileMetadata.setMd5(transferTaskDTO.getMd5());
                     serverFileMetadata.setGridFsId(fileGridFsId.toHexString());
                     serverFileMetadata.setUploadTime(LocalDateTime.now());
                     serverFileMetadata.setLastAccessTime(LocalDateTime.now());
                     transfersTasksManager
-                            .finishTransfersTask(transferTask.getMd5(), transferTask.getTransferTaskId(), fileGridFsId.toHexString())
+                            .finishTransfersTask(transferTaskDTO.getMd5(), transferTaskDTO.getTransferTaskId(), fileGridFsId.toHexString())
                             .subscribeOn(Schedulers.boundedElastic())
                             .subscribe();
 
                     return serverFileMetaRepository
                             .save(serverFileMetadata)
-                            .flatMap(serverFile -> associateUserFile(serverFile.getId(), transferTask.formatToFileMetadata()).flatMap(
-                                    userFileMetadata -> userFileMetaRepository.save(userFileMetadata).then(removeTempData(transferTask))));
+                            .flatMap(serverFile -> associateUserFile(serverFile.getId(), transferTaskDTO.formatToFileMetadata()).flatMap(
+                                    userFileMetadata -> userFileMetaRepository
+                                            .save(userFileMetadata)
+                                            .then(removeTempData(transferTaskDTO))));
                 });
     }
 
@@ -412,17 +423,21 @@ public class ImageFileServiceImpl extends AbstractFileService {
     /**
      * 刪除暫存分塊數據，包括GridFs數據庫中的分塊數據和Redis數據庫中的任務數據
      *
-     * @param transferTask 傳輸任務
+     * @param transferTaskDTO 傳輸任務
      *
      * @return Mono<Void>
      */
     //todo 合併完成後清除記憶體中的數據
-    private Mono<Void> removeTempData (TransferTask transferTask) {
-        String key = "upload_task:" + transferTask.getTransferTaskId();
-        return Flux
-                .range(1, transferTask.getTotalChunks())
-                .flatMap(i -> gridFsProvider.deleteFileByFilename(transferTask.getTransferTaskId() + "_chunk_" + i))
-                .then(redisProvider.deleteHash(key).then(redisProvider.deleteSet(key + ":pending_chunks")));
+    private Mono<Void> removeTempData (TransferTaskDTO transferTaskDTO) {
+        String key = "upload_task:" + transferTaskDTO.getTransferTaskId();
+        return redisProvider
+                .getHashMap(key, "total_chunks")
+                .map(Integer.class::cast)
+                .flatMapMany(totalChunks -> Flux
+                        .range(1, totalChunks)
+                        .flatMap(i -> gridFsProvider.deleteFileByFilename(transferTaskDTO.getTransferTaskId() + "_chunk_" + i))
+                        .then(redisProvider.deleteHash(key).then(redisProvider.deleteSet(key + ":pending_chunks"))))
+                .then();
     }
 
     /**
@@ -438,5 +453,10 @@ public class ImageFileServiceImpl extends AbstractFileService {
             return "";
         }
         return fileName.substring(lastDotIndex);
+    }
+
+    private int getTotalChunks (long fileSize) {
+        long chunkSize = (long) fileProperties.getUpload().getChunkSize() * 1024 * 1024;
+        return (int) Math.ceil((double) fileSize / chunkSize);
     }
 }

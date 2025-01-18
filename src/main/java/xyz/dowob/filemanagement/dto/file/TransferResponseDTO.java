@@ -24,6 +24,16 @@ public class TransferResponseDTO {
     private String transferTaskId;
 
     /**
+     * 總分塊數
+     */
+    private Integer totalChunks;
+
+    /**
+     * 規範分塊大小，此單位為Byte
+     */
+    private Long chunkSize;
+
+    /**
      * 分塊索引
      */
     private Integer chunkIndex;

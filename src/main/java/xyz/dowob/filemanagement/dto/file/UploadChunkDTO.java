@@ -53,6 +53,7 @@ public class UploadChunkDTO {
     public TransferResponseDTO toTransferResponseDTO(Boolean isSuccess, Integer uploadedChunk, String message) {
         TransferResponseDTO transferResponseDTO = new TransferResponseDTO();
         transferResponseDTO.setChunkIndex(chunkIndex);
+        transferResponseDTO.setTotalChunks(totalChunks);
         transferResponseDTO.setTransferTaskId(transferTaskId);
         Optional.ofNullable(isSuccess).ifPresent(transferResponseDTO::setIsSuccess);
         transferResponseDTO.setProgress((double) uploadedChunk / totalChunks);

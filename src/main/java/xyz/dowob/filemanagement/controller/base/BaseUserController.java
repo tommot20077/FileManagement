@@ -47,13 +47,11 @@ public abstract class BaseUserController implements ResponseUnity {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", "")
                         .httpOnly(true)
-                        .secure(true)
+                        .secure(false) //todo 改成true
                         .maxAge(0)
                         .sameSite("Strict")
                         .build();
-                MultiValueMap<String, String> headers = new HttpHeaders();
-                headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
-                return createResponseEntity(createResponse(exchange, "登出成功", null), headers);
+                exchange.getResponse().addCookie(cookie);
             }
             return createResponseEntity(createResponse(exchange, "登出成功", null));
         }))).switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));

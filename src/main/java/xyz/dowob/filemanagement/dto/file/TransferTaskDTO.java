@@ -14,18 +14,12 @@ import lombok.Data;
  * @Version 1.0
  **/
 @Data
-public class TransferTask {
+public class TransferTaskDTO {
     /**
      * 任務ID
      */
     @NotBlank(message = "任務ID不能為空")
     private String transferTaskId;
-
-    /**
-     * 總分塊數
-     */
-    @NotBlank(message = "總分塊數不能為空")
-    private Integer totalChunks;
 
     /**
      * 檔案路徑
@@ -74,7 +68,6 @@ public class TransferTask {
         fileMetadata.setFilePath(this.filePath);
         fileMetadata.setMd5(this.md5);
         fileMetadata.setFileSize(this.fileSize);
-        fileMetadata.setTotalChunks(this.totalChunks);
         fileMetadata.setUserId(this.userId);
         return fileMetadata;
     }

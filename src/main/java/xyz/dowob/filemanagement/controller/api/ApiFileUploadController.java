@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
@@ -35,6 +37,8 @@ public class ApiFileUploadController implements ResponseUnity {
     private final ValidationService validationService;
 
     private final UserService userService;
+
+    private final FileProperties fileProperties;
 
     @PostMapping("/initialTask")
     public Mono<ResponseEntity<?>> uploadFile (@RequestBody FileMetadata fileMetadata, ServerWebExchange exchange) {
@@ -65,8 +69,24 @@ public class ApiFileUploadController implements ResponseUnity {
                 });
     }
 
-    @PostMapping("/bufferUpload")
-    public Mono<ResponseEntity<?>> bufferUpload (@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
+    @PostMapping("/uploadFileData")
+    public Mono<ResponseEntity<?>> uploadFile (ServerWebExchange exchange,
+                                               @RequestPart(value = "transferTaskId", required = false) String transferTaskId,
+                                               @RequestPart(value = "file", required = false) Mono<Part> filePart,
+                                               @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
+        TransmissionEnum transmissionType = fileProperties.getTransmissionType();
+
+        if (transmissionType == TransmissionEnum.MULTIPART) {
+            return handleMultipartUpload(transferTaskId, filePart, exchange);
+        } else if (transmissionType == TransmissionEnum.CHUNK) {
+            return handleChunkUpload(uploadChunkDTO, exchange);
+        } else {
+            return Mono.error(new RuntimeException("不支持的文件傳輸類型"));
+        }
+        //todo 未來支持其他傳輸類型
+    }
+
+    private Mono<ResponseEntity<?>> handleChunkUpload (@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
         return Mono.just(uploadChunkDTO).flatMap(uploadChunk -> {
             // todo Image硬編碼
             return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
@@ -81,8 +101,8 @@ public class ApiFileUploadController implements ResponseUnity {
         });
     }
 
-    @PostMapping("/multipartUpload")
-    public Mono<ResponseEntity<?>> multipartUpload (
+    // todo 暫不使用
+    private Mono<ResponseEntity<?>> handleMultipartUpload (
             @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
         return formatPartToBytes(filePart).flatMap(bytes -> {
             UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
@@ -103,7 +123,7 @@ public class ApiFileUploadController implements ResponseUnity {
         });
     }
 
-    public Mono<byte[]> formatPartToBytes (Mono<Part> multipartFile) {
+    private Mono<byte[]> formatPartToBytes (Mono<Part> multipartFile) {
         return multipartFile.flatMap(part -> part.content().reduce(DataBuffer::write)).map(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];
             dataBuffer.read(bytes);

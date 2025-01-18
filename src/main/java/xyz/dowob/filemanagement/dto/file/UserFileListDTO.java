@@ -5,10 +5,11 @@ import lombok.Getter;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -24,6 +25,8 @@ public class UserFileListDTO {
     private Long id;
 
     private Long userId;
+
+    private String username;
 
     private String filename;
 
@@ -43,19 +46,23 @@ public class UserFileListDTO {
 
     private String md5;
 
-    private Set<Long> shareUsers;
+    private Set<Long> shareUsers = new HashSet<>();
 
-    public UserFileListDTO (ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
+    public UserFileListDTO (ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, User user) {
         this.id = userFileMetadata.getId();
-        this.userId = userFileMetadata.getUserId();
+        this.userId = user.getId();
+        this.username = user.getUsername();
         this.filename = userFileMetadata.getFilename();
         this.filePath = userFileMetadata.getFilePath();
         this.createTime = userFileMetadata.getUploadTime();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
-        this.shareUsers = userFileMetadata.getSharedWithUsers();
         this.fileSize = serverFileMetadata.getFileSize();
         this.fileType = serverFileMetadata.getFileType();
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
+
+        if (userFileMetadata.getSharedWithUsers() != null) {
+            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        }
     }
 }

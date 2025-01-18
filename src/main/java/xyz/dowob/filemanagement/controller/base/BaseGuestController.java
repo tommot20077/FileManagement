@@ -75,20 +75,17 @@ public abstract class BaseGuestController implements ResponseUnity {
     public Mono<ResponseEntity<?>> login (
             @Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
         return userService.login(authRequestDTO, exchange).flatMap(token -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", token)
                         .httpOnly(true)
-                        .secure(true)
+                        .secure(false) //todo 改成true
                         .maxAge((long) securityProperties.getJwtToken().getExpiration() * 60)
                         .sameSite("Strict")
                         .build();
-
-                MultiValueMap<String, String> headers = new HttpHeaders();
-                headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
-                return createResponseEntity(apiResponse, headers);
+                exchange.getResponse().addCookie(cookie);
             }
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("登入失敗: %s", e.getMessage());

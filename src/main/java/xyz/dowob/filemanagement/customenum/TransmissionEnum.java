@@ -17,13 +17,20 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum TransmissionEnum {
     /**
-     * Tus 協議，適合大檔案上傳，支持斷點續傳
+     * Tus 協議，適合大檔案上傳，支持斷點續傳 (暫不支持)
      */
-    TUS("tus"),
+    //TUS("tus"),
+
     /**
      * Multipart 協議，適合小檔案上傳
      */
-    MULTIPART("multipart"),
+    //MULTIPART("multipart"),
+
+    /**
+     * 分塊協議，適合大檔案上傳
+     */
+    CHUNK("chunk"),
+
     /**
      * 混合協議，根據檔案大小自動選擇協議
      */

@@ -39,11 +39,6 @@ public class FileMetadata {
     private Long fileSize;
 
     /**
-     * 文件總塊數
-     */
-    private Integer totalChunks;
-
-    /**
      * 用戶ID
      */
     private Long userId;
@@ -75,10 +70,9 @@ public class FileMetadata {
      *
      * @return 文件傳輸任務對象
      */
-    public TransferTask formatToTransferTask(String uploadTaskId, String message) {
-        TransferTask task = new TransferTask();
+    public TransferTaskDTO formatToTransferTask(String uploadTaskId, String message) {
+        TransferTaskDTO task = new TransferTaskDTO();
         task.setTransferTaskId(uploadTaskId);
-        task.setTotalChunks(this.getTotalChunks());
         task.setFilePath(formatFilePath(this.getFilePath(), this.getFileName()));
         task.setFileName(this.getFileName());
         task.setMd5(this.getMd5());

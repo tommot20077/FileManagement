@@ -63,12 +63,12 @@ public class SecurityConfig {
 
     // todo 補上HSTS
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain (ServerHttpSecurity http) {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrfSpec -> csrfSpec
                         .csrfTokenRepository(webSessionServerCsrfTokenRepository())
-                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/web/**").matches(exchange)))
+                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webe/**").matches(exchange)))
                 .headers(headers -> headers.contentSecurityPolicy(contentSecurityPolicySpec -> {
                     contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                 }))
@@ -94,7 +94,7 @@ public class SecurityConfig {
      * @return PasswordEncoder BCrypt算法加密器
      */
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    public PasswordEncoder passwordEncoder () {
         return new BCryptPasswordEncoder();
     }
 
@@ -104,7 +104,7 @@ public class SecurityConfig {
      * @return CSRF憑證庫
      */
     @Bean
-    public ServerCsrfTokenRepository webSessionServerCsrfTokenRepository() {
+    public ServerCsrfTokenRepository webSessionServerCsrfTokenRepository () {
         WebSessionServerCsrfTokenRepository csrfTokenRepository = new WebSessionServerCsrfTokenRepository();
         csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
         return csrfTokenRepository;
@@ -117,7 +117,7 @@ public class SecurityConfig {
      * @return 跨域配置
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource () {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.addAllowedOriginPattern("http://*localhost:*");
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -137,13 +137,14 @@ public class SecurityConfig {
      *
      * @return Mono<Void>
      */
-    private Mono<Void> writeJsonResponse(ServerWebExchange exchange, String message, int statusCode) {
+    private Mono<Void> writeJsonResponse (ServerWebExchange exchange, String message, int statusCode) {
         try {
             ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
                                                                        statusCode,
                                                                        exchange.getRequest().getPath().value(),
                                                                        message,
-                                                                       null);
+                                                                       null
+            );
             return exchange
                     .getResponse()
                     .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(objectMapper.writeValueAsBytes(apiResponseDTO))));
