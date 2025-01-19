@@ -95,11 +95,14 @@ public class ImageFileServiceImpl extends AbstractFileService {
      *
      * @return 返回用戶文件列表
      */
-    //todo 優化只顯示當前目錄下的文件
+    //todo 優化只顯示當前目錄下的文件，未來改到FileService中
     @Override
     public Flux<UserFileListDTO> getUserFileList (User user) {
         return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMapMany(userFileMetadataList -> {
             Set<Long> serverFileIds = userFileMetadataList.stream().map(UserFileMetadata::getServerFileId).collect(Collectors.toSet());
+            if (serverFileIds.isEmpty()) {
+                return Flux.empty();
+            }
             return serverFileMetaRepository
                     .findAllByIds(serverFileIds)
                     .collectMap(ServerFileMetadata::getId)

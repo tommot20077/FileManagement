@@ -34,12 +34,7 @@ public class CustomWebSocketSession extends ReactorNettyWebSocketSession {
      * @param maxFramePayloadLength 最大幀載荷長度
      * @param userId                用戶ID
      */
-    public CustomWebSocketSession(
-            WebSocketConnection delegate,
-            HandshakeInfo handshakeInfo,
-            NettyDataBufferFactory bufferFactory,
-            int maxFramePayloadLength,
-            String userId) {
+    public CustomWebSocketSession(WebSocketConnection delegate, HandshakeInfo handshakeInfo, NettyDataBufferFactory bufferFactory, int maxFramePayloadLength, String userId) {
         super(delegate.getInbound(), delegate.getOutbound(), handshakeInfo, bufferFactory, maxFramePayloadLength);
         this.userId = userId;
     }

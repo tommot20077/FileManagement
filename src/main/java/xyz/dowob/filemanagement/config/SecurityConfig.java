@@ -2,12 +2,14 @@ package xyz.dowob.filemanagement.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +21,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
@@ -54,13 +57,18 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
 
     /**
+     * WebFilter 用於處理安全上下文的過濾器
+     */
+    @Resource(name = "contextWebFilter")
+    private WebFilter contextWebFilter;
+
+    /**
      * 配置安全過濾器鏈
      *
      * @param http ServerHttpSecurity 用於配置安全過濾器鏈的類
      *
      * @return 返回配置好的安全過濾器鏈
      */
-
     // todo 補上HSTS
     @Bean
     public SecurityWebFilterChain securityWebFilterChain (ServerHttpSecurity http) {
@@ -68,7 +76,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrfSpec -> csrfSpec
                         .csrfTokenRepository(webSessionServerCsrfTokenRepository())
-                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webe/**").matches(exchange)))
+                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/web/**").matches(exchange)))
                 .headers(headers -> headers.contentSecurityPolicy(contentSecurityPolicySpec -> {
                     contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                 }))
@@ -82,6 +90,7 @@ public class SecurityConfig {
                         .anyExchange()
                         .authenticated())
                 .securityContextRepository(securityContextRepository)
+                .addFilterAt(contextWebFilter, SecurityWebFiltersOrder.EXCEPTION_TRANSLATION)
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                         .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, "請先登入", HttpStatus.UNAUTHORIZED.value()))
                         .accessDeniedHandler((exchange, e) -> writeJsonResponse(exchange, "權限不足", HttpStatus.FORBIDDEN.value())))

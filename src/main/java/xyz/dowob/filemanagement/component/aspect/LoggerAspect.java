@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.controller.exception.ExceptionController;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 import java.lang.reflect.Method;
 
@@ -70,56 +71,38 @@ public class LoggerAspect {
      */
     @Around("serviceLayerPointcut() || componentLayerPointcut() || controllerLayerPointcut()")
     public Object logAround (ProceedingJoinPoint joinPoint) throws Throwable {
-        final String[] requestUsername = new String[1];
-        Mono.deferContextual(context -> {
-            ServerWebExchange exchange = context.get(ServerWebExchange.class);
-            if (exchange != null) {
-                return exchange.getSession().flatMap(session -> {
-                    requestUsername[0] = session.getAttribute("username");
-                    return Mono.empty();
-                }).switchIfEmpty(Mono.just("No Session")).then();
-            } else {
-                requestUsername[0] = "Unknown";
-            }
-            return Mono.empty();
-        });
-
-        String className = joinPoint.getTarget().getClass().getSimpleName();
-        String methodName = joinPoint.getSignature().getName();
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         try {
             Object result = joinPoint.proceed();
 
             if (result instanceof Mono<?>) {
-                return ((Mono<?>) result).doOnSuccess(resp -> {
-                    String value = processMethodSignature(method, resp);
-                    infoLog(requestUsername[0], className, methodName, value);
-                }).doOnError(e -> {
-                    if (e instanceof ValidationException) {
-                        warnLog(requestUsername[0], className, methodName, e);
-                    } else {
-                        createErrorLog(requestUsername[0], className, methodName, e);
-                    }
+                return ((Mono<?>) result).transformDeferredContextual((momo, context) -> {
+                    ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
+                    return momo.doOnNext(resp -> {
+                        String value = processMethodSignature(method, resp);
+                        logOperation(exchange, joinPoint, value, null);
+                    }).doOnError(e -> {
+                        logOperation(exchange, joinPoint, null, e);
+                    });
                 });
             } else if (result instanceof Flux<?>) {
-                return ((Flux<?>) result).doOnNext(resp -> {
-                    String value = processMethodSignature(method, resp);
-                    infoLog(requestUsername[0], className, methodName, value);
-                }).doOnError(e -> {
-                    if (e instanceof ValidationException) {
-                        warnLog(requestUsername[0], className, methodName, e);
-                    } else {
-                        createErrorLog(requestUsername[0], className, methodName, e);
-                    }
+                return ((Flux<?>) result).transformDeferredContextual((flux, context) -> {
+                    ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
+                    return flux.doOnNext(resp -> {
+                        String value = processMethodSignature(method, resp);
+                        logOperation(exchange, joinPoint, value, null);
+                    }).doOnError(e -> {
+                        logOperation(exchange, joinPoint, null, e);
+                    });
                 });
             } else {
                 String value = processMethodSignature(method, result);
-                infoLog(requestUsername[0], className, methodName, value);
+                logWithExchange(joinPoint, value, null);
                 return result;
             }
         } catch (Throwable e) {
-            createErrorLog(requestUsername[0], className, methodName, e);
+            logWithExchange(joinPoint, null, e);
             throw e;
         }
     }
@@ -143,15 +126,78 @@ public class LoggerAspect {
         return result.toString();
     }
 
-    private void infoLog (String requestUsername, String className, String methodName, Object result) {
-        log.debug("請求者: {} | 所屬類: {} | 使用方法: {} | 返回值: {}", requestUsername, className, methodName, result);
+    /**
+     * 記錄操作信息
+     *
+     * @param exchange   伺服器交換協議對象
+     * @param className  類名
+     * @param methodName 方法名
+     * @param result     返回值
+     * @param error      錯誤
+     */
+    private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, Object result, Throwable error) {
+        String[] userNameAndUserId = getUserNameAndUserId(exchange);
+
+        String className = joinPoint.getTarget().getClass().getSimpleName();
+        String methodName = joinPoint.getSignature().getName();
+
+        if (error != null) {
+            if (error instanceof ValidationException) {
+                log.warn("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
+                         userNameAndUserId[0],
+                         userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                         className,
+                         methodName,
+                         error.getMessage()
+                );
+            } else {
+                log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
+                          userNameAndUserId[0],
+                          userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                          className,
+                          methodName,
+                          error.getMessage()
+                );
+            }
+        } else {
+            log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
+                      userNameAndUserId[0],
+                      userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                      className,
+                      methodName,
+                      result
+            );
+        }
     }
 
-    private void warnLog (String requestUsername, String className, String methodName, Throwable e) {
-        log.warn("請求者: {} | 所屬類: {} | 使用方法: {} | 警告訊息: {}", requestUsername, className, methodName, e.getMessage());
+    /**
+     * 此方法為處理一般狀況下的日誌輸出，因為無法直接獲取 ServerWebExchange 對象
+     * 所以需要進行判斷，如果為空則直接輸出日誌，否則獲取 ServerWebExchange 對象進行日誌輸出
+     *
+     * @param joinPoint 切入點
+     * @param result    返回值
+     * @param error     錯誤
+     */
+    private void logWithExchange(ProceedingJoinPoint joinPoint, Object result, Throwable error) {
+        CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
+            logOperation(exchange, joinPoint, result, error);
+        }).switchIfEmpty(Mono.defer(() -> {
+            logOperation(null, joinPoint, result, error);
+            return Mono.empty();
+        })).subscribe();
     }
 
-    private void createErrorLog (String requestUsername, String className, String methodName, Throwable e) {
-        log.error("請求者: {} | 所屬類: {} | 使用方法: {} | 錯誤訊息: {}", requestUsername, className, methodName, e.getMessage());
+
+    private String[] getUserNameAndUserId(ServerWebExchange exchange) {
+        String requestUsername;
+        String requsetUserId;
+        if (exchange == null || exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
+            requestUsername = "未知";
+            requsetUserId = null;
+        } else {
+            requestUsername = (String) exchange.getAttribute("username");
+            requsetUserId = ((Long) exchange.getAttribute("userId")).toString();
+        }
+        return new String[]{requestUsername, requsetUserId};
     }
 }

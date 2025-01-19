@@ -209,8 +209,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public Mono<User> getUser (ServerWebExchange exchange) {
         final Object[] userId = new Object[1];
-        return exchange.getSession().flatMap(webSession -> {
-            userId[0] = webSession.getAttributes().get("userId");
+
+        return Mono.defer(() -> {
+            userId[0] = exchange.getAttributes().getOrDefault("userId", null);
             if (userId[0] == null) {
                 return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
                     if (authentication != null && authentication.isAuthenticated()) {

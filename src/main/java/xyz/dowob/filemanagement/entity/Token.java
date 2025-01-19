@@ -39,7 +39,7 @@ public class Token {
      * JWT憑證版本
      */
     @Column("jwt_token_version")
-    private int jwtTokenVersion;
+    private String jwtTokenVersion;
 
     /**
      * JWT憑證過期時間
@@ -59,16 +59,6 @@ public class Token {
      */
     @Column("reset_verification_code_expire_time")
     private LocalDateTime resetVerificationCodeExpireTime;
-
-    /**
-     * 取得JWT憑證的版本並+1
-     *
-     * @return JWT憑證的版本
-     */
-    public int increaseAndGetJwtTokenVersion() {
-        this.jwtTokenVersion = jwtTokenVersion + 1;
-        return jwtTokenVersion;
-    }
 
     @Override
     public boolean equals(Object o) {

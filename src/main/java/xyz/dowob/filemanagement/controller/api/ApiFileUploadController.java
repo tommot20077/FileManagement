@@ -45,23 +45,18 @@ public class ApiFileUploadController implements ResponseUnity {
         return userService
                 .getUser(exchange)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
-                .flatMap(user -> {
-                    // todo Image硬編碼
-                    return validationService
-                            .validateFileMetadataDTO(fileMetadata)
-                            .then(fileStrategy
-                                          .getFileService(FileEnum.IMAGE)
-                                          .uploadFile(fileMetadata, user)
-                                          .flatMap(transferResponseDTO -> {
-                                              ApiResponseDTO<?> apiResponse;
-                                              if (transferResponseDTO.getIsFinished()) {
-                                                  apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                                              } else {
-                                                  apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                                              }
-                                              return createResponseEntity(apiResponse);
-                                          }));
-                })
+                // todo Image硬編碼
+                .flatMap(user -> validationService
+                        .validateFileMetadataDTO(fileMetadata)
+                        .then(fileStrategy.getFileService(FileEnum.IMAGE).uploadFile(fileMetadata, user).flatMap(transferResponseDTO -> {
+                            ApiResponseDTO<?> apiResponse;
+                            if (transferResponseDTO.getIsFinished()) {
+                                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                            } else {
+                                apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                            }
+                            return createResponseEntity(apiResponse);
+                        })))
                 .onErrorResume(ValidationException.class, e -> {
                     String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
                     int responseCode = e.getErrorCode().getCode();
@@ -75,14 +70,7 @@ public class ApiFileUploadController implements ResponseUnity {
                                                @RequestPart(value = "file", required = false) Mono<Part> filePart,
                                                @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
         TransmissionEnum transmissionType = fileProperties.getTransmissionType();
-
-        if (transmissionType == TransmissionEnum.MULTIPART) {
-            return handleMultipartUpload(transferTaskId, filePart, exchange);
-        } else if (transmissionType == TransmissionEnum.CHUNK) {
-            return handleChunkUpload(uploadChunkDTO, exchange);
-        } else {
-            return Mono.error(new RuntimeException("不支持的文件傳輸類型"));
-        }
+        return handleChunkUpload(uploadChunkDTO, exchange);
         //todo 未來支持其他傳輸類型
     }
 

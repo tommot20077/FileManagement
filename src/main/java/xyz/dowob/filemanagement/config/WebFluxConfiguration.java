@@ -1,9 +1,12 @@
 package xyz.dowob.filemanagement.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
+import org.springframework.web.server.WebFilter;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 /**
  * WebFlux 配置類，用於配置 WebFlux 相關的配置，實現 WebFluxConfigurer 接口
@@ -27,7 +30,9 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
      *
      * @param fileProperties 文件配置文件
      */
-    public WebFluxConfiguration(FileProperties fileProperties) {this.fileProperties = fileProperties;}
+    public WebFluxConfiguration(FileProperties fileProperties) {
+        this.fileProperties = fileProperties;
+    }
 
     /**
      * 配置服務器編解碼器，用於設定服務器編解碼器的最大內存大小
@@ -38,4 +43,15 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
     public void configureHttpMessageCodecs(ServerCodecConfigurer configurer) {
         configurer.defaultCodecs().maxInMemorySize(fileProperties.getUpload().getPayloadLength() * 1024 * 1024);
     }
+
+    /**
+     * 配置安全過濾器鏈，此過濾器會依照自定義的{@link CustomRequestContextHolder} 進行上下文的設置
+     *
+     * @return SecurityWebFilterChain 安全過濾器鏈
+     */
+    @Bean
+    public WebFilter contextWebFilter() {
+        return (exchange, chain) -> chain.filter(exchange).contextWrite(CustomRequestContextHolder.mutate(exchange));
+    }
+
 }

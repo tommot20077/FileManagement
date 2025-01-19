@@ -18,4 +18,5 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.TYPE})
-public @interface HideSensitive {}
+public @interface HideSensitive {
+}

@@ -24,6 +24,13 @@ public class ApiFileController extends BaseFileController {
         super(fileService, userService);
     }
 
+    /**
+     * 獲取用戶文件列表的API請求
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回用戶文件列表
+     */
     @GetMapping("/getUserFileList")
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
         return super.getUserFileList(exchange);

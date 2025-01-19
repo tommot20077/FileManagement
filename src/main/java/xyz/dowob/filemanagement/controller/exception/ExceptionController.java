@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.controller.exception;
 
+import io.r2dbc.spi.R2dbcException;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.*;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
@@ -48,11 +50,14 @@ public class ExceptionController implements ResponseUnity {
         String requestUrl = exchange.getRequest().getURI().getPath();
         log.debug("發生404錯誤: {}, 錯誤的請求位置: {}", ex.getMessage(), requestUrl);
 
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.NOT_FOUND.value(),
-                                                                   requestUrl,
-                                                                   "請求位置不存在",
-                                                                   null);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .path(requestUrl)
+                .message("請求的資源不存在")
+                .data(null)
+                .build();
 
         return createResponseEntity(apiResponseDTO, HttpStatus.NOT_FOUND.value());
     }
@@ -66,26 +71,32 @@ public class ExceptionController implements ResponseUnity {
      * @return Mono<ResponseEntity> 回應實體
      */
     @ExceptionHandler(MethodNotAllowedException.class)
-    public Mono<ResponseEntity<?>> handleHttpRequestMethodNotSupportedException(
-            MethodNotAllowedException ex, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> handleHttpRequestMethodNotSupportedException(MethodNotAllowedException ex, ServerWebExchange exchange) {
         log.debug("不支持的請求方法: {}", ex.getMessage());
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.METHOD_NOT_ALLOWED.value(),
-                                                                   exchange.getRequest().getURI().getPath(),
-                                                                   "不支持的請求方法",
-                                                                   null);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.METHOD_NOT_ALLOWED.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("不支持的請求方法")
+                .data(null)
+                .build();
+
         return createResponseEntity(apiResponseDTO, HttpStatus.METHOD_NOT_ALLOWED.value());
     }
 
     @ExceptionHandler(UnsupportedMediaTypeStatusException.class)
-    public Mono<ResponseEntity<?>> handleUnsupportedMediaTypeStatusException(
-            UnsupportedMediaTypeStatusException ex, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> handleUnsupportedMediaTypeStatusException(UnsupportedMediaTypeStatusException ex, ServerWebExchange exchange) {
         log.debug("不支持的媒體類型: {}", ex.getMessage());
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
-                                                                   exchange.getRequest().getURI().getPath(),
-                                                                   "不支持的媒體類型",
-                                                                   null);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("不支持的媒體類型")
+                .data(null)
+                .build();
+
         return createResponseEntity(apiResponseDTO, HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
     }
 
@@ -122,12 +133,15 @@ public class ExceptionController implements ResponseUnity {
         }
 
         log.debug("資料驗證失敗，錯誤原因：{}", errors);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message(String.format("資料驗證失敗，錯誤原因：[%s]", errorMessageBuilder))
+                .data(null)
+                .build();
 
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.BAD_REQUEST.value(),
-                                                                   exchange.getRequest().getURI().getPath(),
-                                                                   String.format("資料驗證失敗，錯誤原因：[%s]", errorMessageBuilder),
-                                                                   null);
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
 
@@ -141,19 +155,49 @@ public class ExceptionController implements ResponseUnity {
      */
     @ExceptionHandler(ServerWebInputException.class)
     public Mono<ResponseEntity<?>> handleInvalidJsonException(ServerWebInputException ex, ServerWebExchange exchange) {
-        log.debug("JSON 格式錯誤，錯誤原因：{}", ex.getMessage());
+        log.debug("JSON 格式錯誤，錯誤: ", ex);
 
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.BAD_REQUEST.value(),
-                                                                   exchange.getRequest().getURI().getPath(),
-                                                                   "請求的 JSON 格式無效",
-                                                                   null);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("JSON 格式錯誤")
+                .data(null)
+                .build();
 
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
 
     /**
-     * 處理未知錯誤，當發生未知錯誤時，返回一個 500 錯誤
+     * 處理 R2dbc資料庫操作錯誤
+     * 發生此異常可能是因為操作過於頻繁，導致資料庫操作失敗
+     *
+     * @param ex       R2dbcException R2dbc 錯誤
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    @ExceptionHandler(R2dbcException.class)
+    public Mono<ResponseEntity<?>> handleR2dbcException(R2dbcException ex, ServerWebExchange exchange) {
+        log.error("R2dbc 錯誤: ", ex);
+        ApiResponseDTO<Void> response = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("超出操作限制，請稍後再試")
+                .data(null)
+                .build();
+
+        return Mono.just(ResponseEntity.status(500).body(response));
+    }
+
+    /**
+     * 處理其他異常，部分異常為該錯誤類的內部類，無法直接捕獲
+     * 此處對該異常進行過濾並進行處理，當都無法處理時，返回未知錯誤
+     * 此類目前過濾
+     * 1. 重試次數過多的異常 {@link Exceptions#isRetryExhausted(Throwable)}
      *
      * @param ex       Throwable 異常
      * @param exchange ServerWebExchange 服務器 Web的請求
@@ -162,15 +206,58 @@ public class ExceptionController implements ResponseUnity {
      */
     @ExceptionHandler(Throwable.class)
     public Mono<ResponseEntity<?>> handleException(Throwable ex, ServerWebExchange exchange) {
+        if (Exceptions.isRetryExhausted(ex)) {
+            return handleRetryExhaustedException(ex, exchange);
+        }
+        return handleUnknownException(ex, exchange);
+    }
+
+    /**
+     * 處理重試次數過多的異常
+     *
+     * @param ex       重試次數過多的異常
+     * @param exchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    private Mono<ResponseEntity<?>> handleRetryExhaustedException(Throwable ex, ServerWebExchange exchange) {
+        log.debug("重試次數過多，錯誤起因: ", ex.getCause());
+        ApiResponseDTO<Void> response = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("超出操作限制，請稍後再試")
+                .data(null)
+                .build();
+
+        return Mono.just(ResponseEntity.status(400).body(response));
+    }
+
+    /**
+     * 處理未知異常
+     *
+     * @param ex       Throwable 異常
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    private Mono<ResponseEntity<?>> handleUnknownException(Throwable ex, ServerWebExchange exchange) {
         log.error("錯誤類型: {}", ex.getClass().getName());
         log.error("發生未知錯誤: {}", ex.getMessage());
         log.error("錯誤起因: ", ex.getCause());
         log.error("錯誤堆棧: ", ex);
-        ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                   HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                                                                   exchange.getRequest().getURI().getPath(),
-                                                                   "伺服器內部處理錯誤",
-                                                                   null);
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("伺服器內部處理錯誤")
+                .data(null)
+                .build();
+
         return createResponseEntity(apiResponseDTO, HttpStatus.INTERNAL_SERVER_ERROR.value());
     }
 }
+
+

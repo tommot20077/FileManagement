@@ -2,15 +2,15 @@ package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
 import xyz.dowob.filemanagement.entity.User;
-
-import java.util.Map;
 
 /**
  * 有關授權的業務邏輯接口
@@ -35,22 +35,20 @@ public interface AuthorizationService {
 
 
     /**
-     * 接口默認方法，根據用戶請求對象和用戶對象進行Session授權
-     * 將用戶名稱、用戶ID和授權對象存入Session中
+     * 接口默認方法，根據用戶請求對象和用戶對象進行授權
+     * 將用戶名稱、用戶ID和授權對象存入ServerWebExchange中
      *
      * @param request 請求對象
      * @param user    用戶對象
      */
-    default Mono<Void> setSessionAuthorization(ServerWebExchange request, User user) {
-        return request.getSession().doOnNext(webSession -> {
-            Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+    default Mono<Void> setAuthorization(ServerWebExchange request, User user) {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
 
-            Map<String, Object> attributes = webSession.getAttributes();
-            attributes.put(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
-            attributes.put("username", user.getUsername());
-            attributes.put("userId", user.getId());
-        }).then();
+        Context securityContext = ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl(authentication)));
+        request.getAttributes().put(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        request.getAttributes().put("username", user.getUsername());
+        request.getAttributes().put("userId", user.getId());
+        return Mono.empty();
     }
 
     default Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {

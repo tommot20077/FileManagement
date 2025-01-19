@@ -79,8 +79,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         try (ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor()) {
             service.scheduleAtFixedRate(() -> USER_SESSION_MAP.entrySet().removeIf(entry -> !entry.getValue().isOpen()),
                                         5,
-                                        5,
-                                        java.util.concurrent.TimeUnit.MINUTES);
+                                        5, java.util.concurrent.TimeUnit.MINUTES
+            );
         }
     }
 
@@ -101,8 +101,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                 JsonNode jsonNode = objectMapper.readTree(webSocketMessage.getPayloadAsText());
                 Long userId = Long.parseLong(customSession.getUserId());
                 String type = convertJsonToObject(jsonNode.get("type"), String.class).orElseThrow(() -> new ValidationException(
-                        ValidationException.ErrorCode.REQUEST_IS_INVALID,
-                        "type"));
+                        ValidationException.ErrorCode.REQUEST_IS_INVALID, "type"));
                 USER_SESSION_MAP.put(userId, customSession);
                 return switch (type) {
                     case "initialUpload" -> handleInitialUpload(userId, customSession, jsonNode);
@@ -110,8 +109,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                     default -> {
                         ApiResponseDTO<?> response = createResponse(customSession.getHandshakeInfo().getUri().getPath(),
                                                                     400,
-                                                                    "未知的請求類型",
-                                                                    null);
+                                                                    "未知的請求類型", null
+                        );
                         yield sendMessage(customSession, response);
                     }
                 };
@@ -144,8 +143,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                                                                                                                   .getHandshakeInfo()
                                                                                                                   .getUri()
                                                                                                                   .getPath(),
-                                                                                                          null,
-                                                                                                          transferResponseDTO);
+                                                                                                          null, transferResponseDTO
+                                                              );
                                                               if (transferResponseDTO.getIsFinished()) {
                                                                   response.setMessage("上傳任務完成");
                                                               } else {
@@ -158,7 +157,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                     String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
                     int responseCode = e.getErrorCode().getCode();
                     return sendMessage(session,
-                                       createResponse(session.getHandshakeInfo().getUri().getPath(), responseCode, errorMessage, null));
+                                       createResponse(session.getHandshakeInfo().getUri().getPath(), responseCode, errorMessage, null)
+                    );
                 });
     }
 

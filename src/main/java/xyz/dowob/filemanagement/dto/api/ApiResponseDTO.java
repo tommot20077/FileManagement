@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.dto.api;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
  * @Version 1.0
  */
 @Data
+@Builder
 @AllArgsConstructor
 public class ApiResponseDTO <T> {
     /**
@@ -47,4 +49,5 @@ public class ApiResponseDTO <T> {
      * 返回的數據
      */
     private T data;
+
 }

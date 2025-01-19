@@ -64,7 +64,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                 Mono<User> optionalUser = userRepository.findById(userId);
                 return optionalUser.flatMap(user -> {
                     if (user != null) {
-                        return setSessionAuthorization(request, user);
+                        return setAuthorization(request, user);
                     }
                     return Mono.empty();
                 });
@@ -90,7 +90,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_OR_PASSWORD_ERROR)))
                 .flatMap(user -> {
                     if (passwordEncoder.matches(authRequestDTO.getPassword(), user.getPassword())) {
-                        Mono<Void> sessionMono = request != null ? setSessionAuthorization(request, user) : Mono.empty();
+                        Mono<Void> sessionMono = request != null ? setAuthorization(request, user) : Mono.empty();
                         return sessionMono.then(tokenService.generateToken(user, TokenEnum.JWT_AUTHORIZATION_TOKEN));
                     }
                     return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_OR_PASSWORD_ERROR));

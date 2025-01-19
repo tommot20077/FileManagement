@@ -38,11 +38,7 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
      * @param applicationContext    應用上下文
      * @param serverCodecConfigurer 服務器編解碼器
      */
-    public CustomExceptionHandler(
-            ErrorAttributes errorAttributes,
-            WebProperties webProperties,
-            ApplicationContext applicationContext,
-            ServerCodecConfigurer serverCodecConfigurer) {
+    public CustomExceptionHandler(ErrorAttributes errorAttributes, WebProperties webProperties, ApplicationContext applicationContext, ServerCodecConfigurer serverCodecConfigurer) {
         super(errorAttributes, webProperties.getResources(), applicationContext);
         super.setMessageWriters(serverCodecConfigurer.getWriters());
         super.setMessageReaders(serverCodecConfigurer.getReaders());
@@ -73,8 +69,8 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
         ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
                                                                    HttpStatus.INTERNAL_SERVER_ERROR.value(),
                                                                    request.exchange().getRequest().getPath().value(),
-                                                                   "伺服器內部處理錯誤",
-                                                                   null);
+                                                                   "伺服器內部處理錯誤", null
+        );
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
 
@@ -82,8 +78,8 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
             apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
                                                   validationException.getErrorCode().getCode(),
                                                   request.exchange().getRequest().getPath().value(),
-                                                  String.format("驗證時發生錯誤：%s", validationException.getMessage()),
-                                                  null);
+                                                  String.format("驗證時發生錯誤：%s", validationException.getMessage()), null
+            );
             status = HttpStatus.BAD_REQUEST;
         }
         return ServerResponse.status(status).contentType(MediaType.APPLICATION_JSON).body(Mono.just(apiResponseDTO), ApiResponseDTO.class);

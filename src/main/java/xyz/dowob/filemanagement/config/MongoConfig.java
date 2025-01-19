@@ -27,9 +27,7 @@ public class MongoConfig {
      * @return ReactiveGridFsTemplate
      */
     @Bean
-    public ReactiveMongoTemplate reactiveMongoTemplate(
-            ReactiveMongoDatabaseFactory reactiveMongoDatabaseFactory,
-            MappingMongoConverter mappingMongoConverter) {
+    public ReactiveMongoTemplate reactiveMongoTemplate(ReactiveMongoDatabaseFactory reactiveMongoDatabaseFactory, MappingMongoConverter mappingMongoConverter) {
         return new ReactiveMongoTemplate(reactiveMongoDatabaseFactory, mappingMongoConverter);
     }
 

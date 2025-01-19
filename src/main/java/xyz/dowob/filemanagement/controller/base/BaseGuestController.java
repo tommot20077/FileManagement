@@ -1,10 +1,8 @@
 package xyz.dowob.filemanagement.controller.base;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.MultiValueMap;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -155,6 +153,14 @@ public abstract class BaseGuestController implements ResponseUnity {
     }
 
     // todo 下放到子類
+
+    /**
+     * 獲取CSRF Token
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回CSRF Token
+     */
     @GetMapping("/getCSRFToken")
     public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
         return authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
