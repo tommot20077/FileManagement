@@ -4,12 +4,12 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -70,8 +70,8 @@ public class UserFileMetadata {
     /**
      * 文件共享給的用戶
      */
-    @Transient
-    private Set<Long> sharedWithUsers;
+    @Column("shared_with_users")
+    private Set<Long> sharedWithUsers = new HashSet<>();
 
 
     @Override
@@ -84,6 +84,7 @@ public class UserFileMetadata {
         map.put("filePath", filePath);
         map.put("uploadTime", uploadTime);
         map.put("lastAccessTime", lastAccessTime);
+        map.put("sharedWithUsers", sharedWithUsers);
         return map.toString();
     }
 }

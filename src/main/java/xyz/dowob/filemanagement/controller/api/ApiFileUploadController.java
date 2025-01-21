@@ -1,17 +1,21 @@
 package xyz.dowob.filemanagement.controller.api;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.Part;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
@@ -20,9 +24,9 @@ import xyz.dowob.filemanagement.dto.file.FileMetadata;
 import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
-import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 /**
  * @author yuan
@@ -33,20 +37,13 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
  * @Version 1.0
  **/
 @RestController
-@RequestMapping("/api/file/upload")
-@RequiredArgsConstructor
-public class ApiFileUploadController implements ResponseUnity {
-    private final FileStrategy fileStrategy;
+@RequestMapping("/api/guest/file")
+public class ApiFileUploadController extends BaseFileController {
+    public ApiFileUploadController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
+        super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
+    }
 
-    private final UserLimiterStrategy userLimiterStrategy;
-
-    private final ValidationService validationService;
-
-    private final UserService userService;
-
-    private final FileProperties fileProperties;
-
-    @PostMapping("/initialTask")
+    @PostMapping("/upload/initialTask")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadata fileMetadata, ServerWebExchange exchange) {
         return userService
                 .getUser(exchange)
@@ -86,7 +83,7 @@ public class ApiFileUploadController implements ResponseUnity {
                 });
     }
 
-    @PostMapping("/uploadFileData")
+    @PostMapping("/upload/uploadFileData")
     public Mono<ResponseEntity<?>> uploadFile(ServerWebExchange exchange,
                                               @RequestPart(value = "transferTaskId", required = false) String transferTaskId,
                                               @RequestPart(value = "file", required = false) Mono<Part> filePart,
@@ -132,6 +129,44 @@ public class ApiFileUploadController implements ResponseUnity {
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });
     }
+
+    /**
+     * 獲取用戶文件列表的API請求
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回用戶文件列表
+     */
+    @HideOverLength
+    @GetMapping("/getUserFileList")
+    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
+        return super.getUserFileList(exchange);
+    }
+
+    @GetMapping("/download")
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(ServerWebExchange exchange,
+                                                               @RequestParam String fileId,
+                                                               @RequestParam(value = "action", defaultValue = "download", required = false)
+                                                               String action) {
+        return userService.getUser(exchange).flatMap(user -> {
+            // todo Image硬編碼
+            Flux<DataBuffer> data = fileStrategy.getFileService(FileEnum.IMAGE).downloadFile(fileId, user);
+
+            HttpHeaders headers = new HttpHeaders();
+            if ("download".equals(action)) {
+                headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileId);
+                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
+            } else {
+                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE);
+            }
+
+            return Mono.just(ResponseEntity.ok().headers(headers).body(data));
+
+        });
+    }
+
+
+
 
     private Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
         return multipartFile.flatMap(part -> part.content().reduce(DataBuffer::write)).map(dataBuffer -> {

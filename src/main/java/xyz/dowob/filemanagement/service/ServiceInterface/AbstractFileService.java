@@ -3,8 +3,9 @@ package xyz.dowob.filemanagement.service.ServiceInterface;
 import org.bson.types.ObjectId;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.file.TransferResponseDTO;
 import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
+import xyz.dowob.filemanagement.dto.file.UploadResponseDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 /**
@@ -27,7 +28,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<String> taskId
      */
-    protected abstract Mono<TransferResponseDTO> initialUpload(FileMetadata fileMetadata);
+    protected abstract Mono<UploadResponseDTO> initialUpload(FileMetadata fileMetadata);
 
     /**
      * 上傳文件分塊
@@ -37,7 +38,7 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<TransferResponseDTO> 上傳結果
      */
     @Override
-    public abstract Mono<TransferResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO);
+    public abstract Mono<UploadResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO);
 
     /**
      * 合併已上傳的文件分塊
@@ -61,4 +62,13 @@ public abstract class AbstractFileService implements FileService {
      */
     protected abstract Mono<UserFileMetadata> associateUserFile(Long serverFileMetadataId, FileMetadata fileMetadata);
 
+    /**
+     * 驗證用戶權限
+     *
+     * @param user             用戶
+     * @param userFileMetadata 用戶文件元數據
+     *
+     * @return Mono<Void>
+     */
+    protected abstract Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata);
 }

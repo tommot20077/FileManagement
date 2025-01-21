@@ -1,6 +1,5 @@
 package xyz.dowob.filemanagement.repostiory;
 
-import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
@@ -48,8 +47,8 @@ public interface TransfersTasksRepository extends ReactiveCrudRepository<Transfe
      *
      * @return Flux<TransfersTask>
      */
-    @Query("SELECT * FROM transfers_task t WHERE t.status NOT IN (:status)")
-    Flux<TransfersTask> findAllByStatusNotContains(@Param("status") List<TransfersStatusEnum> status);
+
+    Flux<TransfersTask> findAllByStatusNotIn(@Param("status") List<TransfersStatusEnum> status);
 
 
 }

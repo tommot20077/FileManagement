@@ -1,6 +1,5 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -32,11 +31,6 @@ public class ValidationServiceImpl implements ValidationService {
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
-
-    /**
-     * JSON對象映射器
-     */
-    private final ObjectMapper objectMapper;
 
     /**
      * 驗證用戶註冊數據類RegisterDTO中的數據是否合法

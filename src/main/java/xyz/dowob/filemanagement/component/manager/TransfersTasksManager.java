@@ -215,7 +215,7 @@ public class TransfersTasksManager {
         List<TransfersStatusEnum> status = new ArrayList<>();
         status.add(TransfersStatusEnum.COMPLETED);
         status.add(TransfersStatusEnum.FAILED);
-        return transfersTasksRepository.findAllByStatusNotContains(status).collectList().map(unfinishedTasks -> {
+        return transfersTasksRepository.findAllByStatusNotIn(status).collectList().map(unfinishedTasks -> {
             if (unfinishedTasks.isEmpty()) {
                 return Mono.empty();
             }

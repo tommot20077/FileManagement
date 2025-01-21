@@ -48,8 +48,17 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1203
          * 錯誤信息: MD5校驗失敗
          */
-        MD5_NOT_MATCH(1203, "MD5校驗失敗");
-
+        MD5_NOT_MATCH(1203, "MD5校驗失敗"),
+        /**
+         * 錯誤碼: 1204
+         * 錯誤信息: 伺服器文件不存在
+         */
+        USER_HAVE_NOT_EXIST_SERVER_FILE(1204, "用戶擁有不存在於伺服器的文件，伺服器檔案ID:%s，用戶檔案ID:%s"),
+        /**
+         * 錯誤碼: 1205
+         * 錯誤信息:
+         */
+        GRIDFS_FILE_NOT_FOUND(1205, "無法獲取GradFS的檔案，伺服器檔案ID：%s");
         /**
          * 錯誤碼
          */

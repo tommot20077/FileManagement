@@ -4,9 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.strategy.FileStrategy;
+import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.Map;
@@ -27,6 +31,10 @@ public abstract class BaseFileController implements ResponseUnity {
      */
     protected final FileService fileService;
     protected final UserService userService;
+    protected final FileStrategy fileStrategy;
+    protected final UserLimiterStrategy userLimiterStrategy;
+    protected final ValidationService validationService;
+    protected final FileProperties fileProperties;
 
     /**
      * 獲取用戶文件列表

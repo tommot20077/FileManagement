@@ -1,12 +1,10 @@
 package xyz.dowob.filemanagement.repostiory;
 
-import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
-import xyz.dowob.filemanagement.entity.User;
 
 import java.util.Set;
 
@@ -41,15 +39,11 @@ public interface ServerFileMetaRepository extends ReactiveCrudRepository<ServerF
     Mono<ServerFileMetadata> findByMd5(String md5);
 
     /**
-     * 查詢指定檔案的所有擁有者
+     * 根據文件ID集合查詢文件元數據
      *
-     * @param serverFileId 伺服器檔案ID
+     * @param serverFileId 文件ID集合
      *
-     * @return Flux<User>
+     * @return Flux<ServerFileMetadata>
      */
-    @Query("SELECT u.* FROM users u JOIN user_file_metadata ufm ON u.id = ufm.user_id WHERE ufm.server_file_id = :serverFileId;")
-    Flux<User> findAllOwnersByServerFileMetaId(Long serverFileId);
-
-    @Query("SELECT * FROM server_file_metadata WHERE server_file_metadata.id IN (:serverFileId)")
-    Flux<ServerFileMetadata> findAllByIds(Set<Long> serverFileId);
+    Flux<ServerFileMetadata> findAllByIdIn(Set<Long> serverFileId);
 }

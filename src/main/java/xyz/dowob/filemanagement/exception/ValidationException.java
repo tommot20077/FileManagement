@@ -91,8 +91,17 @@ public class ValidationException extends Exception {
          * 錯誤碼: 1112
          * 錯誤信息: 已有相同文件正在上傳
          */
-        EXISTING_TRANSFER_TASK(1112, "已有相同文件正在上傳，MD5: %s, 現有任務ID: %s");
-
+        EXISTING_TRANSFER_TASK(1112, "已有相同文件正在上傳，MD5: %s, 現有任務ID: %s"),
+        /**
+         * 錯誤碼: 1113
+         * 錯誤信息: 用戶文件不存在
+         */
+        NOT_EXISTING_USER_FILE(1113, "用戶文件不存在，檔案ID: %s"),
+        /**
+         * 錯誤碼: 1114
+         * 錯誤信息: 您沒有權限訪問此文件
+         */
+        PERMISSION_DENIED(1114, "您沒有權限訪問此文件，檔案ID: %s");
 
         /**
          * 錯誤碼

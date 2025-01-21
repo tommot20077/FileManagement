@@ -50,15 +50,15 @@ public class UploadChunkDTO {
      *
      * @return 文件傳輸響應的數據傳輸對象
      */
-    public TransferResponseDTO toTransferResponseDTO(Boolean isSuccess, Integer uploadedChunk, String message) {
-        TransferResponseDTO transferResponseDTO = new TransferResponseDTO();
-        transferResponseDTO.setChunkIndex(chunkIndex);
-        transferResponseDTO.setTotalChunks(totalChunks);
-        transferResponseDTO.setTransferTaskId(transferTaskId);
-        Optional.ofNullable(isSuccess).ifPresent(transferResponseDTO::setIsSuccess);
-        transferResponseDTO.setProgress((double) uploadedChunk / totalChunks);
-        Optional.ofNullable(message).ifPresent(transferResponseDTO::setMessage);
-        return transferResponseDTO;
+    public UploadResponseDTO toTransferResponseDTO(Boolean isSuccess, Integer uploadedChunk, String message) {
+        UploadResponseDTO uploadResponseDTO = new UploadResponseDTO();
+        uploadResponseDTO.setChunkIndex(chunkIndex);
+        uploadResponseDTO.setTotalChunks(totalChunks);
+        uploadResponseDTO.setTransferTaskId(transferTaskId);
+        Optional.ofNullable(isSuccess).ifPresent(uploadResponseDTO::setIsSuccess);
+        uploadResponseDTO.setProgress((double) uploadedChunk / totalChunks);
+        Optional.ofNullable(message).ifPresent(uploadResponseDTO::setMessage);
+        return uploadResponseDTO;
     }
 
 }

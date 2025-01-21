@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TransferResponseDTO {
+public class UploadResponseDTO {
     /**
      * 傳輸任務ID
      */

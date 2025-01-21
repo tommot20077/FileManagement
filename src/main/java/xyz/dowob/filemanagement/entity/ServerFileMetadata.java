@@ -4,13 +4,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -73,8 +73,7 @@ public class ServerFileMetadata {
     /**
      * 擁有文件的用戶
      */
-    @Transient
-    private Set<Long> owners;
+    private Set<Long> owners = new HashSet<>();
 
     @Override
     public boolean equals (Object o) {
@@ -103,6 +102,7 @@ public class ServerFileMetadata {
         fileMap.put("lastAccessTime", lastAccessTime);
         fileMap.put("gridFsId", gridFsId);
         fileMap.put("md5", md5);
+        fileMap.put("owners", owners);
         return fileMap.toString();
     }
 
