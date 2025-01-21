@@ -11,12 +11,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.controller.exception.ExceptionController;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 用於記錄 Component 和 ServiceInterface 層的日誌切面
@@ -89,9 +91,10 @@ public class LoggerAspect {
             } else if (result instanceof Flux<?>) {
                 return ((Flux<?>) result).transformDeferredContextual((flux, context) -> {
                     ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
-                    return flux.doOnNext(resp -> {
-                        String value = processMethodSignature(method, resp);
-                        logOperation(exchange, joinPoint, value, null);
+                    AtomicInteger count = new AtomicInteger(0);
+                    return flux.doOnNext(item -> count.incrementAndGet()).doOnComplete(() -> {
+                        String value = String.format("Flux<%s> 內元素數量: %d", method.getReturnType().getSimpleName(), count.get());
+                        logOperation(exchange, joinPoint, processMethodSignature(method, value), null);
                     }).doOnError(e -> {
                         logOperation(exchange, joinPoint, null, e);
                     });
@@ -117,11 +120,19 @@ public class LoggerAspect {
      */
     private String processMethodSignature (Method method, Object result) {
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
+        boolean isOverLength = method.isAnnotationPresent(HideOverLength.class);
+
         if (isSensitive) {
             return "[隱藏敏感訊息]";
         }
         if (result == null) {
             return "無返回值";
+        }
+        if (isOverLength) {
+            if (result.toString().length() > 300) {
+                return result.toString().substring(0, 300) + "...";
+            }
+            return result.toString();
         }
         return result.toString();
     }

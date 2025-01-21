@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * 用於定義控制器的接口，為所有控制器的基礎
@@ -30,18 +31,6 @@ import java.time.LocalDateTime;
  **/
 public interface ResponseUnity {
     /**
-     * 用於創建返回Mono<ResponseEntity>的方法，根據請求的結果創建對應的控制器可以處理的3位數狀態碼
-     *
-     * @param apiResponse  返回結果
-     * @param responseCode 返回狀態碼 (3位數)
-     *
-     * @return Mono<ResponseEntity> 返回對應的Mono<ResponseEntity>
-     */
-    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse, int responseCode) {
-        return Mono.just(ResponseEntity.status(responseCode).body(apiResponse));
-    }
-
-    /**
      * 用於創建返回ResponseEntity的方法，此為重載方法
      * 默認成功狀態碼為200，失敗狀態碼為400
      *
@@ -49,9 +38,21 @@ public interface ResponseUnity {
      *
      * @return ResponseEntity 返回對應的ResponseEntity
      */
-    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse) {
+    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse) {
         int responseCode = apiResponse.getStatus() == 200 ? 200 : 400;
         return createResponseEntity(apiResponse, responseCode);
+    }
+
+    /**
+     * 用於創建返回Mono<ResponseEntity>的方法，根據請求的結果創建對應的控制器可以處理的3位數狀態碼
+     *
+     * @param apiResponse  返回結果
+     * @param responseCode 返回狀態碼 (3位數)
+     *
+     * @return Mono<ResponseEntity> 返回對應的Mono<ResponseEntity>
+     */
+    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, Integer responseCode) {
+        return Mono.just(ResponseEntity.status(Objects.requireNonNullElse(responseCode, 200)).body(apiResponse));
     }
 
     /**
@@ -64,7 +65,7 @@ public interface ResponseUnity {
      *
      * @return ResponseEntity 返回對應的ResponseEntity
      */
-    default Mono<ResponseEntity<?>> createResponseEntity (ApiResponseDTO<?> apiResponse, MultiValueMap<String, String> headers) {
+    default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, MultiValueMap<String, String> headers) {
         return Mono.just(new ResponseEntity<>(apiResponse, headers, apiResponse.getStatus()));
     }
 
@@ -79,7 +80,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse (ServerWebExchange request, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -94,7 +95,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse (String path, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse(String path, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
     }
 
@@ -108,7 +109,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse (ServerWebExchange request, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -121,7 +122,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse (String path, String message, T data) {
+    default <T> ApiResponseDTO<T> createResponse(String path, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, path, message, data);
     }
 

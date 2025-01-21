@@ -6,5 +6,6 @@
  * 4. Token: 用於定義憑證 {@link xyz.dowob.filemanagement.customenum.TokenEnum}
  * 5. TransfersStatusEnum: 用於定義文件傳輸狀態 {@link xyz.dowob.filemanagement.customenum.TransfersStatusEnum}
  * 6. TransmissionEnum: 用於定義文件傳輸類型 {@link xyz.dowob.filemanagement.customenum.TransmissionEnum}
+ * 7. UserLimiterEnum: 用於定義用戶限流器類型 {@link xyz.dowob.filemanagement.customenum.UserLimiterEnum}
  */
 package xyz.dowob.filemanagement.customenum;

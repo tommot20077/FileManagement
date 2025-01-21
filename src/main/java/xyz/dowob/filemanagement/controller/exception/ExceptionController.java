@@ -231,7 +231,7 @@ public class ExceptionController implements ResponseUnity {
                 .data(null)
                 .build();
 
-        return Mono.just(ResponseEntity.status(400).body(response));
+        return Mono.just(ResponseEntity.status(429).body(response));
     }
 
     /**

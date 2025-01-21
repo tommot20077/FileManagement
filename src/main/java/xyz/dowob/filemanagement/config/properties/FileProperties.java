@@ -48,5 +48,7 @@ public class FileProperties {
          * 上傳分塊大小限制，單位為 MB，默認為 10MB，此參數需小於 payloadLength
          */
         private Integer chunkSize = 10;
+
+        private Integer maxUploadTaskLimit = 3;
     }
 }
