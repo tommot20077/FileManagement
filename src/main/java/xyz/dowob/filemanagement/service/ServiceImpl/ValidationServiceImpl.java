@@ -3,9 +3,9 @@ package xyz.dowob.filemanagement.service.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.user.RegisterDTO;
-import xyz.dowob.filemanagement.dto.user.ResetPasswordDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
+import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
@@ -70,7 +70,7 @@ public class ValidationServiceImpl implements ValidationService {
      */
 
     @Override
-    public Mono<Void> validateFileMetadataDTO(FileMetadata fileMetadataDTO) {
+    public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) {
         return validateNotNull(fileMetadataDTO);
     }
 

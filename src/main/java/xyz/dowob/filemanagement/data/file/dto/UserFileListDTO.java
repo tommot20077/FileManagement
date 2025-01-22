@@ -1,11 +1,11 @@
-package xyz.dowob.filemanagement.dto.file;
+package xyz.dowob.filemanagement.data.file.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
-import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.time.LocalDateTime;
@@ -23,10 +23,6 @@ import java.util.Set;
 @Setter
 public class UserFileListDTO {
     private Long id;
-
-    private Long userId;
-
-    private String username;
 
     private String filename;
 
@@ -48,10 +44,8 @@ public class UserFileListDTO {
 
     private Set<Long> shareUsers = new HashSet<>();
 
-    public UserFileListDTO (ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, User user) {
+    public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
         this.id = userFileMetadata.getId();
-        this.userId = user.getId();
-        this.username = user.getUsername();
         this.filename = userFileMetadata.getFilename();
         this.filePath = userFileMetadata.getFilePath();
         this.createTime = userFileMetadata.getUploadTime();
@@ -64,5 +58,21 @@ public class UserFileListDTO {
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
         }
+    }
+
+    public UserFileListDTO(UserFileDataBO userFileDataBO) {
+        this.id = userFileDataBO.getUserFileId();
+        this.filename = userFileDataBO.getFileName();
+        this.filePath = userFileDataBO.getFilePath();
+        this.createTime = userFileDataBO.getUploadTime();
+        this.lastAccessTime = userFileDataBO.getLastAccessTime();
+        this.fileSize = userFileDataBO.getFileSize();
+        this.fileType = userFileDataBO.getFileType();
+        this.gridFsId = userFileDataBO.getGridFsId();
+        this.md5 = userFileDataBO.getMd5();
+        if (userFileDataBO.getShareUsers() != null) {
+            shareUsers.addAll(userFileDataBO.getShareUsers());
+        }
+
     }
 }

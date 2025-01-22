@@ -1,12 +1,13 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
-import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
-import xyz.dowob.filemanagement.dto.file.UploadResponseDTO;
-import xyz.dowob.filemanagement.dto.file.UserFileListDTO;
+import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
 
 /**
@@ -30,27 +31,17 @@ public interface FileService {
         return null;
     }
 
-    /**
-     * 獲取用戶文件列表的接口
-     *
-     * @param userId 用戶ID
-     *
-     * @return 返回用戶文件列表
-     */
-    default Flux<UserFileListDTO> getUserFileList(Long userId) {
-        return null;
-    };
 
     /**
      * 上傳文件的接口
      *
-     * @param fileMetadata 文件元數據
+     * @param fileMetadataDTO 文件元數據
      *                     包含文件名、文件大小、文件類型等信息
      * @param user         用戶信息
      *
      * @return 返回上傳結果
      */
-    default Mono<UploadResponseDTO> uploadFile(FileMetadata fileMetadata, User user) {
+    default Mono<UploadResponseDTO> uploadFile(FileMetadataDTO fileMetadataDTO, User user) {
         return null;
     }
 
@@ -74,7 +65,11 @@ public interface FileService {
      *
      * @return 返回文件下載流
      */
-    default Flux<DataBuffer> downloadFile(String fileId, User user) {
+    default Mono<UserFileDataBO> downloadFile(String fileId, User user) {
+        return null;
+    }
+
+    default FileEnum detectFileType(byte[] fileBytes) {
         return null;
     }
 

@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 
 import java.time.LocalDateTime;
 import java.util.Objects;

@@ -1,7 +1,9 @@
-package xyz.dowob.filemanagement.dto.file;
+package xyz.dowob.filemanagement.data.file.bo;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 
 /**
  * 文件傳輸任務的數據傳輸對象，用於規範文件傳輸任務的數據傳輸對象，紀錄文件傳輸任務的數據
@@ -14,7 +16,7 @@ import lombok.Data;
  * @Version 1.0
  **/
 @Data
-public class TransferTaskDTO {
+public class UploadTaskBO {
     /**
      * 任務ID
      */
@@ -32,6 +34,11 @@ public class TransferTaskDTO {
      */
     @NotBlank(message = "檔案名稱不能為空")
     private String fileName;
+
+    /**
+     * 檔案類型
+     */
+    private FileEnum fileType = FileEnum.OTHER;
 
     /**
      * 檔案大小
@@ -62,13 +69,13 @@ public class TransferTaskDTO {
      *
      * @return 文件元數據對象
      */
-    public FileMetadata formatToFileMetadata() {
-        FileMetadata fileMetadata = new FileMetadata();
-        fileMetadata.setFileName(this.fileName);
-        fileMetadata.setFilePath(this.filePath);
-        fileMetadata.setMd5(this.md5);
-        fileMetadata.setFileSize(this.fileSize);
-        fileMetadata.setUserId(this.userId);
-        return fileMetadata;
+    public FileMetadataDTO formatToFileMetadata() {
+        FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
+        fileMetadataDTO.setFileName(this.fileName);
+        fileMetadataDTO.setFilePath(this.filePath);
+        fileMetadataDTO.setMd5(this.md5);
+        fileMetadataDTO.setFileSize(this.fileSize);
+        fileMetadataDTO.setUserId(this.userId);
+        return fileMetadataDTO;
     }
 }

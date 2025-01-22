@@ -11,7 +11,7 @@ import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.LocalDateTime;

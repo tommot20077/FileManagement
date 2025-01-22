@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.TransfersTask;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.repostiory.TransfersTasksRepository;
@@ -54,19 +54,18 @@ public class TransfersTasksManager {
     /**
      * 用於註冊一個新的上傳任務
      *
-     * @param fileMetadata   檔案的元數據
+     * @param fileMetadataDTO   檔案的元數據
      * @param transferTaskId 任務ID
      *
      * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
      */
-    public Mono<Boolean> registerUploadTask (FileMetadata fileMetadata, String transferTaskId) {
+    public Mono<Boolean> registerUploadTask(FileMetadataDTO fileMetadataDTO, String transferTaskId) {
         return Mono.defer(() -> {
-            if (activeTransfersTask.containsKey(fileMetadata.getMd5())) {
-                Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(fileMetadata.getMd5());
+            if (activeTransfersTask.containsKey(fileMetadataDTO.getMd5())) {
+                Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(fileMetadataDTO.getMd5());
                 transfersTaskMap.forEach((key, value) -> {
                     if (value.getStatus() == TransfersStatusEnum.UPLOADING) {
-                        log.debug("發現相同檔案正在上傳，MD5: {}, 現有任務ID: {}, 重複任務ID: {}",
-                                  fileMetadata.getMd5(),
+                        log.debug("發現相同檔案正在上傳，MD5: {}, 現有任務ID: {}, 重複任務ID: {}", fileMetadataDTO.getMd5(),
                                   value.getTransferTaskId(),
                                   transferTaskId
                         );
@@ -74,43 +73,43 @@ public class TransfersTasksManager {
                 });
                 return Mono.just(false);
             }
-            return createTransfersTask(fileMetadata, transferTaskId, TransfersStatusEnum.UPLOADING).thenReturn(true);
+            return createTransfersTask(fileMetadataDTO, transferTaskId, TransfersStatusEnum.UPLOADING).thenReturn(true);
         });
     }
 
     /**
      * 用於註冊一個新的轉換任務
      *
-     * @param fileMetadata   檔案的元數據
+     * @param fileMetadataDTO   檔案的元數據
      * @param transferTaskId 任務ID
      *
      * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
      */
-    public Mono<Void> createTransfersTask (FileMetadata fileMetadata, String transferTaskId, TransfersStatusEnum status) {
-        return createTransfersTask(fileMetadata, transferTaskId, null, FileEnum.IMAGE, null, status);
+    public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, TransfersStatusEnum status) {
+        return createTransfersTask(fileMetadataDTO, transferTaskId, null, FileEnum.IMAGE, null, status);
         // todo 硬編碼
     }
 
     /**
      * 用於創建一個新的傳輸任務，當任務創建成功時，將任務存入 activeTransfersTask 中以及數據庫中
      *
-     * @param fileMetadata   檔案的元數據
+     * @param fileMetadataDTO   檔案的元數據
      * @param transferTaskId 任務ID
      * @param status         任務狀態
      *
      * @return Mono<Void> 返回一個 Mono 對象
      */
-    public Mono<Void> createTransfersTask (FileMetadata fileMetadata, String transferTaskId, String gridFsId, FileEnum fileType, String message, TransfersStatusEnum status) {
+    public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, String gridFsId, FileEnum fileType, String message, TransfersStatusEnum status) {
         TransfersTask transfersTask = new TransfersTask();
         transfersTask.setTransferTaskId(transferTaskId);
-        transfersTask.setMd5(fileMetadata.getMd5());
+        transfersTask.setMd5(fileMetadataDTO.getMd5());
         transfersTask.setGridFsId(gridFsId);
-        transfersTask.setFileSize(fileMetadata.getFileSize());
+        transfersTask.setFileSize(fileMetadataDTO.getFileSize());
         transfersTask.setFileType(fileType);
         transfersTask.setStartTime(LocalDateTime.now());
         transfersTask.setMessage(message);
         transfersTask.setStatus(status);
-        activeTransfersTask.put(fileMetadata.getMd5(), Map.of(transferTaskId, transfersTask));
+        activeTransfersTask.put(fileMetadataDTO.getMd5(), Map.of(transferTaskId, transfersTask));
         return transfersTasksRepository.save(transfersTask).then();
     }
 

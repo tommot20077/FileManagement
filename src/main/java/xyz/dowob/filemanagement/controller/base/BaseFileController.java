@@ -7,13 +7,13 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
-import java.util.Map;
+import java.util.HashMap;
 
 /**
  * 檔案控制器的基礎類
@@ -46,8 +46,11 @@ public abstract class BaseFileController implements ResponseUnity {
 
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
         return userService.getUser(exchange).flatMap(user -> fileService.getUserFileList(user).collectList().flatMap(files -> {
-            Map<String, Object> dataMap = Map.of("files", files);
-            ApiResponseDTO<?> apiResponseDTO = createResponse(exchange, "成功獲取用戶文件列表", dataMap);
+            HashMap<String, Object> result = new HashMap<>();
+            result.put("userId", user.getId());
+            result.put("username", user.getUsername());
+            result.put("files", files);
+            ApiResponseDTO<?> apiResponseDTO = createResponse(exchange, "成功獲取用戶文件列表", result);
             return createResponseEntity(apiResponseDTO);
         }));
     }

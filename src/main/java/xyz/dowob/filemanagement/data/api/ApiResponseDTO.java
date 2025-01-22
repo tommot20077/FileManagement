@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.dto.api;
+package xyz.dowob.filemanagement.data.api;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;

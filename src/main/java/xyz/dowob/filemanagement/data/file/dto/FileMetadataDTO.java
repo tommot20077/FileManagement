@@ -1,6 +1,7 @@
-package xyz.dowob.filemanagement.dto.file;
+package xyz.dowob.filemanagement.data.file.dto;
 
 import lombok.Data;
+import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.time.LocalDateTime;
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
  * @Version 1.0
  **/
 @Data
-public class FileMetadata {
+public class FileMetadataDTO {
     /**
      * 文件名稱
      */
@@ -70,8 +71,8 @@ public class FileMetadata {
      *
      * @return 文件傳輸任務對象
      */
-    public TransferTaskDTO formatToTransferTask(String uploadTaskId, String message) {
-        TransferTaskDTO task = new TransferTaskDTO();
+    public UploadTaskBO formatToTransferTask(String uploadTaskId, String message) {
+        UploadTaskBO task = new UploadTaskBO();
         task.setTransferTaskId(uploadTaskId);
         task.setFilePath(formatFilePath(this.getFilePath(), this.getFileName()));
         task.setFileName(this.getFileName());

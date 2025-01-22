@@ -15,9 +15,9 @@ import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
@@ -134,7 +134,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @return Mono<Void>
      */
     private Mono<Void> handleInitialUpload(Long userId, WebSocketSession session, JsonNode jsonNode) {
-        Optional<FileMetadata> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadata.class);
+        Optional<FileMetadataDTO> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadataDTO.class);
         return fileMetadataOptional
                 .map(fileMetadata -> userService
                         .getById(userId)

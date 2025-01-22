@@ -12,7 +12,7 @@ import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.*;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.time.LocalDateTime;

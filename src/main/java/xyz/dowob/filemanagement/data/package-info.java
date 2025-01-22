@@ -4,4 +4,4 @@
  * 1.api: 用於規範API請求的數據傳輸對象
  * 2.user: 用於規範用戶相關的數據傳輸對象
  */
-package xyz.dowob.filemanagement.dto;
+package xyz.dowob.filemanagement.data;

@@ -1,6 +1,7 @@
-package xyz.dowob.filemanagement.dto.file;
+package xyz.dowob.filemanagement.data.file.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -17,6 +18,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class UploadResponseDTO {
     /**
      * 傳輸任務ID

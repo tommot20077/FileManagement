@@ -22,7 +22,7 @@ import xyz.dowob.filemanagement.component.handler.CustomWebSocketSession;
 import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 

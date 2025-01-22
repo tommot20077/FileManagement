@@ -9,7 +9,7 @@ import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
-import xyz.dowob.filemanagement.dto.user.AuthRequestDTO;
+import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.entity.User;
 
 /**

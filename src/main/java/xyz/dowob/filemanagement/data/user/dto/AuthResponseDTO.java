@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.dto.user;
+package xyz.dowob.filemanagement.data.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;

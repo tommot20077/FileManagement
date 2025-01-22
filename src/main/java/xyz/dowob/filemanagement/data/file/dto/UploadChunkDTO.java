@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.dto.file;
+package xyz.dowob.filemanagement.data.file.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;

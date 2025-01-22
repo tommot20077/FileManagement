@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.dto.user;
+package xyz.dowob.filemanagement.data.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

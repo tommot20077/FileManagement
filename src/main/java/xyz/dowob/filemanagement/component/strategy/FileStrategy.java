@@ -1,6 +1,5 @@
 package xyz.dowob.filemanagement.component.strategy;
 
-import lombok.extern.log4j.Log4j2;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
@@ -22,7 +21,6 @@ import java.util.List;
  * @Version 1.0
  **/
 
-@Log4j2
 @Component
 public class FileStrategy {
     /**
@@ -45,6 +43,9 @@ public class FileStrategy {
                 fileStrategies.put(annotation.value(), service);
             }
         }
+        if (fileStrategies.isEmpty()) {
+            throw new IllegalArgumentException("沒有找到對應的檔案處理方法，請檢查是否有添加 FileHandlerType 注解");
+        }
     }
 
     /**
@@ -55,10 +56,13 @@ public class FileStrategy {
      * @return 返回對應的檔案處理方法
      */
     public FileService getFileService(FileEnum fileEnum) {
-        FileService fileService = fileStrategies.get(fileEnum);
-        if (fileService == null) {
-            throw new IllegalArgumentException("無法找到對應的檔案處理方法");
+        if (fileEnum != null) {
+            FileService fileService = fileStrategies.get(fileEnum);
+            if (fileService != null) {
+                return fileService;
+            }
+            throw new IllegalArgumentException("沒有找到對應的檔案處理方法");
         }
-        return fileService;
+        return fileStrategies.values().stream().findFirst().orElseThrow(() -> new IllegalArgumentException("沒有找到對應的檔案處理方法"));
     }
 }

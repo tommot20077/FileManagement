@@ -1,5 +1,7 @@
 package xyz.dowob.filemanagement.controller.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -19,9 +21,9 @@ import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
-import xyz.dowob.filemanagement.dto.api.ApiResponseDTO;
-import xyz.dowob.filemanagement.dto.file.FileMetadata;
-import xyz.dowob.filemanagement.dto.file.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
@@ -37,18 +39,19 @@ import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
  * @Version 1.0
  **/
 @RestController
-@RequestMapping("/api/guest/file")
-public class ApiFileUploadController extends BaseFileController {
-    public ApiFileUploadController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
+@RequestMapping("/api/file")
+public class ApiFileController extends BaseFileController {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public ApiFileController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
         super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
     }
 
     @PostMapping("/upload/initialTask")
-    public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadata fileMetadata, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         return userService
                 .getUser(exchange)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
-                // todo Image硬編碼
                 .flatMap(user -> {
                     UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
                     if (!userLimiter.tryAcquire(user.getId())) {
@@ -57,19 +60,16 @@ public class ApiFileUploadController extends BaseFileController {
                         ));
                     }
                     return validationService
-                            .validateFileMetadataDTO(fileMetadata)
-                            .then(fileStrategy
-                                          .getFileService(FileEnum.IMAGE)
-                                          .uploadFile(fileMetadata, user)
-                                          .flatMap(transferResponseDTO -> {
-                                              ApiResponseDTO<?> apiResponse;
-                                              if (transferResponseDTO.getIsFinished()) {
-                                                  apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                                              } else {
-                                                  apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                                              }
-                                              return createResponseEntity(apiResponse);
-                                          }))
+                            .validateFileMetadataDTO(fileMetadataDTO)
+                            .then(fileStrategy.getFileService(null).uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
+                                ApiResponseDTO<?> apiResponse;
+                                if (transferResponseDTO.getIsFinished()) {
+                                    apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                                } else {
+                                    apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                                }
+                                return createResponseEntity(apiResponse);
+                            }))
                             .doFinally(signalType -> userLimiter.release(user.getId()));
                 })
                 .onErrorResume(ValidationException.class, e -> {
@@ -94,18 +94,18 @@ public class ApiFileUploadController extends BaseFileController {
     }
 
     private Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
-        return Mono.just(uploadChunkDTO).flatMap(uploadChunk -> {
-            // todo Image硬編碼
-            return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
-        }).flatMap(transferResponseDTO -> {
-            ApiResponseDTO<?> apiResponse;
-            if (transferResponseDTO.getIsSuccess()) {
-                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-            } else {
-                apiResponse = createResponse(exchange, 400, "上傳失敗", transferResponseDTO);
-            }
-            return createResponseEntity(apiResponse);
-        });
+        return Mono
+                .just(uploadChunkDTO)
+                .flatMap(uploadChunk -> fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO))
+                .flatMap(transferResponseDTO -> {
+                    ApiResponseDTO<?> apiResponse;
+                    if (transferResponseDTO.getIsSuccess()) {
+                        apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                    } else {
+                        apiResponse = createResponse(exchange, 400, "上傳失敗", transferResponseDTO);
+                    }
+                    return createResponseEntity(apiResponse);
+                });
     }
 
     // todo 暫不使用
@@ -113,8 +113,7 @@ public class ApiFileUploadController extends BaseFileController {
             @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
         return formatPartToBytes(filePart).flatMap(bytes -> {
             UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
-            // todo Image硬編碼
-            return fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(uploadChunkDTO);
+            return fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO);
         }).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsFinished()) {
@@ -145,27 +144,40 @@ public class ApiFileUploadController extends BaseFileController {
 
     @GetMapping("/download")
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(ServerWebExchange exchange,
-                                                               @RequestParam String fileId,
-                                                               @RequestParam(value = "action", defaultValue = "download", required = false)
+                                                               @RequestParam(name = "id") String fileId,
+                                                               @RequestParam(value = "action", defaultValue = "preview", required = false)
                                                                String action) {
-        return userService.getUser(exchange).flatMap(user -> {
-            // todo Image硬編碼
-            Flux<DataBuffer> data = fileStrategy.getFileService(FileEnum.IMAGE).downloadFile(fileId, user);
-
-            HttpHeaders headers = new HttpHeaders();
-            if ("download".equals(action)) {
-                headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileId);
-                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
-            } else {
-                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.IMAGE_JPEG_VALUE);
-            }
-
-            return Mono.just(ResponseEntity.ok().headers(headers).body(data));
-
-        });
+        return userService
+                .getUser(exchange)
+                .flatMap(user -> fileStrategy.getFileService(null).downloadFile(fileId, user).map(userFileDataBO -> {
+                    HttpHeaders headers = new HttpHeaders();
+                    if ("download".equals(action)) {
+                        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + userFileDataBO.getFileName());
+                        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
+                    } else {
+                        headers.add(HttpHeaders.CONTENT_TYPE,
+                                    FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFileName())
+                        );
+                    }
+                    return ResponseEntity.ok().headers(headers).body(userFileDataBO.getDataStream());
+                }))
+                .onErrorResume(ValidationException.class, e -> {
+                    String errorMessage = String.format("下載失敗: %s", e.getMessage());
+                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+                    try {
+                        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+                        return Mono.just(ResponseEntity
+                                                 .status(400)
+                                                 .contentType(MediaType.APPLICATION_JSON)
+                                                 .body(Flux.just(exchange
+                                                                         .getResponse()
+                                                                         .bufferFactory()
+                                                                         .wrap(objectMapper.writeValueAsString(apiResponse).getBytes()))));
+                    } catch (JsonProcessingException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                });
     }
-
-
 
 
     private Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
