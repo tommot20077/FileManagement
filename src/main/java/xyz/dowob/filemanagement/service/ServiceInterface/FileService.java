@@ -2,12 +2,8 @@ package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
-import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
-import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
-import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
-import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.User;
 
 /**
@@ -27,7 +23,7 @@ public interface FileService {
      *
      * @return 返回用戶文件列表
      */
-    default Flux<UserFileListDTO> getUserFileList (User user) {
+    default Flux<UserFileListDTO> getUserFileList(User user) {
         return null;
     }
 
@@ -36,8 +32,8 @@ public interface FileService {
      * 上傳文件的接口
      *
      * @param fileMetadataDTO 文件元數據
-     *                     包含文件名、文件大小、文件類型等信息
-     * @param user         用戶信息
+     *                        包含文件名、文件大小、文件類型等信息
+     * @param user            用戶信息
      *
      * @return 返回上傳結果
      */
@@ -69,11 +65,28 @@ public interface FileService {
         return null;
     }
 
-    default FileEnum detectFileType(byte[] fileBytes) {
+    /**
+     * 刪除文件的接口
+     *
+     * @param fileId 文件ID
+     * @param user   用戶信息
+     *
+     * @return 返回刪除結果
+     */
+    default Mono<Void> deleteFile(String fileId, User user) {
         return null;
     }
 
-    // Mono<ResponseEntity<?>> deleteFile(ServerWebExchange exchange, String fileId);
-
+    /**
+     * 編輯文件的接口
+     *
+     * @param fileEditDTO 文件ID
+     * @param user        用戶信息
+     *
+     * @return 返回編輯結果
+     */
+    default Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+        return null;
+    }
 
 }

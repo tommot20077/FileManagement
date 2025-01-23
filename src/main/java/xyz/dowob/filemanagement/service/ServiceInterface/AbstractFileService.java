@@ -9,21 +9,19 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
-import xyz.dowob.filemanagement.component.provider.providerImpl.GridFsProvider;
-import xyz.dowob.filemanagement.component.provider.providerImpl.RedisProvider;
+import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
+import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
-import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
-import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
-import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
-import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -52,6 +50,7 @@ public abstract class AbstractFileService implements FileService {
     protected final GridFsProvider gridFsProvider;
     protected final TransfersTasksManager transfersTasksManager;
     protected final FileProperties fileProperties;
+    protected final DatabaseClient databaseClient;
 
     private final Tika tika = new Tika();
     protected Long CHUNK_SIZE;
@@ -98,6 +97,7 @@ public abstract class AbstractFileService implements FileService {
         fileMetadataDTO.setUserId(user.getId());
         return serverFileMetaRepository.findByMd5(fileMetadataDTO.getMd5()).flatMap(existingFile -> {
             existingFile.getOwners().add(user.getId());
+            existingFile.setLastAccessTime(LocalDateTime.now());
             return serverFileMetaRepository
                     .save(existingFile)
                     .then(associateUserFile(existingFile.getId(), fileMetadataDTO).flatMap(userFileMetadata -> userFileMetaRepository
@@ -172,7 +172,7 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, false).then(Mono.just(userFileMetadata)))
                 .flatMap(userFileMetadata -> serverFileMetaRepository
                         .findById(userFileMetadata.getServerFileId().toString())
                         .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
@@ -197,7 +197,6 @@ public abstract class AbstractFileService implements FileService {
                         })));
     }
 
-    @Override
     public FileEnum detectFileType(byte[] fileBytes) {
         String mimeType = tika.detect(fileBytes);
         return FileEnum.fromMimeType(mimeType);
@@ -211,15 +210,39 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<Void>
      */
-    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
-        if (userFileMetadata.getUserId().equals(user.getId()) || userFileMetadata.getSharedWithUsers().contains(user.getId())) {
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata, boolean OwnerOnly) {
+        if (userFileMetadata.getUserId().equals(user.getId()) || (!OwnerOnly && userFileMetadata
+                .getSharedWithUsers()
+                .contains(user.getId()))) {
             return Mono.empty();
-        } else {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED,
-                                                      user.getId(),
-                                                      userFileMetadata.getId()
-            ));
         }
+        return Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, userFileMetadata.getId()));
+
+    }
+
+    @Override
+    public Mono<Void> deleteFile(String fileId, User user) {
+        return userFileMetaRepository
+                .findById(fileId)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> userFileMetaRepository
+                        .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
+                        .flatMap(c -> {
+                            if (c == 1) {
+                                return serverFileMetaRepository
+                                        .findById(userFileMetadata.getServerFileId().toString())
+                                        .flatMap(serverFileMetadata -> {
+                                            serverFileMetadata.getOwners().remove(user.getId());
+                                            serverFileMetadata.setLastAccessTime(LocalDateTime.now());
+                                            return serverFileMetaRepository
+                                                    .save(serverFileMetadata)
+                                                    .then(userFileMetaRepository.deleteById(fileId));
+                                        });
+                            } else {
+                                return userFileMetaRepository.deleteById(fileId);
+                            }
+                        }));
     }
 
     /**
@@ -480,6 +503,35 @@ public abstract class AbstractFileService implements FileService {
                             .save(serverFileMetadata)
                             .flatMap(serverFile -> associateUserFile(serverFile.getId(), uploadTaskBO.formatToFileMetadata()).flatMap(
                                     userFileMetadata -> userFileMetaRepository.save(userFileMetadata).then(removeTempData(uploadTaskBO))));
+                });
+    }
+
+    /**
+     * 驗證用戶權限的重寫方法，默認開啟擁有者限定
+     *
+     * @param user             用戶信息
+     * @param userFileMetadata 用戶文件元數據
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
+        return validateUserPermission(user, userFileMetadata, true);
+    }
+
+    @Override
+    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+        return userFileMetaRepository
+                .findById(fileEditDTO.getFileId())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                  fileEditDTO.getFileId()
+                )))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> {
+                    userFileMetadata.setFilename(fileEditDTO.getFileName());
+                    userFileMetadata.setFilePath(fileEditDTO.getFilePath());
+                    userFileMetadata.setSharedWithUsers(fileEditDTO.getShareUserIds());
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+                    return userFileMetaRepository.save(userFileMetadata).then();
                 });
     }
 }

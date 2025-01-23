@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.data.file.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -22,21 +23,25 @@ public class FileMetadataDTO {
     /**
      * 文件名稱
      */
+    @NotBlank(message = "文件名稱不能為空")
     private String fileName;
 
     /**
      * 文件路徑
      */
+    @NotBlank(message = "文件路徑不能為空")
     private String filePath;
 
     /**
      * 文件MD5值
      */
+    @NotBlank(message = "文件MD5值不能為空")
     private String md5;
 
     /**
      * 文件大小
      */
+    @NotBlank(message = "文件大小不能為空")
     private Long fileSize;
 
     /**

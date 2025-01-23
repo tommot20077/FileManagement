@@ -1,10 +1,11 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
+import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
-import xyz.dowob.filemanagement.component.provider.providerImpl.GridFsProvider;
-import xyz.dowob.filemanagement.component.provider.providerImpl.RedisProvider;
+import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
+import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
@@ -22,10 +23,17 @@ import xyz.dowob.filemanagement.service.ServiceInterface.AbstractFileService;
  * @create 2024-09-27 00:48
  * @Version 1.0
  **/
-@FileHandlerType(FileEnum.IMAGE)
 @Service
+@FileHandlerType(FileEnum.IMAGE)
 public class ImageFileServiceImpl extends AbstractFileService {
-    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties) {
-        super(serverFileMetaRepository, userFileMetaRepository, redisProvider, gridFsProvider, transfersTasksManager, fileProperties);
+    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient) {
+        super(serverFileMetaRepository,
+              userFileMetaRepository,
+              redisProvider,
+              gridFsProvider,
+              transfersTasksManager,
+              fileProperties,
+              databaseClient
+        );
     }
 }

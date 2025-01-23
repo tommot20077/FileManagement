@@ -1,11 +1,11 @@
 package xyz.dowob.filemanagement.repostiory;
 
-import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 /**
@@ -41,23 +41,21 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     Mono<UserFileMetadata> findByUserIdAndFilename(Long userId, String filename);
 
     /**
-     * 根據用戶ID和伺服器檔案ID查詢檔案元數據
+     * 計算該用戶擁有同一伺服器檔案的檔案數量
      *
-     * @param userId       用戶ID
-     * @param serverFileId 伺服器檔案ID
+     * @param userId         用戶ID
+     * @param serverFileId   伺服器檔案ID
+     * @param databaseClient 數據庫客戶端
      *
-     * @return Mono<UserFileMetadata>
+     * @return Mono<Long> 返回檔案數量
      */
-    Mono<UserFileMetadata> findByUserIdAndServerFileId(Long userId, Long serverFileId);
-
-    /**
-     * 查詢指定檔案的所有分享用戶
-     *
-     * @param id 用戶檔案ID
-     *
-     * @return Flux<User>
-     */
-    @Query("select u.* from shared_files sf join users u on sf.user_id = u.id where sf.user_file_id = :id;")
-    Flux<User> findAllShareUsersById(Long id);
-
+    default Mono<Long> countByServerFileIdAndUserId(
+            @Param("serverFileId") Long serverFileId, @Param("userId") Long userId, DatabaseClient databaseClient) {
+        return databaseClient
+                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE server_file_id = :serverFileId AND user_id = :userId")
+                .bind("serverFileId", serverFileId)
+                .bind("userId", userId)
+                .map(row -> row.get("count", Long.class))
+                .one();
+    }
 }

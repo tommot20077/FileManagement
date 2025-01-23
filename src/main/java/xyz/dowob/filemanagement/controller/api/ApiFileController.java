@@ -22,6 +22,7 @@ import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
@@ -179,6 +180,36 @@ public class ApiFileController extends BaseFileController {
                 });
     }
 
+    @DeleteMapping("/delete")
+    public Mono<ResponseEntity<?>> deleteFile(ServerWebExchange exchange, @RequestParam(name = "id") String fileId) {
+        return userService
+                .getUser(exchange)
+                .flatMap(user -> fileStrategy
+                        .getFileService(null)
+                        .deleteFile(fileId, user)
+                        .then(createResponseEntity(createResponse(exchange, "刪除成功", null))))
+                .onErrorResume(ValidationException.class, e -> {
+                    String errorMessage = String.format("刪除失敗: %s", e.getMessage());
+                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+                    return createResponseEntity(apiResponse);
+                });
+    }
+
+    @PutMapping("/edit")
+    public Mono<ResponseEntity<?>> editFile(ServerWebExchange exchange, @RequestBody FileEditDTO fileEditDTO) {
+        return validationService
+                .validateEditFileDTO(fileEditDTO)
+                .then(userService.getUser(exchange))
+                .flatMap(user -> fileStrategy
+                        .getFileService(null)
+                        .editFile(fileEditDTO, user)
+                        .then(createResponseEntity(createResponse(exchange, "資料更新成功", null))))
+                .onErrorResume(ValidationException.class, e -> {
+                    String errorMessage = String.format("更新失敗: %s", e.getMessage());
+                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+                    return createResponseEntity(apiResponse);
+                });
+    }
 
     private Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
         return multipartFile.flatMap(part -> part.content().reduce(DataBuffer::write)).map(dataBuffer -> {

@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.component.provider.providerImpl;
+package xyz.dowob.filemanagement.component.provider.provider;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Range;

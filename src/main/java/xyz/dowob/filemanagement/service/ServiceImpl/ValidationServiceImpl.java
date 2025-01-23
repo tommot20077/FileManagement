@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.service.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -68,10 +69,16 @@ public class ValidationServiceImpl implements ValidationService {
      *
      * @param fileMetadataDTO 文件元數據DTO
      */
-
     @Override
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) {
-        return validateNotNull(fileMetadataDTO);
+        return validateNotNull(fileMetadataDTO)
+                .then(validFileName(fileMetadataDTO.getFileName()))
+                .then(validFilePath(fileMetadataDTO.getFilePath()));
+    }
+
+    @Override
+    public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO) {
+        return validateNotNull(fileEditDTO).then(validFileName(fileEditDTO.getFileName())).then(validFilePath(fileEditDTO.getFilePath()));
     }
 
     /**
@@ -201,5 +208,26 @@ public class ValidationServiceImpl implements ValidationService {
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));
         });
+    }
+
+    //todo 特殊字符檢查
+    private Mono<Void> validFileName(String fileName) {
+        if (fileName == null || fileName.isBlank() || !fileName.contains(".")) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_NAME_INVALID));
+        }
+        if (fileName.length() > 200) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_NAME_TOO_LONG));
+        }
+        return Mono.empty();
+    }
+
+    private Mono<Void> validFilePath(String filePath) {
+        if (filePath == null || filePath.isBlank() || !filePath.startsWith("/") || !filePath.endsWith("/")) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PATH_INVALID));
+        }
+        if (filePath.length() > 200) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PATH_TOO_LONG));
+        }
+        return Mono.empty();
     }
 }

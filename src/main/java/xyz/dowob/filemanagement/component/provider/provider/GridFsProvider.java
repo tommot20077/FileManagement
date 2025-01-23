@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.component.provider.providerImpl;
+package xyz.dowob.filemanagement.component.provider.provider;
 
 import com.mongodb.client.gridfs.model.GridFSFile;
 import com.mongodb.client.gridfs.model.GridFSUploadOptions;

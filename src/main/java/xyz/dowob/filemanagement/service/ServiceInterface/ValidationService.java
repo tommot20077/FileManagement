@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -41,6 +42,7 @@ public interface ValidationService {
      */
     Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO);
 
+    Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO);
 
     /**
      * 驗證數據傳輸對象是否為空
