@@ -14,6 +14,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.exception.LimitationException;
+import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -124,6 +126,26 @@ public interface ResponseUnity {
      */
     default <T> ApiResponseDTO<T> createResponse(String path, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, path, message, data);
+    }
+
+    /**
+     * 統一處理錯誤
+     *
+     * @param operation 要執行的操作
+     * @param exchange  請求對象
+     *
+     * @return 處理後的 ResponseEntity
+     */
+    default Mono<ResponseEntity<?>> handleError(Mono<ResponseEntity<?>> operation, ServerWebExchange exchange) {
+        return operation.onErrorResume(ValidationException.class, e -> {
+            String errorMessage = String.format("處理失敗: %s", e.getMessage());
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+            return createResponseEntity(apiResponse, 400);
+        }).onErrorResume(LimitationException.class, e -> {
+            String errorMessage = String.format("限制錯誤: %s", e.getMessage());
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+            return createResponseEntity(apiResponse, 429);
+        });
     }
 
 }

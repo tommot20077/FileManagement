@@ -5,7 +5,6 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 
 import java.time.LocalDateTime;
@@ -54,12 +53,6 @@ public class TransfersTask {
      */
     @Column("file_size")
     private Long fileSize;
-
-    /**
-     * 文件類型
-     */
-    @Column("file_type")
-    private FileEnum fileType;
 
     /**
      * 開始時間
@@ -125,7 +118,6 @@ public class TransfersTask {
         map.put("md5", md5);
         map.put("gridFsId", gridFsId);
         map.put("fileSize", fileSize);
-        map.put("fileType", fileType);
         map.put("startTime", startTime);
         map.put("finishTime", finishTime);
         map.put("message", message);

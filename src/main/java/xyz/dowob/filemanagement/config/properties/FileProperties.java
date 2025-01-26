@@ -28,6 +28,7 @@ public class FileProperties {
      * 建立文件上傳配置
      */
     private Upload upload = new Upload();
+    private global global = new global();
 
     /**
      * 文件上傳配置
@@ -50,5 +51,12 @@ public class FileProperties {
         private Integer chunkSize = 10;
 
         private Integer maxUploadTaskLimit = 3;
+
+        private Integer combineProcessCountLimit = 3;
+    }
+
+    @Data
+    public static class global {
+
     }
 }

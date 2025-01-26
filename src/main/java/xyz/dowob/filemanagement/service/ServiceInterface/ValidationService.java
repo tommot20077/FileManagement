@@ -7,6 +7,8 @@ import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -42,7 +44,7 @@ public interface ValidationService {
      */
     Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO);
 
-    Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO);
+    Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder);
 
     /**
      * 驗證數據傳輸對象是否為空
@@ -55,6 +57,39 @@ public interface ValidationService {
             if (Objects.isNull(dto)) {
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.NULL_DTO));
             }
+            return Mono.empty();
+        });
+    }
+
+    default <T> Mono<Void> validSpecifyColumn(T dto, String... columns) {
+        return Mono.defer(() -> {
+            if (Objects.isNull(dto)) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.NULL_DTO));
+            }
+
+            Field[] fields = dto.getClass().getDeclaredFields();
+            if (fields.length == 0) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.NULL_DTO));
+            }
+
+            for (String column : columns) {
+                boolean columnFound = Arrays.stream(fields).anyMatch(field -> field.getName().equals(column));
+                if (!columnFound) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.COLUMN_NOT_FOUND, column));
+                }
+
+                try {
+                    Field field = dto.getClass().getDeclaredField(column);
+                    field.setAccessible(true);
+                    Object value = field.get(dto);
+                    if (value instanceof String && ((String) value).isBlank()) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, column));
+                    }
+                } catch (NoSuchFieldException | IllegalAccessException e) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.COLUMN_NOT_FOUND, column));
+                }
+            }
+
             return Mono.empty();
         });
     }

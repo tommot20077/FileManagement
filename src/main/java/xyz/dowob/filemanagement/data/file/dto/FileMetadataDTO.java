@@ -29,8 +29,7 @@ public class FileMetadataDTO {
     /**
      * 文件路徑
      */
-    @NotBlank(message = "文件路徑不能為空")
-    private String filePath;
+    private Long parentFolderId;
 
     /**
      * 文件MD5值
@@ -60,7 +59,7 @@ public class FileMetadataDTO {
     public UserFileMetadata formatToUserFileMetadata(Long serverFileId) {
         UserFileMetadata userFileMetadata = new UserFileMetadata();
         userFileMetadata.setFilename(this.fileName);
-        userFileMetadata.setFilePath(this.filePath);
+        userFileMetadata.setParentFolderId(this.parentFolderId);
         userFileMetadata.setServerFileId(serverFileId);
         userFileMetadata.setUserId(this.userId);
         userFileMetadata.setLastAccessTime(LocalDateTime.now());
@@ -79,27 +78,12 @@ public class FileMetadataDTO {
     public UploadTaskBO formatToTransferTask(String uploadTaskId, String message) {
         UploadTaskBO task = new UploadTaskBO();
         task.setTransferTaskId(uploadTaskId);
-        task.setFilePath(formatFilePath(this.getFilePath(), this.getFileName()));
+        task.setParentFolderId(parentFolderId);
         task.setFileName(this.getFileName());
         task.setMd5(this.getMd5());
         task.setUserId(this.userId);
         task.setMessage(message);
         task.setFileSize(this.getFileSize());
         return task;
-    }
-
-    /**
-     * 格式化文件路徑
-     *
-     * @param filePath 文件路徑
-     * @param filename 文件名稱
-     *
-     * @return 格式化後的文件路徑
-     */
-    public String formatFilePath(String filePath, String filename) {
-        if (filePath.lastIndexOf(filename) != -1) {
-            return filePath.substring(0, filePath.lastIndexOf(filename));
-        }
-        return filePath;
     }
 }

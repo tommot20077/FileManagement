@@ -48,10 +48,17 @@ public class UserFileMetadata {
     private String filename;
 
     /**
-     * 文件路徑
+     * 文件的父資料夾ID（用於樹狀結構）
+     * 若為根目錄，則為 null
      */
-    @Column("file_path")
-    private String filePath;
+    @Column("parent_folder_id")
+    private Long parentFolderId;
+
+    /**
+     * 是否為資料夾
+     */
+    @Column("is_folder")
+    private Boolean isFolder = false;
 
     /**
      * 文件大小
@@ -80,8 +87,9 @@ public class UserFileMetadata {
         map.put("id", id);
         map.put("user", userId);
         map.put("serverFile", serverFileId);
+        map.put("parentFolder", parentFolderId);
         map.put("filename", filename);
-        map.put("filePath", filePath);
+        map.put("isFolder", isFolder);
         map.put("uploadTime", uploadTime);
         map.put("lastAccessTime", lastAccessTime);
         map.put("sharedWithUsers", sharedWithUsers);

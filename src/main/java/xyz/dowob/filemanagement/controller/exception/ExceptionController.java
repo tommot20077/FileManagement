@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.controller.exception;
 
 import io.r2dbc.spi.R2dbcException;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -19,6 +20,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 自定義異常處理器，用於處理一些操作所異常
@@ -100,6 +103,33 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
     }
 
+    @ExceptionHandler(ConversionFailedException.class)
+    public Mono<ResponseEntity<?>> handleConversionFailException(ConversionFailedException ex, ServerWebExchange exchange) {
+        log.debug("轉換類型時發生錯誤: {}", ex.getMessage());
+        String errorMessage;
+        Pattern pattern = Pattern.compile("Failed to convert from type \\[(.*?)\\] to type \\[(.*?)\\] for value \\[(.*?)\\]");
+        Matcher matcher = pattern.matcher(ex.getMessage());
+        if (matcher.find()) {
+            errorMessage = String.format("轉換類型時發生問題，從類型[%s]轉換到類型[%s]時發生錯誤，請檢查請求參數: %s",
+                                         matcher.group(1),
+                                         matcher.group(2),
+                                         matcher.group(3)
+            );
+        } else {
+            errorMessage = "轉換類型時發生問題，請檢查請求參數";
+        }
+
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message(errorMessage)
+                .data(null)
+                .build();
+
+        return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
+    }
 
     /**
      * 處理資料驗證錯誤，此錯誤是由 @Validated 或 @Valid 注解引起的

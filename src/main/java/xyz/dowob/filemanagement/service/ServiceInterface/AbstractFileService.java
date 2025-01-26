@@ -1,5 +1,8 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -33,10 +36,7 @@ import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +51,7 @@ public abstract class AbstractFileService implements FileService {
     protected final TransfersTasksManager transfersTasksManager;
     protected final FileProperties fileProperties;
     protected final DatabaseClient databaseClient;
+    protected final CircuitBreakerConfig circuitBreakerConfig;
 
     private final Tika tika = new Tika();
     protected Long CHUNK_SIZE;
@@ -67,20 +68,46 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO>
      */
+    //todo 加入緩存
     @Override
-    public Flux<UserFileListDTO> getUserFileList(User user) {
-        return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMapMany(userFileMetadataList -> {
-            Set<Long> serverFileIds = userFileMetadataList.stream().map(UserFileMetadata::getServerFileId).collect(Collectors.toSet());
-            if (serverFileIds.isEmpty()) {
+    public Flux<UserFileListDTO> getUserFileList(User user, Long folderId) {
+        Mono<List<UserFileMetadata>> userFileMetadataMono;
+        if (folderId == null || folderId == 0) {
+            userFileMetadataMono = userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId()).collectList();
+        } else if (folderId == -1) {
+            userFileMetadataMono = userFileMetaRepository.findAllByUserId(user.getId()).collectList();
+        } else {
+            userFileMetadataMono = userFileMetaRepository.findAllByUserIdAndParentFolderIdIn(user.getId(), List.of(folderId)).collectList();
+        }
+
+        return userFileMetadataMono.flatMapMany(userFileMetadataList -> {
+            Set<Long> serverFileIds = userFileMetadataList
+                    .stream()
+                    .map(UserFileMetadata::getServerFileId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            List<UserFileMetadata> folderMetadata = userFileMetadataList
+                    .stream()
+                    .filter(userFileMetadata -> userFileMetadata.getServerFileId() == null)
+                    .toList();
+
+            if (serverFileIds.isEmpty() && folderMetadata.isEmpty()) {
                 return Flux.empty();
             }
-            return serverFileMetaRepository
+
+            Flux<UserFileListDTO> nullServerFileMetadataFlux = Flux.fromIterable(folderMetadata).map(UserFileListDTO::new);
+            Flux<UserFileListDTO> serverFileMetadataFlux = serverFileMetaRepository
                     .findAllByIdIn(serverFileIds)
                     .collectMap(ServerFileMetadata::getId)
-                    .flatMapMany(serverFileMetadataMap -> Flux.fromIterable(userFileMetadataList).map(userFileMetadata -> {
-                        ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
-                        return new UserFileListDTO(serverFileMetadata, userFileMetadata);
-                    }));
+                    .flatMapMany(serverFileMetadataMap -> Flux
+                            .fromIterable(userFileMetadataList)
+                            .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
+                            .map(userFileMetadata -> {
+                                ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
+                                return new UserFileListDTO(serverFileMetadata, userFileMetadata);
+                            }));
+
+            return Flux.concat(nullServerFileMetadataFlux, serverFileMetadataFlux);
         });
     }
 
@@ -95,21 +122,26 @@ public abstract class AbstractFileService implements FileService {
     @Override
     public Mono<UploadResponseDTO> uploadFile(FileMetadataDTO fileMetadataDTO, User user) {
         fileMetadataDTO.setUserId(user.getId());
-        return serverFileMetaRepository.findByMd5(fileMetadataDTO.getMd5()).flatMap(existingFile -> {
+        return Mono.defer(() -> {
+            if (fileMetadataDTO.getParentFolderId() != null) {
+                return checkParentFolderId(fileMetadataDTO.getParentFolderId(), user);
+            }
+            return Mono.empty();
+        }).then(serverFileMetaRepository.findByMd5(fileMetadataDTO.getMd5()).flatMap(existingFile -> {
             existingFile.getOwners().add(user.getId());
             existingFile.setLastAccessTime(LocalDateTime.now());
             return serverFileMetaRepository
                     .save(existingFile)
-                    .then(associateUserFile(existingFile.getId(), fileMetadataDTO).flatMap(userFileMetadata -> userFileMetaRepository
-                            .save(userFileMetadata)
-                            .then(Mono.just(UploadResponseDTO
-                                                    .builder()
-                                                    .progress(100.0)
-                                                    .isSuccess(true)
-                                                    .isFinished(true)
-                                                    .message("上傳成功")
-                                                    .build()))));
-        }).switchIfEmpty(initialUpload(fileMetadataDTO));
+                    .then(associateUserFile(existingFile.getId(), fileMetadataDTO)
+                                  .flatMap(userFileMetaRepository::save)
+                                  .thenReturn(UploadResponseDTO
+                                                      .builder()
+                                                      .progress(100.0)
+                                                      .isSuccess(true)
+                                                      .isFinished(true)
+                                                      .message("上傳成功")
+                                                      .build()));
+        }).switchIfEmpty(initialUpload(fileMetadataDTO)));
     }
 
     /**
@@ -131,31 +163,31 @@ public abstract class AbstractFileService implements FileService {
                 .flatMap(task -> redisProvider.isChunkSetPending(pendingChunkKey, uploadChunkDTO.getChunkIndex()).flatMap(isPending -> {
                     if (isPending) {
                         return processChunk(uploadChunkDTO, transferTaskId, key, pendingChunkKey);
-                    } else {
-                        return redisProvider.getHashMap(key, "uploaded_count").flatMap(uploadCount -> {
-                            Long uploadCountLong = (Long) uploadCount;
-                            double progress = (uploadCountLong.doubleValue() / uploadChunkDTO.getTotalChunks()) * 100.0;
-                            String message = String.format("文件分塊: %d 已上傳", uploadChunkDTO.getChunkIndex());
-                            UploadResponseDTO responseDTO = UploadResponseDTO
-                                    .builder()
-                                    .chunkIndex(uploadChunkDTO.getChunkIndex())
-                                    .transferTaskId(transferTaskId)
-                                    .progress(progress)
-                                    .isSuccess(true)
-                                    .isFinished(false)
-                                    .message(message)
-                                    .totalChunks(uploadChunkDTO.getTotalChunks())
-                                    .build();
-
-                            if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
-                                combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks())
-                                        .subscribeOn(Schedulers.boundedElastic())
-                                        .subscribe();
-                                responseDTO.setIsFinished(true);
-                            }
-                            return Mono.just(responseDTO);
-                        });
                     }
+                    return redisProvider.getHashMap(key, "uploaded_count").flatMap(uploadCount -> {
+                        Long uploadCountLong = (Long) uploadCount;
+                        double progress = (uploadCountLong.doubleValue() / uploadChunkDTO.getTotalChunks()) * 100.0;
+                        String message = String.format("文件分塊: %d 已上傳", uploadChunkDTO.getChunkIndex());
+                        UploadResponseDTO responseDTO = UploadResponseDTO
+                                .builder()
+                                .chunkIndex(uploadChunkDTO.getChunkIndex())
+                                .transferTaskId(transferTaskId)
+                                .progress(progress)
+                                .isSuccess(true)
+                                .isFinished(false)
+                                .message(message)
+                                .totalChunks(uploadChunkDTO.getTotalChunks())
+                                .build();
+
+                        if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
+                            combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks())
+                                    .subscribeOn(Schedulers.boundedElastic())
+                                    .subscribe();
+                            responseDTO.setIsFinished(true);
+                        }
+                        return Mono.just(responseDTO);
+                    });
+
                 })));
     }
 
@@ -167,12 +199,15 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<UserFileDataBO>
      */
+    //todo 後期加入下載資料夾
     @Override
     public Mono<UserFileDataBO> downloadFile(String fileId, User user) {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, false).then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, false).then(isFileOrFolder(userFileMetadata,
+                                                                                                                       false
+                )))
                 .flatMap(userFileMetadata -> serverFileMetaRepository
                         .findById(userFileMetadata.getServerFileId().toString())
                         .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
@@ -197,52 +232,137 @@ public abstract class AbstractFileService implements FileService {
                         })));
     }
 
-    public FileEnum detectFileType(byte[] fileBytes) {
-        String mimeType = tika.detect(fileBytes);
-        return FileEnum.fromMimeType(mimeType);
-    }
-
-    /**
-     * 驗證用戶權限的抽象方法
-     *
-     * @param user             用戶信息
-     * @param userFileMetadata 用戶文件元數據
-     *
-     * @return Mono<Void>
-     */
-    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata, boolean OwnerOnly) {
-        if (userFileMetadata.getUserId().equals(user.getId()) || (!OwnerOnly && userFileMetadata
-                .getSharedWithUsers()
-                .contains(user.getId()))) {
-            return Mono.empty();
-        }
-        return Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, userFileMetadata.getId()));
-
-    }
-
     @Override
     public Mono<Void> deleteFile(String fileId, User user) {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(Mono.just(userFileMetadata)))
-                .flatMap(userFileMetadata -> userFileMetaRepository
-                        .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
-                        .flatMap(c -> {
-                            if (c == 1) {
-                                return serverFileMetaRepository
-                                        .findById(userFileMetadata.getServerFileId().toString())
-                                        .flatMap(serverFileMetadata -> {
-                                            serverFileMetadata.getOwners().remove(user.getId());
-                                            serverFileMetadata.setLastAccessTime(LocalDateTime.now());
-                                            return serverFileMetaRepository
-                                                    .save(serverFileMetadata)
-                                                    .then(userFileMetaRepository.deleteById(fileId));
-                                        });
-                            } else {
-                                return userFileMetaRepository.deleteById(fileId);
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, false)))
+                .flatMap(userFileMetadata -> updateOwner(userFileMetadata, user).then(userFileMetaRepository.deleteById(userFileMetadata
+                                                                                                                                .getId()
+                                                                                                                                .toString())));
+    }
+
+    private Mono<Void> updateOwner(UserFileMetadata userFileMetadata, User user) {
+        return Mono.defer(() -> {
+            if (userFileMetadata.getIsFolder()) {
+                return Mono.empty();
+            }
+            return userFileMetaRepository
+                    .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
+                    .flatMap(c -> {
+                        if (c == 1) {
+                            return serverFileMetaRepository
+                                    .findById(userFileMetadata.getServerFileId().toString())
+                                    .flatMap(serverFileMetadata -> {
+                                        serverFileMetadata.getOwners().remove(user.getId());
+                                        serverFileMetadata.setLastAccessTime(LocalDateTime.now());
+                                        return serverFileMetaRepository.save(serverFileMetadata).then();
+                                    });
+                        }
+                        return Mono.empty();
+                    });
+        });
+    }
+
+    @Override
+    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+        return userFileMetaRepository
+                .findById(fileEditDTO.getFileId())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                  fileEditDTO.getFileId()
+                )))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata)
+                        .then(isFileOrFolder(userFileMetadata, false))
+                        .then(Mono.defer(() -> {
+                            if (fileEditDTO.getParentFolderId() == null) {
+                                return Mono.just(userFileMetadata);
                             }
-                        }));
+                            return userFileMetaRepository
+                                    .findById(fileEditDTO.getParentFolderId().toString())
+                                    .flatMap(parentFolder -> validateUserPermission(user, parentFolder)
+                                            .then(Mono.just(userFileMetadata))
+                                            .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED,
+                                                                                              fileEditDTO.getParentFolderId()
+                                            ))))
+                                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                                      fileEditDTO.getParentFolderId()
+                                    )));
+                        }))
+                        .then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> {
+                    userFileMetadata.setFilename(fileEditDTO.getFileName());
+                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+                    userFileMetadata.setSharedWithUsers(fileEditDTO.getShareUserIds());
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+                    return userFileMetaRepository.save(userFileMetadata).then();
+                });
+    }
+
+    @Override
+    public Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
+        return Mono.defer(() -> {
+            if (fileEditDTO.getParentFolderId() != null) {
+                return checkParentFolderId(fileEditDTO.getParentFolderId(), user);
+            }
+            return Mono.empty();
+        }).then(Mono.defer(() -> {
+            UserFileMetadata folder = new UserFileMetadata();
+            folder.setUserId(user.getId());
+            folder.setFilename(fileEditDTO.getFileName());
+            folder.setIsFolder(true);
+            folder.setParentFolderId(fileEditDTO.getParentFolderId());
+            folder.setSharedWithUsers(fileEditDTO.getShareUserIds());
+            folder.setLastAccessTime(LocalDateTime.now());
+            folder.setUploadTime(LocalDateTime.now());
+            return userFileMetaRepository.save(folder).then();
+        }));
+    }
+
+    @Override
+    public Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
+        return userFileMetaRepository
+                .findById(fileEditDTO.getFileId())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                  fileEditDTO.getFileId()
+                )))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, true)))
+                .flatMap(userFileMetadata -> {
+                    if (fileEditDTO.getParentFolderId() != null) {
+                        return checkParentFolderId(fileEditDTO.getParentFolderId(), user).then(Mono.just(userFileMetadata));
+                    }
+                    return Mono.just(userFileMetadata);
+                })
+                .flatMap(userFileMetadata -> {
+                    userFileMetadata.setFilename(fileEditDTO.getFileName());
+                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+                    userFileMetadata.setSharedWithUsers(fileEditDTO.getShareUserIds());
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+                    return userFileMetaRepository.save(userFileMetadata).then();
+                });
+    }
+
+    @Override
+    public Mono<Void> deleteFolder(String fileId, User user) {
+        return userFileMetaRepository
+                .findById(fileId)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, true)))
+                .flatMap(userFileMetadata -> {
+                    List<UserFileMetadata> userFileList = new ArrayList<>(List.of(userFileMetadata));
+                    List<Long> parentFolderIdList = new ArrayList<>(List.of(userFileMetadata.getId()));
+                    Mono<Void> result = deleteFolderRecursive(user, parentFolderIdList, userFileList);
+                    return result.then(updateOwner(userFileList, user)).then(userFileMetaRepository.delete(userFileMetadata));
+                });
+    }
+
+    private Mono<Void> checkParentFolderId(Long parentFolderId, User user) {
+        return userFileMetaRepository
+                .findById(parentFolderId.toString())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, parentFolderId)))
+                .flatMap(parentFolder -> validateUserPermission(user, parentFolder).then(isFileOrFolder(parentFolder, true)))
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, parentFolderId)))
+                .then();
     }
 
     /**
@@ -258,10 +378,14 @@ public abstract class AbstractFileService implements FileService {
         userFileMetadata.setUserId(fileMetadataDTO.getUserId());
         userFileMetadata.setServerFileId(serverFileMetadataId);
         userFileMetadata.setFilename(fileMetadataDTO.getFileName());
-        userFileMetadata.setFilePath(fileMetadataDTO.formatFilePath(fileMetadataDTO.getFilePath(), fileMetadataDTO.getFileName()));
+        userFileMetadata.setParentFolderId(fileMetadataDTO.getParentFolderId());
         userFileMetadata.setUploadTime(LocalDateTime.now());
         userFileMetadata.setLastAccessTime(LocalDateTime.now());
         return userFileMetaRepository.save(userFileMetadata);
+    }
+
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
+        return validateUserPermission(user, userFileMetadata, true);
     }
 
     /**
@@ -318,123 +442,34 @@ public abstract class AbstractFileService implements FileService {
         return (int) Math.ceil((double) fileSize / CHUNK_SIZE);
     }
 
-    /**
-     * 合併已上傳的文件分塊的共通實現
-     *
-     * @param transferTaskId 任務ID
-     * @param totalChunks    總分塊數
-     *
-     * @return Mono<ObjectId>
-     */
-    protected Mono<ObjectId> combineChunks(String transferTaskId, int totalChunks) {
-        return redisProvider.getHashMap("upload_task:" + transferTaskId, "DTO").flatMap(task -> {
-            UploadTaskBO uploadTaskBO = (UploadTaskBO) task;
-            return Mono.defer(() -> {
-                record ChunkData(int index, byte[] data) {
-                }
-
-                Flux<byte[]> chunkFiles = Flux
-                        .range(1, totalChunks)
-                        .parallel(Runtime.getRuntime().availableProcessors())
-                        .runOn(Schedulers.boundedElastic())
-                        .flatMap(index -> gridFsProvider
-                                .findFileByFileName(transferTaskId + "_chunk_" + index)
-                                .flatMap(gridFsProvider::getResource)
-                                .flatMap(resource -> DataBufferUtils.join(resource.getDownloadStream()).map(dataBuffer -> {
-                                    byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                    dataBuffer.read(bytes);
-                                    DataBufferUtils.release(dataBuffer);
-                                    return new ChunkData(index, bytes);
-                                })))
-                        .sequential()
-                        .sort(Comparator.comparingInt(ChunkData::index))
-                        .map(ChunkData::data);
-                return chunkFiles.collectList().flatMap(this::combineBytes).flatMap(combinedBytes -> {
-                    String computedChunkMd5 = DigestUtils.md5Hex(combinedBytes);
-                    if (!uploadTaskBO.getMd5().equals(computedChunkMd5)) {
-                        transfersTasksManager
-                                .updateTransfersTask(uploadTaskBO.getMd5(),
-                                                     uploadTaskBO.getTransferTaskId(),
-                                                     TransfersStatusEnum.FAILED,
-                                                     "MD5校驗失敗",
-                                                     null,
-                                                     false
-                                )
-                                .subscribeOn(Schedulers.boundedElastic())
-                                .subscribe();
-                        return Mono.defer(() -> removeTempData(uploadTaskBO).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
-                    }
-
-                    uploadTaskBO.setFileType(detectFileType(combinedBytes));
-                    processFileAfterMd5Check(uploadTaskBO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                    return Mono.just(new ObjectId());
-
-                }).flatMap(id -> removeTempData(uploadTaskBO).thenReturn(id));
-            });
-        });
+    private Mono<UserFileMetadata> isFileOrFolder(UserFileMetadata userFileMetadata, boolean isFolder) {
+        if (userFileMetadata.getIsFolder() == isFolder) {
+            return Mono.just(userFileMetadata);
+        }
+        ValidationException.ErrorCode errorCode = isFolder ? ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FOLDER : ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FILE;
+        return Mono.error(new ValidationException(errorCode, userFileMetadata.getId()));
     }
 
     /**
-     * 處理文件分塊的共通實現
+     * 驗證用戶權限的抽象方法
      *
-     * @param uploadChunkDTO  上傳文件數據
-     * @param transferTaskId  任務ID
-     * @param key             任務Key
-     * @param pendingChunkKey 待處理文件分塊Key
+     * @param user             用戶信息
+     * @param userFileMetadata 用戶文件元數據
      *
-     * @return Mono<UploadResponseDTO>
+     * @return Mono<Void>
      */
-    protected Mono<UploadResponseDTO> processChunk(UploadChunkDTO uploadChunkDTO, String transferTaskId, String key, String pendingChunkKey) {
-        int chunkIndex = uploadChunkDTO.getChunkIndex();
-        int totalChunks = uploadChunkDTO.getTotalChunks();
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata, boolean ownerOnly) {
+        boolean isOwner = userFileMetadata.getUserId().equals(user.getId());
+        boolean isShared = !ownerOnly && userFileMetadata.getSharedWithUsers().contains(user.getId());
+        if (isOwner || isShared) {
+            return Mono.empty();
+        }
+        return Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, userFileMetadata.getId()));
+    }
 
-        DataBufferFactory dataBufferFactory = new DefaultDataBufferFactory();
-        Flux<DataBuffer> chunkData = Flux.just(dataBufferFactory.wrap(uploadChunkDTO.getChunkData()));
-
-        return Mono.defer(() -> redisProvider
-                .deleteSet(pendingChunkKey, chunkIndex)
-                .then(gridFsProvider.storeFile(chunkData, transferTaskId + "_chunk_" + chunkIndex))
-                .flatMap(id -> redisProvider.incrementHashMap(key, "uploaded_count", 1, 1, ChronoUnit.HOURS))
-                .flatMap(uploadCount -> {
-                    Long uploadCountLong = (Long) uploadCount;
-                    double progress = (uploadCountLong.doubleValue() / totalChunks) * 100.0;
-                    String message = String.format("文件分塊: %d 上傳成功", chunkIndex);
-                    UploadResponseDTO responseDTO = UploadResponseDTO
-                            .builder()
-                            .chunkIndex(chunkIndex)
-                            .transferTaskId(transferTaskId)
-                            .progress(progress)
-                            .isSuccess(true)
-                            .isFinished(false)
-                            .message(message)
-                            .totalChunks(uploadChunkDTO.getTotalChunks())
-                            .build();
-                    if (uploadCountLong.intValue() == totalChunks) {
-                        combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks()).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                        responseDTO.setIsFinished(true);
-                    }
-                    return Mono.just(responseDTO);
-                })
-                .onErrorResume(Exception.class,
-                               e -> redisProvider
-                                       .setSet(pendingChunkKey, chunkIndex)
-                                       .then(redisProvider.getHashMap(key, "uploaded_count"))
-                                       .flatMap(currentCount -> {
-                                           long uploadCountLong = Long.parseLong(currentCount.toString());
-                                           double progress = ((double) uploadCountLong / totalChunks) * 100.0;
-                                           UploadResponseDTO responseDTO = UploadResponseDTO
-                                                   .builder()
-                                                   .chunkIndex(chunkIndex)
-                                                   .transferTaskId(transferTaskId)
-                                                   .progress(progress)
-                                                   .isSuccess(false)
-                                                   .isFinished(false)
-                                                   .message("文件分塊上傳失敗")
-                                                   .totalChunks(uploadChunkDTO.getTotalChunks())
-                                                   .build();
-                                           return Mono.just(responseDTO);
-                                       })
-                ));
+    public FileEnum detectFileType(byte[] fileBytes) {
+        String mimeType = tika.detect(fileBytes);
+        return FileEnum.fromMimeType(mimeType);
     }
 
     /**
@@ -507,31 +542,257 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 驗證用戶權限的重寫方法，默認開啟擁有者限定
+     * 合併已上傳的文件分塊的共通實現
      *
-     * @param user             用戶信息
-     * @param userFileMetadata 用戶文件元數據
+     * @param transferTaskId 任務ID
+     * @param totalChunks    總分塊數
      *
-     * @return Mono<Void>
+     * @return Mono<ObjectId>
      */
-    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
-        return validateUserPermission(user, userFileMetadata, true);
+    protected Mono<ObjectId> combineChunks(String transferTaskId, int totalChunks) {
+        record ChunkData(int index, byte[] data) {
+            static Comparator<Object> comparator() {
+                return Comparator.comparingInt(a -> ((ChunkData) a).index);
+            }
+        }
+
+        String key = "upload_task:" + transferTaskId;
+        return redisProvider.getHashMap(key, "DTO").cast(UploadTaskBO.class).flatMap(uploadTaskBO -> Mono.defer(() -> {
+            Flux<byte[]> chunkFiles = Flux
+                    .range(1, totalChunks)
+                    .parallel(transfersTasksManager.getAvailableThreadCount())
+                    .runOn(Schedulers.boundedElastic())
+                    .flatMap(index -> CircuitBreakerOperator
+                            .of(CircuitBreaker.of("chunkProcessor", this.circuitBreakerConfig))
+                            .apply(this.gridFsProvider
+                                           .findFileByFileName(transferTaskId + "_chunk_" + index)
+                                           .flatMap(this.gridFsProvider::getResource)
+                                           .flatMap(resource -> DataBufferUtils
+                                                   .join(resource.getDownloadStream())
+                                                   .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM,
+                                                                                                       transferTaskId + "_chunk_" + index
+                                                   )))
+                                                   .map(dataBuffer -> {
+                                                       try {
+                                                           byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                                                           dataBuffer.read(bytes);
+                                                           return new ChunkData(index, bytes);
+                                                       } finally {
+                                                           DataBufferUtils.release(dataBuffer);
+                                                       }
+                                                   }))))
+                    .sequential()
+                    .sort(ChunkData.comparator())
+                    .cast(ChunkData.class)
+                    .map((ChunkData -> ChunkData.data));
+            return chunkFiles.collectList().flatMap(this::combineBytes).flatMap(combinedBytes -> {
+                String computedChunkMd5 = DigestUtils.md5Hex(combinedBytes);
+                if (!uploadTaskBO.getMd5().equals(computedChunkMd5)) {
+                    transfersTasksManager
+                            .updateTransfersTask(uploadTaskBO.getMd5(),
+                                                 uploadTaskBO.getTransferTaskId(),
+                                                 TransfersStatusEnum.FAILED,
+                                                 "MD5校驗失敗",
+                                                 null,
+                                                 false
+                            )
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe();
+                    return Mono.defer(() -> removeTempData(uploadTaskBO).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
+                }
+
+                uploadTaskBO.setFileType(detectFileType(combinedBytes));
+                processFileAfterMd5Check(uploadTaskBO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                return Mono.just(new ObjectId());
+
+            }).flatMap(id -> removeTempData(uploadTaskBO).thenReturn(id));
+        }));
     }
 
+    /**
+     * 處理文件分塊的共通實現
+     *
+     * @param uploadChunkDTO  上傳文件數據
+     * @param transferTaskId  任務ID
+     * @param key             任務Key
+     * @param pendingChunkKey 待處理文件分塊Key
+     *
+     * @return Mono<UploadResponseDTO>
+     */
+    protected Mono<UploadResponseDTO> processChunk(UploadChunkDTO uploadChunkDTO, String transferTaskId, String key, String pendingChunkKey) {
+        int chunkIndex = uploadChunkDTO.getChunkIndex();
+        int totalChunks = uploadChunkDTO.getTotalChunks();
+
+        DataBufferFactory dataBufferFactory = new DefaultDataBufferFactory();
+        Flux<DataBuffer> chunkData = Flux.just(dataBufferFactory.wrap(uploadChunkDTO.getChunkData()));
+
+        return redisProvider
+                .deleteSet(pendingChunkKey, chunkIndex)
+                .then(gridFsProvider.storeFile(chunkData, transferTaskId + "_chunk_" + chunkIndex))
+                .then(redisProvider.incrementHashMap(key, "uploaded_count", 1, 1, ChronoUnit.HOURS))
+                .flatMap(uploadCount -> {
+                    Long uploadCountLong = (Long) uploadCount;
+                    double progress = (uploadCountLong.doubleValue() / totalChunks) * 100.0;
+                    String message = String.format("文件分塊: %d 上傳成功", chunkIndex);
+
+                    UploadResponseDTO responseDTO = UploadResponseDTO
+                            .builder()
+                            .chunkIndex(chunkIndex)
+                            .transferTaskId(transferTaskId)
+                            .progress(progress)
+                            .isSuccess(true)
+                            .isFinished(false)
+                            .message(message).totalChunks(totalChunks)
+                            .build();
+
+                    if (uploadCountLong.intValue() == totalChunks) {
+                        combineChunks(transferTaskId, totalChunks).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                        responseDTO.setIsFinished(true);
+                    }
+                    return Mono.just(responseDTO);
+                })
+                .onErrorResume(e -> redisProvider
+                        .setSet(pendingChunkKey, chunkIndex)
+                        .then(redisProvider.getHashMap(key, "uploaded_count").map(count -> {
+                            long uploadCountLong = Long.parseLong(count.toString());
+                            double progress = ((double) uploadCountLong / totalChunks) * 100.0;
+                            return UploadResponseDTO
+                                    .builder()
+                                    .chunkIndex(chunkIndex)
+                                    .transferTaskId(transferTaskId)
+                                    .progress(progress)
+                                    .isSuccess(false)
+                                    .isFinished(false)
+                                    .message("文件分塊上傳失敗")
+                                    .totalChunks(totalChunks)
+                                    .build();
+                        })));
+    }
+
+    private Mono<Void> deleteFolderRecursive(User user, List<Long> parentFolderIdList, List<UserFileMetadata> serverFileList) {
+        return findFileWithSameParentFolderId(user.getId(), parentFolderIdList, serverFileList).flatMap(nextParentFolderIds -> {
+            if (nextParentFolderIds.isEmpty()) {
+                return Mono.empty();
+            }
+            return deleteFolderRecursive(user, nextParentFolderIds, serverFileList);
+        });
+    }
+
+    private Mono<List<Long>> findFileWithSameParentFolderId(Long userId, List<Long> parentFolderId, List<UserFileMetadata> serverFileList) {
+        return userFileMetaRepository.findAllByUserIdAndParentFolderIdIn(userId, parentFolderId).collectList().map(userFileMetadataList -> {
+            serverFileList.addAll(userFileMetadataList);
+            return userFileMetadataList
+                    .stream()
+                    .filter(UserFileMetadata::getIsFolder)
+                    .map(UserFileMetadata::getId)
+                    .collect(Collectors.toList());
+        }).switchIfEmpty(Mono.just(Collections.emptyList()));
+    }
+
+    private Mono<Void> updateOwner(List<UserFileMetadata> userFileMetadataList, User user) {
+        return Flux.fromIterable(userFileMetadataList).flatMap(userFileMetadata -> updateOwner(userFileMetadata, user)).then();
+    }
+
+    /**
+     * 創建一個新的用戶文件元數據實體
+     *
+     * @return 返回一個新的實體對象
+     */
     @Override
-    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
-        return userFileMetaRepository
-                .findById(fileEditDTO.getFileId())
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
-                                                                  fileEditDTO.getFileId()
-                )))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(Mono.just(userFileMetadata)))
-                .flatMap(userFileMetadata -> {
-                    userFileMetadata.setFilename(fileEditDTO.getFileName());
-                    userFileMetadata.setFilePath(fileEditDTO.getFilePath());
-                    userFileMetadata.setSharedWithUsers(fileEditDTO.getShareUserIds());
-                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
-                    return userFileMetaRepository.save(userFileMetadata).then();
-                });
+    public Mono<UserFileMetadata> createUserFileMetadata() {
+        return null;
+    }
+
+    /**
+     * 根據ID獲取一個用戶文件元數據實體
+     *
+     * @param id 服務器文件元數據ID
+     *
+     * @return 用戶文件元數據實體對象
+     */
+    @Override
+    public Mono<UserFileMetadata> getUserFileMetadataById(Long id) {
+        if (id == null) {
+            return Mono.empty();
+        }
+        return userFileMetaRepository.findById(id.toString());
+    }
+
+    /**
+     * 獲取所有用戶文件元數據實體
+     */
+    @Override
+    public Flux<UserFileMetadata> getAllUserFileMetadata() {
+        return null;
+    }
+
+    /**
+     * 更新一個用戶文件元數據實體
+     *
+     * @param entity 用戶文件元數據實體對象
+     */
+    @Override
+    public Mono<Void> updateUserFileMetadata(UserFileMetadata entity) {
+        return null;
+    }
+
+    /**
+     * 刪除一個用戶文件元數據實體
+     *
+     * @param entity 用戶文件元數據實體對象
+     */
+    @Override
+    public Mono<Void> deleteUserFileMetadata(UserFileMetadata entity) {
+        return null;
+    }
+
+    /**
+     * 創建一個新的服務器文件元數據實體
+     *
+     * @return 返回一個新的服務器文件元數據實體對象
+     */
+    @Override
+    public Mono<ServerFileMetadata> createServerFileMetadata() {
+        return null;
+    }
+
+    /**
+     * 根據ID獲取一個服務器文件元數據實體
+     *
+     * @param id 服務器文件元數據ID
+     *
+     * @return 服務器文件元數據實體對象
+     */
+    @Override
+    public Mono<ServerFileMetadata> getByServerFileMetadataId(Long id) {
+        return null;
+    }
+
+    /**
+     * 獲取所有服務器文件元數據實體
+     */
+    @Override
+    public Flux<ServerFileMetadata> getAllServerFileMetadata() {
+        return null;
+    }
+
+    /**
+     * 更新一個服務器文件元數據實體
+     *
+     * @param entity 服務器文件元數據實體對象
+     */
+    @Override
+    public Mono<ServerFileMetadata> updateServerFileMetadata(ServerFileMetadata entity) {
+        return null;
+    }
+
+    /**
+     * 刪除一個服務器文件元數據實體
+     *
+     * @param entity 服務器文件元數據實體對象
+     */
+    @Override
+    public Mono<ServerFileMetadata> deleteServerFileMetadata(ServerFileMetadata entity) {
+        return null;
     }
 }

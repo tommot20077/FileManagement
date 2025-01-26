@@ -26,13 +26,15 @@ public class UserFileListDTO {
 
     private String filename;
 
-    private String filePath;
+    private Long parentFolderId;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
+
+    private boolean isFolder;
 
     private Long fileSize;
 
@@ -47,14 +49,27 @@ public class UserFileListDTO {
     public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
-        this.filePath = userFileMetadata.getFilePath();
+        this.parentFolderId = userFileMetadata.getParentFolderId();
         this.createTime = userFileMetadata.getUploadTime();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.fileSize = serverFileMetadata.getFileSize();
         this.fileType = serverFileMetadata.getFileType();
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
+        this.isFolder = userFileMetadata.getIsFolder();
 
+        if (userFileMetadata.getSharedWithUsers() != null) {
+            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        }
+    }
+
+    public UserFileListDTO(UserFileMetadata userFileMetadata) {
+        this.id = userFileMetadata.getId();
+        this.filename = userFileMetadata.getFilename();
+        this.parentFolderId = userFileMetadata.getParentFolderId();
+        this.createTime = userFileMetadata.getUploadTime();
+        this.lastAccessTime = userFileMetadata.getLastAccessTime();
+        this.isFolder = userFileMetadata.getIsFolder();
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
         }
@@ -63,7 +78,7 @@ public class UserFileListDTO {
     public UserFileListDTO(UserFileDataBO userFileDataBO) {
         this.id = userFileDataBO.getUserFileId();
         this.filename = userFileDataBO.getFileName();
-        this.filePath = userFileDataBO.getFilePath();
+        this.parentFolderId = userFileDataBO.getParentFolderId();
         this.createTime = userFileDataBO.getUploadTime();
         this.lastAccessTime = userFileDataBO.getLastAccessTime();
         this.fileSize = userFileDataBO.getFileSize();

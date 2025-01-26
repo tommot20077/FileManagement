@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.data.file.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.util.Set;
@@ -13,16 +14,21 @@ import java.util.Set;
  **/
 @Data
 public class FileEditDTO {
+    /**
+     * 文件ID
+     */
     private String fileId;
+
     /**
      * 文件名稱
      */
+    @NotBlank(message = "文件名稱不能為空")
     private String fileName;
 
     /**
-     * 文件路徑
+     * 文件父資料夾ID
      */
-    private String filePath;
+    private Long parentFolderId;
 
     /**
      * 分享用戶ID

@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
@@ -26,14 +27,13 @@ import xyz.dowob.filemanagement.service.ServiceInterface.AbstractFileService;
 @Service
 @FileHandlerType(FileEnum.IMAGE)
 public class ImageFileServiceImpl extends AbstractFileService {
-    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient) {
+    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               redisProvider,
               gridFsProvider,
               transfersTasksManager,
-              fileProperties,
-              databaseClient
+              fileProperties, databaseClient, circuitBreakerConfig
         );
     }
 }

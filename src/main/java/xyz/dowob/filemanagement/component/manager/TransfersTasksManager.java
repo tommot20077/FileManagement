@@ -4,7 +4,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.TransfersTask;
@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Log4j2
 public class TransfersTasksManager {
     /**
-     * 用於存儲正在進行的傳輸任務，key 為檔案的 MD5 值value 為檔案的傳輸任務Map
+     * 用於存儲正在進行的傳輸任務，key 為檔案的 MD5 值，value 為檔案的傳輸任務Map
      * 傳輸任務Map的key 為任務ID，value 為傳輸任務
      */
     private final ConcurrentHashMap<String, Map<String, TransfersTask>> activeTransfersTask = new ConcurrentHashMap<>();
@@ -42,20 +42,23 @@ public class TransfersTasksManager {
      */
     private final TransfersTasksRepository transfersTasksRepository;
 
+    private final FileProperties fileProperties;
+
     /**
      * 用於構造 TransfersTasksManager 對象
      *
      * @param transfersTasksRepository TransfersTasksRepository 用於操作傳輸任務的數據庫操作接口
      */
-    public TransfersTasksManager (TransfersTasksRepository transfersTasksRepository) {
+    public TransfersTasksManager(TransfersTasksRepository transfersTasksRepository, FileProperties fileProperties) {
         this.transfersTasksRepository = transfersTasksRepository;
+        this.fileProperties = fileProperties;
     }
 
     /**
      * 用於註冊一個新的上傳任務
      *
-     * @param fileMetadataDTO   檔案的元數據
-     * @param transferTaskId 任務ID
+     * @param fileMetadataDTO 檔案的元數據
+     * @param transferTaskId  任務ID
      *
      * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
      */
@@ -80,37 +83,54 @@ public class TransfersTasksManager {
     /**
      * 用於註冊一個新的轉換任務
      *
-     * @param fileMetadataDTO   檔案的元數據
-     * @param transferTaskId 任務ID
+     * @param fileMetadataDTO 檔案的元數據
+     * @param transferTaskId  任務ID
      *
      * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
      */
     public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, TransfersStatusEnum status) {
-        return createTransfersTask(fileMetadataDTO, transferTaskId, null, FileEnum.IMAGE, null, status);
-        // todo 硬編碼
+        return createTransfersTask(fileMetadataDTO, transferTaskId, null, null, status);
     }
 
     /**
      * 用於創建一個新的傳輸任務，當任務創建成功時，將任務存入 activeTransfersTask 中以及數據庫中
      *
-     * @param fileMetadataDTO   檔案的元數據
-     * @param transferTaskId 任務ID
-     * @param status         任務狀態
+     * @param fileMetadataDTO 檔案的元數據
+     * @param transferTaskId  任務ID
+     * @param status          任務狀態
      *
      * @return Mono<Void> 返回一個 Mono 對象
      */
-    public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, String gridFsId, FileEnum fileType, String message, TransfersStatusEnum status) {
+    public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, String gridFsId, String message, TransfersStatusEnum status) {
         TransfersTask transfersTask = new TransfersTask();
         transfersTask.setTransferTaskId(transferTaskId);
         transfersTask.setMd5(fileMetadataDTO.getMd5());
         transfersTask.setGridFsId(gridFsId);
         transfersTask.setFileSize(fileMetadataDTO.getFileSize());
-        transfersTask.setFileType(fileType);
         transfersTask.setStartTime(LocalDateTime.now());
         transfersTask.setMessage(message);
         transfersTask.setStatus(status);
         activeTransfersTask.put(fileMetadataDTO.getMd5(), Map.of(transferTaskId, transfersTask));
         return transfersTasksRepository.save(transfersTask).then();
+    }
+
+    /**
+     * 用於完成一個傳輸任務時，更新任務的狀態
+     *
+     * @param md5             檔案的 MD5 值
+     * @param transfersTaskId 任務ID
+     * @param gridFsId        GridFS 檔案ID
+     *
+     * @return Mono<Void> 返回一個 Mono 對象
+     */
+    public Mono<Void> finishTransfersTask(String md5, String transfersTaskId, String gridFsId) {
+        return updateTransfersTask(md5,
+                                   transfersTaskId,
+                                   TransfersStatusEnum.COMPLETED,
+                                   "檔案處理成功",
+                                   gridFsId,
+                                   true
+        ).doOnSuccess(aVoid -> activeTransfersTask.remove(md5));
     }
 
     /**
@@ -125,7 +145,7 @@ public class TransfersTasksManager {
      *
      * @return Mono<Void> 返回一個 Mono 對象
      */
-    public Mono<Void> updateTransfersTask (String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
+    public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
         TransfersTask transfersTask = activeTransfersTask.get(md5).get(transfersTaskId);
         if (transfersTask == null) {
             log.error("無法找到MD5為{}的任務", md5);
@@ -145,25 +165,6 @@ public class TransfersTasksManager {
     }
 
     /**
-     * 用於完成一個傳輸任務時，更新任務的狀態
-     *
-     * @param md5             檔案的 MD5 值
-     * @param transfersTaskId 任務ID
-     * @param gridFsId        GridFS 檔案ID
-     *
-     * @return Mono<Void> 返回一個 Mono 對象
-     */
-    public Mono<Void> finishTransfersTask (String md5, String transfersTaskId, String gridFsId) {
-        return updateTransfersTask(md5,
-                                   transfersTaskId,
-                                   TransfersStatusEnum.COMPLETED,
-                                   "檔案處理成功",
-                                   gridFsId,
-                                   true
-        ).doOnSuccess(aVoid -> activeTransfersTask.remove(md5));
-    }
-
-    /**
      * 用於獲取一個檔案的所有傳輸任務，可以根據任務狀態進行過濾
      * 當檔案不存在時，返回空列表
      *
@@ -172,7 +173,7 @@ public class TransfersTasksManager {
      *
      * @return List<TransfersTask> 返回一個包含所有符合條件的傳輸任務的列表
      */
-    public List<TransfersTask> getTransfersTask (String md5, TransfersStatusEnum status) {
+    public List<TransfersTask> getTransfersTask(String md5, TransfersStatusEnum status) {
         if (activeTransfersTask.containsKey(md5)) {
             Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(md5);
             List<TransfersTask> result = new ArrayList<>();
@@ -186,22 +187,10 @@ public class TransfersTasksManager {
         return Collections.emptyList();
     }
 
-    /**
-     * 用於移除一個檔案的傳輸任務，當該檔案的所有任務都被移除時，將從 activeTransfersTask 中移除
-     *
-     * @param md5             檔案的 MD5 值
-     * @param transfersTaskId 任務ID
-     *
-     * @return Mono<Void> 返回一個 Mono 對象
-     */
-    public Mono<Void> removeTransfersTask (String md5, String transfersTaskId) {
-        if (activeTransfersTask.containsKey(md5)) {
-            activeTransfersTask.get(md5).remove(transfersTaskId);
-            if (activeTransfersTask.get(md5).isEmpty()) {
-                activeTransfersTask.remove(md5);
-            }
-        }
-        return Mono.empty();
+    public int getAvailableThreadCount() {
+        return Math.min(Math.max((Runtime.getRuntime().availableProcessors() - activeTransfersTask.size()), 1),
+                        fileProperties.getUpload().getCombineProcessCountLimit()
+        );
     }
 
     /**
@@ -210,7 +199,7 @@ public class TransfersTasksManager {
      * @return Mono<Void> 返回一個 Mono 對象
      */
     @PreDestroy
-    public Mono<Void> destroy () {
+    public Mono<Void> destroy() {
         List<TransfersStatusEnum> status = new ArrayList<>();
         status.add(TransfersStatusEnum.COMPLETED);
         status.add(TransfersStatusEnum.FAILED);

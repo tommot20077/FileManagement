@@ -5,6 +5,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.unity.FileCrudService;
 
 /**
  * @author yuan
@@ -14,7 +15,7 @@ import xyz.dowob.filemanagement.entity.User;
  * @create 2024-09-30 20:13
  * @Version 1.0
  **/
-public interface FileService {
+public interface FileService extends FileCrudService {
 
     /**
      * 獲取用戶文件列表的接口
@@ -23,7 +24,7 @@ public interface FileService {
      *
      * @return 返回用戶文件列表
      */
-    default Flux<UserFileListDTO> getUserFileList(User user) {
+    default Flux<UserFileListDTO> getUserFileList(User user, Long folderId) {
         return null;
     }
 
@@ -88,5 +89,19 @@ public interface FileService {
     default Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         return null;
     }
+
+    default Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
+        return null;
+    }
+
+    default Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
+        return null;
+    }
+
+    default Mono<Void> deleteFolder(String folderId, User user) {
+        return null;
+    }
+
+
 
 }

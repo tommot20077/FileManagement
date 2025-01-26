@@ -30,7 +30,7 @@ public class UserFileDataBO {
     private Long serverFileId;
     private Long userId;
     private String fileName;
-    private String filePath;
+    private Long parentFolderId;
     private FileEnum fileType;
     private Long fileSize;
     private Set<Long> shareUsers = new HashSet<>();
@@ -48,7 +48,7 @@ public class UserFileDataBO {
         this.serverFileId = serverFileMetadata.getId();
         this.userId = userFileMetadata.getUserId();
         this.fileName = userFileMetadata.getFilename();
-        this.filePath = userFileMetadata.getFilePath();
+        this.parentFolderId = userFileMetadata.getParentFolderId();
         this.fileType = serverFileMetadata.getFileType();
         this.fileSize = serverFileMetadata.getFileSize();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
@@ -62,7 +62,7 @@ public class UserFileDataBO {
         this.userFileId = userFileMetadata.getId();
         this.userId = userFileMetadata.getUserId();
         this.fileName = userFileMetadata.getFilename();
-        this.filePath = userFileMetadata.getFilePath();
+        this.parentFolderId = userFileMetadata.getParentFolderId();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.uploadTime = userFileMetadata.getUploadTime();
         this.shareUsers = userFileMetadata.getSharedWithUsers();

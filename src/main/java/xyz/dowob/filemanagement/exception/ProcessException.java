@@ -58,7 +58,17 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1205
          * 錯誤信息:
          */
-        GRIDFS_FILE_NOT_FOUND(1205, "無法獲取GradFS的檔案，伺服器檔案ID：%s");
+        GRIDFS_FILE_NOT_FOUND(1205, "無法獲取GradFS的檔案，伺服器檔案ID：%s"),
+        /**
+         * 錯誤碼: 1206
+         * 錯誤信息: 無法獲取檔案流
+         */
+        CANNOT_GET_FILE_STREAM(1206, "無法獲取檔案流 任務ID：%s"),
+
+        ;
+
+
+
         /**
          * 錯誤碼
          */

@@ -33,6 +33,8 @@ public class ValidationServiceImpl implements ValidationService {
      */
     private final UserRepository userRepository;
 
+    private static final Pattern INVALID_CHARACTERS_PATTERN = Pattern.compile("[/\\\\|\"']");
+
     /**
      * 驗證用戶註冊數據類RegisterDTO中的數據是否合法
      * 當數據不合法時，拋出ValidationException
@@ -71,14 +73,12 @@ public class ValidationServiceImpl implements ValidationService {
      */
     @Override
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) {
-        return validateNotNull(fileMetadataDTO)
-                .then(validFileName(fileMetadataDTO.getFileName()))
-                .then(validFilePath(fileMetadataDTO.getFilePath()));
+        return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFileName(), false));
     }
 
     @Override
-    public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO) {
-        return validateNotNull(fileEditDTO).then(validFileName(fileEditDTO.getFileName())).then(validFilePath(fileEditDTO.getFilePath()));
+    public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
+        return validateNotNull(fileEditDTO).then(Mono.defer(() -> validFileName(fileEditDTO.getFileName(), isFolder)));
     }
 
     /**
@@ -210,23 +210,17 @@ public class ValidationServiceImpl implements ValidationService {
         });
     }
 
-    //todo 特殊字符檢查
-    private Mono<Void> validFileName(String fileName) {
-        if (fileName == null || fileName.isBlank() || !fileName.contains(".")) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_NAME_INVALID));
+    private Mono<Void> validFileName(String fileName, boolean isFolder) {
+        if (fileName == null || fileName.isBlank() || (!isFolder && !fileName.contains(".")) || INVALID_CHARACTERS_PATTERN
+                .matcher(fileName)
+                .find()) {
+            if (isFolder) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FOLDER_NAME));
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FILE_NAME));
         }
         if (fileName.length() > 200) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_NAME_TOO_LONG));
-        }
-        return Mono.empty();
-    }
-
-    private Mono<Void> validFilePath(String filePath) {
-        if (filePath == null || filePath.isBlank() || !filePath.startsWith("/") || !filePath.endsWith("/")) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PATH_INVALID));
-        }
-        if (filePath.length() > 200) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PATH_TOO_LONG));
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.NAME_TOO_LONG));
         }
         return Mono.empty();
     }

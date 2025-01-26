@@ -24,10 +24,9 @@ public class UploadTaskBO {
     private String transferTaskId;
 
     /**
-     * 檔案路徑
+     * 檔案母資料夾ID
      */
-    @NotBlank(message = "檔案路徑不能為空")
-    private String filePath;
+    private Long parentFolderId;
 
     /**
      * 檔案名稱
@@ -72,7 +71,7 @@ public class UploadTaskBO {
     public FileMetadataDTO formatToFileMetadata() {
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
         fileMetadataDTO.setFileName(this.fileName);
-        fileMetadataDTO.setFilePath(this.filePath);
+        fileMetadataDTO.setParentFolderId(this.parentFolderId);
         fileMetadataDTO.setMd5(this.md5);
         fileMetadataDTO.setFileSize(this.fileSize);
         fileMetadataDTO.setUserId(this.userId);

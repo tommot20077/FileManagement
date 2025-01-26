@@ -3,11 +3,9 @@ package xyz.dowob.filemanagement.controller.api;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.codec.multipart.Part;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -40,7 +38,7 @@ import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
  * @Version 1.0
  **/
 @RestController
-@RequestMapping("/api/file")
+@RequestMapping("/api/files")
 public class ApiFileController extends BaseFileController {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,109 +46,50 @@ public class ApiFileController extends BaseFileController {
         super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
     }
 
-    @PostMapping("/upload/initialTask")
+    @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
+        return handleError(userService
+                                   .getUser(exchange)
+                                   .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
+                                   .flatMap(user -> {
+                                       UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
+                                       if (!userLimiter.tryAcquire(user.getId())) {
+                                           return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                                                     UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                                           ));
+                                       }
+                                       return validationService
+                                               .validateFileMetadataDTO(fileMetadataDTO)
+                                               .then(fileStrategy
+                                                             .getFileService(null)
+                                                             .uploadFile(fileMetadataDTO, user)
+                                                             .flatMap(transferResponseDTO -> {
+                                                                 ApiResponseDTO<?> apiResponse;
+                                                                 if (transferResponseDTO.getIsFinished()) {
+                                                                     apiResponse = createResponse(exchange,
+                                                                                                  "上傳成功",
+                                                                                                  transferResponseDTO
+                                                                     );
+                                                                 } else {
+                                                                     apiResponse = createResponse(exchange,
+                                                                                                  "建立任務成功",
+                                                                                                  transferResponseDTO
+                                                                     );
+                                                                 }
+                                                                 return createResponseEntity(apiResponse);
+                                                             }))
+                                               .doFinally(signalType -> userLimiter.release(user.getId()));
+                                   }), exchange);
+    }
+
+
+    @GetMapping("/{id}")
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
+            @PathVariable String id,
+            @RequestParam(value = "action", defaultValue = "preview", required = false) String action, ServerWebExchange exchange) {
         return userService
                 .getUser(exchange)
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
-                .flatMap(user -> {
-                    UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-                    if (!userLimiter.tryAcquire(user.getId())) {
-                        return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                                  UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                        ));
-                    }
-                    return validationService
-                            .validateFileMetadataDTO(fileMetadataDTO)
-                            .then(fileStrategy.getFileService(null).uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
-                                ApiResponseDTO<?> apiResponse;
-                                if (transferResponseDTO.getIsFinished()) {
-                                    apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                                } else {
-                                    apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                                }
-                                return createResponseEntity(apiResponse);
-                            }))
-                            .doFinally(signalType -> userLimiter.release(user.getId()));
-                })
-                .onErrorResume(ValidationException.class, e -> {
-                    String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
-                    int responseCode = e.getErrorCode().getCode();
-                    return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-                }).onErrorResume(LimitationException.class, e -> {
-                    String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
-                    int responseCode = e.getErrorCode().getCode();
-                    return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null), 429);
-                });
-    }
-
-    @PostMapping("/upload/uploadFileData")
-    public Mono<ResponseEntity<?>> uploadFile(ServerWebExchange exchange,
-                                              @RequestPart(value = "transferTaskId", required = false) String transferTaskId,
-                                              @RequestPart(value = "file", required = false) Mono<Part> filePart,
-                                              @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
-        TransmissionEnum transmissionType = fileProperties.getTransmissionType();
-        return handleChunkUpload(uploadChunkDTO, exchange);
-        //todo 未來支持其他傳輸類型
-    }
-
-    private Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
-        return Mono
-                .just(uploadChunkDTO)
-                .flatMap(uploadChunk -> fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO))
-                .flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> apiResponse;
-                    if (transferResponseDTO.getIsSuccess()) {
-                        apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                    } else {
-                        apiResponse = createResponse(exchange, 400, "上傳失敗", transferResponseDTO);
-                    }
-                    return createResponseEntity(apiResponse);
-                });
-    }
-
-    // todo 暫不使用
-    private Mono<ResponseEntity<?>> handleMultipartUpload(
-            @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
-        return formatPartToBytes(filePart).flatMap(bytes -> {
-            UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
-            return fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO);
-        }).flatMap(transferResponseDTO -> {
-            ApiResponseDTO<?> apiResponse;
-            if (transferResponseDTO.getIsFinished()) {
-                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-            } else {
-                apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-            }
-            return createResponseEntity(apiResponse);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("上傳失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
-    }
-
-    /**
-     * 獲取用戶文件列表的API請求
-     *
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity> 返回用戶文件列表
-     */
-    @HideOverLength
-    @GetMapping("/getUserFileList")
-    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
-        return super.getUserFileList(exchange);
-    }
-
-    @GetMapping("/download")
-    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(ServerWebExchange exchange,
-                                                               @RequestParam(name = "id") String fileId,
-                                                               @RequestParam(value = "action", defaultValue = "preview", required = false)
-                                                               String action) {
-        return userService
-                .getUser(exchange)
-                .flatMap(user -> fileStrategy.getFileService(null).downloadFile(fileId, user).map(userFileDataBO -> {
+                .flatMap(user -> fileStrategy.getFileService(null).downloadFile(id, user).map(userFileDataBO -> {
                     HttpHeaders headers = new HttpHeaders();
                     if ("download".equals(action)) {
                         headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + userFileDataBO.getFileName());
@@ -175,40 +114,73 @@ public class ApiFileController extends BaseFileController {
                                                                          .bufferFactory()
                                                                          .wrap(objectMapper.writeValueAsString(apiResponse).getBytes()))));
                     } catch (JsonProcessingException ex) {
-                        throw new RuntimeException(ex);
+                        return Mono.error(new RuntimeException(ex));
                     }
                 });
     }
 
-    @DeleteMapping("/delete")
-    public Mono<ResponseEntity<?>> deleteFile(ServerWebExchange exchange, @RequestParam(name = "id") String fileId) {
-        return userService
-                .getUser(exchange)
-                .flatMap(user -> fileStrategy
-                        .getFileService(null)
-                        .deleteFile(fileId, user)
-                        .then(createResponseEntity(createResponse(exchange, "刪除成功", null))))
-                .onErrorResume(ValidationException.class, e -> {
-                    String errorMessage = String.format("刪除失敗: %s", e.getMessage());
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-                    return createResponseEntity(apiResponse);
-                });
+    @DeleteMapping("/{id}")
+    public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
+        return handleError(userService
+                                   .getUser(exchange)
+                                   .flatMap(user -> fileService.deleteFile(id, user))
+                                   .then(createResponseEntity(createResponse(exchange, "刪除成功", null))), exchange);
     }
 
-    @PutMapping("/edit")
-    public Mono<ResponseEntity<?>> editFile(ServerWebExchange exchange, @RequestBody FileEditDTO fileEditDTO) {
-        return validationService
-                .validateEditFileDTO(fileEditDTO)
-                .then(userService.getUser(exchange))
-                .flatMap(user -> fileStrategy
-                        .getFileService(null)
-                        .editFile(fileEditDTO, user)
-                        .then(createResponseEntity(createResponse(exchange, "資料更新成功", null))))
-                .onErrorResume(ValidationException.class, e -> {
-                    String errorMessage = String.format("更新失敗: %s", e.getMessage());
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-                    return createResponseEntity(apiResponse);
-                });
+    @PutMapping("")
+    public Mono<ResponseEntity<?>> editFile(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
+        return handleError(validationService
+                                   .validateEditFileDTO(fileEditDTO, false)
+                                   .then(validationService.validSpecifyColumn(fileEditDTO, "fileId"))
+                                   .then(userService.getUser(exchange))
+                                   .flatMap(user -> fileService.editFile(fileEditDTO, user))
+                                   .then(createResponseEntity(createResponse(exchange, "資料更新成功", null))), exchange);
+    }
+
+
+    @PostMapping("/upload-chunk")
+    public Mono<ResponseEntity<?>> uploadFile(ServerWebExchange exchange,
+                                              //@RequestPart(value = "transferTaskId", required = false) String transferTaskId,
+                                              //@RequestPart(value = "file", required = false) Mono<Part> filePart,
+                                              @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
+        TransmissionEnum transmissionType = fileProperties.getTransmissionType();
+        return handleChunkUpload(uploadChunkDTO, exchange);
+        //todo 未來支持其他傳輸類型
+    }
+
+    private Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
+        return handleError(fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
+            ApiResponseDTO<?> apiResponse;
+            if (transferResponseDTO.getIsSuccess()) {
+                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+            } else {
+                apiResponse = createResponse(exchange, 400, "上傳失敗", transferResponseDTO);
+            }
+            return createResponseEntity(apiResponse);
+        }), exchange);
+    }
+
+
+    /*
+    // todo 暫不使用
+    private Mono<ResponseEntity<?>> handleMultipartUpload(
+            @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
+        return formatPartToBytes(filePart).flatMap(bytes -> {
+            UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
+            return fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO);
+        }).flatMap(transferResponseDTO -> {
+            ApiResponseDTO<?> apiResponse;
+            if (transferResponseDTO.getIsFinished()) {
+                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+            } else {
+                apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+            }
+            return createResponseEntity(apiResponse);
+        }).onErrorResume(ValidationException.class, e -> {
+            String errorMessage = String.format("上傳失敗: %s", e.getMessage());
+            int responseCode = e.getErrorCode().getCode();
+            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
+        });
     }
 
     private Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
@@ -218,5 +190,20 @@ public class ApiFileController extends BaseFileController {
             DataBufferUtils.release(dataBuffer);
             return bytes;
         });
+    }
+    */
+
+
+    /**
+     * 獲取用戶文件列表的API請求
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回用戶文件列表
+     */
+    @HideOverLength
+    @GetMapping("/user-file-list")
+    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
+        return super.getUserFileList(exchange, -1L);
     }
 }

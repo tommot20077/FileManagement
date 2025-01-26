@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.repostiory;
 
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -7,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+
+import java.util.List;
 
 /**
  * 用戶檔案元數據操作介面，使用Spring Data R2DBC來操作數據庫，繼承ReactiveCrudRepository。
@@ -39,6 +42,12 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @return Mono<UserFileMetadata>
      */
     Mono<UserFileMetadata> findByUserIdAndFilename(Long userId, String filename);
+
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIn(Long userId, List<Long> parentFolderId);
+
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL")
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
+
 
     /**
      * 計算該用戶擁有同一伺服器檔案的檔案數量
