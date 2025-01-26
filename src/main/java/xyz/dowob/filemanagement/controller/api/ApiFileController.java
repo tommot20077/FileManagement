@@ -30,6 +30,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
 /**
+ * 文件的 API 控制器，用於處理文件相關的 API 請求
+ * 用於處理文件的增刪改查操作
  * @author yuan
  * @program FileManagement
  * @ClassName ApiFileUploadController
@@ -40,12 +42,24 @@ import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 @RestController
 @RequestMapping("/api/files")
 public class ApiFileController extends BaseFileController {
+    /**
+     * ObjectMapper 用於對象與 JSON 之間的轉換
+     */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ApiFileController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
         super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
     }
 
+    /**
+     * 上傳文件的 API 請求，此步驟為預先上傳文件的元數據檢驗檔案的步驟
+     * 處理完成之後依照結果提供繼續上傳文件分塊或是完成操作
+     *
+     * @param fileMetadataDTO 上傳文件的元數據
+     * @param exchange        請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件的結果
+     */
     @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         return handleError(userService
@@ -83,6 +97,16 @@ public class ApiFileController extends BaseFileController {
     }
 
 
+    /**
+     * 下載文件的 API 請求，根據文件 ID 下載文件並提供預覽或是下載
+     * 預設為預覽
+     *
+     * @param id       文件 ID
+     * @param action   預覽或是下載
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
+     */
     @GetMapping("/{id}")
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
             @PathVariable String id,
@@ -119,6 +143,14 @@ public class ApiFileController extends BaseFileController {
                 });
     }
 
+    /**
+     * 刪除文件的 API 請求，根據文件 ID 刪除文件
+     *
+     * @param id       文件 ID
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回刪除文件的結果
+     */
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
         return handleError(userService
@@ -127,6 +159,14 @@ public class ApiFileController extends BaseFileController {
                                    .then(createResponseEntity(createResponse(exchange, "刪除成功", null))), exchange);
     }
 
+    /**
+     * 編輯文件的 API 請求，根據文件 ID 編輯文件
+     *
+     * @param fileEditDTO 文件編輯的元數據
+     * @param exchange    請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回編輯文件的結果
+     */
     @PutMapping("")
     public Mono<ResponseEntity<?>> editFile(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
@@ -138,6 +178,14 @@ public class ApiFileController extends BaseFileController {
     }
 
 
+    /**
+     * 上傳文件分塊的 API 請求，根據文件 ID 上傳文件分塊
+     *
+     * @param exchange       請求對象
+     * @param uploadChunkDTO 上傳文件分塊的元數據
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     */
     @PostMapping("/upload-chunk")
     public Mono<ResponseEntity<?>> uploadFile(ServerWebExchange exchange,
                                               //@RequestPart(value = "transferTaskId", required = false) String transferTaskId,
@@ -148,6 +196,14 @@ public class ApiFileController extends BaseFileController {
         //todo 未來支持其他傳輸類型
     }
 
+    /**
+     * 此方法為分塊上船的處理方法
+     *
+     * @param uploadChunkDTO 上傳文件分塊的元數據
+     * @param exchange       請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     */
     private Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
         return handleError(fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;

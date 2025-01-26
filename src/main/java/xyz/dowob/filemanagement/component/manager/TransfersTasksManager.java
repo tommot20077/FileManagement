@@ -187,6 +187,13 @@ public class TransfersTasksManager {
         return Collections.emptyList();
     }
 
+    /**
+     * 獲取當前可用的線程數量
+     * 此方法獲取可用線程數量的計算方式為：最大線程數 - 正在進行的任務數量
+     * 並且最小為 1，最大為配置文件中的 combineProcessCountLimit
+     *
+     * @return int 返回一個整數，表示可用線程數量
+     */
     public int getAvailableThreadCount() {
         return Math.min(Math.max((Runtime.getRuntime().availableProcessors() - activeTransfersTask.size()), 1),
                         fileProperties.getUpload().getCombineProcessCountLimit()

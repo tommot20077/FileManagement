@@ -60,6 +60,22 @@ public class Token {
     @Column("reset_verification_code_expire_time")
     private LocalDateTime resetVerificationCodeExpireTime;
 
+    /**
+     * 重寫 hashCode 方法，用於計算憑證的 hashCode
+     * @return int
+     */
+    @Override
+    public int hashCode() {
+        return Long.hashCode(id);
+    }
+
+    /**
+     * 重寫 equals 方法，用於比較憑證是否相同
+     *
+     * @param o 憑證對象
+     *
+     * @return boolean
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -72,11 +88,10 @@ public class Token {
         return id == token.id;
     }
 
-    @Override
-    public int hashCode() {
-        return Long.hashCode(id);
-    }
-
+    /**
+     * 重寫 toString 方法，將憑證轉換為HashMap
+     * @return String
+     */
     @Override
     public String toString() {
         HashMap<String, Object> tokenMap = new HashMap<>();

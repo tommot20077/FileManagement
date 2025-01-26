@@ -111,6 +111,13 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         return authenticate(authRequestDTO, null);
     }
 
+    /**
+     * 獲取CSRF Token
+     *
+     * @param request 請求對象
+     *
+     * @return 返回CSRF Token
+     */
     @Override
     public Mono<CsrfToken> getCSRFToken (ServerWebExchange request) {
         return csrfTokenRepository.generateToken(request);

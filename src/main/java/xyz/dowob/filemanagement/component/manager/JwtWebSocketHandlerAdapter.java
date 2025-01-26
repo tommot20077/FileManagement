@@ -171,4 +171,4 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         });
     }
 }
-//todo 前端頁面顯示、檔案下載功能、用戶檔案的歷程記錄、用戶個人檔案的管理、檔案預覽、檔案分享、檔案容量上限
+//todo 用戶檔案的歷程記錄、用戶個人檔案的管理、檔案預覽、檔案分享、檔案容量上限

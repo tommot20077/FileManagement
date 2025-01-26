@@ -61,6 +61,16 @@ public interface ValidationService {
         });
     }
 
+    /**
+     * 自訂義檢測字段欄位的方法，部分字段有時可以為空，但是有時又不能為空
+     * 這時可以使用這個方法來檢測指定的字段是否為空
+     *
+     * @param dto     數據傳輸對象
+     * @param columns 指定的字段
+     * @param <T>     泛型
+     *
+     * @return Mono<Void>
+     */
     default <T> Mono<Void> validSpecifyColumn(T dto, String... columns) {
         return Mono.defer(() -> {
             if (Objects.isNull(dto)) {

@@ -55,6 +55,22 @@ public class User {
      */
     private RoleEnum role = RoleEnum.USER;
 
+    /**
+     * 重寫hashCode方法，用於判斷用戶是否相同
+     * @return hashCode
+     */
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+
+    /**
+     * 重寫equals方法，用於判斷用戶是否相同
+     *
+     * @param o 用戶對象
+     *
+     * @return 是否相同
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -67,11 +83,10 @@ public class User {
         return id.equals(user.id);
     }
 
-    @Override
-    public int hashCode() {
-        return id.hashCode();
-    }
-
+    /**
+     * 重寫toString方法，將用戶數據轉換為HashMap
+     * @return 用戶數據HashMap
+     */
     @Override
     public String toString() {
         HashMap<String, Object> userMap = new HashMap<>();
@@ -82,6 +97,10 @@ public class User {
         return userMap.toString();
     }
 
+    /**
+     * 獲取用戶的權限
+     * @return 用戶的權限
+     */
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }

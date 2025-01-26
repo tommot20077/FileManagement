@@ -6,6 +6,7 @@ import lombok.Data;
 import java.util.Set;
 
 /**
+ * 文件編輯的數據傳輸對象，用於規範文件編輯的數據傳輸對象，紀錄文件編輯的數據
  * @author yuan
  * @program FileManagement
  * @ClassName FileEditDTO

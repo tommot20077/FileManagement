@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
@@ -57,7 +58,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
     /**
      * 用於存儲 JWT 憑證的緩存，key 為 JWT 憑證，value 為 TokenCacheEntity 記錄類 {@link TokenCacheEntity}
      */
-    //todo 考慮新增定時任務
+    @Getter
     private final ConcurrentHashMap<String, TokenCacheEntity> cacheTokenMap = new ConcurrentHashMap<>();
 
     /**
@@ -291,6 +292,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
     /**
      * TokenCacheEntity 用於記錄 JWT 憑證的版本、用戶 ID 和過期時間
      */
-    private record TokenCacheEntity(String version, Long userId, Date expireTime) {
+    public record TokenCacheEntity(String version, Long userId, Date expireTime) {
     }
+
 }

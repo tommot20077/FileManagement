@@ -44,18 +44,51 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 public abstract class AbstractFileService implements FileService {
+    /**
+     * 服務器文件元數據庫操作對象
+     */
     protected final ServerFileMetaRepository serverFileMetaRepository;
+    /**
+     * 用戶文件元數據庫操作對象
+     */
     protected final UserFileMetaRepository userFileMetaRepository;
+    /**
+     * Redis操作對象
+     */
     protected final RedisProvider redisProvider;
+    /**
+     * GridFs操作對象
+     */
     protected final GridFsProvider gridFsProvider;
+    /**
+     * 文件上傳任務管理器
+     */
     protected final TransfersTasksManager transfersTasksManager;
+    /**
+     * 文件配置屬性
+     */
     protected final FileProperties fileProperties;
+    /**
+     * 數據庫操作對象
+     */
     protected final DatabaseClient databaseClient;
+    /**
+     * 斷路器配置
+     */
     protected final CircuitBreakerConfig circuitBreakerConfig;
 
+    /**
+     * 檔案類型檢驗器
+     */
     private final Tika tika = new Tika();
+    /**
+     * 每個分塊的大小
+     */
     protected Long CHUNK_SIZE;
 
+    /**
+     * 初始化方法，獲取文件配置中的分塊大小
+     */
     @PostConstruct
     public void init() {
         CHUNK_SIZE = (long) fileProperties.getUpload().getChunkSize() * 1024 * 1024;
@@ -232,6 +265,14 @@ public abstract class AbstractFileService implements FileService {
                         })));
     }
 
+    /**
+     * 刪除文件的共通實現
+     *
+     * @param fileId 文件ID
+     * @param user   用戶信息
+     *
+     * @return Mono<Void>
+     */
     @Override
     public Mono<Void> deleteFile(String fileId, User user) {
         return userFileMetaRepository
@@ -243,28 +284,14 @@ public abstract class AbstractFileService implements FileService {
                                                                                                                                 .toString())));
     }
 
-    private Mono<Void> updateOwner(UserFileMetadata userFileMetadata, User user) {
-        return Mono.defer(() -> {
-            if (userFileMetadata.getIsFolder()) {
-                return Mono.empty();
-            }
-            return userFileMetaRepository
-                    .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
-                    .flatMap(c -> {
-                        if (c == 1) {
-                            return serverFileMetaRepository
-                                    .findById(userFileMetadata.getServerFileId().toString())
-                                    .flatMap(serverFileMetadata -> {
-                                        serverFileMetadata.getOwners().remove(user.getId());
-                                        serverFileMetadata.setLastAccessTime(LocalDateTime.now());
-                                        return serverFileMetaRepository.save(serverFileMetadata).then();
-                                    });
-                        }
-                        return Mono.empty();
-                    });
-        });
-    }
-
+    /**
+     * 編輯文件的共通實現
+     * 處理文件名、父文件夾ID、共享用戶ID的更新
+     * @param fileEditDTO 文件ID
+     * @param user        用戶信息
+     *
+     * @return Mono<Void>
+     */
     @Override
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         return userFileMetaRepository
@@ -299,6 +326,14 @@ public abstract class AbstractFileService implements FileService {
                 });
     }
 
+    /**
+     * 創建文件夾的共通實現
+     *
+     * @param fileEditDTO 文件編輯數據
+     * @param user        用戶信息
+     *
+     * @return Mono<Void>
+     */
     @Override
     public Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
         return Mono.defer(() -> {
@@ -319,6 +354,14 @@ public abstract class AbstractFileService implements FileService {
         }));
     }
 
+    /**
+     * 編輯文件夾的共通實現
+     *
+     * @param fileEditDTO 文件編輯數據
+     * @param user        用戶信息
+     *
+     * @return Mono<Void>
+     */
     @Override
     public Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
         return userFileMetaRepository
@@ -342,6 +385,14 @@ public abstract class AbstractFileService implements FileService {
                 });
     }
 
+    /**
+     * 刪除文件夾的共通實現
+     *
+     * @param fileId 文件ID
+     * @param user   用戶信息
+     *
+     * @return Mono<Void>
+     */
     @Override
     public Mono<Void> deleteFolder(String fileId, User user) {
         return userFileMetaRepository
@@ -356,6 +407,13 @@ public abstract class AbstractFileService implements FileService {
                 });
     }
 
+    /**
+     * 檢查父文件夾的實體是否存在以及相關用戶的權限
+     * 當檔案不存在或是用戶無權限時，拋出ValidationException
+     * @param parentFolderId 父文件夾ID
+     * @param user          用戶信息
+     * @return Mono<Void>
+     */
     private Mono<Void> checkParentFolderId(Long parentFolderId, User user) {
         return userFileMetaRepository
                 .findById(parentFolderId.toString())
@@ -363,6 +421,18 @@ public abstract class AbstractFileService implements FileService {
                 .flatMap(parentFolder -> validateUserPermission(user, parentFolder).then(isFileOrFolder(parentFolder, true)))
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, parentFolderId)))
                 .then();
+    }
+
+    /**
+     * 檢驗用戶檔案權限的共通實現，此為重載方法默認限定只有擁有者才有權限
+     *
+     * @param user             用戶信息
+     * @param userFileMetadata 用戶文件元數據
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
+        return validateUserPermission(user, userFileMetadata, true);
     }
 
     /**
@@ -384,9 +454,7 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository.save(userFileMetadata);
     }
 
-    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
-        return validateUserPermission(user, userFileMetadata, true);
-    }
+
 
     /**
      * 初始化上傳任務，若需要則返回Mono<String> taskId
@@ -467,6 +535,36 @@ public abstract class AbstractFileService implements FileService {
         return Mono.error(new ValidationException(ValidationException.ErrorCode.PERMISSION_DENIED, userFileMetadata.getId()));
     }
 
+    /**
+     * 更新文件擁有者的共通實現
+     * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
+     *
+     * @param userFileMetadata 文件元數據
+     * @param user             用戶信息
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> updateOwner(UserFileMetadata userFileMetadata, User user) {
+        return Mono.defer(() -> {
+            if (userFileMetadata.getIsFolder()) {
+                return Mono.empty();
+            }
+            return userFileMetaRepository
+                    .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
+                    .flatMap(c -> {
+                        if (c == 1) {
+                            return serverFileMetaRepository
+                                    .findById(userFileMetadata.getServerFileId().toString())
+                                    .flatMap(serverFileMetadata -> {
+                                        serverFileMetadata.getOwners().remove(user.getId());
+                                        serverFileMetadata.setLastAccessTime(LocalDateTime.now());
+                                        return serverFileMetaRepository.save(serverFileMetadata).then();
+                                    });
+                        }
+                        return Mono.empty();
+                    });
+        });
+    }
     public FileEnum detectFileType(byte[] fileBytes) {
         String mimeType = tika.detect(fileBytes);
         return FileEnum.fromMimeType(mimeType);
@@ -669,6 +767,15 @@ public abstract class AbstractFileService implements FileService {
                         })));
     }
 
+    /**
+     * 遞歸刪除文件夾的共通實現
+     *
+     * @param user             用戶信息
+     * @param parentFolderIdList 父文件夾ID列表
+     * @param serverFileList   服務器文件列表
+     *
+     * @return Mono<Void>
+     */
     private Mono<Void> deleteFolderRecursive(User user, List<Long> parentFolderIdList, List<UserFileMetadata> serverFileList) {
         return findFileWithSameParentFolderId(user.getId(), parentFolderIdList, serverFileList).flatMap(nextParentFolderIds -> {
             if (nextParentFolderIds.isEmpty()) {
@@ -678,6 +785,15 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+    /**
+     * 查找與父文件夾ID相同的文件的共通實現
+     *
+     * @param userId          用戶ID
+     * @param parentFolderId 父文件夾ID
+     * @param serverFileList  服務器文件列表
+     *
+     * @return Mono<List<Long>>
+     */
     private Mono<List<Long>> findFileWithSameParentFolderId(Long userId, List<Long> parentFolderId, List<UserFileMetadata> serverFileList) {
         return userFileMetaRepository.findAllByUserIdAndParentFolderIdIn(userId, parentFolderId).collectList().map(userFileMetadataList -> {
             serverFileList.addAll(userFileMetadataList);
@@ -689,6 +805,14 @@ public abstract class AbstractFileService implements FileService {
         }).switchIfEmpty(Mono.just(Collections.emptyList()));
     }
 
+    /**
+     * 更新文件擁有者的共通實現
+     *
+     * @param userFileMetadataList 用戶文件元數據列表
+     * @param user                用戶信息
+     *
+     * @return Mono<Void>
+     */
     private Mono<Void> updateOwner(List<UserFileMetadata> userFileMetadataList, User user) {
         return Flux.fromIterable(userFileMetadataList).flatMap(userFileMetadata -> updateOwner(userFileMetadata, user)).then();
     }

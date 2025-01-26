@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
+ * 用戶文件列表數據傳輸對象，用於封裝用戶文件列表的數據
  * @author yuan
  * @program FileManagement
  * @ClassName UserFileListDTO
@@ -22,30 +23,69 @@ import java.util.Set;
 @Getter
 @Setter
 public class UserFileListDTO {
+    /**
+     * 文件ID
+     */
     private Long id;
 
+    /**
+     * 文件名稱
+     */
     private String filename;
 
+    /**
+     * 父文件夾ID
+     */
     private Long parentFolderId;
 
+    /**
+     * 創建時間
+     */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
+    /**
+     * 最後更改時間
+     */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
 
+    /**
+     * 是否為文件夾
+     */
     private boolean isFolder;
 
+    /**
+     * 文件大小
+     */
     private Long fileSize;
 
+    /**
+     * 文件類型
+     */
     private FileEnum fileType;
 
+    /**
+     * 文件GridFsId
+     */
     private String gridFsId;
 
+    /**
+     * 文件MD5值
+     */
     private String md5;
 
+    /**
+     * 共享用戶
+     */
     private Set<Long> shareUsers = new HashSet<>();
 
+    /**
+     * 用戶文件列表數據傳輸對象構造函數
+     *
+     * @param serverFileMetadata 服務器文件元數據對象
+     * @param userFileMetadata   用戶文件元數據對象
+     */
     public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
@@ -63,6 +103,10 @@ public class UserFileListDTO {
         }
     }
 
+    /**
+     * 用戶文件列表數據傳輸對象構造函數
+     * @param userFileMetadata 用戶文件元數據對象
+     */
     public UserFileListDTO(UserFileMetadata userFileMetadata) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
@@ -75,6 +119,10 @@ public class UserFileListDTO {
         }
     }
 
+    /**
+     * 用戶文件列表數據傳輸對象構造函數
+     * @param userFileDataBO 用戶文件數據業務對象
+     */
     public UserFileListDTO(UserFileDataBO userFileDataBO) {
         this.id = userFileDataBO.getUserFileId();
         this.filename = userFileDataBO.getFileName();

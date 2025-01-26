@@ -29,14 +29,32 @@ public abstract class BaseFileController implements ResponseUnity {
      * 檔案業務層對象
      */
     protected final FileService fileService;
+    /**
+     * 用戶業務層對象
+     */
     protected final UserService userService;
+    /**
+     * 檔案策略
+     */
     protected final FileStrategy fileStrategy;
+    /**
+     * 用戶限制策略
+     */
     protected final UserLimiterStrategy userLimiterStrategy;
+    /**
+     * 驗證業務層對象
+     */
     protected final ValidationService validationService;
+    /**
+     * 檔案屬性
+     */
     protected final FileProperties fileProperties;
 
     /**
-     * 獲取用戶文件列表
+     * 獲取用戶文件列表，此 ID 為資料夾 ID
+     * 有2個特定的ID作為特殊用途
+     * 1. 0: 獲取用戶根目錄文件列表
+     * 2. -1: 獲取用戶所有文件列表
      *
      * @param exchange 請求對象
      *

@@ -103,6 +103,14 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
     }
 
+    /**
+     * 處理參數轉換錯誤，當請求參數無法轉換時，返回一個 400 錯誤，並提示錯誤的參數
+     *
+     * @param ex       ConversionFailedException 轉換類型時發生錯誤
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
     @ExceptionHandler(ConversionFailedException.class)
     public Mono<ResponseEntity<?>> handleConversionFailException(ConversionFailedException ex, ServerWebExchange exchange) {
         log.debug("轉換類型時發生錯誤: {}", ex.getMessage());

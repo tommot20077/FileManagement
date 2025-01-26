@@ -43,8 +43,23 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Mono<UserFileMetadata> findByUserIdAndFilename(Long userId, String filename);
 
+    /**
+     * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
+     *
+     * @param userId         用戶ID
+     * @param parentFolderId 父文件夾ID
+     *
+     * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
+     */
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIn(Long userId, List<Long> parentFolderId);
 
+    /**
+     * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)
+     *
+     * @param userId 用戶ID
+     *
+     * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
+     */
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
 

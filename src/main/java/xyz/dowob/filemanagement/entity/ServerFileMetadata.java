@@ -75,6 +75,22 @@ public class ServerFileMetadata {
      */
     private Set<Long> owners = new HashSet<>();
 
+    /**
+     * 重寫hashCode方法，使用id作為hashCode的依據
+     * @return hashCode
+     */
+    @Override
+    public int hashCode () {
+        return id.hashCode();
+    }
+
+    /**
+     * 重寫equals方法，使用id作為判斷是否相等的依據
+     *
+     * @param o 用於比較的對象
+     *
+     * @return 是否相等
+     */
     @Override
     public boolean equals (Object o) {
         if (this == o) {
@@ -87,11 +103,10 @@ public class ServerFileMetadata {
         return id.equals(that.id);
     }
 
-    @Override
-    public int hashCode () {
-        return id.hashCode();
-    }
-
+    /**
+     * 重寫toString方法，將文件元數據轉換為HashMap
+     * @return 文件元數據HashMap
+     */
     @Override
     public String toString () {
         HashMap<String, Object> fileMap = new HashMap<>();

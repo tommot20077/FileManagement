@@ -16,6 +16,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
+ * 用戶文件數據業務對象，此對象用於封裝用戶文件的數據
+ * 包括整個用戶檔案的所有信息
  * @author yuan
  * @program FileManagement
  * @ClassName DownloadTaskBO
@@ -26,23 +28,69 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 public class UserFileDataBO {
+    /**
+     * 用戶文件ID
+     */
     private Long userFileId;
+    /**
+     * 服務器文件ID
+     */
     private Long serverFileId;
+    /**
+     * 用戶ID
+     */
     private Long userId;
+    /**
+     * 文件名稱
+     */
     private String fileName;
+    /**
+     * 父文件夾ID
+     */
     private Long parentFolderId;
+    /**
+     * 文件類型
+     */
     private FileEnum fileType;
+    /**
+     * 文件大小
+     */
     private Long fileSize;
+    /**
+     * 共享用戶
+     */
     private Set<Long> shareUsers = new HashSet<>();
+    /**
+     * 最後更改時間
+     */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
+    /**
+     * 上傳時間
+     */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadTime;
+    /**
+     * GridFS ID
+     */
     private String gridFsId;
+    /**
+     * MD5值
+     */
     private String md5;
+    /**
+     * 數據流
+     */
     @JsonIgnore
     private Flux<DataBuffer> dataStream;
 
+
+    /**
+     * 用戶文件數據業務對象構造函數
+     *
+     * @param serverFileMetadata 服務器文件元數據對象
+     * @param userFileMetadata   用戶文件元數據對象
+     */
     public UserFileDataBO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
         this.userFileId = userFileMetadata.getId();
         this.serverFileId = serverFileMetadata.getId();
@@ -58,6 +106,11 @@ public class UserFileDataBO {
         this.shareUsers = userFileMetadata.getSharedWithUsers();
     }
 
+    /**
+     * 用戶文件數據業務對象構造函數
+     *
+     * @param userFileMetadata 用戶文件元數據對象
+     */
     public UserFileDataBO(UserFileMetadata userFileMetadata) {
         this.userFileId = userFileMetadata.getId();
         this.userId = userFileMetadata.getUserId();

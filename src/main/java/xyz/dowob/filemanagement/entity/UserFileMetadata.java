@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
+ * 用於定義用戶文件元數據表
  * @author yuan
  * @program File-Management
  * @ClassName UserFileMetadata
@@ -80,7 +81,39 @@ public class UserFileMetadata {
     @Column("shared_with_users")
     private Set<Long> sharedWithUsers = new HashSet<>();
 
+    /**
+     * 重寫hashCode方法，獲取對象的hashCode
+     *
+     * @return hashCode
+     */
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
 
+    /**
+     * 重寫equals方法，使用id作為判斷是否相等的依據
+     *
+     * @param o 用於比較的對象
+     *
+     * @return 是否相等
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        UserFileMetadata that = (UserFileMetadata) o;
+        return id.equals(that.id);
+    }
+
+    /**
+     * 重寫toString方法，將文件元數據轉換為HashMap
+     * @return 文件元數據HashMap
+     */
     @Override
     public String toString() {
         HashMap<String, Object> map = new HashMap<>();

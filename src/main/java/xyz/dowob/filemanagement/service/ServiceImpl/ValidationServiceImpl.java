@@ -33,6 +33,9 @@ public class ValidationServiceImpl implements ValidationService {
      */
     private final UserRepository userRepository;
 
+    /**
+     * 非法字符正則表達式，用於檢查文件名是否包含非法字符
+     */
     private static final Pattern INVALID_CHARACTERS_PATTERN = Pattern.compile("[/\\\\|\"']");
 
     /**
@@ -76,6 +79,12 @@ public class ValidationServiceImpl implements ValidationService {
         return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFileName(), false));
     }
 
+    /**
+     * 驗證文件編輯數據DTO中的數據是否合法
+     *
+     * @param fileEditDTO 文件編輯數據DTO
+     * @param isFolder    是否為文件夾
+     */
     @Override
     public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
         return validateNotNull(fileEditDTO).then(Mono.defer(() -> validFileName(fileEditDTO.getFileName(), isFolder)));
@@ -210,6 +219,14 @@ public class ValidationServiceImpl implements ValidationService {
         });
     }
 
+    /**
+     * 驗證檔案名稱是否出現非法字符
+     *
+     * @param fileName 檔案名稱
+     * @param isFolder 是否為文件夾
+     *
+     * @return Mono<Void>
+     */
     private Mono<Void> validFileName(String fileName, boolean isFolder) {
         if (fileName == null || fileName.isBlank() || (!isFolder && !fileName.contains(".")) || INVALID_CHARACTERS_PATTERN
                 .matcher(fileName)

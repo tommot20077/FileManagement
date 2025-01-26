@@ -28,6 +28,10 @@ public class FileProperties {
      * 建立文件上傳配置
      */
     private Upload upload = new Upload();
+
+    /**
+     * 建立全局配置
+     */
     private global global = new global();
 
     /**
@@ -50,11 +54,20 @@ public class FileProperties {
          */
         private Integer chunkSize = 10;
 
+        /**
+         * 最大上傳任務限制，默認為 3
+         */
         private Integer maxUploadTaskLimit = 3;
 
+        /**
+         * 合併處理任務限制，默認為 3
+         */
         private Integer combineProcessCountLimit = 3;
     }
 
+    /**
+     * 全局配置
+     */
     @Data
     public static class global {
 

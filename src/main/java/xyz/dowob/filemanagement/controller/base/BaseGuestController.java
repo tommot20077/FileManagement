@@ -38,8 +38,14 @@ public abstract class BaseGuestController implements ResponseUnity {
      */
     protected final AuthorizationService authorizationService;
 
+    /**
+     * 用戶業務層對象
+     */
     protected final UserService userService;
 
+    /**
+     * 安全屬性
+     */
     protected final SecurityProperties securityProperties;
 
     /**
@@ -91,6 +97,14 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });
     }
+
+    /**
+     * 確認當前用戶授權狀態，並返回用戶信息
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回用戶授權狀態
+     */
     @GetMapping("/checkAuthenticationStatus")
     public Mono<ResponseEntity<?>> checkAuthenticationStatus (ServerWebExchange exchange) {
         return userService.getUser(exchange).flatMap(user -> {
@@ -147,29 +161,6 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(apiResponse);
         })).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("密碼重置失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
-    }
-
-    // todo 下放到子類
-
-    /**
-     * 獲取CSRF Token
-     *
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity> 返回CSRF Token
-     */
-    @GetMapping("/getCSRFToken")
-    public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
-        return authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
-            HashMap<String, Object> data = new HashMap<>();
-            data.put("csrfToken", csrfToken.getToken());
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取CSRF Token成功", data);
-            return createResponseEntity(apiResponse);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("獲取CSRF Token失敗: %s", e.getMessage());
             int responseCode = e.getErrorCode().getCode();
             return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
         });

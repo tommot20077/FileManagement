@@ -50,7 +50,14 @@ public enum FileEnum {
      */
     private final String type;
 
+    /**
+     * MIME類型與文件類型的映射
+     */
     private static final Map<String, FileEnum> MIME_TYPE_MAPPING = new HashMap<>();
+
+    /**
+     * 文件類型與擴展名的映射
+     */
     private static final Map<FileEnum, Map<String, String>> FILE_ENUM_MAP = new HashMap<>();
 
     static {
@@ -60,7 +67,7 @@ public enum FileEnum {
         MIME_TYPE_MAPPING.put("image/gif", FileEnum.IMAGE);
         MIME_TYPE_MAPPING.put("image/webp", FileEnum.IMAGE);
 
-        // 視頻類型
+        // 影片類型
         MIME_TYPE_MAPPING.put("video/mp4", FileEnum.VIDEO);
         MIME_TYPE_MAPPING.put("video/mpeg", FileEnum.VIDEO);
         MIME_TYPE_MAPPING.put("video/webm", FileEnum.VIDEO);
@@ -82,6 +89,7 @@ public enum FileEnum {
     }
 
     static {
+        // 圖片類型
         Map<String, String> imageMap = new HashMap<>();
         imageMap.put("jpeg", "image/jpeg");
         imageMap.put("jpg", "image/jpeg");
@@ -89,24 +97,28 @@ public enum FileEnum {
         imageMap.put("gif", "image/gif");
         FILE_ENUM_MAP.put(FileEnum.IMAGE, imageMap);
 
+        // 影片類型
         Map<String, String> videoMap = new HashMap<>();
         videoMap.put("mp4", "video/mp4");
         videoMap.put("mpeg", "video/mpeg");
         videoMap.put("webm", "video/webm");
         FILE_ENUM_MAP.put(FileEnum.VIDEO, videoMap);
 
+        // 音樂類型
         Map<String, String> musicMap = new HashMap<>();
         musicMap.put("mp3", "audio/mpeg");
         musicMap.put("wav", "audio/wav");
         musicMap.put("ogg", "audio/ogg");
         FILE_ENUM_MAP.put(FileEnum.MUSIC, musicMap);
 
+        // 文件類型
         Map<String, String> documentMap = new HashMap<>();
         documentMap.put("pdf", "application/pdf");
         documentMap.put("doc", "application/msword");
         documentMap.put("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
         FILE_ENUM_MAP.put(FileEnum.DOCUMENT, documentMap);
 
+        // 壓縮檔類型
         Map<String, String> zipMap = new HashMap<>();
         zipMap.put("zip", "application/zip");
         zipMap.put("rar", "application/x-rar-compressed");
@@ -114,10 +126,24 @@ public enum FileEnum {
         FILE_ENUM_MAP.put(FileEnum.ZIP, zipMap);
     }
 
+    /**
+     * 根據 MIME 類型獲取文件類型，如果找不到對應的文件類型，則返回其他類型
+     *
+     * @param mimeType MIME 類型
+     *
+     * @return 返回文件類型
+     */
     public static FileEnum fromMimeType(String mimeType) {
         return MIME_TYPE_MAPPING.getOrDefault(mimeType, FileEnum.OTHER);
     }
 
+    /**
+     * 根據文件名獲取文件類型，如果找不到對應的文件類型，則返回其他類型
+     *
+     * @param fileName 文件名
+     *
+     * @return 返回文件類型
+     */
     public static String getMediaType(FileEnum fileEnum, String fileName) {
         String extension = FilenameUtils.getExtension(fileName).toLowerCase();
         Map<String, String> extensionMap = FILE_ENUM_MAP.get(fileEnum);
@@ -127,6 +153,13 @@ public enum FileEnum {
         return getDefaultMediaType(fileEnum);
     }
 
+    /**
+     * 獲取默認的 MIME 類型
+     *
+     * @param fileEnum 文件類型
+     *
+     * @return 返回默認的 MIME 類型
+     */
     private static String getDefaultMediaType(FileEnum fileEnum) {
         return switch (fileEnum) {
             case IMAGE -> "image/jpeg";

@@ -13,7 +13,6 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
@@ -94,7 +93,6 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      *
      * @return Mono<Void>
      */
-    // todo 訊息包含 userId 、 type 、data
     @Override
     @NonNull
     public Mono<Void> handle(@NonNull WebSocketSession session) {
@@ -147,8 +145,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                                 ));
                             }
                             return validationService.validateFileMetadataDTO(fileMetadata)
-                                                    // todo Image硬編碼
-                                                    .then(fileStrategy.getFileService(FileEnum.IMAGE).uploadFile(fileMetadata, user))
+                                                    .then(fileStrategy.getFileService(null).uploadFile(fileMetadata, user))
                                                     .flatMap(transferResponseDTO -> {
                                                         ApiResponseDTO<?> response = createResponse(session
                                                                                                             .getHandshakeInfo()
@@ -186,9 +183,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      */
     private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
-        return uploadChunkDTO
-                // todo Image硬編碼
-                .map(chunkDTO -> fileStrategy.getFileService(FileEnum.IMAGE).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
+        return uploadChunkDTO.map(chunkDTO -> fileStrategy.getFileService(null).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
                     ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
                     if (transferResponseDTO.getIsFinished()) {
                         response.setMessage("上傳任務完成");

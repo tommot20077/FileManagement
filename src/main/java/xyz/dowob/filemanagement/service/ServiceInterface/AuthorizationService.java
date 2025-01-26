@@ -51,6 +51,13 @@ public interface AuthorizationService {
         return Mono.empty();
     }
 
+    /**
+     * 接口默認方法，根據請求對象獲取CSRF憑證
+     *
+     * @param request 請求對象
+     *
+     * @return CSRF憑證
+     */
     default Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {
         return request.getSession().mapNotNull(webSession -> webSession.getAttribute("csrfToken"));
     }

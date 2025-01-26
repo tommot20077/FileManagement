@@ -16,6 +16,9 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
 /**
+ * 資料夾的 API 控制器，用於處理資料夾的 API 請求
+ * 用於處理資料夾的增刪改查操作
+ * 繼承自 BaseFileController，該類為基礎的文件控制器，用於處理文件的基本操作
  * @author yuan
  * @program FileManagement
  * @ClassName ApiFileUploadController
@@ -32,7 +35,7 @@ public class ApiFolderController extends BaseFileController {
 
 
     /**
-     * 獲取資料夾內的檔案列表
+     * 獲取資料夾內的檔案列表，此 ID 為資料夾 ID
      *
      * @param id       資料夾ID
      * @param exchange 請求對象
@@ -46,7 +49,7 @@ public class ApiFolderController extends BaseFileController {
     }
 
     /**
-     * 刪除資料夾
+     * 刪除資料夾，此操作會刪除資料夾下的所有檔案
      *
      * @param id       資料夾ID
      * @param exchange 請求對象
@@ -62,7 +65,7 @@ public class ApiFolderController extends BaseFileController {
     }
 
     /**
-     * 編輯資料夾
+     * 編輯資料夾，此操作用於修改資料夾名稱、位置以及分享狀態
      *
      * @param fileEditDTO 編輯資料
      * @param exchange    請求對象
