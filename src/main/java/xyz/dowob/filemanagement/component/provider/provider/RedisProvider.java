@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.component.provider.provider;
 
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -9,6 +10,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 /**
  * 此類用於提供 Redis 的操作方法，透過自定義方法操作 RedisTemplate 來對數據進行操作
@@ -23,23 +25,17 @@ import java.time.temporal.ChronoUnit;
  **/
 @Component
 @SuppressWarnings("unused")
-@RequiredArgsConstructor
 public class RedisProvider {
     /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的
      */
-    private final ReactiveRedisTemplate<String, Object> ObjectRedisTemplate;
+    private final ReactiveRedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * 將數據存入 Redis
-     *
-     * @param key   鍵
-     * @param value 值
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    public Mono<Void> setValue(String key, Object value) {
-        return ObjectRedisTemplate.opsForValue().set(key, value).then();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public RedisProvider(ReactiveRedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+        objectMapper.registerModule(new JavaTimeModule());
     }
 
     /**
@@ -56,12 +52,50 @@ public class RedisProvider {
         if (expireTime <= 0) {
             return setValue(key, value);
         }
-        return ObjectRedisTemplate
-                .opsForValue()
-                .set(key, value)
-                .then(ObjectRedisTemplate.expire(key, Duration.of(expireTime, unit)))
-                .then();
+        return redisTemplate.opsForValue().set(key, value).then(redisTemplate.expire(key, Duration.of(expireTime, unit))).then();
 
+    }
+
+    /**
+     * 將數據存入 Redis
+     *
+     * @param key   鍵
+     * @param value 值
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setValue(String key, Object value) {
+        return redisTemplate.opsForValue().set(key, value).then();
+    }
+
+    /**
+     * 根據鍵獲取數據
+     *
+     * @param key 鍵
+     */
+    public Mono<Object> getValue(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    public <T> Mono<T> getValue(String key, Class<T> clazz) {
+        return redisTemplate.opsForValue().get(key).cast(clazz);
+    }
+
+    public <T> Flux<T> getValueList(String key, Class<T> clazz) {
+        return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
+    }
+
+    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
+        if (!(objects instanceof List<?> list)) {
+            return Flux.empty();
+        }
+        List<T> finalList = list.stream().map(object -> {
+            if (clazz.isInstance(object)) {
+                return clazz.cast(object);
+            }
+            return objectMapper.convertValue(object, clazz);
+        }).toList();
+        return Flux.fromIterable(finalList);
     }
 
     /**
@@ -73,16 +107,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> incrementDelta(String key, long delta) {
-        return ObjectRedisTemplate.opsForValue().increment(key, delta).then();
-    }
-
-    /**
-     * 根據鍵獲取數據
-     *
-     * @param key 鍵
-     */
-    public Mono<Object> getValue(String key) {
-        return ObjectRedisTemplate.opsForValue().get(key);
+        return redisTemplate.opsForValue().increment(key, delta).then();
     }
 
     /**
@@ -93,21 +118,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> delete(String key) {
-        return ObjectRedisTemplate.delete(key).then();
-    }
-
-
-    /**
-     * 將數據存入 Redis 的 Hash 中
-     *
-     * @param hashKey  Hash 的鍵
-     * @param innerKey Hash 內部的鍵
-     * @param value    值
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    public Mono<Void> setHashMap(String hashKey, String innerKey, Object value) {
-        return ObjectRedisTemplate.opsForHash().put(hashKey, innerKey, value).then();
+        return redisTemplate.delete(key).then();
     }
 
     /**
@@ -125,11 +136,47 @@ public class RedisProvider {
         if (expireTime <= 0) {
             return setHashMap(hashKey, innerKey, value);
         }
-        return ObjectRedisTemplate
+        return redisTemplate
                 .opsForHash()
-                .put(hashKey, innerKey, value)
-                .then(ObjectRedisTemplate.expire(hashKey, Duration.of(expireTime, unit)))
+                .put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, Duration.of(expireTime, unit)))
                 .then();
+    }
+
+    /**
+     * 將數據存入 Redis 的 Hash 中
+     *
+     * @param hashKey  Hash 的鍵
+     * @param innerKey Hash 內部的鍵
+     * @param value    值
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setHashMap(String hashKey, String innerKey, Object value) {
+        return redisTemplate.opsForHash().put(hashKey, innerKey, value).then();
+    }
+
+    /**
+     * 根據 Hash 的鍵和內部的鍵獲取數據
+     *
+     * @param hashKey  Hash 的鍵
+     * @param innerKey Hash 內部的鍵
+     *
+     * @return 返回 Mono<Object> 對象
+     */
+    public Mono<Object> getHashMap(String hashKey, String innerKey) {
+        return redisTemplate.opsForHash().get(hashKey, innerKey);
+    }
+
+    /**
+     * 根據 Hash 的鍵和內部的鍵獲取數據
+     *
+     * @param hashKey  Hash 的鍵
+     * @param innerKey Hash 內部的鍵
+     *
+     * @return 返回 Mono<Object> 對象
+     */
+    public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
+        return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
     }
 
     /**
@@ -142,7 +189,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> incrementHashMap(String hashKey, String innerKey, long delta) {
-        return ObjectRedisTemplate.opsForHash().increment(hashKey, innerKey, delta).then();
+        return redisTemplate.opsForHash().increment(hashKey, innerKey, delta).then();
     }
 
     /**
@@ -157,22 +204,10 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Object> incrementHashMap(String hashKey, String innerKey, long delta, long expireTime, ChronoUnit unit) {
-        return ObjectRedisTemplate
+        return redisTemplate
                 .opsForHash()
                 .increment(hashKey, innerKey, delta)
-                .flatMap(incrementResult -> ObjectRedisTemplate.expire(hashKey, Duration.of(expireTime, unit)).thenReturn(incrementResult));
-    }
-
-    /**
-     * 根據 Hash 的鍵和內部的鍵獲取數據
-     *
-     * @param hashKey  Hash 的鍵
-     * @param innerKey Hash 內部的鍵
-     *
-     * @return 返回 Mono<Object> 對象
-     */
-    public Mono<Object> getHashMap(String hashKey, String innerKey) {
-        return ObjectRedisTemplate.opsForHash().get(hashKey, innerKey);
+                .flatMap(incrementResult -> redisTemplate.expire(hashKey, Duration.of(expireTime, unit)).thenReturn(incrementResult));
     }
 
     /**
@@ -183,7 +218,18 @@ public class RedisProvider {
      * @return 返回 Flux<Object> 對象
      */
     public Flux<Object> getHashMapAll(String hashKey) {
-        return ObjectRedisTemplate.opsForHash().values(hashKey);
+        return redisTemplate.opsForHash().values(hashKey);
+    }
+
+    /**
+     * 獲取 HashMap 中的查詢Key的所有數據
+     *
+     * @param hashKey Hash 的鍵
+     *
+     * @return 返回 Flux<Object> 對象
+     */
+    public <T> Flux<T> getHashMapAll(String hashKey, Class<T> clazz) {
+        return redisTemplate.opsForHash().values(hashKey).cast(clazz);
     }
 
     /**
@@ -195,7 +241,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteHash(String key, String innerKey) {
-        return ObjectRedisTemplate.opsForHash().remove(key, innerKey).then();
+        return redisTemplate.opsForHash().remove(key, innerKey).then();
     }
 
     /**
@@ -206,7 +252,22 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteHash(String key) {
-        return ObjectRedisTemplate.opsForHash().delete(key).then();
+        return redisTemplate.opsForHash().delete(key).then();
+    }
+
+    /**
+     * 將數據存入 Redis 的 Set 中
+     *
+     * @param key   鍵
+     * @param value 值
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setSet(String key, Object value, long expireTime, ChronoUnit unit) {
+        if (expireTime <= 0) {
+            return setSet(key, value);
+        }
+        return redisTemplate.opsForSet().add(key, value).then(redisTemplate.expire(key, Duration.of(expireTime, unit))).then();
     }
 
     /**
@@ -218,7 +279,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setSet(String key, Object value) {
-        return ObjectRedisTemplate.opsForSet().add(key, value).then();
+        return redisTemplate.opsForSet().add(key, value).then();
     }
 
     /**
@@ -229,19 +290,18 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Flux<Object> getSet(String key) {
-        return ObjectRedisTemplate.opsForSet().members(key);
+        return redisTemplate.opsForSet().members(key);
     }
 
     /**
-     * 插入額外的數據到 Set 中
+     * 取得 Set 中的數據
      *
-     * @param key   鍵
-     * @param value 值
+     * @param key 鍵
      *
      * @return 返回 Mono<Void> 對象
      */
-    public Mono<Void> setList(String key, Object value) {
-        return ObjectRedisTemplate.opsForList().rightPush(key, value).then();
+    public <T> Flux<T> getSet(String key, Class<T> clazz) {
+        return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
     }
 
     /**
@@ -253,7 +313,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteSet(String key, Object value) {
-        return ObjectRedisTemplate.opsForSet().remove(key, value).then();
+        return redisTemplate.opsForSet().remove(key, value).then();
     }
 
     /**
@@ -264,24 +324,45 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteSet(String key) {
-        return ObjectRedisTemplate.opsForSet().delete(key).then();
+        return redisTemplate.opsForSet().delete(key).then();
+    }
+
+    public Mono<Void> setList(String key, Object value, long expireTime, ChronoUnit unit) {
+        if (expireTime <= 0) {
+            return setList(key, value);
+        }
+        return redisTemplate.opsForList().rightPush(key, value).then(redisTemplate.expire(key, Duration.of(expireTime, unit))).then();
     }
 
     /**
-     * 將數據存入 Redis 的 List 中
+     * 插入額外的數據到 Set 中
      *
-     * @param key    鍵
-     * @param value  值
-     * @param isLeft 是否從左邊插入
+     * @param key   鍵
+     * @param value 值
      *
      * @return 返回 Mono<Void> 對象
      */
-    public Mono<Void> insertList(String key, Object value, Boolean isLeft) {
-        if (isLeft) {
-            return ObjectRedisTemplate.opsForList().leftPush(key, value).then();
-        } else {
-            return ObjectRedisTemplate.opsForList().rightPush(key, value).then();
-        }
+    public Mono<Void> setList(String key, Object value) {
+        return redisTemplate.opsForList().rightPush(key, value).then();
+    }
+
+    /**
+     * 獲取 List 中的數據
+     *
+     * @param key 鍵
+     *
+     * @return 返回 Flux<Object> 對象
+     */
+    public Flux<Object> getList(String key) {
+        return redisTemplate.opsForList().range(key, 0, -1);
+    }
+
+    public Flux<Object> getList(String key, long start, long end) {
+        return redisTemplate.opsForList().range(key, start, end);
+    }
+
+    public <T> Flux<T> getList(String key, Class<T> clazz) {
+        return redisTemplate.opsForList().range(key, 0, -1).flatMap(object -> convertObjectList(object, clazz));
     }
 
     /**
@@ -299,18 +380,24 @@ public class RedisProvider {
         if (expireTime <= 0) {
             return insertList(key, value, isLeft);
         }
-        return insertList(key, value, isLeft).then(ObjectRedisTemplate.expire(key, Duration.of(expireTime, unit))).then();
+        return insertList(key, value, isLeft).then(redisTemplate.expire(key, Duration.of(expireTime, unit))).then();
     }
 
     /**
-     * 獲取 List 中的數據
+     * 將數據存入 Redis 的 List 中
      *
-     * @param key 鍵
+     * @param key    鍵
+     * @param value  值
+     * @param isLeft 是否從左邊插入
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Mono<Void> 對象
      */
-    public Flux<Object> getList(String key) {
-        return ObjectRedisTemplate.opsForList().range(key, 0, -1);
+    public Mono<Void> insertList(String key, Object value, Boolean isLeft) {
+        if (isLeft) {
+            return redisTemplate.opsForList().leftPush(key, value).then();
+        } else {
+            return redisTemplate.opsForList().rightPush(key, value).then();
+        }
     }
 
     /**
@@ -322,20 +409,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteList(String key, Object value) {
-        return ObjectRedisTemplate.opsForList().remove(key, 1, value).then();
-    }
-
-    /**
-     * 新增數據到 Redis 的 Zset 中
-     *
-     * @param key   鍵
-     * @param value 值
-     * @param score 序號
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    public Mono<Void> setZset(String key, Object value, double score) {
-        return ObjectRedisTemplate.opsForZSet().add(key, value, score).then();
+        return redisTemplate.opsForList().remove(key, 1, value).then();
     }
 
     /**
@@ -353,7 +427,20 @@ public class RedisProvider {
         if (expireTime <= 0) {
             return setZset(key, value, score);
         }
-        return setZset(key, value, score).then(ObjectRedisTemplate.expire(key, Duration.of(expireTime, unit))).then();
+        return setZset(key, value, score).then(redisTemplate.expire(key, Duration.of(expireTime, unit))).then();
+    }
+
+    /**
+     * 新增數據到 Redis 的 Zset 中
+     *
+     * @param key   鍵
+     * @param value 值
+     * @param score 序號
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setZset(String key, Object value, double score) {
+        return redisTemplate.opsForZSet().add(key, value, score).then();
     }
 
     /**
@@ -364,7 +451,7 @@ public class RedisProvider {
      * @return 返回 Flux<Object> 對象
      */
     public Flux<Object> getZset(String key) {
-        return ObjectRedisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(0L)).to(Range.Bound.unbounded()));
+        return redisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(0L)).to(Range.Bound.unbounded()));
     }
 
     /**
@@ -377,7 +464,7 @@ public class RedisProvider {
      * @return 返回 Flux<Object> 對象
      */
     public Flux<Object> getZset(String key, long start, long end) {
-        return ObjectRedisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end)));
+        return redisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end)));
     }
 
     /**
@@ -389,43 +476,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteZset(String key, Object value) {
-        return ObjectRedisTemplate.opsForZSet().remove(key, value).then();
-    }
-
-    /**
-     * 依照通配符刪除 Redis 中的數據
-     *
-     * @param pattern 通配符
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    @Deprecated
-    public Mono<Void> deleteByPattern(String pattern) {
-        return Mono.empty();
-    }
-
-    /**
-     * 格式化數據，將單一數據轉換為指定類型
-     *
-     * @param clazz      類型
-     * @param objectMono 數據流
-     *
-     * @return 返回 Mono<?> 對象
-     */
-    public Mono<?> formatObject(Class<?> clazz, Mono<Object> objectMono) {
-        return objectMono.cast(clazz);
-    }
-
-    /**
-     * 格式化數據，將數據流中的數據轉換為指定類型
-     *
-     * @param clazz       類型
-     * @param objectsFlux 數據流
-     *
-     * @return 返回 Flux<?> 對象
-     */
-    public Flux<?> formatObject(Class<?> clazz, Flux<Object> objectsFlux) {
-        return objectsFlux.cast(clazz);
+        return redisTemplate.opsForZSet().remove(key, value).then();
     }
 
     /**
@@ -441,6 +492,20 @@ public class RedisProvider {
     }
 
     /**
+     * 依照通配符刪除 Redis 中的數據
+     *
+     * @param pattern 通配符
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteByPattern(String pattern) {
+        return redisTemplate.keys(pattern).collectList().flatMap(keys -> {
+            keys.forEach(redisTemplate::delete);
+            return Mono.empty();
+        });
+    }
+
+    /**
      * 確認分塊是否尚未完成
      *
      * @param key        鍵
@@ -449,6 +514,6 @@ public class RedisProvider {
      * @return 返回 Mono<Boolean> 對象
      */
     public Mono<Boolean> isChunkSetPending(String key, int chunkIndex) {
-        return ObjectRedisTemplate.opsForSet().isMember(key, chunkIndex);
+        return redisTemplate.opsForSet().isMember(key, chunkIndex);
     }
 }

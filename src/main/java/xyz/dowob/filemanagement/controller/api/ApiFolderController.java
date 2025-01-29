@@ -1,11 +1,13 @@
 package xyz.dowob.filemanagement.controller.api;
 
+import jakarta.annotation.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -15,10 +17,13 @@ import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
+import java.util.HashMap;
+
 /**
  * 資料夾的 API 控制器，用於處理資料夾的 API 請求
  * 用於處理資料夾的增刪改查操作
  * 繼承自 BaseFileController，該類為基礎的文件控制器，用於處理文件的基本操作
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName ApiFileUploadController
@@ -29,8 +34,12 @@ import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 @RestController
 @RequestMapping("/api/folders")
 public class ApiFolderController extends BaseFileController {
-    public ApiFolderController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
+    private final FolderListTreeManager folderListTreeManager;
+
+    public ApiFolderController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties,
+                               @Nullable FolderListTreeManager folderListTreeManager) {
         super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
+        this.folderListTreeManager = folderListTreeManager;
     }
 
 
@@ -72,7 +81,6 @@ public class ApiFolderController extends BaseFileController {
      *
      * @return 編輯結果
      */
-    //todo 移動到自身子目錄下錯誤檢查
     @PutMapping()
     public Mono<ResponseEntity<?>> editFolder(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
@@ -99,4 +107,37 @@ public class ApiFolderController extends BaseFileController {
                                    .flatMap(user -> fileStrategy.getFileService(null).createFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
     }
+
+    @GetMapping("/path/{fileId}")
+    public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, @PathVariable Long fileId) {
+        return handleError(userService.getUser(exchange).flatMap(user -> {
+            FileService fileService = fileStrategy.getFileService(null);
+
+            return Mono.defer(() -> {
+                HashMap<String, Object> result = new HashMap<>();
+                return fileService.getUserFilePaths(fileId, user).flatMap(list -> {
+                    result.put("filePaths", list);
+                    return Mono.just(result);
+                });
+            }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)));
+        }), exchange);
+    }
+
+
+    @PostMapping("/fileTree")
+    public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
+        return handleError(userService.getUser(exchange).flatMap(user -> {
+            FileService fileService = fileStrategy.getFileService(null);
+            if (!fileProperties.getGlobal().getEnableUserFolderListTree()) {
+                return createResponseEntity(createResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
+            }
+            return Mono.defer(() -> fileService.getUserFileList(user, -1L).collectList().flatMap(files -> {
+                if (folderListTreeManager != null) {
+                    folderListTreeManager.initializeTree(user.getId());
+                }
+                return Mono.empty();
+            })).then(createResponseEntity(createResponse(exchange, "建立用戶檔案樹成功", null)));
+        }), exchange);
+    }
+
 }

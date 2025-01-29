@@ -42,6 +42,9 @@ public interface AuthorizationService {
      * @param user    用戶對象
      */
     default Mono<Void> setAuthorization(ServerWebExchange request, User user) {
+        if (user == null) {
+            return Mono.empty();
+        }
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
 
         Context securityContext = ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl(authentication)));

@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.data.file.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
@@ -22,6 +23,7 @@ import java.util.Set;
  **/
 @Getter
 @Setter
+@NoArgsConstructor
 public class UserFileListDTO {
     /**
      * 文件ID

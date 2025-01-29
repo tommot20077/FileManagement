@@ -64,7 +64,16 @@ public class ProcessException extends Exception {
          * 錯誤信息: 無法獲取檔案流
          */
         CANNOT_GET_FILE_STREAM(1206, "無法獲取檔案流 任務ID：%s"),
-
+        /**
+         * 錯誤碼: 1207
+         * 錯誤信息: 無法將數據格式化為JSON
+         */
+        FORMAT_DATA_TO_JSON_FAILED(1207, "無法將數據格式化為JSON"),
+        /**
+         * 錯誤碼: 1208
+         * 錯誤信息: 構建文件樹失敗
+         */
+        BUILD_FILE_TREE_FAILED(1208, "構建文件樹失敗: %s"),
         ;
 
 

@@ -137,6 +137,11 @@ public class ValidationException extends Exception {
          * 錯誤信息: 欄位不存在
          */
         COLUMN_NOT_FOUND(1121, "欄位不存在: %s"),
+        /**
+         * 錯誤碼: 1122
+         * 錯誤信息: 不能移動到自身子目錄下
+         */
+        MOVE_TO_CHILD_FOLDER(1122, "不能移動到自身或其子目錄下"),
 
         ;
 

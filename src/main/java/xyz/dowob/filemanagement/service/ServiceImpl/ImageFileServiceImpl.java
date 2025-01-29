@@ -1,10 +1,12 @@
 package xyz.dowob.filemanagement.service.ServiceImpl;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import jakarta.annotation.Nullable;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
+import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -27,13 +29,12 @@ import xyz.dowob.filemanagement.service.ServiceInterface.AbstractFileService;
 @Service
 @FileHandlerType(FileEnum.IMAGE)
 public class ImageFileServiceImpl extends AbstractFileService {
-    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig) {
+    public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig,
+                                @Nullable FolderListTreeProvider folderListTreeProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               redisProvider,
-              gridFsProvider,
-              transfersTasksManager,
-              fileProperties, databaseClient, circuitBreakerConfig
+              gridFsProvider, transfersTasksManager, fileProperties, databaseClient, circuitBreakerConfig, folderListTreeProvider
         );
     }
 }

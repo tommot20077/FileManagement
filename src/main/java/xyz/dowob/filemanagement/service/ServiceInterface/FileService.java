@@ -2,10 +2,13 @@ package xyz.dowob.filemanagement.service.ServiceInterface;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.unity.FileCrudService;
+
+import java.util.List;
 
 /**
  * 文件業務邏輯接口，定義了文件業務邏輯的相關方法
@@ -25,9 +28,7 @@ public interface FileService extends FileCrudService {
      *
      * @return 返回用戶文件列表
      */
-    default Flux<UserFileListDTO> getUserFileList(User user, Long folderId) {
-        return null;
-    }
+    Flux<UserFileListDTO> getUserFileList(User user, Long folderId);
 
 
     /**
@@ -129,6 +130,9 @@ public interface FileService extends FileCrudService {
         return null;
     }
 
+    default Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
+        return null;
+    }
 
 
 }

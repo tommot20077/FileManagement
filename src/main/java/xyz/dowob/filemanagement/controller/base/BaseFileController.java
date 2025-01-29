@@ -70,13 +70,12 @@ public abstract class BaseFileController implements ResponseUnity {
                     result.put("userId", user.getId());
                     result.put("username", user.getUsername());
                     result.put("files", files);
-                    result.put("parentFolder", null);
-                    return fileService.getUserFileMetadataById(folderId).map(metadata -> {
-                        result.put("parentFolder", metadata);
-                        return result;
-                    }).switchIfEmpty(Mono.just(result));
+                    return Mono.just(result);
                 });
-            }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶文件列表成功", result)));
+            }).flatMap(result -> fileService.getUserFilePaths(folderId, user).flatMap(list -> {
+                result.put("filePaths", list);
+                return createResponseEntity(createResponse(exchange, "獲取用戶文件列表成功", result));
+            }));
         }), exchange);
     }
 }
