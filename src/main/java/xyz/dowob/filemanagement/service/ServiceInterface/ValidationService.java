@@ -5,6 +5,7 @@ import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.lang.reflect.Field;
@@ -42,8 +43,14 @@ public interface ValidationService {
      *
      * @param fileMetadataDTO 文件元數據DTO
      */
-    Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO);
+    Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user);
 
+    /**
+     * 驗證編輯文件DTO中的數據是否合法
+     *
+     * @param fileEditDTO 編輯文件DTO
+     * @param isFolder    是否為文件夾
+     */
     Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder);
 
     /**
@@ -99,7 +106,6 @@ public interface ValidationService {
                     return Mono.error(new ValidationException(ValidationException.ErrorCode.COLUMN_NOT_FOUND, column));
                 }
             }
-
             return Mono.empty();
         });
     }

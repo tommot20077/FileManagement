@@ -140,12 +140,11 @@ public interface ResponseUnity {
         return operation.onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("處理失敗: %s", e.getMessage());
             ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-            return createResponseEntity(apiResponse, 400);
+            return createResponseEntity(apiResponse, e.getErrorCode().getHttpStatus().value());
         }).onErrorResume(LimitationException.class, e -> {
             String errorMessage = String.format("限制錯誤: %s", e.getMessage());
             ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-            return createResponseEntity(apiResponse, 429);
+            return createResponseEntity(apiResponse, e.getErrorCode().getHttpStatus().value());
         });
     }
-
 }

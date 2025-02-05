@@ -9,8 +9,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
@@ -251,7 +253,9 @@ public class UserServiceImpl implements UserService {
     /**
      * 獲取所有實體
      */
+
     @Override
+    @RequirePermission(PermissionEnum.MANAGE)
     public Flux<User> getAll () {
         return userRepository.findAll();
     }

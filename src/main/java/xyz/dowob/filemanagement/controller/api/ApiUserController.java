@@ -1,9 +1,11 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
@@ -22,7 +24,7 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 @RestController
 @RequestMapping("/api/user")
 public class ApiUserController extends BaseUserController {
-    public ApiUserController (FileStrategy fileStrategy, UserService userService) {
+    public ApiUserController(FileStrategy fileStrategy, UserService userService) {
         super(fileStrategy, userService);
     }
 
@@ -35,23 +37,9 @@ public class ApiUserController extends BaseUserController {
      */
     @PostMapping("/logout")
     @Override
-    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange, boolean isWeb) {
+    public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return super.logout(exchange, false);
     }
-
-    /**
-     * 獲取所有用戶信息的API請求
-     *
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity> 返回用戶信息
-     */
-    @GetMapping("/getUserInfo")
-    @Override
-    public Mono<ResponseEntity<?>> getUserInfo (ServerWebExchange exchange, @RequestParam Long userid) {
-        return super.getUserInfo(exchange, userid);
-    }
-
 
     /**
      * 獲取所有用戶信息的API請求
@@ -63,8 +51,20 @@ public class ApiUserController extends BaseUserController {
 
     @GetMapping("/getAllUserInfo")
     @Override
-    public Flux<ResponseEntity<?>> getAllUserInfo (ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
     }
 
+    /**
+     * 獲取所有用戶信息的API請求
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回用戶信息
+     */
+    @GetMapping("/info")
+    @Override
+    public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
+        return super.getUserInfo(exchange);
+    }
 }

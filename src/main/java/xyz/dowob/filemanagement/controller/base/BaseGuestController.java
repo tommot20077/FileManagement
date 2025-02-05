@@ -56,16 +56,12 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回註冊結果
      */
-    public Mono<ResponseEntity<?>> register (@Validated @RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
-        return userService.register(registerUserDTO).then(Mono.defer(() -> {
+    public Mono<ResponseEntity<?>> register(@Validated @RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
+        return handleError(userService.register(registerUserDTO).then(Mono.defer(() -> {
             HashMap<String, Object> data = new HashMap<>();
             ApiResponseDTO<?> apiResponse = createResponse(exchange, 201, "註冊成功", data);
             return createResponseEntity(apiResponse);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("註冊失敗: %s", e.getMessage());
-            int errorCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, errorCode, errorMessage, null));
-        }));
+        })), exchange);
     }
 
     /**
@@ -76,9 +72,8 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回登入結果
      */
-    public Mono<ResponseEntity<?>> login (
-            @Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
-        return userService.login(authRequestDTO, exchange).flatMap(token -> {
+    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
+        return handleError(userService.login(authRequestDTO, exchange).flatMap(token -> {
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", token)
@@ -91,11 +86,7 @@ public abstract class BaseGuestController implements ResponseUnity {
             }
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
             return createResponseEntity(apiResponse);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("登入失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
+        }), exchange);
     }
 
     /**
@@ -106,7 +97,7 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @return Mono<ResponseEntity> 返回用戶授權狀態
      */
     @GetMapping("/checkAuthenticationStatus")
-    public Mono<ResponseEntity<?>> checkAuthenticationStatus (ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
         return userService.getUser(exchange).flatMap(user -> {
             HashMap<String, Object> data = new HashMap<>();
             HashMap<String, Object> userMap = new HashMap<>();
@@ -136,15 +127,11 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回發送結果
      */
-    public Mono<ResponseEntity<?>> sendResetPasswordMail (@RequestBody @Validated UserEmailDTO userMail, ServerWebExchange exchange) {
-        return userService.sendResetPasswordMail(userMail).then(Mono.defer(() -> {
+    public Mono<ResponseEntity<?>> sendResetPasswordMail(@RequestBody @Validated UserEmailDTO userMail, ServerWebExchange exchange) {
+        return handleError(userService.sendResetPasswordMail(userMail).then(Mono.defer(() -> {
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
             return createResponseEntity(apiResponse);
-        })).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("重置密碼郵件發送失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
+        })), exchange);
     }
 
     /**
@@ -155,14 +142,10 @@ public abstract class BaseGuestController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回重置密碼結果
      */
-    public Mono<ResponseEntity<?>> resetPassword (@Validated @RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
-        return userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
+    public Mono<ResponseEntity<?>> resetPassword(@Validated @RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
+        return handleError(userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "密碼重置成功", null);
             return createResponseEntity(apiResponse);
-        })).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("密碼重置失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
+        })), exchange);
     }
 }

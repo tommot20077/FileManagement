@@ -3,10 +3,12 @@ package xyz.dowob.filemanagement.service.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
@@ -75,8 +77,10 @@ public class ValidationServiceImpl implements ValidationService {
      * @param fileMetadataDTO 文件元數據DTO
      */
     @Override
-    public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) {
-        return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFileName(), false));
+    public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
+        return validateNotNull(fileMetadataDTO)
+                .then(validFileName(fileMetadataDTO.getFileName(), false))
+                .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
     }
 
     /**
@@ -221,6 +225,9 @@ public class ValidationServiceImpl implements ValidationService {
 
     /**
      * 驗證檔案名稱是否出現非法字符
+     * 當檔案名稱為空、包含非法字符或者長度超過200時、檔案名稱不包含"."時，拋出ValidationException
+     * 當檔案為文件夾時，不檢查是否包含"."，但是檢查是否包含非法字符
+     *
      *
      * @param fileName 檔案名稱
      * @param isFolder 是否為文件夾
@@ -238,6 +245,29 @@ public class ValidationServiceImpl implements ValidationService {
         }
         if (fileName.length() > 200) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.NAME_TOO_LONG));
+        }
+        return Mono.empty();
+    }
+
+    /**
+     * 檢查用戶是否有足夠的存儲空間來存儲文件，如果用戶的存儲限制為-1，則不進行檢查
+     * 當用戶存儲空間不足時，拋出ValidationException
+     *
+     * @param user       用戶
+     * @param expectSize 預期存儲大小
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> validateUserStorageLimit(User user, long expectSize) {
+        if (user.getStorageLimit() == -1) {
+            return Mono.empty();
+        }
+        if (user.getStorageLimit() < user.getUsedStorage() + expectSize) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
+                                                      ByteEnum.toReadableSize(user.getStorageLimit()),
+                                                      ByteEnum.toReadableSize(user.getUsedStorage()),
+                                                      ByteEnum.toReadableSize(expectSize)
+            ));
         }
         return Mono.empty();
     }

@@ -81,7 +81,9 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     public static void clearInactiveSession() {
         try (ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor()) {
             service.scheduleAtFixedRate(() -> USER_SESSION_MAP.entrySet().removeIf(entry -> !entry.getValue().isOpen()),
-                                        5, 5, java.util.concurrent.TimeUnit.MINUTES
+                                        5,
+                                        5,
+                                        java.util.concurrent.TimeUnit.MINUTES
             );
         }
     }
@@ -111,7 +113,9 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                     case "bufferUpload" -> handleBufferUpload(customSession, jsonNode);
                     default -> {
                         ApiResponseDTO<?> response = createResponse(customSession.getHandshakeInfo().getUri().getPath(),
-                                                                    400, "未知的請求類型", null
+                                                                    400,
+                                                                    "未知的請求類型",
+                                                                    null
                         );
                         yield sendMessage(customSession, response);
                     }
@@ -144,24 +148,22 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                                                                           UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
                                 ));
                             }
-                            return validationService.validateFileMetadataDTO(fileMetadata)
-                                                    .then(fileStrategy.getFileService(null).uploadFile(fileMetadata, user))
-                                                    .flatMap(transferResponseDTO -> {
-                                                        ApiResponseDTO<?> response = createResponse(session
-                                                                                                            .getHandshakeInfo()
-                                                                                                            .getUri()
-                                                                                                            .getPath(),
-                                                                                                    null,
-                                                                                                    transferResponseDTO
-                                                        );
-                                                        if (transferResponseDTO.getIsFinished()) {
-                                                            response.setMessage("上傳任務完成");
-                                                        } else {
-                                                            response.setMessage("初始化上傳任務成功");
-                                                        }
-                                                        return sendMessage(session, response);
-                                                    })
-                                                    .doFinally(signalType -> userLimiter.release(user.getId()));
+                            return validationService
+                                    .validateFileMetadataDTO(fileMetadata, user)
+                                    .then(fileStrategy.getFileService(null).uploadFile(fileMetadata, user))
+                                    .flatMap(transferResponseDTO -> {
+                                        ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
+                                                                                    null,
+                                                                                    transferResponseDTO
+                                        );
+                                        if (transferResponseDTO.getIsFinished()) {
+                                            response.setMessage("上傳任務完成");
+                                        } else {
+                                            response.setMessage("初始化上傳任務成功");
+                                        }
+                                        return sendMessage(session, response);
+                                    })
+                                    .doFinally(signalType -> userLimiter.release(user.getId()));
                         }))
                 .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
                 .onErrorResume(ValidationException.class, e -> {

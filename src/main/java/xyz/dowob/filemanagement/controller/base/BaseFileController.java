@@ -60,7 +60,6 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return 返回用戶文件列表
      */
-
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileStrategy.getFileService(null);
@@ -78,4 +77,6 @@ public abstract class BaseFileController implements ResponseUnity {
             }));
         }), exchange);
     }
+
+    //todo 併發請求最後整合 加快速度
 }

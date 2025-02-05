@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
 
 import java.util.Collection;
@@ -56,7 +58,21 @@ public class User {
     private RoleEnum role = RoleEnum.USER;
 
     /**
+     * 用戶的存儲限制
+     */
+    @Column("storage_limit")
+    private Long storageLimit = role.getDefaultStorageLimit();
+
+    /**
+     * 用戶的已使用存儲
+     */
+    @Column("used_storage")
+    private Long usedStorage = 0L;
+
+
+    /**
      * 重寫hashCode方法，用於判斷用戶是否相同
+     *
      * @return hashCode
      */
     @Override
@@ -85,6 +101,7 @@ public class User {
 
     /**
      * 重寫toString方法，將用戶數據轉換為HashMap
+     *
      * @return 用戶數據HashMap
      */
     @Override
@@ -94,14 +111,20 @@ public class User {
         userMap.put("username", username);
         userMap.put("email", email);
         userMap.put("role", role);
+        userMap.put("storageLimit", ByteEnum.toReadableSize(storageLimit));
+        userMap.put("usedStorage", ByteEnum.toReadableSize(usedStorage));
         return userMap.toString();
     }
 
     /**
      * 獲取用戶的權限
+     *
      * @return 用戶的權限
      */
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 }
+
+//todo 權限aop、前端預覽更多類型和載入進度

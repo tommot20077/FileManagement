@@ -104,8 +104,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
             String jwtToken = Jwts
                     .builder()
                     .subject(String.valueOf(user.getId()))
-                    .issuedAt(now)
-                    .claim("role", role).claim("username", user.getUsername())
+                    .issuedAt(now).claim("role", role).claim("username", user.getUsername())
                     .claim("version", tokenVersion)
                     .expiration(expirationDate)
                     .signWith(key)
@@ -226,8 +225,10 @@ public class JwtTokenProviderImpl implements TokenProvider {
      */
     private Mono<Long> updateExchangeAttributes(Long userId, Claims claims) {
         return CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
+            String role = claims.get("role", String.class);
             exchange.getAttributes().put("userId", userId);
             exchange.getAttributes().put("username", claims.get("username", String.class));
+            exchange.getAttributes().put("role", RoleEnum.valueOf(role));
         }).thenReturn(userId);
     }
 

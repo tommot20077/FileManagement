@@ -15,6 +15,7 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
+import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -30,6 +31,7 @@ import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
+import xyz.dowob.filemanagement.repostiory.UserRepository;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -60,6 +62,10 @@ class AbstractFileServiceTest {
     @Mock
     private CircuitBreakerConfig mockCircuitBreakerConfig;
     @Mock
+    private FolderListTreeProvider folderListTreeProvider;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
     private Tika mockTika;
 
     private AbstractFileService abstractFileServiceUnderTest;
@@ -67,13 +73,12 @@ class AbstractFileServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         abstractFileServiceUnderTest = new AbstractFileService(mockServerFileMetaRepository,
-                                                               mockUserFileMetaRepository,
+                                                               mockUserFileMetaRepository, userRepository,
                                                                mockRedisProvider,
                                                                mockGridFsProvider,
                                                                mockTransfersTasksManager,
                                                                mockFileProperties,
-                                                               mockDatabaseClient,
-                                                               mockCircuitBreakerConfig
+                                                               mockDatabaseClient, mockCircuitBreakerConfig, folderListTreeProvider
         ) {
         };
         // TODO: Set the following fields: tika.
@@ -434,7 +439,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -522,7 +527,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -531,7 +536,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -560,7 +565,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -636,7 +641,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -645,7 +650,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -674,7 +679,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -752,7 +757,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -761,7 +766,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -790,7 +795,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -867,7 +872,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -876,7 +881,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -905,7 +910,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -984,7 +989,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -993,7 +998,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1022,7 +1027,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1100,7 +1105,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1109,7 +1114,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1138,7 +1143,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1217,7 +1222,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1226,7 +1231,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1255,7 +1260,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1332,7 +1337,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1341,7 +1346,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1370,7 +1375,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1448,7 +1453,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1457,7 +1462,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1486,7 +1491,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1574,7 +1579,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.empty());
 
         // Configure RedisProvider.setHashMap(...).
@@ -1583,7 +1588,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1612,7 +1617,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1700,7 +1705,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1,
                                                           "transferTaskId"
         )).thenReturn(Mono.error(new Exception("message")));
@@ -1711,7 +1716,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1740,7 +1745,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1828,7 +1833,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1837,7 +1842,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.error(new Exception("message")));
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -1856,7 +1861,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -1944,7 +1949,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -1953,7 +1958,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.error(new Exception("message")));
@@ -1972,7 +1977,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         final User user = new User();
         user.setId(0L);
@@ -2060,7 +2065,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         when(mockTransfersTasksManager.getTransfersTask("md5", TransfersStatusEnum.UPLOADING)).thenReturn(Collections.emptyList());
@@ -7280,7 +7285,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure UserFileMetaRepository.save(...).
         final UserFileMetadata userFileMetadata = new UserFileMetadata();
@@ -7320,7 +7325,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure UserFileMetaRepository.save(...).
         final UserFileMetadata entity = new UserFileMetadata();
@@ -7349,7 +7354,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure UserFileMetaRepository.save(...).
         final Mono<UserFileMetadata> userFileMetadataMono = Mono.error(new Exception("message"));
@@ -7379,7 +7384,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7387,7 +7392,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -7396,7 +7401,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -7425,7 +7430,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7433,7 +7438,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.empty());
 
         // Configure RedisProvider.setHashMap(...).
@@ -7442,7 +7447,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -7471,7 +7476,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7479,7 +7484,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1,
                                                           "transferTaskId"
         )).thenReturn(Mono.error(new Exception("message")));
@@ -7490,7 +7495,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -7519,7 +7524,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7527,7 +7532,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -7536,7 +7541,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.error(new Exception("message")));
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.empty());
@@ -7555,7 +7560,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7563,7 +7568,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         // Configure RedisProvider.setHashMap(...).
@@ -7572,7 +7577,7 @@ class AbstractFileServiceTest {
         value.setFileType(FileEnum.IMAGE);
         value.setFileSize(0L);
         value.setMd5("md5");
-        value.setUserId(0L);
+        value.setUser(new User());
         when(mockRedisProvider.setHashMap("hashKey", "DTO", value, 6L, ChronoUnit.HOURS)).thenReturn(Mono.empty());
 
         when(mockRedisProvider.generateChunkSet("key", 0)).thenReturn(Mono.error(new Exception("message")));
@@ -7591,7 +7596,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Configure TransfersTasksManager.registerUploadTask(...).
         final FileMetadataDTO fileMetadataDTO1 = new FileMetadataDTO();
@@ -7599,7 +7604,7 @@ class AbstractFileServiceTest {
         fileMetadataDTO1.setParentFolderId(0L);
         fileMetadataDTO1.setMd5("md5");
         fileMetadataDTO1.setFileSize(0L);
-        fileMetadataDTO1.setUserId(0L);
+        fileMetadataDTO1.setUser(new User());
         when(mockTransfersTasksManager.registerUploadTask(fileMetadataDTO1, "transferTaskId")).thenReturn(Mono.just(false));
 
         when(mockTransfersTasksManager.getTransfersTask("md5", TransfersStatusEnum.UPLOADING)).thenReturn(Collections.emptyList());
@@ -7671,7 +7676,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.just("value"));
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.empty());
@@ -7692,7 +7697,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.empty());
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.empty());
@@ -7713,7 +7718,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.error(new Exception("message")));
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.empty());
@@ -7734,7 +7739,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.just("value"));
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.error(new Exception("message")));
@@ -7755,7 +7760,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.just("value"));
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.empty());
@@ -7776,7 +7781,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockRedisProvider.getHashMap("hashKey", "total_chunks")).thenReturn(Mono.just("value"));
         when(mockGridFsProvider.deleteFileByFilename("fileName")).thenReturn(Mono.empty());
@@ -7790,14 +7795,14 @@ class AbstractFileServiceTest {
     }
 
     @Test
-    void testProcessFileAfterMd5Check() throws Exception {
+    void testProcessFileAfterFileCheck() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -7857,7 +7862,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -7870,7 +7875,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         when(mockGridFsProvider.storeFile(any(Flux.class), eq("fileName"))).thenReturn(Mono.empty());
         when(mockTransfersTasksManager.finishTransfersTask("md5", "transferTaskId", "gridFsId")).thenReturn(Mono.empty());
@@ -7927,7 +7932,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -7940,7 +7945,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.error(new Exception("message"));
@@ -8000,20 +8005,20 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
 
     @Test
-    void testProcessFileAfterMd5Check_TransfersTasksManagerReturnsError() throws Exception {
+    void testProcessFileAfterFileCheck_TransfersTasksManagerReturnsError() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8074,7 +8079,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -8087,7 +8092,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8137,7 +8142,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -8150,7 +8155,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8201,7 +8206,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -8214,7 +8219,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8263,7 +8268,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -8276,7 +8281,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8326,20 +8331,20 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
 
     @Test
-    void testProcessFileAfterMd5Check_RedisProviderGetHashMapReturnsNoItem() throws Exception {
+    void testProcessFileAfterFileCheck_RedisProviderGetHashMapReturnsNoItem() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8399,20 +8404,20 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
 
     @Test
-    void testProcessFileAfterMd5Check_RedisProviderGetHashMapReturnsError() throws Exception {
+    void testProcessFileAfterFileCheck_RedisProviderGetHashMapReturnsError() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8472,7 +8477,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
@@ -8485,7 +8490,7 @@ class AbstractFileServiceTest {
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8545,20 +8550,20 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
 
     @Test
-    void testProcessFileAfterMd5Check_RedisProviderDeleteHashReturnsError() throws Exception {
+    void testProcessFileAfterFileCheck_RedisProviderDeleteHashReturnsError() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8618,20 +8623,20 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.empty());
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }
 
     @Test
-    void testProcessFileAfterMd5Check_RedisProviderDeleteSetReturnsError() throws Exception {
+    void testProcessFileAfterFileCheck_RedisProviderDeleteSetReturnsError() throws Exception {
         // Setup
         final UploadTaskBO uploadTaskBO = new UploadTaskBO();
         uploadTaskBO.setTransferTaskId("transferTaskId");
         uploadTaskBO.setFileType(FileEnum.IMAGE);
         uploadTaskBO.setFileSize(0L);
         uploadTaskBO.setMd5("md5");
-        uploadTaskBO.setUserId(0L);
+        uploadTaskBO.setUser(new User());
 
         // Configure GridFsProvider.storeFile(...).
         final Mono<ObjectId> objectIdMono = Mono.just(new ObjectId(new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(), 0));
@@ -8691,7 +8696,7 @@ class AbstractFileServiceTest {
         when(mockRedisProvider.deleteSet("key")).thenReturn(Mono.error(new Exception("message")));
 
         // Run the test
-        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterMd5Check(uploadTaskBO, "content".getBytes());
+        final Mono<Void> result = abstractFileServiceUnderTest.processFileAfterFileCheck(uploadTaskBO, "content".getBytes());
 
         // Verify the results
     }

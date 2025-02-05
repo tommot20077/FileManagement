@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.entity.User;
 
 /**
  * 文件傳輸任務的數據傳輸對象，用於規範文件傳輸任務的數據傳輸對象，紀錄文件傳輸任務的數據
@@ -52,10 +53,10 @@ public class UploadTaskBO {
     private String md5;
 
     /**
-     * 用戶ID
+     * 用戶
      */
     @NotBlank(message = "用戶不能為空")
-    private Long userId;
+    private User user;
 
     /**
      * 訊息
@@ -74,7 +75,7 @@ public class UploadTaskBO {
         fileMetadataDTO.setParentFolderId(this.parentFolderId);
         fileMetadataDTO.setMd5(this.md5);
         fileMetadataDTO.setFileSize(this.fileSize);
-        fileMetadataDTO.setUserId(this.userId);
+        fileMetadataDTO.setUser(this.user);
         return fileMetadataDTO;
     }
 }

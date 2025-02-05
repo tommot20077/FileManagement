@@ -17,7 +17,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CircuitBreakersConfig {
     /**
-     * 斷路器配置
+     * 斷路器配置，用於配置斷路器的相關參數
+     * 當前配置失敗率為 50%，等待時間為 10 秒，半開狀態允許的請求次數為 2，窗口大小為 2
      *
      * @return 斷路器配置
      */

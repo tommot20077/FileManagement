@@ -12,7 +12,6 @@ import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
-import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 
@@ -31,7 +30,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping("/web/guest")
 public class WebGuestController extends BaseGuestController {
-    public WebGuestController (UserService userService, AuthorizationService authorizationService, SecurityProperties securityProperties) {
+    public WebGuestController(UserService userService, AuthorizationService authorizationService, SecurityProperties securityProperties) {
         super(authorizationService, userService, securityProperties);
     }
 
@@ -101,15 +100,11 @@ public class WebGuestController extends BaseGuestController {
      */
     @GetMapping("/getCSRFToken")
     public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
-        return authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
+        return handleError(authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
             HashMap<String, Object> data = new HashMap<>();
             data.put("csrfToken", csrfToken.getToken());
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取CSRF Token成功", data);
             return createResponseEntity(apiResponse);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("獲取CSRF Token失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
-        });
+        }), exchange);
     }
 }

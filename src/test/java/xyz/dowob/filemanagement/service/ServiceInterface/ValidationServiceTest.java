@@ -10,6 +10,7 @@ import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 class ValidationServiceTest {
@@ -31,7 +32,7 @@ class ValidationServiceTest {
             }
 
             @Override
-            public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO) {
+            public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
                 return Mono.empty();
             }
 

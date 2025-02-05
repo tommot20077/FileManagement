@@ -201,10 +201,10 @@ class ValidationServiceImplTest {
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
-        fileMetadataDTO.setUserId(0L);
+        fileMetadataDTO.setUser(new User());
 
         // Run the test
-        final Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO);
+        final Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO, new User());
 
         // Verify the results
     }

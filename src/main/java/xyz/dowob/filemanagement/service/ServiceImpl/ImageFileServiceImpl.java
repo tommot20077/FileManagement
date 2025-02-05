@@ -13,6 +13,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
+import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.ServiceInterface.AbstractFileService;
 
 /**
@@ -30,11 +31,17 @@ import xyz.dowob.filemanagement.service.ServiceInterface.AbstractFileService;
 @FileHandlerType(FileEnum.IMAGE)
 public class ImageFileServiceImpl extends AbstractFileService {
     public ImageFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig,
-                                @Nullable FolderListTreeProvider folderListTreeProvider) {
+                                @Nullable FolderListTreeProvider folderListTreeProvider, UserRepository userRepository) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
+              userRepository,
               redisProvider,
-              gridFsProvider, transfersTasksManager, fileProperties, databaseClient, circuitBreakerConfig, folderListTreeProvider
+              gridFsProvider,
+              transfersTasksManager,
+              fileProperties,
+              databaseClient,
+              circuitBreakerConfig,
+              folderListTreeProvider
         );
     }
 }

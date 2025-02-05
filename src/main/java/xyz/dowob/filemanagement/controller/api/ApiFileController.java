@@ -29,9 +29,13 @@ import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 /**
  * 文件的 API 控制器，用於處理文件相關的 API 請求
  * 用於處理文件的增刪改查操作
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName ApiFileUploadController
@@ -72,8 +76,7 @@ public class ApiFileController extends BaseFileController {
                                                                                      UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
                                            ));
                                        }
-                                       return validationService
-                                               .validateFileMetadataDTO(fileMetadataDTO)
+                                       return validationService.validateFileMetadataDTO(fileMetadataDTO, user)
                                                .then(fileStrategy
                                                              .getFileService(null)
                                                              .uploadFile(fileMetadataDTO, user)
@@ -116,13 +119,17 @@ public class ApiFileController extends BaseFileController {
                 .flatMap(user -> fileStrategy.getFileService(null).downloadFile(id, user).map(userFileDataBO -> {
                     HttpHeaders headers = new HttpHeaders();
                     if ("download".equals(action)) {
-                        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + userFileDataBO.getFileName());
+                        headers.add(HttpHeaders.CONTENT_DISPOSITION,
+                                    "attachment; filename=" + URLEncoder.encode(userFileDataBO.getFileName(), StandardCharsets.UTF_8)
+                        );
                         headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
                     } else {
                         headers.add(HttpHeaders.CONTENT_TYPE,
                                     FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFileName())
                         );
                     }
+                    headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
+                    headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(userFileDataBO.getFileSize()));
                     return ResponseEntity.ok().headers(headers).body(userFileDataBO.getDataStream());
                 }))
                 .onErrorResume(ValidationException.class, e -> {
@@ -130,8 +137,7 @@ public class ApiFileController extends BaseFileController {
                     ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
                     try {
                         objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                        return Mono.just(ResponseEntity
-                                                 .status(400)
+                        return Mono.just(ResponseEntity.status(e.getErrorCode().getHttpStatus())
                                                  .contentType(MediaType.APPLICATION_JSON)
                                                  .body(Flux.just(exchange
                                                                          .getResponse()

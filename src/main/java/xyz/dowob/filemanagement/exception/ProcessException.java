@@ -74,6 +74,11 @@ public class ProcessException extends Exception {
          * 錯誤信息: 構建文件樹失敗
          */
         BUILD_FILE_TREE_FAILED(1208, "構建文件樹失敗: %s"),
+        /**
+         * 錯誤碼: 1209
+         * 錯誤信息: 文件大小不匹配
+         */
+        FILE_SIZE_NOT_MATCH(1209, "文件大小不匹配"),
         ;
 
 

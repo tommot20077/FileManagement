@@ -3,13 +3,10 @@ package xyz.dowob.filemanagement.controller.base;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ServerWebExchange;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileStrategy;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
-import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
@@ -39,16 +36,11 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回登出結果
      */
-    public Mono<ResponseEntity<?>> logout (ServerWebExchange exchange, boolean isWeb) {
+    public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return userService.getUser(exchange).flatMap(user -> userService.logout(user.getId(), exchange).then(Mono.defer(() -> {
             if (isWeb) {
-                ResponseCookie cookie = ResponseCookie
-                        .from("jwtToken", "")
-                        .httpOnly(true)
-                        .secure(false) //todo 改成true
-                        .maxAge(0)
-                        .sameSite("Strict")
-                        .build();
+                ResponseCookie cookie = ResponseCookie.from("jwtToken", "").httpOnly(true).secure(false) //todo 改成true
+                                                      .maxAge(0).sameSite("Strict").build();
                 exchange.getResponse().addCookie(cookie);
             }
             return createResponseEntity(createResponse(exchange, "登出成功", null));
@@ -64,15 +56,11 @@ public abstract class BaseUserController implements ResponseUnity {
      * @return Mono<ResponseEntity> 返回用戶信息
      */
     //todo 改成管理員使用
-    public Flux<ResponseEntity<?>> getAllUserInfo (ServerWebExchange exchange) {
-        return userService.getAll().flatMap(user -> {
-            ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
+    public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
+        return handleError(userService.getAll().collectList().flatMap(userList -> {
+            ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", userList);
             return createResponseEntity(responseEntity);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("獲取用户信息失敗: %s", e.getMessage());
-            int errorCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, errorCode, errorMessage, null));
-        });
+        }), exchange);
     }
 
     /**
@@ -82,15 +70,11 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
-    // 此方法為示例方法
-    public Mono<ResponseEntity<?>> getUserInfo (ServerWebExchange exchange, @RequestParam("userid") Long id) {
-        return userService.getById(id).flatMap(user -> {
+    // 此方法為管理員方法
+    public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
+        return handleError(userService.getUser(exchange).flatMap(user -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
             return createResponseEntity(responseEntity);
-        }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("獲取用户信息失敗: %s", e.getMessage());
-            int errorCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, errorCode, errorMessage, null));
-        });
+        }), exchange);
     }
 }

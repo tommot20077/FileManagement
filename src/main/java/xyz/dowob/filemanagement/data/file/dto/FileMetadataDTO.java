@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.data.file.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.time.LocalDateTime;
@@ -44,9 +45,9 @@ public class FileMetadataDTO {
     private Long fileSize;
 
     /**
-     * 用戶ID
+     * 用戶
      */
-    private Long userId;
+    private User user;
 
 
     /**
@@ -61,7 +62,7 @@ public class FileMetadataDTO {
         userFileMetadata.setFilename(this.fileName);
         userFileMetadata.setParentFolderId(this.parentFolderId);
         userFileMetadata.setServerFileId(serverFileId);
-        userFileMetadata.setUserId(this.userId);
+        userFileMetadata.setUserId(this.user.getId());
         userFileMetadata.setLastAccessTime(LocalDateTime.now());
         userFileMetadata.setUploadTime(LocalDateTime.now());
         return userFileMetadata;
@@ -81,7 +82,7 @@ public class FileMetadataDTO {
         task.setParentFolderId(parentFolderId);
         task.setFileName(this.getFileName());
         task.setMd5(this.getMd5());
-        task.setUserId(this.userId);
+        task.setUser(this.user);
         task.setMessage(message);
         task.setFileSize(this.getFileSize());
         return task;

@@ -8,7 +8,6 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
@@ -26,6 +25,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
 
 import java.time.LocalDateTime;
@@ -73,7 +73,7 @@ public class SecurityConfig {
      */
     // todo 補上HSTS
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain (ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrfSpec -> csrfSpec
@@ -87,38 +87,16 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/web/guest/**", "/api/guest/**", "/docs/**", "/ws/**")
                         .permitAll()
-                        .pathMatchers("/api/user/getAllUserInfo")
-                        .hasRole("ADMIN")
+                        //.pathMatchers("/api/user/getAllUserInfo")
+                        //.hasRole("ADMIN")
                         .anyExchange()
                         .authenticated())
                 .securityContextRepository(securityContextRepository)
                 .addFilterAt(contextWebFilter, SecurityWebFiltersOrder.EXCEPTION_TRANSLATION)
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
-                        .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, "請先登入", HttpStatus.UNAUTHORIZED.value()))
-                        .accessDeniedHandler((exchange, e) -> writeJsonResponse(exchange, "權限不足", HttpStatus.FORBIDDEN.value())))
+                        .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.UNAUTHORIZED))
+                        .accessDeniedHandler((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.FORBIDDEN)))
                 .build();
-    }
-
-    /**
-     * 密碼加密處理的 Bean
-     *
-     * @return PasswordEncoder BCrypt算法加密器
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder () {
-        return new BCryptPasswordEncoder();
-    }
-
-    /**
-     * 配置 CSRF Token Repository
-     *
-     * @return CSRF憑證庫
-     */
-    @Bean
-    public ServerCsrfTokenRepository webSessionServerCsrfTokenRepository () {
-        WebSessionServerCsrfTokenRepository csrfTokenRepository = new WebSessionServerCsrfTokenRepository();
-        csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
-        return csrfTokenRepository;
     }
 
     /**
@@ -128,9 +106,9 @@ public class SecurityConfig {
      * @return 跨域配置
      */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource () {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOriginPattern("http://*localhost:*");
+        configuration.addAllowedOriginPattern("*");
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
@@ -141,28 +119,48 @@ public class SecurityConfig {
     }
 
     /**
+     * 配置 CSRF Token Repository
+     *
+     * @return CSRF憑證庫
+     */
+    @Bean
+    public ServerCsrfTokenRepository webSessionServerCsrfTokenRepository() {
+        WebSessionServerCsrfTokenRepository csrfTokenRepository = new WebSessionServerCsrfTokenRepository();
+        csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
+        return csrfTokenRepository;
+    }
+
+    /**
      * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息
      *
-     * @param exchange   請求交換對象
-     * @param message    響應消息
-     * @param statusCode 狀態碼
+     * @param exchange 請求交換對象
+     * @param error    錯誤信息
      *
      * @return Mono<Void>
      */
-    private Mono<Void> writeJsonResponse (ServerWebExchange exchange, String message, int statusCode) {
+    private Mono<Void> writeJsonResponse(ServerWebExchange exchange, ValidationException.ErrorCode error) {
         try {
-            ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
-                                                                       statusCode,
-                                                                       exchange.getRequest().getPath().value(),
-                                                                       message,
+            ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(), error.getCode(),
+                                                                       exchange.getRequest().getPath().value(), error.getMessage(),
                                                                        null
             );
             exchange.getResponse().getHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+            exchange.getResponse().setStatusCode(error.getHttpStatus());
             return exchange
                     .getResponse()
                     .writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(objectMapper.writeValueAsBytes(apiResponseDTO))));
         } catch (JsonProcessingException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    /**
+     * 密碼加密處理的 Bean
+     *
+     * @return PasswordEncoder BCrypt算法加密器
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }
