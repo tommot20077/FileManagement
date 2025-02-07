@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.controller.exception;
 import io.r2dbc.spi.R2dbcException;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.dao.NonTransientDataAccessResourceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -270,6 +271,21 @@ public class ExceptionController implements ResponseUnity {
                 .build();
 
         return Mono.just(ResponseEntity.status(429).body(response));
+    }
+
+    @ExceptionHandler(NonTransientDataAccessResourceException.class)
+    private Mono<ResponseEntity<?>> handleDatabaseException(Throwable ex, ServerWebExchange exchange) {
+        log.error("資料庫操作錯誤: ", ex);
+        ApiResponseDTO<Void> response = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("操作失敗，請稍後再試或聯繫管理員")
+                .data(null)
+                .build();
+
+        return Mono.just(ResponseEntity.status(500).body(response));
     }
 
     /**

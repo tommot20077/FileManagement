@@ -1,12 +1,14 @@
 package xyz.dowob.filemanagement.component.provider.provider;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -31,11 +33,11 @@ public class RedisProvider {
      */
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public RedisProvider(ReactiveRedisTemplate<String, Object> redisTemplate) {
+    public RedisProvider(ReactiveRedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
-        objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -81,6 +83,14 @@ public class RedisProvider {
         return redisTemplate.opsForValue().get(key).cast(clazz);
     }
 
+    @HideOverLength
+    public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromValue(String key, Class<T> clazz) {
+        return redisTemplate.opsForValue().get(key).map(obj -> {
+            JavaType type = objectMapper.getTypeFactory().constructParametricType(PagedResponseDTO.class, clazz);
+            return objectMapper.convertValue(obj, type);
+        });
+    }
+
     public <T> Flux<T> getValueList(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
     }
@@ -97,6 +107,7 @@ public class RedisProvider {
         }).toList();
         return Flux.fromIterable(finalList);
     }
+
 
     /**
      * 對數據進行自增操作
@@ -137,8 +148,7 @@ public class RedisProvider {
             return setHashMap(hashKey, innerKey, value);
         }
         return redisTemplate
-                .opsForHash()
-                .put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, Duration.of(expireTime, unit)))
+                .opsForHash().put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, Duration.of(expireTime, unit)))
                 .then();
     }
 
@@ -467,6 +477,20 @@ public class RedisProvider {
         return redisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end)));
     }
 
+    @HideOverLength
+    public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromZset(String key, int page, Class<T> clazz) {
+        return redisTemplate.opsForZSet().rangeByScore(key, Range.just((double) page)).next().flatMap(obj -> {
+            if (obj == null) {
+                return Mono.empty();
+            }
+
+            JavaType type = objectMapper.getTypeFactory().constructParametricType(PagedResponseDTO.class, clazz);
+            PagedResponseDTO<T> pagedResponseDTO = objectMapper.convertValue(obj, type);
+            return Mono.just(pagedResponseDTO);
+        });
+    }
+
+
     /**
      * 根據目標數值，刪除 Zset 中的數據
      *
@@ -475,8 +499,16 @@ public class RedisProvider {
      *
      * @return 返回 Mono<Void> 對象
      */
-    public Mono<Void> deleteZset(String key, Object value) {
+    public Mono<Void> deleteZset(String key, Object... value) {
         return redisTemplate.opsForZSet().remove(key, value).then();
+    }
+
+    public Mono<Void> deleteZset(String key) {
+        return redisTemplate.opsForZSet().removeRange(key, Range.unbounded()).then();
+    }
+
+    public Mono<Void> deleteZset(String key, long start, long end) {
+        return redisTemplate.opsForZSet().removeRange(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end))).then();
     }
 
     /**

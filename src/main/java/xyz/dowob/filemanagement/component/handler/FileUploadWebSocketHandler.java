@@ -63,6 +63,9 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      */
     private final FileStrategy fileStrategy;
 
+    /**
+     * 用戶限制器策略模式
+     */
     private final UserLimiterStrategy userLimiterStrategy;
 
     /**

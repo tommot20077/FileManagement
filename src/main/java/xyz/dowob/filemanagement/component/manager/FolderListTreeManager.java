@@ -1,12 +1,16 @@
 package xyz.dowob.filemanagement.component.manager;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
+import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
@@ -23,10 +27,11 @@ import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
  * @create 2025/1/31
  * @Version 1.0
  **/
+@Log4j2
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = {"file.global.enable-user-folder-list-tree"}, havingValue = "true", matchIfMissing = true)
-public class FolderListTreeManager {
+public class FolderListTreeManager implements ApplicationRunner {
     /**
      * 用戶資料庫操作類
      */
@@ -43,8 +48,12 @@ public class FolderListTreeManager {
     /**
      * 初始化用戶的檔案列表樹
      */
-    @PostConstruct
-    public void init() {
+    /**
+     * @param args 啟動參數
+     */
+    @Override
+    public void run(ApplicationArguments args) {
+        log.info("初始化用戶的檔案列表樹");
         initializeTree();
     }
 
@@ -54,20 +63,32 @@ public class FolderListTreeManager {
      * @param userIds 用戶ID
      */
     public void initializeTree(Long... userIds) {
-        folderListTreeProvider.getUserFileListTree().clear();
-        Flux<User> userMono;
-        if (userIds.length == 0) {
-            userMono = userRepository.findAll();
-        } else {
-            userMono = userRepository.findAllById(Flux.fromArray(userIds));
-        }
-        userMono.flatMap(user -> fileService.getUserFileList(user, -1L).collectList().flatMap(userFileListDTOS -> {
-            try {
-                folderListTreeProvider.initializeTree(user.getId(), userFileListDTOS);
-                return Mono.empty();
-            } catch (ProcessException e) {
-                return Mono.error(new RuntimeException(e));
-            }
-        })).subscribe();
+        Flux<User> userMono = userIds.length == 0 ? userRepository.findAll() : userRepository.findAllById(Flux.fromArray(userIds));
+
+        userMono
+                .doOnNext(user -> folderListTreeProvider.getUserFileListTree().remove(user.getId()))
+                .flatMap(user -> fetchAllUserFiles(user, 1000).doOnNext(pageList -> {
+
+                    try {
+                        folderListTreeProvider.initializeTree(user.getId(),
+                                                              pageList.getData(),
+                                                              pageList.getCurrentPage() == pageList.getTotalPages()
+                        );
+                    } catch (ProcessException e) {
+                        throw new RuntimeException(e);
+                    }
+                }))
+                .subscribe();
+    }
+
+    private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user, int pageSize) {
+        return fileService.getUserFileList(user, -1L, 1, pageSize).expand(pagedResponseDTO -> {
+            int nextPage = pagedResponseDTO.getCurrentPage() + 1;
+            return nextPage <= pagedResponseDTO.getTotalPages() ? (fileService.getUserFileList(user,
+                                                                                               -1L,
+                                                                                               nextPage,
+                                                                                               pageSize
+            )) : Mono.empty();
+        }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
     }
 }

@@ -11,6 +11,7 @@ package xyz.dowob.filemanagement.unity;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -99,6 +100,10 @@ public interface ResponseUnity {
      */
     default <T> ApiResponseDTO<T> createResponse(String path, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
+    }
+
+    default <T> ApiResponseDTO<T> createResponse(WebSocketSession session, int status, String message, T data) {
+        return new ApiResponseDTO<>(LocalDateTime.now(), status, session.getHandshakeInfo().getUri().getPath(), message, data);
     }
 
     /**

@@ -16,6 +16,7 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
@@ -24,8 +25,10 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
+import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
+import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
@@ -41,6 +44,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -114,58 +119,81 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO>
      */
-    public Flux<UserFileListDTO> getUserFileList(User user, Long fatherFolderId) {
+    @HideOverLength
+    public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long fatherFolderId, int currentPage, int pageSize) {
         String key = getUserFileListKey(user.getId(), fatherFolderId);
-        return Flux.defer(() -> redisProvider.getValueList(key, UserFileListDTO.class)).switchIfEmpty(Flux.defer(() -> {
-            Mono<List<UserFileMetadata>> userFileMetadataMono;
-            if (fatherFolderId == null || fatherFolderId == 0) {
-                userFileMetadataMono = userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId()).collectList();
-            } else if (fatherFolderId == -1) {
-                userFileMetadataMono = userFileMetaRepository.findAllByUserId(user.getId()).collectList();
-            } else {
-                userFileMetadataMono = userFileMetaRepository
-                        .findAllByUserIdAndParentFolderIdIn(user.getId(), List.of(fatherFolderId))
-                        .collectList();
-            }
+        return Mono
+                .defer(() -> redisProvider.getPagedResponseFromZset(key, currentPage, UserFileListDTO.class).flatMap(Mono::just))
+                .switchIfEmpty(Mono.defer(() -> {
+                    int offset = Math.max((currentPage - 1), 0) * pageSize;
 
-            return userFileMetadataMono.flatMapMany(userFileMetadataList -> {
-                Set<Long> serverFileIds = userFileMetadataList
-                        .stream()
-                        .map(UserFileMetadata::getServerFileId)
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toSet());
-                List<UserFileMetadata> folderMetadata = userFileMetadataList
-                        .stream()
-                        .filter(userFileMetadata -> userFileMetadata.getServerFileId() == null)
-                        .toList();
-                if (serverFileIds.isEmpty() && folderMetadata.isEmpty()) {
-                    return Flux.empty();
-                }
+                    Mono<List<UserFileMetadata>> userFileMetadataMono;
+                    Mono<Long> totalMono;
+                    if (fatherFolderId == null || fatherFolderId == 0) {
+                        userFileMetadataMono = userFileMetaRepository
+                                .findAllByUserIdAndParentFolderIdIsNullWithPagination(user.getId(), pageSize, offset)
+                                .collectList();
+                        totalMono = userFileMetaRepository.countByUserIdAndParentFolderIdIsNull(user.getId(), databaseClient);
+                    } else if (fatherFolderId == -1) {
+                        userFileMetadataMono = userFileMetaRepository
+                                .findAllByUserIdWithPagination(user.getId(), pageSize, offset)
+                                .collectList();
+                        totalMono = userFileMetaRepository.countByUserId(user.getId(), databaseClient);
+                    } else {
+                        userFileMetadataMono = userFileMetaRepository
+                                .findAllByUserIdAndParentFolderIdInWithPagination(user.getId(), List.of(fatherFolderId), pageSize, offset)
+                                .collectList();
+                        totalMono = userFileMetaRepository.countByUserIdAndParentFolderIdIn(user.getId(),
+                                                                                            List.of(fatherFolderId),
+                                                                                            databaseClient
+                        );
+                    }
+                    return Mono.zip(userFileMetadataMono, totalMono).flatMap(tuple -> {
+                        List<UserFileMetadata> userFileMetadataList = tuple.getT1();
+                        long total = tuple.getT2();
 
-                Flux<UserFileListDTO> nullServerFileMetadataFlux = Flux.fromIterable(folderMetadata).map(UserFileListDTO::new);
-                Flux<UserFileListDTO> serverFileMetadataFlux = Flux.empty();
+                        Set<Long> serverFileIds = userFileMetadataList
+                                .stream()
+                                .map(UserFileMetadata::getServerFileId)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toSet());
+                        List<UserFileMetadata> folderMetadata = userFileMetadataList
+                                .stream()
+                                .filter(userFileMetadata -> userFileMetadata.getServerFileId() == null)
+                                .toList();
+                        if (serverFileIds.isEmpty() && folderMetadata.isEmpty()) {
+                            return Mono.just(new PagedResponseDTO<>());
+                        }
 
-                if (!serverFileIds.isEmpty()) {
-                    serverFileMetadataFlux = serverFileMetaRepository
-                            .findAllByIdIn(serverFileIds)
-                            .collectMap(ServerFileMetadata::getId)
-                            .flatMapMany(serverFileMetadataMap -> Flux
-                                    .fromIterable(userFileMetadataList)
-                                    .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
-                                    .map(userFileMetadata -> {
-                                        ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
-                                        return new UserFileListDTO(serverFileMetadata, userFileMetadata);
-                                    }));
-                }
+                        Flux<UserFileListDTO> folderListDTO = Flux.fromIterable(folderMetadata).map(UserFileListDTO::new);
+                        Flux<UserFileListDTO> fileListDTO = Flux.empty();
 
-                return Flux
-                        .concat(nullServerFileMetadataFlux, serverFileMetadataFlux)
-                        .collectList()
-                        .flatMapMany(userFileList -> redisProvider
-                                .setValue(key, userFileList, 1, ChronoUnit.HOURS)
-                                .thenMany(Flux.fromIterable(userFileList)));
-            }).switchIfEmpty(Flux.empty());
-        }));
+                        if (!serverFileIds.isEmpty()) {
+                            fileListDTO = serverFileMetaRepository
+                                    .findAllByIdIn(serverFileIds)
+                                    .collectMap(ServerFileMetadata::getId)
+                                    .flatMapMany(serverFileMetadataMap -> Flux
+                                            .fromIterable(userFileMetadataList)
+                                            .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
+                                            .map(userFileMetadata -> {
+                                                ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
+                                                return new UserFileListDTO(serverFileMetadata, userFileMetadata);
+                                            }));
+                        }
+                        Mono<List<UserFileListDTO>> userListMono = Flux.concat(folderListDTO, fileListDTO).collectList();
+                        return userListMono.flatMap(userFileList -> {
+                            PagedResponseDTO<UserFileListDTO> pagedResponseDTO = new PagedResponseDTO<>(userFileList,
+                                                                                                        (int) (total / pageSize + 1),
+                                                                                                        currentPage,
+                                                                                                        pageSize,
+                                                                                                        total
+                            );
+                            return redisProvider
+                                    .setZset(key, pagedResponseDTO, currentPage, 1, ChronoUnit.HOURS)
+                                    .thenReturn(pagedResponseDTO);
+                        });
+                    });
+                }));
     }
 
     /**
@@ -190,7 +218,8 @@ public abstract class AbstractFileService implements FileService {
             return serverFileMetaRepository
                     .save(existingFile)
                     .then(associateUserFile(existingFile.getId(), fileMetadataDTO)
-                                  .flatMap(userFileMetaRepository::save).then(handleUserStorage(user, existingFile.getFileSize(), false))
+                                  .flatMap(userFileMetaRepository::save)
+                                  .then(handleUserStorage(user, existingFile.getFileSize(), false))
                                   .thenReturn(UploadResponseDTO
                                                       .builder()
                                                       .progress(100.0)
@@ -297,17 +326,16 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<Void>
      */
 
+
     public Mono<Void> deleteFile(String fileId, User user) {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
                 .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, false)))
-                .flatMap(userFileMetadata -> updateOwner(userFileMetadata, user)
-                        .then(handleUserStorage(user, userFileMetadata.getServerFileId().toString()))
-                        .then(cleanUserListCache(user.getId(),
-                                                 userFileMetadata.getParentFolderId(),
-                                                 null
-                        ).then(userFileMetaRepository.deleteById(userFileMetadata.getId().toString()))));
+                .flatMap(userFileMetadata -> updateOwner(List.of(userFileMetadata), user).then(handleUserStorage(user,
+                                                                                                                 List.of(userFileMetadata.getServerFileId())
+                ).then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId(), null).then(userFileMetaRepository.deleteById(
+                        userFileMetadata.getId().toString())))));
     }
 
     /**
@@ -319,7 +347,6 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<Void>
      */
-
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         return userFileMetaRepository
                 .findById(fileEditDTO.getFileId())
@@ -342,7 +369,7 @@ public abstract class AbstractFileService implements FileService {
                                     .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
                                                                                       fileEditDTO.getParentFolderId()
                                     )));
-                        })).then(redisProvider.delete(getUserFileListKey(user.getId(), userFileMetadata.getParentFolderId())))
+                        })).then(redisProvider.deleteZset(getUserFileListKey(user.getId(), userFileMetadata.getParentFolderId())))
                         .then(Mono.just(userFileMetadata)))
                 .flatMap(userFileMetadata -> {
                     userFileMetadata.setFilename(fileEditDTO.getFileName());
@@ -350,7 +377,7 @@ public abstract class AbstractFileService implements FileService {
                     userFileMetadata.setSharedWithUsers(fileEditDTO.getShareUserIds());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
                     return userFileMetaRepository.save(userFileMetadata);
-                }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId(), null));
+                }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
     }
 
     /**
@@ -384,7 +411,7 @@ public abstract class AbstractFileService implements FileService {
                 if (folderListTreeProvider != null) {
                     folderListTreeProvider.addFolder(user.getId(), new UserFileListDTO(newFolder));
                 }
-                return cleanUserListCache(user.getId(), newFolder.getParentFolderId(), null);
+                return cleanUserListCache(user.getId(), newFolder.getParentFolderId());
             });
         }));
     }
@@ -425,7 +452,7 @@ public abstract class AbstractFileService implements FileService {
                     return Mono.just(userFileMetadata);
                 })
                 .flatMap(userFileMetadata -> redisProvider
-                        .delete(getUserFileListKey(user.getId(), userFileMetadata.getParentFolderId()))
+                        .deleteZset(getUserFileListKey(user.getId(), userFileMetadata.getParentFolderId()))
                         .then(Mono.just(userFileMetadata)))
                 .flatMap(userFileMetadata -> {
                     userFileMetadata.setFilename(fileEditDTO.getFileName());
@@ -465,11 +492,10 @@ public abstract class AbstractFileService implements FileService {
                     if (folderListTreeProvider != null) {
                         folderListTreeProvider.deleteFolder(user.getId(), userFileMetadata);
                     }
-                    List<UserFileMetadata> userFileList = new ArrayList<>(List.of(userFileMetadata));
+                    List<UserFileMetadata> userFileList = new ArrayList<>();
                     List<Long> parentFolderIdList = new ArrayList<>(List.of(userFileMetadata.getId()));
                     Mono<Void> res = deleteFolderRecursive(user, parentFolderIdList, userFileList);
-                    return res
-                            .then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId(), null))
+                    return res.then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()))
                             .then(updateOwner(userFileList, user))
                             .then(userFileMetaRepository.delete(userFileMetadata));
                 });
@@ -515,10 +541,46 @@ public abstract class AbstractFileService implements FileService {
         return validateUserPermission(user, userFileMetadata, true);
     }
 
-    private Mono<Void> handleUserStorage(User user, String serverFileId) {
-        return serverFileMetaRepository.findById(serverFileId).flatMap(serverFileMetadata -> {
-            long fileSize = serverFileMetadata.getFileSize();
-            return handleUserStorage(user, fileSize, true);
+    /**
+     * 更新文件擁有者的共通實現
+     * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
+     *
+     * @param userFileList 文件元數據列表
+     * @param user         用戶信息
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> updateOwner(List<UserFileMetadata> userFileList, User user) {
+        return Mono.defer(() -> {
+            if (userFileList.isEmpty()) {
+                return Mono.empty();
+            }
+            List<Long> serverFileIds = userFileList
+                    .stream()
+                    .map(UserFileMetadata::getServerFileId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            return userFileMetaRepository
+                    .countByServerFileIdInAndUserId(serverFileIds, user.getId(), databaseClient)
+                    .collectList()
+                    .flatMap(serverFileMetaCountDaoList -> {
+                        Set<Long> serverFileIdList = serverFileMetaCountDaoList
+                                .stream()
+                                .filter(serverFileMetaCountDao -> serverFileMetaCountDao.count() == 1)
+                                .map(ServerFileMetaCountDao::serverFileId)
+                                .collect(Collectors.toSet());
+                        if (serverFileIdList.isEmpty()) {
+                            return Mono.empty();
+                        }
+                        return serverFileMetaRepository.findAllByIdIn(serverFileIdList).collectList().flatMap(serverFileMetadataList -> {
+                            serverFileMetadataList.forEach(serverFileMetadata -> {
+                                serverFileMetadata.getOwners().remove(user.getId());
+                                serverFileMetadata.setLastAccessTime(LocalDateTime.now());
+                            });
+                            return serverFileMetaRepository.saveAll(serverFileMetadataList).then();
+                        });
+                    });
         });
     }
 
@@ -603,36 +665,20 @@ public abstract class AbstractFileService implements FileService {
                 .then();
     }
 
-    /**
-     * 更新文件擁有者的共通實現
-     * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
-     *
-     * @param userFileMetadata 文件元數據
-     * @param user             用戶信息
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> updateOwner(UserFileMetadata userFileMetadata, User user) {
-        return Mono.defer(() -> {
-            if (userFileMetadata.getIsFolder()) {
-                return Mono.empty();
-            }
-            return userFileMetaRepository
-                    .countByServerFileIdAndUserId(userFileMetadata.getServerFileId(), user.getId(), databaseClient)
-                    .flatMap(c -> {
-                        if (c == 1) {
-                            return serverFileMetaRepository
-                                    .findById(userFileMetadata.getServerFileId().toString())
-                                    .flatMap(serverFileMetadata -> {
-                                        serverFileMetadata.getOwners().remove(user.getId());
-                                        serverFileMetadata.setLastAccessTime(LocalDateTime.now());
-                                        return serverFileMetaRepository.save(serverFileMetadata).then();
-                                    });
-                        }
-                        return Mono.empty();
-                    });
+    private Mono<Void> handleUserStorage(User user, List<Long> serverFileIds) {
+        AtomicLong totalSize = new AtomicLong(0);
+        Map<Long, Long> serverFileIdMap = new ConcurrentHashMap<>();
+        serverFileIds.forEach(serverFileId -> serverFileIdMap.put(serverFileId, serverFileIdMap.getOrDefault(serverFileId, 0L) + 1));
+
+        return serverFileMetaRepository.findAllByIdIn(serverFileIdMap.keySet()).collectList().flatMap(serverFileMetadataList -> {
+            serverFileMetadataList.forEach(serverFileMetadata -> {
+                long size = serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId());
+                totalSize.addAndGet(size);
+            });
+            return handleUserStorage(user, totalSize.get(), true);
         });
     }
+
 
     public FileEnum detectFileType(byte[] fileBytes) {
         String mimeType = tika.detect(fileBytes);
@@ -676,19 +722,18 @@ public abstract class AbstractFileService implements FileService {
 
     private Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
         CompletableFuture.runAsync(() -> {
-            Arrays.stream(folderIds).distinct().forEach(folderId -> redisProvider.delete(getUserFileListKey(userId, folderId)).subscribe());
-            redisProvider.delete(getUserFileListKey(userId, -1L)).subscribe();
+            Arrays
+                    .stream(folderIds)
+                    .distinct()
+                    .forEach(folderId -> redisProvider.deleteZset(getUserFileListKey(userId, folderId)).subscribe());
+            redisProvider.deleteZset(getUserFileListKey(userId, -1L)).subscribe();
         });
         return Mono.empty();
     }
 
     private String getUserFileListKey(Long userId, Long parentFolderId) {
-        String FILE_LIST_KEY = "user:%sfolder:%s:fileList";
+        String FILE_LIST_KEY = "fileList_user:%s_folder:%s";
         return String.format(FILE_LIST_KEY, userId, Objects.requireNonNullElse(parentFolderId, 0L));
-    }
-
-    private String getUserFileListKey(Long userId) {
-        return getUserFileListKey(userId, null);
     }
 
     /**
@@ -780,7 +825,11 @@ public abstract class AbstractFileService implements FileService {
                             .builder()
                             .chunkIndex(chunkIndex)
                             .transferTaskId(transferTaskId)
-                            .progress(progress).isSuccess(true).isFinished(false).message(message).totalChunks(totalChunks)
+                            .progress(progress)
+                            .isSuccess(true)
+                            .isFinished(false)
+                            .message(message)
+                            .totalChunks(totalChunks)
                             .build();
 
                     if (uploadCountLong.intValue() == totalChunks) {
@@ -858,8 +907,7 @@ public abstract class AbstractFileService implements FileService {
                         uploadTaskBO.setFileType(detectFileType(combinedBytes));
                         processFileAfterFileCheck(uploadTaskBO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
                         return Mono.just(new ObjectId());
-                    })))
-                    .flatMap(id -> removeTempData(uploadTaskBO).thenReturn(id));
+                    })));
         }));
     }
 
@@ -925,19 +973,17 @@ public abstract class AbstractFileService implements FileService {
                             .subscribe();
 
                     Mono<Void> result = handleUserStorage(uploadTaskBO.getUser(), uploadTaskBO.getFileSize(), false);
-                    return result.then(serverFileMetaRepository
-                                               .save(serverFileMetadata)
-                                               .flatMap(serverFile -> associateUserFile(serverFile.getId(),
-                                                                                        uploadTaskBO.formatToFileMetadata()
-                                               ))
-                                               .flatMap(userFileMetadata -> userFileMetaRepository
-                                                       .save(userFileMetadata)
-                                                       .then(redisProvider.delete(getUserFileListKey(userFileMetadata.getUserId())))
-                                                       .then(redisProvider.delete(getUserFileListKey(userFileMetadata.getUserId(),
-                                                                                                     userFileMetadata.getParentFolderId()
-                                                       )))
-                                                       .then(removeTempData(uploadTaskBO)))
-                                               .then());
+                    return result
+                            .then(serverFileMetaRepository
+                                          .save(serverFileMetadata)
+                                          .flatMap(serverFile -> associateUserFile(serverFile.getId(), uploadTaskBO.formatToFileMetadata()))
+                                          .flatMap(userFileMetadata -> userFileMetaRepository
+                                                  .save(userFileMetadata)
+                                                  .then(cleanUserListCache(userFileMetadata.getUserId(),
+                                                                           userFileMetadata.getParentFolderId()
+                                                  ))))
+                            .then(removeTempData(uploadTaskBO))
+                            .then();
                 });
     }
 
@@ -946,16 +992,17 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param user               用戶信息
      * @param parentFolderIdList 父文件夾ID列表
-     * @param serverFileList     服務器文件列表
+     * @param userFileList       服務器文件列表
      *
      * @return Mono<Void>
      */
-    private Mono<Void> deleteFolderRecursive(User user, List<Long> parentFolderIdList, List<UserFileMetadata> serverFileList) {
-        return findFileWithSameParentFolderId(user.getId(), parentFolderIdList, serverFileList).flatMap(nextParentFolderIds -> {
+    private Mono<Void> deleteFolderRecursive(User user, List<Long> parentFolderIdList, List<UserFileMetadata> userFileList) {
+        return findFoldersWithSameParentFolderId(user.getId(), parentFolderIdList, userFileList).flatMap(nextParentFolderIds -> {
             if (nextParentFolderIds.isEmpty()) {
-                return Mono.empty();
+                List<Long> serverFileIds = userFileList.stream().map(UserFileMetadata::getServerFileId).filter(Objects::nonNull).toList();
+                return handleUserStorage(user, serverFileIds);
             }
-            return deleteFolderRecursive(user, nextParentFolderIds, serverFileList);
+            return deleteFolderRecursive(user, nextParentFolderIds, userFileList);
         });
     }
 
@@ -964,31 +1011,23 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param userId         用戶ID
      * @param parentFolderId 父文件夾ID
-     * @param serverFileList 服務器文件列表
+     * @param userFileList   服務器文件列表
      *
      * @return Mono<List < Long>>
      */
-    private Mono<List<Long>> findFileWithSameParentFolderId(Long userId, List<Long> parentFolderId, List<UserFileMetadata> serverFileList) {
-        return userFileMetaRepository.findAllByUserIdAndParentFolderIdIn(userId, parentFolderId).collectList().map(userFileMetadataList -> {
-            serverFileList.addAll(userFileMetadataList);
-            return userFileMetadataList
-                    .stream()
-                    .filter(UserFileMetadata::getIsFolder)
-                    .map(UserFileMetadata::getId)
-                    .collect(Collectors.toList());
-        }).switchIfEmpty(Mono.just(Collections.emptyList()));
-    }
-
-    /**
-     * 更新文件擁有者的共通實現
-     *
-     * @param userFileMetadataList 用戶文件元數據列表
-     * @param user                 用戶信息
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> updateOwner(List<UserFileMetadata> userFileMetadataList, User user) {
-        return Flux.fromIterable(userFileMetadataList).flatMap(userFileMetadata -> updateOwner(userFileMetadata, user)).then();
+    private Mono<List<Long>> findFoldersWithSameParentFolderId(Long userId, List<Long> parentFolderId, List<UserFileMetadata> userFileList) {
+        return userFileMetaRepository
+                .findAllByUserIdAndParentFolderIdInOrderByIsFolder(userId, parentFolderId)
+                .collectList()
+                .map(userFileMetadataList -> {
+                    userFileList.addAll(userFileMetadataList);
+                    return userFileMetadataList
+                            .stream()
+                            .filter(UserFileMetadata::getIsFolder)
+                            .map(UserFileMetadata::getId)
+                            .collect(Collectors.toList());
+                })
+                .switchIfEmpty(Mono.just(Collections.emptyList()));
     }
 
     /**

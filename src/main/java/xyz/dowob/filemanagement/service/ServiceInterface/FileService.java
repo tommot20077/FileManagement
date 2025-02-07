@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.service.ServiceInterface;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
+import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.entity.User;
@@ -28,7 +28,7 @@ public interface FileService extends FileCrudService {
      *
      * @return 返回用戶文件列表
      */
-    Flux<UserFileListDTO> getUserFileList(User user, Long folderId);
+    Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long folderId, int page, int pageSize);
 
 
     /**

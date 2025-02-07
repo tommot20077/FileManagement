@@ -49,10 +49,11 @@ public class ApiFileController extends BaseFileController {
     /**
      * ObjectMapper 用於對象與 JSON 之間的轉換
      */
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public ApiFileController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties) {
+    public ApiFileController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties, ObjectMapper objectMapper) {
         super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -265,7 +266,8 @@ public class ApiFileController extends BaseFileController {
      */
     @HideOverLength
     @GetMapping("/user-file-list")
-    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange) {
-        return super.getUserFileList(exchange, -1L);
+    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange,
+                                                   @RequestParam(value = "page", required = false, defaultValue = "1") Integer page) {
+        return super.getUserFileList(exchange, -1L, page);
     }
 }

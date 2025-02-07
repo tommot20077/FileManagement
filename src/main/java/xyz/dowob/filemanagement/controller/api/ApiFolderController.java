@@ -18,6 +18,7 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
 
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 資料夾的 API 控制器，用於處理資料夾的 API 請求
@@ -53,8 +54,9 @@ public class ApiFolderController extends BaseFileController {
      */
     @GetMapping({"/{id}"})
     @HideOverLength
-    public Mono<ResponseEntity<?>> getFolderFiles(@PathVariable Long id, ServerWebExchange exchange) {
-        return super.getUserFileList(exchange, id);
+    public Mono<ResponseEntity<?>> getFolderFiles(
+            @PathVariable Long id, @RequestParam(required = false, defaultValue = "1") Integer page, ServerWebExchange exchange) {
+        return super.getUserFileList(exchange, id, page);
     }
 
     /**
@@ -127,16 +129,13 @@ public class ApiFolderController extends BaseFileController {
     @PostMapping("/fileTree")
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            FileService fileService = fileStrategy.getFileService(null);
             if (!fileProperties.getGlobal().getEnableUserFolderListTree()) {
                 return createResponseEntity(createResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
             }
-            return Mono.defer(() -> fileService.getUserFileList(user, -1L).collectList().flatMap(files -> {
-                if (folderListTreeManager != null) {
-                    folderListTreeManager.initializeTree(user.getId());
-                }
-                return Mono.empty();
-            })).then(createResponseEntity(createResponse(exchange, "建立用戶檔案樹成功", null)));
+            if (folderListTreeManager != null) {
+                CompletableFuture.runAsync(() -> folderListTreeManager.initializeTree(user.getId()));
+            }
+            return (createResponseEntity(createResponse(exchange, "請求建立用戶檔案樹成功", null)));
         }), exchange);
     }
 

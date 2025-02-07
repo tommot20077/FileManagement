@@ -71,5 +71,6 @@ public class FileProperties {
     @Data
     public static class global {
         private Boolean enableUserFolderListTree = true;
+        private Integer pageSize = 100;
     }
 }

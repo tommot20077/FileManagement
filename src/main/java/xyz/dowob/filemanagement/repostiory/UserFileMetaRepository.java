@@ -7,6 +7,7 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.util.List;
@@ -33,6 +34,10 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserId(Long userId);
 
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
+    Flux<UserFileMetadata> findAllByUserIdWithPagination(
+            @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
+
     /**
      * 根據用戶ID和檔案名稱查詢檔案元數據
      *
@@ -41,7 +46,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Mono<UserFileMetadata>
      */
-    Mono<UserFileMetadata> findByUserIdAndFilename(Long userId, String filename);
+    Mono<UserFileMetadata> findByUserIdAndFilenameOrderByIsFolder(Long userId, String filename);
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
@@ -51,7 +56,12 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIn(Long userId, List<Long> parentFolderId);
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInOrderByIsFolder(Long userId, List<Long> parentFolderId);
+
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IN (:parentFolderId) ORDER BY IF(is_folder = 1, 0, 1), filename LIMIT :limit OFFSET :offset")
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInWithPagination(
+            @Param("userId") Long userId,
+            @Param("parentFolderId") List<Long> parentFolderId, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)
@@ -60,26 +70,65 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
      */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL")
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
+
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNullWithPagination(
+            @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
 
 
     /**
      * 計算該用戶擁有同一伺服器檔案的檔案數量
      *
      * @param userId         用戶ID
-     * @param serverFileId   伺服器檔案ID
+     * @param serverFileIds  伺服器檔案ID
      * @param databaseClient 數據庫客戶端
      *
      * @return Mono<Long> 返回檔案數量
      */
-    default Mono<Long> countByServerFileIdAndUserId(
-            @Param("serverFileId") Long serverFileId, @Param("userId") Long userId, DatabaseClient databaseClient) {
+    default Flux<ServerFileMetaCountDao> countByServerFileIdInAndUserId(
+            @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, DatabaseClient databaseClient) {
         return databaseClient
-                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE server_file_id = :serverFileId AND user_id = :userId")
-                .bind("serverFileId", serverFileId)
+                .sql("SELECT server_file_id as serverFileId, COUNT(*) AS count FROM user_file_metadata WHERE server_file_id IN (:serverFileIds) AND user_id = :userId GROUP BY server_file_id")
+                .bind("serverFileIds", serverFileIds)
+                .bind("userId", userId)
+                .fetch()
+                .all()
+                .mapNotNull(row -> {
+                    Long serverFileId = (Long) row.get("serverFileId");
+                    Long count = (Long) row.get("count");
+                    if (serverFileId != null && count != null) {
+                        return new ServerFileMetaCountDao(serverFileId, count);
+                    }
+                    return null;
+                });
+    }
+
+
+    default Mono<Long> countByUserId(@Param("userId") Long userId, DatabaseClient databaseClient) {
+        return databaseClient
+                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId")
                 .bind("userId", userId)
                 .map(row -> row.get("count", Long.class))
                 .one();
     }
+
+    default Mono<Long> countByUserIdAndParentFolderIdIn(
+            @Param("userId") Long userId, @Param("parentFolderId") List<Long> parentFolderId, DatabaseClient databaseClient) {
+        return databaseClient
+                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IN (:parentFolderId)")
+                .bind("userId", userId)
+                .bind("parentFolderId", parentFolderId)
+                .map(row -> row.get("count", Long.class))
+                .one();
+    }
+
+    default Mono<Long> countByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId, DatabaseClient databaseClient) {
+        return databaseClient.sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL")
+                .bind("userId", userId)
+                .map(row -> row.get("count", Long.class))
+                .one();
+    }
+
 }

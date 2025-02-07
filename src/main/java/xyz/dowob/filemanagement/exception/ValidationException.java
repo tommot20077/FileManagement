@@ -181,7 +181,18 @@ public class ValidationException extends Exception {
          * 錯誤信息: 權限不足
          */
         FORBIDDEN(1125, HttpStatus.FORBIDDEN, "權限不足"),
-
+        /**
+         * 錯誤碼: 1126
+         * HTTP狀態碼: 400
+         * 錯誤信息: WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議與JWT憑證
+         */
+        WEBSOCKET_PROTOCOL_ERROR(1126, HttpStatus.UNAUTHORIZED, "WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議和JWT憑證"),
+        /**
+         * 錯誤碼: 1127
+         * HTTP狀態碼: 401
+         * 錯誤信息: WebSocket連線錯誤
+         */
+        WEBSOCKET_CONNECTION_ERROR(1127, HttpStatus.UNAUTHORIZED, "WebSocket連線錯誤"),
 
         ;
 

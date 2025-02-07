@@ -1,16 +1,13 @@
 package xyz.dowob.filemanagement.component.manager;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.Nullable;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.HandshakeInfo;
 import org.springframework.web.reactive.socket.WebSocketHandler;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.adapter.AbstractWebSocketSession;
 import org.springframework.web.reactive.socket.adapter.ReactorNettyWebSocketSession;
 import org.springframework.web.reactive.socket.server.support.HandshakeWebSocketService;
@@ -20,15 +17,14 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.server.WebsocketServerSpec;
 import xyz.dowob.filemanagement.component.handler.CustomWebSocketSession;
 import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
+import xyz.dowob.filemanagement.component.handler.WebSocketFailHandler;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -60,7 +56,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final WebSocketFailHandler webSocketFailHandler;
 
     /**
      * JwtWebSocketHandlerAdapter 構造方法
@@ -69,12 +65,13 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param fileProperties             FileProperties 用於操作文件上傳相關配置的類
      * @param fileUploadWebSocketHandler FileUploadWebSocketHandler 用於處理文件上傳的 WebSocketHandler
      */
-    public JwtWebSocketHandlerAdapter(JwtTokenProviderImpl jwtTokenProvider, FileProperties fileProperties, FileUploadWebSocketHandler fileUploadWebSocketHandler) {
+    public JwtWebSocketHandlerAdapter(JwtTokenProviderImpl jwtTokenProvider, FileProperties fileProperties, FileUploadWebSocketHandler fileUploadWebSocketHandler, WebSocketFailHandler webSocketFailHandler) {
         super(createUpgradeStrategy(fileProperties.getUpload().getPayloadLength()));
         this.jwtTokenProvider = jwtTokenProvider;
         this.fileProperties = fileProperties;
         this.fileUploadWebSocketHandler = fileUploadWebSocketHandler;
-        this.objectMapper.registerModule(new JavaTimeModule());
+        this.webSocketFailHandler = webSocketFailHandler;
+        super.setSessionAttributePredicate(attributeKey -> attributeKey.startsWith("X-WebSocket-Error"));
     }
 
     /**
@@ -115,60 +112,72 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     @Override
     @NonNull
-    // todo 憑證錯誤回傳回應
     public Mono<Void> handleRequest(@NonNull ServerWebExchange exchange, @NonNull WebSocketHandler wsHandler) {
         return Mono.defer(() -> {
-            List<String> protocols = exchange.getRequest().getHeaders().get("Sec-WebSocket-Protocol");
-            if (protocols != null && !protocols.isEmpty()) {
-                Optional<String> protocolOption = protocols.stream().filter(protocol -> protocol.startsWith("jwt.")).findFirst();
-                if (protocolOption.isPresent()) {
-                    String protocol = protocolOption.get();
-                    String token = protocol.substring(4);
-                    return jwtTokenProvider.validateToken(token, null).flatMap(userId -> {
-                        exchange.getAttributes().put("userId", userId);
-                        exchange.getResponse().getHeaders().add("Sec-WebSocket-Protocol", protocol);
-                        return super.handleRequest(exchange, session -> {
-                            if (session instanceof ReactorNettyWebSocketSession nettySession) {
-                                try {
-                                    NettyDataBufferFactory bufferFactory = (NettyDataBufferFactory) exchange.getResponse().bufferFactory();
-                                    Method getDelegateMethod = AbstractWebSocketSession.class.getDeclaredMethod("getDelegate");
-                                    getDelegateMethod.setAccessible(true);
-                                    ReactorNettyWebSocketSession.WebSocketConnection delegate = (ReactorNettyWebSocketSession.WebSocketConnection) getDelegateMethod.invoke(
-                                            nettySession);
-                                    CustomWebSocketSession customSession = new CustomWebSocketSession(delegate,
-                                                                                                      nettySession.getHandshakeInfo(),
-                                                                                                      bufferFactory,
-                                                                                                      fileProperties
-                                                                                                              .getUpload()
-                                                                                                              .getPayloadLength() * 1024 * 1024,
-                                                                                                      userId.toString()
-                                    );
-                                    return fileUploadWebSocketHandler.handle(customSession);
-                                } catch (Exception e) {
-                                    log.error("Error: ", e);
-                                    return Mono.error(e);
-                                }
-                            }
-                            return fileUploadWebSocketHandler.handle(session);
-                        });
-                    });
-                }
+            String token = extractTokenFromProtocol(exchange);
+            if (token == null) {
+                return failWithError(exchange, ValidationException.ErrorCode.WEBSOCKET_PROTOCOL_ERROR);
             }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED));
-        }).onErrorResume(ValidationException.class, e -> {
-            try {
-                ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), e.getMessage(), null);
-                byte[] responseBytes = objectMapper.writeValueAsBytes(apiResponse);
 
-                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
-
-                return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(responseBytes)));
-            } catch (Exception jsonException) {
-                log.error("序列化結果時發生錯誤: ", jsonException);
-                return Mono.error(jsonException);
-            }
+            return jwtTokenProvider
+                    .validateToken(token, null)
+                    .flatMap(userId -> super.handleRequest(exchange, session -> handleWebSocketSession(exchange, session, userId)))
+                    .onErrorResume(ValidationException.class, e -> failWithError(exchange, e.getErrorCode()));
         });
     }
+
+    /**
+     * 從 WebSocket 請求標頭中提取 JWT Token
+     */
+    private String extractTokenFromProtocol(ServerWebExchange exchange) {
+        List<String> protocols = exchange.getRequest().getHeaders().get("Sec-WebSocket-Protocol");
+        if (protocols == null || protocols.isEmpty()) {
+            return null;
+        }
+        return protocols
+                .stream()
+                .filter(protocol -> protocol.startsWith("jwt."))
+                .map(protocol -> protocol.substring(4))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 失敗時設置錯誤標頭，並使用 `failWebSocketHandler`
+     */
+    private Mono<Void> failWithError(ServerWebExchange exchange, ValidationException.ErrorCode errorCode) {
+        return exchange.getSession().flatMap(session -> {
+            session.getAttributes().put("X-WebSocket-Error", errorCode.name());
+            return super.handleRequest(exchange, webSocketFailHandler);
+        });
+    }
+
+    /**
+     * 轉換 WebSocketSession，並交給 {@link FileUploadWebSocketHandler} 處理
+     */
+    private Mono<Void> handleWebSocketSession(ServerWebExchange exchange, WebSocketSession session, Long userId) {
+        if (session instanceof ReactorNettyWebSocketSession nettySession) {
+            try {
+                NettyDataBufferFactory bufferFactory = (NettyDataBufferFactory) exchange.getResponse().bufferFactory();
+                Method getDelegateMethod = AbstractWebSocketSession.class.getDeclaredMethod("getDelegate");
+                getDelegateMethod.setAccessible(true);
+                ReactorNettyWebSocketSession.WebSocketConnection delegate = (ReactorNettyWebSocketSession.WebSocketConnection) getDelegateMethod.invoke(
+                        nettySession);
+                CustomWebSocketSession customSession = new CustomWebSocketSession(delegate,
+                                                                                  nettySession.getHandshakeInfo(),
+                                                                                  bufferFactory,
+                                                                                  fileProperties
+                                                                                          .getUpload()
+                                                                                          .getPayloadLength() * 1024 * 1024,
+                                                                                  userId.toString()
+                );
+                return fileUploadWebSocketHandler.handle(customSession);
+            } catch (Exception e) {
+                return Mono.error(e);
+            }
+        }
+        return fileUploadWebSocketHandler.handle(session);
+    }
+
 }
 //todo 用戶檔案的歷程記錄、用戶個人檔案的管理、檔案分享
