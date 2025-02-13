@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.entity.UserOnlineFile;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -18,6 +19,7 @@ import java.util.Set;
 /**
  * 用戶文件數據業務對象，此對象用於封裝用戶文件的數據
  * 包括整個用戶檔案的所有信息
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName DownloadTaskBO
@@ -83,6 +85,15 @@ public class UserFileDataBO {
      */
     @JsonIgnore
     private Flux<DataBuffer> dataStream;
+    /**
+     * 字符串內容
+     */
+    @JsonIgnore
+    private String stringContent;
+    /**
+     * 最後修改者
+     */
+    private Long lastModifiedBy;
 
 
     /**
@@ -109,10 +120,14 @@ public class UserFileDataBO {
     /**
      * 用戶文件數據業務對象構造函數
      *
-     * @param userFileMetadata 用戶文件元數據對象
+     * @param userOnlineFile 用戶線上檔案對象
      */
-    public UserFileDataBO(UserFileMetadata userFileMetadata) {
-        this.userFileId = userFileMetadata.getId();
+    public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata) {
+        this.userFileId = userOnlineFile.getId();
+        this.fileSize = userOnlineFile.getFileSize();
+        this.fileType = userFileMetadata.getFileType();
+        this.stringContent = userOnlineFile.getContent() == null ? "" : userOnlineFile.getContent();
+        this.lastModifiedBy = userOnlineFile.getLastModifiedBy();
         this.userId = userFileMetadata.getUserId();
         this.fileName = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();

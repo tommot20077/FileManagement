@@ -8,6 +8,7 @@ import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.entity.UserOnlineFile;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -104,6 +105,28 @@ public class UserFileListDTO {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
         }
     }
+
+    /**
+     * 用戶文件列表數據傳輸對象構造函數
+     *
+     * @param userOnlineFile   用戶在線文件對象
+     * @param userFileMetadata 用戶文件元數據對象
+     */
+    public UserFileListDTO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata) {
+        this.id = userFileMetadata.getId();
+        this.filename = userFileMetadata.getFilename();
+        this.parentFolderId = userFileMetadata.getParentFolderId();
+        this.createTime = userFileMetadata.getUploadTime();
+        this.lastAccessTime = userFileMetadata.getLastAccessTime();
+        this.fileSize = userOnlineFile.getFileSize();
+        this.fileType = userFileMetadata.getFileType();
+        this.isFolder = userFileMetadata.getIsFolder();
+
+        if (userFileMetadata.getSharedWithUsers() != null) {
+            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        }
+    }
+
 
     /**
      * 用戶文件列表數據傳輸對象構造函數

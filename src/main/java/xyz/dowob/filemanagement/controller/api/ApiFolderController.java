@@ -8,14 +8,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
-import xyz.dowob.filemanagement.component.strategy.FileStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
-import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
-import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
+import xyz.dowob.filemanagement.service.serviceInterface.FileService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
@@ -36,11 +35,13 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping("/api/folders")
 public class ApiFolderController extends BaseFileController {
     private final FolderListTreeManager folderListTreeManager;
+    private final ValidationService validationService;
 
-    public ApiFolderController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties,
-                               @Nullable FolderListTreeManager folderListTreeManager) {
-        super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
+    public ApiFolderController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties,
+                               @Nullable FolderListTreeManager folderListTreeManager, ValidationService validationService) {
+        super(userService, fileServiceStrategy, fileProperties);
         this.folderListTreeManager = folderListTreeManager;
+        this.validationService = validationService;
     }
 
 
@@ -70,8 +71,7 @@ public class ApiFolderController extends BaseFileController {
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFolder(@PathVariable String id, ServerWebExchange exchange) {
         return handleError(userService
-                                   .getUser(exchange)
-                                   .flatMap(user -> fileService.deleteFolder(id, user))
+                                   .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().deleteFolder(id, user))
                                    .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null))), exchange);
     }
 
@@ -87,9 +87,9 @@ public class ApiFolderController extends BaseFileController {
     public Mono<ResponseEntity<?>> editFolder(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
-                                   .then(validationService.validSpecifyColumn(fileEditDTO, "fileId"))
+                                   .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
                                    .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileService.editFolder(fileEditDTO, user))
+                                   .flatMap(user -> fileServiceStrategy.getFileService().editFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null))), exchange);
     }
 
@@ -106,14 +106,14 @@ public class ApiFolderController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
                                    .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileStrategy.getFileService(null).createFolder(fileEditDTO, user))
+                                   .flatMap(user -> fileServiceStrategy.getFileService(null).createFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
     }
 
     @GetMapping("/path/{fileId}")
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, @PathVariable Long fileId) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            FileService fileService = fileStrategy.getFileService(null);
+            FileService fileService = fileServiceStrategy.getFileService(null);
 
             return Mono.defer(() -> {
                 HashMap<String, Object> result = new HashMap<>();

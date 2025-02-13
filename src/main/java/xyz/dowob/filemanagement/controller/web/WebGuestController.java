@@ -12,8 +12,8 @@ import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
-import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 
 import java.util.HashMap;
 

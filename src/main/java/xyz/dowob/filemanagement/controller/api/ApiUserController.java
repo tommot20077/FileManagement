@@ -7,9 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.strategy.FileStrategy;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 
 /**
  * 用於處理用戶相關的API請求的控制器
@@ -24,8 +24,8 @@ import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
 @RestController
 @RequestMapping("/api/user")
 public class ApiUserController extends BaseUserController {
-    public ApiUserController(FileStrategy fileStrategy, UserService userService) {
-        super(fileStrategy, userService);
+    public ApiUserController(FileServiceStrategy fileServiceStrategy, UserService userService) {
+        super(fileServiceStrategy, userService);
     }
 
     /**

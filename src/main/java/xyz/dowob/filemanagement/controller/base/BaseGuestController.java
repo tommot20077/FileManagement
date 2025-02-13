@@ -12,8 +12,8 @@ import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.ServiceInterface.AuthorizationService;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;

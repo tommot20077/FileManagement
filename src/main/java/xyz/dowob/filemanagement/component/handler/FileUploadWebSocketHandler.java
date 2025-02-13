@@ -11,7 +11,7 @@ import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
-import xyz.dowob.filemanagement.component.strategy.FileStrategy;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -19,8 +19,8 @@ import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
-import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
@@ -61,7 +61,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     /**
      * 檔案處理策略模式
      */
-    private final FileStrategy fileStrategy;
+    private final FileServiceStrategy fileServiceStrategy;
 
     /**
      * 用戶限制器策略模式
@@ -153,7 +153,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                             }
                             return validationService
                                     .validateFileMetadataDTO(fileMetadata, user)
-                                    .then(fileStrategy.getFileService(null).uploadFile(fileMetadata, user))
+                                    .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
                                     .flatMap(transferResponseDTO -> {
                                         ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
                                                                                     null,
@@ -179,29 +179,20 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     }
 
     /**
-     * 處理分塊上傳任務
+     * 將 JSON 資料轉換為指定類型的物件
      *
-     * @param session  WebSocket 會話
-     * @param jsonNode JSON 資料
+     * @param node  JSON 資料
+     * @param clazz 類型
+     * @param <T>   類型
      *
-     * @return Mono<Void>
+     * @return Optional<T>
      */
-    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
-        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
-        return uploadChunkDTO.map(chunkDTO -> fileStrategy.getFileService(null).uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                    if (transferResponseDTO.getIsFinished()) {
-                        response.setMessage("上傳任務完成");
-                    } else {
-                        response.setMessage("分塊上傳成功");
-                    }
-                    return sendMessage(session, response);
-                }))
-                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
-                .onErrorResume(Exception.class, e -> {
-                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
-                    return sendMessage(session, createResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
-                });
+    private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
+        try {
+            return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -262,20 +253,30 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     }
 
     /**
-     * 將 JSON 資料轉換為指定類型的物件
+     * 處理分塊上傳任務
      *
-     * @param node  JSON 資料
-     * @param clazz 類型
-     * @param <T>   類型
+     * @param session  WebSocket 會話
+     * @param jsonNode JSON 資料
      *
-     * @return Optional<T>
+     * @return Mono<Void>
      */
-    private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
-        try {
-            return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
+    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
+        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
+        return uploadChunkDTO
+                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
+                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
+                    if (transferResponseDTO.getIsFinished()) {
+                        response.setMessage("上傳任務完成");
+                    } else {
+                        response.setMessage("分塊上傳成功");
+                    }
+                    return sendMessage(session, response);
+                }))
+                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
+                .onErrorResume(Exception.class, e -> {
+                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
+                    return sendMessage(session, createResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
+                });
     }
 
     /**

@@ -79,6 +79,11 @@ public class ProcessException extends Exception {
          * 錯誤信息: 文件大小不匹配
          */
         FILE_SIZE_NOT_MATCH(1209, "文件大小不匹配"),
+        /**
+         * 錯誤碼: 1210
+         * 錯誤信息: 計算文件差異失敗
+         */
+        CALCULATE_CONTENT_DIFFERENCE_FAILED(1210, "計算文件差異失敗"),
         ;
 
 

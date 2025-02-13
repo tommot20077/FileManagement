@@ -41,6 +41,10 @@ public enum FileEnum {
      */
     ZIP("壓縮檔"),
     /**
+     * 個人文件類型
+     */
+    ONLINE_DOCUMENT("線上文件"),
+    /**
      * 其他類型
      */
     OTHER("其他");
@@ -86,6 +90,9 @@ public enum FileEnum {
         MIME_TYPE_MAPPING.put("application/zip", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-rar-compressed", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-7z-compressed", FileEnum.ZIP);
+
+        // 線上文件類型
+        MIME_TYPE_MAPPING.put("application/json", FileEnum.ONLINE_DOCUMENT);
     }
 
     static {
@@ -167,6 +174,7 @@ public enum FileEnum {
             case MUSIC -> "audio/mp3";
             case DOCUMENT -> "application/pdf";
             case ZIP -> "application/zip";
+            case ONLINE_DOCUMENT -> "application/json";
             default -> "application/octet-stream";
         };
     }

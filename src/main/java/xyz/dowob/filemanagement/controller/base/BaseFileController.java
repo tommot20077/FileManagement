@@ -5,14 +5,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
-import xyz.dowob.filemanagement.component.strategy.FileStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
-import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
-import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
+import xyz.dowob.filemanagement.service.serviceInterface.FileService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
@@ -30,25 +28,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public abstract class BaseFileController implements ResponseUnity {
     /**
-     * 檔案業務層對象
-     */
-    protected final FileService fileService;
-    /**
      * 用戶業務層對象
      */
     protected final UserService userService;
     /**
      * 檔案策略
      */
-    protected final FileStrategy fileStrategy;
-    /**
-     * 用戶限制策略
-     */
-    protected final UserLimiterStrategy userLimiterStrategy;
-    /**
-     * 驗證業務層對象
-     */
-    protected final ValidationService validationService;
+    protected final FileServiceStrategy fileServiceStrategy;
     /**
      * 檔案屬性
      */
@@ -66,7 +52,7 @@ public abstract class BaseFileController implements ResponseUnity {
      */
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            FileService fileService = fileStrategy.getFileService(null);
+            FileService fileService = fileServiceStrategy.getFileService(null);
             int pageSize = fileProperties.getGlobal().getPageSize();
             Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, folderId, Math.max(page, 1), pageSize);
             Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folderId, user);

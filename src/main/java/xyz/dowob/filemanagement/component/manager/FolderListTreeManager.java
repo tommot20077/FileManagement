@@ -9,12 +9,12 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
-import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
 
 /**
  * 用戶檔案列表樹管理器，用於初始化用戶的檔案列表樹
@@ -43,7 +43,7 @@ public class FolderListTreeManager implements ApplicationRunner {
     /**
      * 檔案服務類
      */
-    private final FileService fileService;
+    private final FileServiceStrategy fileServiceStrategy;
 
     /**
      * 初始化用戶的檔案列表樹
@@ -54,7 +54,7 @@ public class FolderListTreeManager implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         log.info("初始化用戶的檔案列表樹");
-        initializeTree();
+        //initializeTree();
     }
 
     /**
@@ -82,13 +82,11 @@ public class FolderListTreeManager implements ApplicationRunner {
     }
 
     private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user, int pageSize) {
-        return fileService.getUserFileList(user, -1L, 1, pageSize).expand(pagedResponseDTO -> {
+        return fileServiceStrategy.getFileService().getUserFileList(user, -1L, 1, pageSize).expand(pagedResponseDTO -> {
             int nextPage = pagedResponseDTO.getCurrentPage() + 1;
-            return nextPage <= pagedResponseDTO.getTotalPages() ? (fileService.getUserFileList(user,
-                                                                                               -1L,
-                                                                                               nextPage,
-                                                                                               pageSize
-            )) : Mono.empty();
+            return nextPage <= pagedResponseDTO.getTotalPages() ? (fileServiceStrategy
+                    .getFileService()
+                    .getUserFileList(user, -1L, nextPage, pageSize)) : Mono.empty();
         }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
     }
 }

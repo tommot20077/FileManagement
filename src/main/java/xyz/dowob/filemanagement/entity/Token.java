@@ -44,7 +44,6 @@ public class Token {
     /**
      * JWT憑證過期時間
      */
-    // todo 需要刪除過期憑證
     @Column("jwt_token_expire_time")
     private LocalDateTime jwtTokenExpireTime;
 

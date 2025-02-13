@@ -194,7 +194,7 @@ public class ExceptionController implements ResponseUnity {
      */
     @ExceptionHandler(ServerWebInputException.class)
     public Mono<ResponseEntity<?>> handleInvalidJsonException(ServerWebInputException ex, ServerWebExchange exchange) {
-        log.debug("JSON 格式錯誤，錯誤: ", ex);
+        log.debug("用戶輸入的JSON 格式錯誤，錯誤: " + ex.getMessage());
 
         ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
                 .<Void>builder()

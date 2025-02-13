@@ -192,9 +192,51 @@ public class ValidationException extends Exception {
          * HTTP狀態碼: 401
          * 錯誤信息: WebSocket連線錯誤
          */
-        WEBSOCKET_CONNECTION_ERROR(1127, HttpStatus.UNAUTHORIZED, "WebSocket連線錯誤"),
-
+        WEBSOCKET_CONNECTION_ERROR(1127, HttpStatus.UNAUTHORIZED, "WebSocket拒絕連線"),
+        /**
+         * 錯誤碼: 1128
+         * HTTP狀態碼: 400
+         * 錯誤信息: JSON解析錯誤
+         */
+        INVALID_JSON_CONTENT(1128, "無效的 JSON 格式"),
+        /**
+         * 錯誤碼: 1129
+         * HTTP狀態碼: 404
+         * 錯誤信息: 歷程記錄不存在
+         */
+        NOT_EXISTING_HISTORY_RECORD(1129, HttpStatus.NOT_FOUND, "歷程記錄不存在，版本號: %s"),
+        /**
+         * 錯誤碼: 1130
+         * HTTP狀態碼: 400
+         * 錯誤信息: 字段長度過短
+         */
+        FIELD_LENGTH_TOO_SHORT(1130, "欄位: %s 字段長度過短，最小長度限制: %s，當前長度: %s"),
+        /**
+         * 錯誤碼: 1131
+         * HTTP狀態碼: 400
+         * 錯誤信息: 字段長度過長
+         */
+        FIELD_LENGTH_TOO_LONG(1131, "欄位: %s 字段長度過長，最大長度限制: %s，當前長度: %s"),
+        /**
+         * 錯誤碼: 1132
+         * HTTP狀態碼: 400
+         * 錯誤信息: 版本號無效
+         */
+        INVALID_VERSION_NUMBER(1132, "版本號無效: %s"),
+        /**
+         * 錯誤碼: 1133
+         * HTTP狀態碼: 400
+         * 錯誤信息: 版本鏈錯誤
+         */
+        INVALID_VERSION_CHAIN(1133, "版本鏈錯誤，當前版本號: %s，上一版本號: %s"),
+        /**
+         * 錯誤碼: 1134
+         * HTTP狀態碼: 400
+         * 錯誤信息: 歷程記錄鏈錯誤
+         */
+        INVALID_HISTORY_CHAIN(1134, "歷程記錄鏈錯誤，當前歷程記錄ID: %s，上一歷程記錄ID: %s"),
         ;
+
 
         /**
          * 錯誤碼

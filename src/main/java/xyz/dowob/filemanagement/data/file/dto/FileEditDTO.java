@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.data.file.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 
 import java.util.Set;
 
@@ -35,4 +36,24 @@ public class FileEditDTO {
      * 分享用戶ID
      */
     private Set<Long> shareUserIds;
+
+    /**
+     * 編輯類型
+     */
+    private EditTypeEnum editType = EditTypeEnum.EDIT_METADATA;
+
+    /**
+     * 文件內容
+     */
+    private EditorContentJsonDTO content;
+
+    /**
+     * 備註
+     */
+    private String note;
+
+    /**
+     * 恢復的版本號
+     */
+    private Long version;
 }

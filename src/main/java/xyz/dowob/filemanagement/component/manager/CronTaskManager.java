@@ -65,6 +65,7 @@ public class CronTaskManager {
                     Map<String, Integer> serverFileIdMap = userFileMetaList
                             .stream()
                             .filter(metadata -> !metadata.getIsFolder())
+                            .filter(metadata -> metadata.getServerFileId() != null) //todo 線上檔案沒有serverFileId暫不紀錄
                             .collect(Collectors.groupingBy(metadata -> metadata.getServerFileId().toString(),
                                                            Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
                             ));

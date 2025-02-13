@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
-import xyz.dowob.filemanagement.component.strategy.FileStrategy;
+import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
@@ -25,9 +25,8 @@ import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.ServiceInterface.FileService;
-import xyz.dowob.filemanagement.service.ServiceInterface.UserService;
-import xyz.dowob.filemanagement.service.ServiceInterface.ValidationService;
+import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -50,10 +49,14 @@ public class ApiFileController extends BaseFileController {
      * ObjectMapper 用於對象與 JSON 之間的轉換
      */
     private final ObjectMapper objectMapper;
+    private final UserLimiterStrategy userLimiterStrategy;
+    private final ValidationService validationService;
 
-    public ApiFileController(FileService fileService, UserService userService, FileStrategy fileStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties, ObjectMapper objectMapper) {
-        super(fileService, userService, fileStrategy, userLimiterStrategy, validationService, fileProperties);
+    public ApiFileController(UserService userService, FileServiceStrategy fileServiceStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties, ObjectMapper objectMapper) {
+        super(userService, fileServiceStrategy, fileProperties);
         this.objectMapper = objectMapper;
+        this.userLimiterStrategy = userLimiterStrategy;
+        this.validationService = validationService;
     }
 
     /**
@@ -77,9 +80,9 @@ public class ApiFileController extends BaseFileController {
                                                                                      UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
                                            ));
                                        }
-                                       return validationService.validateFileMetadataDTO(fileMetadataDTO, user)
-                                               .then(fileStrategy
-                                                             .getFileService(null)
+                                       return validationService
+                                               .validateFileMetadataDTO(fileMetadataDTO, user)
+                                               .then(fileServiceStrategy.getFileService()
                                                              .uploadFile(fileMetadataDTO, user)
                                                              .flatMap(transferResponseDTO -> {
                                                                  ApiResponseDTO<?> apiResponse;
@@ -116,8 +119,7 @@ public class ApiFileController extends BaseFileController {
             @PathVariable String id,
             @RequestParam(value = "action", defaultValue = "preview", required = false) String action, ServerWebExchange exchange) {
         return userService
-                .getUser(exchange)
-                .flatMap(user -> fileStrategy.getFileService(null).downloadFile(id, user).map(userFileDataBO -> {
+                .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
                     HttpHeaders headers = new HttpHeaders();
                     if ("download".equals(action)) {
                         headers.add(HttpHeaders.CONTENT_DISPOSITION,
@@ -161,8 +163,7 @@ public class ApiFileController extends BaseFileController {
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
         return handleError(userService
-                                   .getUser(exchange)
-                                   .flatMap(user -> fileService.deleteFile(id, user))
+                                   .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().deleteFile(id, user))
                                    .then(createResponseEntity(createResponse(exchange, "刪除成功", null))), exchange);
     }
 
@@ -178,9 +179,9 @@ public class ApiFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> editFile(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, false)
-                                   .then(validationService.validSpecifyColumn(fileEditDTO, "fileId"))
+                                   .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
                                    .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileService.editFile(fileEditDTO, user))
+                                   .flatMap(user -> fileServiceStrategy.getFileService().editFile(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料更新成功", null))), exchange);
     }
 
@@ -212,7 +213,7 @@ public class ApiFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
      */
     private Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
-        return handleError(fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
+        return handleError(fileServiceStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsSuccess()) {
                 apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);

@@ -6,6 +6,7 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import java.util.Set;
 
 /**
  * 用於定義用戶文件元數據表
+ *
  * @author yuan
  * @program File-Management
  * @ClassName UserFileMetadata
@@ -62,7 +64,14 @@ public class UserFileMetadata {
     private Boolean isFolder = false;
 
     /**
-     * 文件大小
+     * 文件類型，此與ServerFileMetadata的fileType相同
+     * 部分自定義檔案無伺服器文件元數據，因此需要在此處定義
+     */
+    @Column("file_type")
+    private FileEnum fileType = FileEnum.OTHER;
+
+    /**
+     * 上傳時間
      */
     @Column("upload_time")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -112,6 +121,7 @@ public class UserFileMetadata {
 
     /**
      * 重寫toString方法，將文件元數據轉換為HashMap
+     *
      * @return 文件元數據HashMap
      */
     @Override
