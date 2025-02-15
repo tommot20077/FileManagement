@@ -58,6 +58,16 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInOrderByIsFolder(Long userId, List<Long> parentFolderId);
 
+    /**
+     * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據，並進行分頁
+     *
+     * @param userId         用戶ID
+     * @param parentFolderId 父文件夾ID
+     * @param limit          限制條數
+     * @param offset         偏移量
+     *
+     * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
+     */
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IN (:parentFolderId) ORDER BY IF(is_folder = 1, 0, 1), filename LIMIT :limit OFFSET :offset")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInWithPagination(
             @Param("userId") Long userId,
@@ -73,6 +83,15 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
 
+    /**
+     * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)，並進行分頁
+     *
+     * @param userId 用戶ID
+     * @param limit  限制條數
+     * @param offset 偏移量
+     *
+     * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
+     */
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNullWithPagination(
             @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
@@ -104,31 +123,4 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                     return null;
                 });
     }
-
-
-    default Mono<Long> countByUserId(@Param("userId") Long userId, DatabaseClient databaseClient) {
-        return databaseClient
-                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId")
-                .bind("userId", userId)
-                .map(row -> row.get("count", Long.class))
-                .one();
-    }
-
-    default Mono<Long> countByUserIdAndParentFolderIdIn(
-            @Param("userId") Long userId, @Param("parentFolderId") List<Long> parentFolderId, DatabaseClient databaseClient) {
-        return databaseClient
-                .sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IN (:parentFolderId)")
-                .bind("userId", userId)
-                .bind("parentFolderId", parentFolderId)
-                .map(row -> row.get("count", Long.class))
-                .one();
-    }
-
-    default Mono<Long> countByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId, DatabaseClient databaseClient) {
-        return databaseClient.sql("SELECT COUNT(*) AS count FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL")
-                .bind("userId", userId)
-                .map(row -> row.get("count", Long.class))
-                .one();
-    }
-
 }

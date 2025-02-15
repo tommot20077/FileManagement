@@ -16,6 +16,7 @@ import java.util.Set;
 
 /**
  * 用戶文件列表數據傳輸對象，用於封裝用戶文件列表的數據
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName UserFileListDTO
@@ -130,6 +131,7 @@ public class UserFileListDTO {
 
     /**
      * 用戶文件列表數據傳輸對象構造函數
+     *
      * @param userFileMetadata 用戶文件元數據對象
      */
     public UserFileListDTO(UserFileMetadata userFileMetadata) {
@@ -137,6 +139,7 @@ public class UserFileListDTO {
         this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
         this.createTime = userFileMetadata.getUploadTime();
+        this.fileType = userFileMetadata.getFileType();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.isFolder = userFileMetadata.getIsFolder();
         if (userFileMetadata.getSharedWithUsers() != null) {
@@ -146,6 +149,7 @@ public class UserFileListDTO {
 
     /**
      * 用戶文件列表數據傳輸對象構造函數
+     *
      * @param userFileDataBO 用戶文件數據業務對象
      */
     public UserFileListDTO(UserFileDataBO userFileDataBO) {
@@ -161,6 +165,5 @@ public class UserFileListDTO {
         if (userFileDataBO.getShareUsers() != null) {
             shareUsers.addAll(userFileDataBO.getShareUsers());
         }
-
     }
 }

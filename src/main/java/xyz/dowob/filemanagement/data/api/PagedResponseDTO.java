@@ -24,4 +24,8 @@ public class PagedResponseDTO<T> {
     private int currentPage = 0;
     private int pageSize = 0;
     private long totalElements = 0;
+
+    public PagedResponseDTO(int pageSize) {
+        this.pageSize = pageSize;
+    }
 }

@@ -1,17 +1,17 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
-import xyz.dowob.filemanagement.data.file.dto.*;
+import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.unity.FileCrudService;
 
-import java.util.List;
-
 /**
  * 文件業務邏輯接口，定義了文件業務邏輯的相關方法
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName FileService
@@ -19,17 +19,7 @@ import java.util.List;
  * @create 2024-09-30 20:13
  * @Version 1.0
  **/
-public interface FileService extends FileCrudService {
-
-    /**
-     * 獲取用戶文件列表的接口
-     *
-     * @param user 用戶信息
-     *
-     * @return 返回用戶文件列表
-     */
-    Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long folderId, int page, int pageSize);
-
+public interface FileService extends FileCrudService, BaseFileService {
 
     /**
      * 上傳文件的接口
@@ -89,48 +79,6 @@ public interface FileService extends FileCrudService {
      * @return 返回編輯結果
      */
     default Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
-        return null;
-    }
-
-    /**
-     * 創建文件夾的接口
-     *
-     * @param fileEditDTO 文件夾數據
-     *                    包含文件夾名稱、父文件夾ID等信息
-     * @param user        用戶信息
-     *
-     * @return 返回創建結果
-     */
-    default Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
-        return null;
-    }
-
-    /**
-     * 編輯文件夾的接口
-     *
-     * @param fileEditDTO 文件夾數據
-     *                    包含文件夾ID、文件夾名稱等信息
-     * @param user        用戶信息
-     *
-     * @return 返回編輯結果
-     */
-    default Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
-        return null;
-    }
-
-    /**
-     * 刪除文件夾的接口
-     *
-     * @param folderId 文件夾ID
-     * @param user     用戶信息
-     *
-     * @return 返回刪除結果
-     */
-    default Mono<Void> deleteFolder(String folderId, User user) {
-        return null;
-    }
-
-    default Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
         return null;
     }
 

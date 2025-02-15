@@ -45,6 +45,10 @@ public enum FileEnum {
      */
     ONLINE_DOCUMENT("線上文件"),
     /**
+     * 資料夾類型
+     */
+    FOLDER("資料夾"),
+    /**
      * 其他類型
      */
     OTHER("其他");

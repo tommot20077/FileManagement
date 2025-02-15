@@ -30,6 +30,10 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 文件的 API 控制器，用於處理文件相關的 API 請求
@@ -81,8 +85,7 @@ public class ApiFileController extends BaseFileController {
                                            ));
                                        }
                                        return validationService
-                                               .validateFileMetadataDTO(fileMetadataDTO, user)
-                                               .then(fileServiceStrategy.getFileService()
+                                               .validateFileMetadataDTO(fileMetadataDTO, user).then(fileServiceStrategy.getFileService()
                                                              .uploadFile(fileMetadataDTO, user)
                                                              .flatMap(transferResponseDTO -> {
                                                                  ApiResponseDTO<?> apiResponse;
@@ -119,7 +122,8 @@ public class ApiFileController extends BaseFileController {
             @PathVariable String id,
             @RequestParam(value = "action", defaultValue = "preview", required = false) String action, ServerWebExchange exchange) {
         return userService
-                .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
+                .getUser(exchange)
+                .flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
                     HttpHeaders headers = new HttpHeaders();
                     if ("download".equals(action)) {
                         headers.add(HttpHeaders.CONTENT_DISPOSITION,
@@ -162,8 +166,7 @@ public class ApiFileController extends BaseFileController {
      */
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
-        return handleError(userService
-                                   .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().deleteFile(id, user))
+        return handleError(userService.getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().deleteFile(id, user))
                                    .then(createResponseEntity(createResponse(exchange, "刪除成功", null))), exchange);
     }
 
@@ -268,7 +271,16 @@ public class ApiFileController extends BaseFileController {
     @HideOverLength
     @GetMapping("/user-file-list")
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange,
-                                                   @RequestParam(value = "page", required = false, defaultValue = "1") Integer page) {
-        return super.getUserFileList(exchange, -1L, page);
+                                                   @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+                                                   @RequestParam(value = "size", required = false) Integer size,
+                                                   @RequestParam(value = "type", required = false) List<String> types) {
+        List<FileEnum> fileEnums = Optional.ofNullable(types).orElse(Collections.emptyList()).stream().map(type -> {
+            try {
+                return FileEnum.valueOf(type.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }).filter(Objects::nonNull).toList();
+        return super.getUserFileList(exchange, -1L, page, size, fileEnums);
     }
 }

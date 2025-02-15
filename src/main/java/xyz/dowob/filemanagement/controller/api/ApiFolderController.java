@@ -11,12 +11,13 @@ import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
-import xyz.dowob.filemanagement.service.serviceInterface.FileService;
+import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -36,12 +37,14 @@ import java.util.concurrent.CompletableFuture;
 public class ApiFolderController extends BaseFileController {
     private final FolderListTreeManager folderListTreeManager;
     private final ValidationService validationService;
+    private final FolderService folderService;
 
-    public ApiFolderController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties,
-                               @Nullable FolderListTreeManager folderListTreeManager, ValidationService validationService) {
+    public ApiFolderController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, @Nullable
+    FolderListTreeManager folderListTreeManager, ValidationService validationService, FolderService folderService) {
         super(userService, fileServiceStrategy, fileProperties);
         this.folderListTreeManager = folderListTreeManager;
         this.validationService = validationService;
+        this.folderService = folderService;
     }
 
 
@@ -56,8 +59,17 @@ public class ApiFolderController extends BaseFileController {
     @GetMapping({"/{id}"})
     @HideOverLength
     public Mono<ResponseEntity<?>> getFolderFiles(
-            @PathVariable Long id, @RequestParam(required = false, defaultValue = "1") Integer page, ServerWebExchange exchange) {
-        return super.getUserFileList(exchange, id, page);
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type, ServerWebExchange exchange) {
+        List<FileEnum> fileEnums = Optional.ofNullable(type).orElse(Collections.emptyList()).stream().map(t -> {
+            try {
+                return FileEnum.valueOf(t.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }).filter(Objects::nonNull).toList();
+        return super.getUserFileList(exchange, id, page, size, fileEnums);
     }
 
     /**
@@ -70,8 +82,7 @@ public class ApiFolderController extends BaseFileController {
      */
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFolder(@PathVariable String id, ServerWebExchange exchange) {
-        return handleError(userService
-                                   .getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().deleteFolder(id, user))
+        return handleError(userService.getUser(exchange).flatMap(user -> folderService.deleteFolder(id, user))
                                    .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null))), exchange);
     }
 
@@ -88,8 +99,7 @@ public class ApiFolderController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
                                    .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
-                                   .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileServiceStrategy.getFileService().editFolder(fileEditDTO, user))
+                                   .then(userService.getUser(exchange)).flatMap(user -> folderService.editFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null))), exchange);
     }
 
@@ -105,24 +115,19 @@ public class ApiFolderController extends BaseFileController {
     public Mono<ResponseEntity<?>> createFolder(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
-                                   .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileServiceStrategy.getFileService(null).createFolder(fileEditDTO, user))
+                                   .then(userService.getUser(exchange)).flatMap(user -> folderService.createFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
     }
 
     @GetMapping("/path/{fileId}")
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, @PathVariable Long fileId) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
-            FileService fileService = fileServiceStrategy.getFileService(null);
-
-            return Mono.defer(() -> {
-                HashMap<String, Object> result = new HashMap<>();
-                return fileService.getUserFilePaths(fileId, user).flatMap(list -> {
-                    result.put("filePaths", list);
-                    return Mono.just(result);
-                });
-            }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)));
-        }), exchange);
+        return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
+            HashMap<String, Object> result = new HashMap<>();
+            return folderService.getUserFilePaths(fileId, user).flatMap(list -> {
+                result.put("filePaths", list);
+                return Mono.just(result);
+            });
+        }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
     }
 
 

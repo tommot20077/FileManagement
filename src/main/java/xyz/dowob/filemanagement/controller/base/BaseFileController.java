@@ -7,6 +7,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
@@ -15,6 +16,7 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 檔案控制器的基礎類
@@ -50,11 +52,16 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return 返回用戶文件列表
      */
-    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page) {
+    public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page, Integer size, List<FileEnum> types) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            FileService fileService = fileServiceStrategy.getFileService(null);
-            int pageSize = fileProperties.getGlobal().getPageSize();
-            Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, folderId, Math.max(page, 1), pageSize);
+            FileService fileService = fileServiceStrategy.getFileService();
+            int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
+            Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user,
+                                                                                               folderId,
+                                                                                               Math.max(page, 1),
+                                                                                               pageSize,
+                                                                                               types
+            );
             Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folderId, user);
             return Mono.zip(fileListMono, filePathsMono).flatMap(tuple -> {
                 HashMap<String, Object> result = new HashMap<>();

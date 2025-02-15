@@ -41,6 +41,9 @@ public class FileServiceStrategy {
         for (FileService service : fileServices) {
             FileHandlerType annotation = AnnotatedElementUtils.findMergedAnnotation(service.getClass(), FileHandlerType.class);
             if (annotation != null) {
+                if (fileStrategies.containsKey(annotation.value())) {
+                    throw new IllegalArgumentException("檔案處理方法重複，請檢查是否有添加 FileHandlerType 注解");
+                }
                 fileStrategies.put(annotation.value(), service);
             }
         }
