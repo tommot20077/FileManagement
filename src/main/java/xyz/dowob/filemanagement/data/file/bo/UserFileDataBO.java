@@ -8,6 +8,7 @@ import lombok.Setter;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.file.dto.EditorContentDTO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -89,7 +90,7 @@ public class UserFileDataBO {
      * 字符串內容
      */
     @JsonIgnore
-    private String stringContent;
+    private EditorContentDTO content;
     /**
      * 最後修改者
      */
@@ -122,11 +123,11 @@ public class UserFileDataBO {
      *
      * @param userOnlineFile 用戶線上檔案對象
      */
-    public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata) {
+    public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, EditorContentDTO content) {
         this.userFileId = userOnlineFile.getId();
         this.fileSize = userOnlineFile.getFileSize();
         this.fileType = userFileMetadata.getFileType();
-        this.stringContent = userOnlineFile.getContent() == null ? "" : userOnlineFile.getContent();
+        this.content = content;
         this.lastModifiedBy = userOnlineFile.getLastModifiedBy();
         this.userId = userFileMetadata.getUserId();
         this.fileName = userFileMetadata.getFilename();

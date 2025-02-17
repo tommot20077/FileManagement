@@ -1,9 +1,11 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
@@ -18,6 +20,7 @@ import java.util.Map;
 /**
  * 在線文件 API 控制器，用於處理在線文件的相關請求
  * 此類繼承自 BaseFileController，用於處理文件相關的請求
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName ApiOnlineFileController
@@ -57,23 +60,29 @@ public class ApiOnlineFileController extends BaseFileController {
 
     /**
      * 下載文件
-     * @param id 文件 ID
+     *
+     * @param id       文件 ID
      * @param exchange 服務器 Web 交換對象
+     *
      * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @GetMapping("/{id}")
+    @HideOverLength
     public Mono<ResponseEntity<?>> downloadFile(@PathVariable String id, ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             return fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).downloadFile(id, user).flatMap(userFileDataBO -> {
-                return createResponseEntity(createResponse(exchange, "下載成功", Map.of("content", userFileDataBO.getStringContent())));
+                Map<String, Object> data = Map.of("content", userFileDataBO.getContent(), "filename", userFileDataBO.getFileName());
+                return createResponseEntity(createResponse(exchange, "下載成功", data));
             });
         }), exchange);
     }
 
     /**
      * 獲取文件元數據
-     * @param id 文件 ID
+     *
+     * @param id       文件 ID
      * @param exchange 服務器 Web 交換對象
+     *
      * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @DeleteMapping("/{id}")
@@ -88,12 +97,14 @@ public class ApiOnlineFileController extends BaseFileController {
 
     /**
      * 編輯文件
+     *
      * @param fileEditDTO 文件編輯數據傳輸對象
-     * @param exchange 服務器 Web 交換對象
+     * @param exchange    服務器 Web 交換對象
+     *
      * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @PutMapping("")
-    public Mono<ResponseEntity<?>> editFile(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> editFile(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, false)
                                    .then(userService.getUser(exchange))
@@ -101,6 +112,19 @@ public class ApiOnlineFileController extends BaseFileController {
                                            .getFileService(FileEnum.ONLINE_DOCUMENT)
                                            .editFile(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "編輯成功", null))), exchange);
+    }
+
+    @GetMapping("/history/{id}")
+    public Mono<ResponseEntity<?>> getHistory(ServerWebExchange exchange,
+                                              @PathVariable String id,
+                                              @RequestParam(required = false, defaultValue = "1") Integer page,
+                                              @RequestParam(required = false) Integer pageSize) {
+        return handleError(userService.getUser(exchange).flatMap(user -> {
+            return fileServiceStrategy
+                    .getFileService(FileEnum.ONLINE_DOCUMENT)
+                    .getFileVersionList(user, id, page, pageSize)
+                    .flatMap(history -> createResponseEntity(createResponse(exchange, "獲取歷史成功", history)));
+        }), exchange);
     }
 
 }

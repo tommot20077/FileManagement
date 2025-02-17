@@ -1,6 +1,8 @@
 package xyz.dowob.filemanagement.data.file.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import xyz.dowob.filemanagement.entity.UserOnlineFileHistory;
 
 import java.time.LocalDateTime;
 
@@ -19,19 +21,24 @@ public class FileVersionDTO {
      */
     private Long version;
     /**
-     * 上一個版本號
+     * 修改者
      */
-    private String modifiedBy;
+    private Long modifiedBy;
     /**
      * 修改時間
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime modifiedTime;
     /**
      * 修改註釋
      */
     private String note;
-    /**
-     * 文件大小
-     */
-    private Long fileSize;
+
+
+    public FileVersionDTO(UserOnlineFileHistory userOnlineFileHistory) {
+        this.version = userOnlineFileHistory.getVersion();
+        this.modifiedBy = userOnlineFileHistory.getModifiedBy();
+        this.modifiedTime = userOnlineFileHistory.getModifiedTime();
+        this.note = userOnlineFileHistory.getNote();
+    }
 }

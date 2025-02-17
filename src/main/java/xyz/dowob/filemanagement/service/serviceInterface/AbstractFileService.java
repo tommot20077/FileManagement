@@ -130,7 +130,10 @@ public abstract class AbstractFileService implements FileService {
      * @return Flux<UserFileListDTO>
      */
     @HideOverLength
-    public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long fatherFolderId, int currentPage, int pageSize, List<FileEnum> types) {
+    public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long fatherFolderId, Integer page, Integer size, List<FileEnum> types) {
+        int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
+        int currentPage = Math.max(1, Objects.requireNonNullElse(page, 1));
+
         String key = getUserFileListBaseKey(user.getId(), fatherFolderId);
 
         return getFileListFormCache(key).collectList().flatMap(cachedList -> {
@@ -244,7 +247,9 @@ public abstract class AbstractFileService implements FileService {
 
     /**
      * 從緩存中獲取用戶文件列表
+     *
      * @param key 緩存Key
+     *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
     private Flux<UserFileListDTO> getFileListFormCache(String key) {
@@ -366,9 +371,11 @@ public abstract class AbstractFileService implements FileService {
 
     /**
      * 緩存用戶文件列表
-     * @param user 用戶信息
-     * @param fatherFolderId 父文件夾ID
+     *
+     * @param user                用戶信息
+     * @param fatherFolderId      父文件夾ID
      * @param userFileListDTOFlux 檔案列表流
+     *
      * @return Mono<Void>
      */
     private Mono<Void> cacheUserFileList(User user, Long fatherFolderId, Flux<UserFileListDTO> userFileListDTOFlux) {
@@ -542,8 +549,7 @@ public abstract class AbstractFileService implements FileService {
                         return Mono.empty();
                     }
                     return handleUserStorage(user, List.of(userFileMetadata.getServerFileId())).then(cleanUserListCache(user.getId(),
-                                                                                                                        userFileMetadata.getParentFolderId(),
-                                                                                                                        null
+                                                                                                                        userFileMetadata.getParentFolderId()
                     ).then(userFileMetaRepository.deleteById(userFileMetadata.getId().toString())));
                 })));
     }
@@ -864,7 +870,8 @@ public abstract class AbstractFileService implements FileService {
         CompletableFuture.runAsync(() -> {
             Arrays
                     .stream(folderIds)
-                    .distinct().forEach(folderId -> redisProvider.deleteList(getUserFileListBaseKey(userId, folderId)).subscribe());
+                    .distinct()
+                    .forEach(folderId -> redisProvider.deleteList(getUserFileListBaseKey(userId, folderId)).subscribe());
         });
         return Mono.empty();
     }

@@ -31,7 +31,7 @@ public interface FileService extends FileCrudService, BaseFileService {
      * @return 返回上傳結果
      */
     default Mono<UploadResponseDTO> uploadFile(FileMetadataDTO fileMetadataDTO, User user) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -43,7 +43,7 @@ public interface FileService extends FileCrudService, BaseFileService {
      * @return 返回上傳結果
      */
     default Mono<UploadResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -55,7 +55,7 @@ public interface FileService extends FileCrudService, BaseFileService {
      * @return 返回文件下載流
      */
     default Mono<UserFileDataBO> downloadFile(String fileId, User user) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -67,7 +67,7 @@ public interface FileService extends FileCrudService, BaseFileService {
      * @return 返回刪除結果
      */
     default Mono<Void> deleteFile(String fileId, User user) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -79,8 +79,7 @@ public interface FileService extends FileCrudService, BaseFileService {
      * @return 返回編輯結果
      */
     default Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
-        return null;
+        return Mono.empty();
     }
-
 
 }

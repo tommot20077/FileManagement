@@ -149,9 +149,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     }
                     return userFileMetaRepository
                             .save(userFileMetadata)
-                            .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(),
-                                                                               newUserFileMetadata.getParentFolderId(),
-                                                                               null
+                            .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()
                             ));
                 });
     }

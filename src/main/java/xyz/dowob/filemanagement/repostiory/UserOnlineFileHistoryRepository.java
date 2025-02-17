@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.repostiory;
 
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.UserOnlineFileHistory;
 
@@ -35,4 +36,13 @@ public interface UserOnlineFileHistoryRepository extends ReactiveCrudRepository<
      * @return 用戶在線文件歷史數據
      */
     Mono<UserOnlineFileHistory> findByFileIdAndVersion(Long fileId, Long version);
+
+    /**
+     * 使用文件id查詢用戶在線文件歷史數據
+     *
+     * @param fileId 文件id
+     *
+     * @return 用戶在線文件歷史數據
+     */
+    Flux<UserOnlineFileHistory> findAllByFileIdOrderByVersionDesc(Long fileId);
 }

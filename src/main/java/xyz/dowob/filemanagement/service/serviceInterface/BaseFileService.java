@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileVersionDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -24,11 +25,17 @@ public interface BaseFileService {
     /**
      * 獲取用戶文件列表的接口
      *
-     * @param user 用戶信息
+     * @param user     用戶信息
+     * @param folderId 文件夾ID
+     * @param page     分頁頁碼
+     * @param pageSize 分頁大小
+     * @param types    文件類型
      *
      * @return 返回用戶文件列表
      */
-    Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long folderId, int page, int pageSize, List<FileEnum> type);
+    default Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long folderId, Integer page, Integer pageSize, List<FileEnum> types) {
+        return Mono.empty();
+    }
 
     /**
      * 獲取用戶文件路徑的接口
@@ -39,6 +46,22 @@ public interface BaseFileService {
      * @return 返回用戶文件路徑
      */
     default Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
-        return null;
+        return Mono.empty();
     }
+
+    /**
+     * 獲取文件版本列表的接口
+     *
+     * @param user     用戶信息
+     * @param fileId   文件ID
+     * @param page     分頁頁碼
+     * @param pageSize 分頁大小
+     *
+     * @return 返回文件版本列表
+     */
+    default Mono<PagedResponseDTO<FileVersionDTO>> getFileVersionList(User user, String fileId, Integer page, Integer pageSize) {
+        return Mono.empty();
+    }
+
+
 }

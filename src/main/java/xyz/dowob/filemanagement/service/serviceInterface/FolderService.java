@@ -27,7 +27,7 @@ public interface FolderService extends BaseFileService {
      * @return 返回創建結果
      */
     default Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -40,7 +40,7 @@ public interface FolderService extends BaseFileService {
      * @return 返回編輯結果
      */
     default Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -52,7 +52,7 @@ public interface FolderService extends BaseFileService {
      * @return 返回刪除結果
      */
     default Mono<Void> deleteFolder(String folderId, User user) {
-        return null;
+        return Mono.empty();
     }
 
 }

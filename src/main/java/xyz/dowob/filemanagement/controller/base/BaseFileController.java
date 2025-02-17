@@ -16,7 +16,6 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * 檔案控制器的基礎類
@@ -55,13 +54,8 @@ public abstract class BaseFileController implements ResponseUnity {
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page, Integer size, List<FileEnum> types) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
-            int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
-            Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user,
-                                                                                               folderId,
-                                                                                               Math.max(page, 1),
-                                                                                               pageSize,
-                                                                                               types
-            );
+
+            Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, folderId, page, size, types);
             Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folderId, user);
             return Mono.zip(fileListMono, filePathsMono).flatMap(tuple -> {
                 HashMap<String, Object> result = new HashMap<>();

@@ -19,6 +19,7 @@ public class FileEditDTO {
     /**
      * 文件ID
      */
+    @NotBlank(message = "文件ID不能為空")
     private String fileId;
 
     /**
@@ -45,7 +46,7 @@ public class FileEditDTO {
     /**
      * 文件內容
      */
-    private EditorContentJsonDTO content;
+    private EditorContentDTO content;
 
     /**
      * 備註

@@ -18,7 +18,7 @@ import java.util.Map;
  **/
 @Data
 @NoArgsConstructor
-public class EditorContentJsonDTO {
+public class EditorContentDTO {
     /**
      * 編輯器內容的內容記錄
      */
