@@ -135,7 +135,7 @@ public interface ValidationService {
      */
     default Mono<Void> validLength(Object object, Number minLength, Number maxLength, String... columns) {
         if (object == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, columns[0] == null ? "未知" : columns[0]));
+            return Mono.empty();
         }
         double min = minLength == null ? -1 : minLength.doubleValue();
         double max = maxLength == null ? -1 : maxLength.doubleValue();

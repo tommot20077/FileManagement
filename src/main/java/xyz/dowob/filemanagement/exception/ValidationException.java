@@ -235,6 +235,12 @@ public class ValidationException extends Exception {
          * 錯誤信息: 歷程記錄鏈錯誤
          */
         INVALID_HISTORY_CHAIN(1134, "歷程記錄鏈錯誤，當前歷程記錄ID: %s，上一歷程記錄ID: %s"),
+        /**
+         * 錯誤碼: 1135
+         * HTTP狀態碼: 400
+         * 錯誤信息: 與上次紀錄內容相同
+         */
+        NO_CHANGE_IN_CONTENT(1135, "與上次紀錄內容相同"),
         ;
 
 

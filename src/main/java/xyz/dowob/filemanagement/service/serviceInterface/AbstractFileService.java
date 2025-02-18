@@ -545,12 +545,12 @@ public abstract class AbstractFileService implements FileService {
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
                 .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, false)))
                 .flatMap(userFileMetadata -> updateOwner(List.of(userFileMetadata), user).then(Mono.defer(() -> {
-                    if (userFileMetadata.getServerFileId() == null) {
-                        return Mono.empty();
+                    Mono<Void> deleteFile = Mono.empty();
+                    if (userFileMetadata.getServerFileId() != null) {
+                        deleteFile = handleUserStorage(user, List.of(userFileMetadata.getServerFileId()));
                     }
-                    return handleUserStorage(user, List.of(userFileMetadata.getServerFileId())).then(cleanUserListCache(user.getId(),
-                                                                                                                        userFileMetadata.getParentFolderId()
-                    ).then(userFileMetaRepository.deleteById(userFileMetadata.getId().toString())));
+                    return deleteFile.then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()).then(
+                            userFileMetaRepository.deleteById(userFileMetadata.getId().toString())));
                 })));
     }
 

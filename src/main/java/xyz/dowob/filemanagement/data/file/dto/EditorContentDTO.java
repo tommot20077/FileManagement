@@ -7,9 +7,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 編輯器內容 JSON 數據傳輸對象，用於封裝編輯器內容的 JSON 數據
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName EditorContentJsonDTO
@@ -49,5 +51,26 @@ public class EditorContentDTO {
          */
         @JsonInclude(JsonInclude.Include.NON_NULL)
         private Map<String, Object> attributes;
+    }
+
+    /**
+     * 重寫比較方法，判斷兩個對象是否相等
+     *
+     * @param o 要比較的對象
+     *
+     * @return 如果兩個對象相等，則返回 true，否則返回 false
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        EditorContentDTO that = (EditorContentDTO) o;
+
+        return Objects.equals(delta, that.delta);
     }
 }

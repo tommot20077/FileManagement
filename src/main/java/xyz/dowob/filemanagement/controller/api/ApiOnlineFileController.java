@@ -123,7 +123,7 @@ public class ApiOnlineFileController extends BaseFileController {
             return fileServiceStrategy
                     .getFileService(FileEnum.ONLINE_DOCUMENT)
                     .getFileVersionList(user, id, page, pageSize)
-                    .flatMap(history -> createResponseEntity(createResponse(exchange, "獲取歷史成功", history)));
+                    .flatMap(history -> createResponseEntity(createResponse(exchange, "獲取歷程記錄成功", history)));
         }), exchange);
     }
 

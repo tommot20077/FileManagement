@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
+import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
@@ -195,6 +196,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     }
 
     @Override
+    @HideOverLength
     public Mono<PagedResponseDTO<FileVersionDTO>> getFileVersionList(User user, String fileId, Integer page, Integer size) {
         int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
         int currentPage = Math.max(1, Objects.requireNonNullElse(page, 1));
@@ -274,6 +276,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         history.setModifiedTime(LocalDateTime.now());
         history.setIsSnapshot(true);
         history.setSnapshotContent(userOnlineFile.getContent());
+        history.setNote("初始化歷史記錄");
         return userOnlineFileHistoryRepository.save(history);
     }
 
@@ -314,7 +317,12 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         Mono<EditorContentDTO> contentJsonDTOMono = formatJsonToEditorContentJsonDTO(userOnlineFile.getContent());
         return contentJsonDTOMono
                 .flatMap(contentInDB -> Mono.defer(() -> {
+                    if (contentInDB.equals(fileEditDTO.getContent())) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.NO_CHANGE_IN_CONTENT));
+                    }
+
                     Mono<String> diffResult = calculateFileContentDiff(contentInDB, fileEditDTO.getContent());
+
                     userOnlineFile.setLastModifiedBy(user.getId());
                     userOnlineFile.setCurrentSnapshotCount(userOnlineFile.getCurrentSnapshotCount() + 1);
                     if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
@@ -344,14 +352,13 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                                     .map(UserOnlineFileHistory::getVersion)
                                     .defaultIfEmpty(0L)
                                     .flatMap(lastVersion -> {
-                                        userOnlineFileHistory.setPreviousVersion(lastVersion);
-
                                         if (userOnlineFile.getCurrentSnapshotCount() % 5 == 0) {
                                             userOnlineFileHistory.setIsSnapshot(true);
                                             userOnlineFileHistory.setSnapshotContent(userOnlineFile.getContent());
                                             userOnlineFile.setCurrentSnapshotCount(0L);
                                         } else {
                                             userOnlineFileHistory.setDiff(diffResult);
+                                            userOnlineFileHistory.setPreviousVersion(lastVersion);
                                         }
 
                                         return userOnlineFileHistoryRepository
@@ -441,10 +448,11 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * @return 空Mono
      */
     private Mono<Void> restoreFromSnapshot(UserOnlineFile userOnlineFile, UserOnlineFileHistory snapshot, Long userId) {
-        userOnlineFile.setContent(snapshot.getSnapshotContent());
-        userOnlineFile.setLastModifiedBy(userId);
-
-        return userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(userOnlineFile.getId().toString()));
+        return saveFileHistory(userOnlineFile, userOnlineFile.getContent(), userId, snapshot.getVersion()).then(Mono.defer(() -> {
+            userOnlineFile.setContent(snapshot.getSnapshotContent());
+            userOnlineFile.setLastModifiedBy(userId);
+            return userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(userOnlineFile.getId().toString()));
+        }));
     }
 
     /**
@@ -542,35 +550,37 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     }
 
     /**
-     * 應用歷史鏈進行還原
+     * 保存文件歷史
+     *
+     * @param userOnlineFile    用戶在線文件
+     * @param editorContentJson 編輯內容JSON
+     * @param userId            用戶ID
+     * @param targetVersion     上一個版本
+     *
+     * @return 空Mono
      */
-    private Mono<Void> applyHistoryChain(UserOnlineFile userOnlineFile, List<UserOnlineFileHistory> historyChain, Long userId) {
-        Collections.reverse(historyChain);
+    private Mono<Void> saveFileHistory(UserOnlineFile userOnlineFile, String editorContentJson, Long userId, Long targetVersion) {
+        return userOnlineFileHistoryRepository.findTopByFileIdOrderByVersionDesc(userOnlineFile.getId()).flatMap(lastHistory -> {
+            Long newVersion = lastHistory.getVersion() + 1;
+            UserOnlineFileHistory userOnlineFileHistory = new UserOnlineFileHistory();
+            userOnlineFileHistory.setFileId(userOnlineFile.getId());
+            userOnlineFileHistory.setModifiedTime(LocalDateTime.now());
+            userOnlineFileHistory.setModifiedBy(userId);
+            userOnlineFileHistory.setVersion(newVersion);
+            userOnlineFileHistory.setPreviousVersion(null);
+            userOnlineFileHistory.setIsSnapshot(true);
+            userOnlineFileHistory.setSnapshotContent(userOnlineFile.getContent());
+            String note = String.format("修改者:%s 還原到 %d 版本 (此為自動建立的快照，用於恢復到還原操作之前的版本)",
+                                        userId,
+                                        targetVersion
+            );
+            userOnlineFileHistory.setNote(note);
 
-        if (historyChain.isEmpty() || !historyChain.getFirst().getIsSnapshot()) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_HISTORY_CHAIN));
-        }
+            userOnlineFile.setLastModifiedBy(userId);
+            userOnlineFile.setContent(editorContentJson);
 
-        String baseContent = historyChain.getFirst().getSnapshotContent();
-        return formatJsonToEditorContentJsonDTO(baseContent).flatMap(contentInDB -> {
-            List<String> restoredContentList = convertDeltaToLines(contentInDB);
-
-            for (int i = 1; i < historyChain.size(); i++) {
-                try {
-                    restoredContentList = applyRevertDiff(restoredContentList, historyChain.get(i).getDiff());
-                } catch (Exception e) {
-                    return Mono.error(new RuntimeException("還原歷史版本時發生錯誤", e));
-                }
-            }
-
-            return formatJsonToEditorContentJsonDTO(restoredContentList).flatMap(editorContentDTO -> saveFileHistory(userOnlineFile,
-                                                                                                                     editorContentDTO,
-                                                                                                                     userId,
-                                                                                                                     historyChain
-                                                                                                                             .getLast()
-                                                                                                                             .getVersion()
-            ));
-        }).then(updateUserFileMetadata(userOnlineFile.getId().toString()));
+            return userOnlineFileHistoryRepository.save(userOnlineFileHistory).then(userOnlineFileRepository.save(userOnlineFile));
+        }).then();
     }
 
     /**
@@ -598,39 +608,29 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     }
 
     /**
-     * 保存文件歷史
-     *
-     * @param userOnlineFile   用戶在線文件
-     * @param editorContentDTO 編輯內容JSON
-     * @param userId           用戶ID
-     * @param previousVersion  上一個版本
-     *
-     * @return 空Mono
+     * 應用歷史鏈進行還原
      */
-    private Mono<Void> saveFileHistory(UserOnlineFile userOnlineFile, EditorContentDTO editorContentDTO, Long userId, Long previousVersion) {
-        return formatObjectToJson(editorContentDTO)
-                .flatMap(editorContentJson -> userOnlineFileHistoryRepository
-                        .findTopByFileIdOrderByVersionDesc(userOnlineFile.getId())
-                        .flatMap(lastHistory -> {
-                            Long newVersion = lastHistory.getVersion() + 1;
-                            UserOnlineFileHistory userOnlineFileHistory = new UserOnlineFileHistory();
-                            userOnlineFileHistory.setFileId(userOnlineFile.getId());
-                            userOnlineFileHistory.setModifiedTime(LocalDateTime.now());
-                            userOnlineFileHistory.setModifiedBy(userId);
-                            userOnlineFileHistory.setVersion(newVersion);
-                            userOnlineFileHistory.setNote("還原版本到 " + previousVersion);
-                            userOnlineFileHistory.setPreviousVersion(previousVersion);
-                            userOnlineFile.setLastModifiedBy(userId);
+    private Mono<Void> applyHistoryChain(UserOnlineFile userOnlineFile, List<UserOnlineFileHistory> historyChain, Long userId) {
+        Collections.reverse(historyChain);
 
-                            userOnlineFileHistory.setIsSnapshot(true);
-                            userOnlineFileHistory.setSnapshotContent(editorContentJson);
-                            userOnlineFile.setContent(editorContentJson);
+        if (historyChain.isEmpty() || !historyChain.getFirst().getIsSnapshot()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_HISTORY_CHAIN));
+        }
 
-                            return userOnlineFileHistoryRepository
-                                    .save(userOnlineFileHistory)
-                                    .then(userOnlineFileRepository.save(userOnlineFile));
-                        }))
-                .then();
+        String baseContent = historyChain.getFirst().getSnapshotContent();
+        return formatJsonToEditorContentJsonDTO(baseContent).flatMap(contentInDB -> {
+            List<String> restoredContentList = convertDeltaToLines(contentInDB);
+
+            for (int i = 1; i < historyChain.size(); i++) {
+                try {
+                    restoredContentList = applyRevertDiff(restoredContentList, historyChain.get(i).getDiff());
+                } catch (Exception e) {
+                    return Mono.error(new RuntimeException("還原歷史版本時發生錯誤", e));
+                }
+            }
+            Mono<String> result = formatJsonToEditorContentJsonDTO(restoredContentList).flatMap(this::formatObjectToJson);
+            return result.flatMap(contentJson -> saveFileHistory(userOnlineFile, contentJson, userId, historyChain.getLast().getVersion()));
+        }).then(updateUserFileMetadata(userOnlineFile.getId().toString()));
     }
 }
 
