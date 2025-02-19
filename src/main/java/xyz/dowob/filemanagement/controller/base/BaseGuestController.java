@@ -60,7 +60,7 @@ public abstract class BaseGuestController implements ResponseUnity {
         return handleError(userService.register(registerUserDTO).then(Mono.defer(() -> {
             HashMap<String, Object> data = new HashMap<>();
             ApiResponseDTO<?> apiResponse = createResponse(exchange, 201, "註冊成功", data);
-            return createResponseEntity(apiResponse);
+            return createResponseEntity(apiResponse, 201);
         })), exchange);
     }
 
@@ -73,14 +73,16 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @return Mono<ResponseEntity> 返回登入結果
      */
     public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
+
         return handleError(userService.login(authRequestDTO, exchange).flatMap(token -> {
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", token)
-                        .httpOnly(true)
-                        .secure(false) //todo 改成true
+                        .httpOnly(securityProperties.getCookie().isHttpOnly())
+                        .secure(securityProperties.getCookie().isSecure())
                         .maxAge((long) securityProperties.getJwtToken().getExpiration() * 60)
-                        .sameSite("Strict")
+                        .sameSite(securityProperties.getCookie().getSameSite())
+                        .path("/")
                         .build();
                 exchange.getResponse().addCookie(cookie);
             }

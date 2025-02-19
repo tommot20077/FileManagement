@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 
@@ -23,8 +24,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 @RestController
 @RequestMapping("/web/user")
 public class WebUserController extends BaseUserController {
-    public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService) {
-        super(fileServiceStrategy, userService);
+    public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties) {
+        super(fileServiceStrategy, userService, securityProperties);
     }
 
     /**

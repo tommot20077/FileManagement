@@ -12,6 +12,11 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.JwtAuthenticationManager;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Spring Security 上下文存儲庫，用於保存和加載 SecurityContext
  * 這裡主要用於 JWT 的驗證，從請求中獲取 JWT Token 進行驗證
@@ -31,6 +36,11 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
      * JWT 憑證的前綴
      */
     private static final String TOKEN_PREFIX = "Bearer ";
+
+    /**
+     * JWT 憑證的正則表達式
+     */
+    private static final Pattern JWT_PATTERN = Pattern.compile("jwtToken=([^;]+)");
 
     /**
      * JWT 驗證管理器
@@ -60,13 +70,32 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
      */
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
+        AtomicReference<String> token = new AtomicReference<>();
+        String cookie = exchange.getRequest().getHeaders().getFirst(HttpHeaders.COOKIE);
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader != null && authHeader.startsWith(TOKEN_PREFIX)) {
-            String authToken = authHeader.substring(TOKEN_PREFIX.length());
-            Authentication auth = new UsernamePasswordAuthenticationToken(authToken, authToken);
-            return authenticationManager.authenticate(auth).map(SecurityContextImpl::new);
-        } else {
-            return Mono.empty();
+
+        extractJwtFromHeader(cookie).ifPresent(token::set);
+
+        if (token.get() == null && authHeader != null && authHeader.startsWith(TOKEN_PREFIX)) {
+            token.set(authHeader.substring(TOKEN_PREFIX.length()));
         }
+
+        if (token.get() != null) {
+            Authentication auth = new UsernamePasswordAuthenticationToken(token.get(), token.get());
+            return authenticationManager.authenticate(auth).map(SecurityContextImpl::new);
+        }
+        return Mono.empty();
+    }
+
+    public Optional<String> extractJwtFromHeader(String cookieHeader) {
+        if (cookieHeader == null) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = JWT_PATTERN.matcher(cookieHeader);
+        if (matcher.find()) {
+            return Optional.of(matcher.group(1));
+        }
+        return Optional.empty();
     }
 }

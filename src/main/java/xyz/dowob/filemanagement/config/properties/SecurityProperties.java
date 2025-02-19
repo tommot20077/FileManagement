@@ -32,6 +32,11 @@ public class SecurityProperties {
     private resetPasswordToken resetPasswordToken = new resetPasswordToken();
 
     /**
+     * Cookie 憑證配置
+     */
+    private Cookie cookie = new Cookie();
+
+    /**
      * 驗證 JWT 密鑰是否配置
      */
     @PostConstruct
@@ -71,5 +76,23 @@ public class SecurityProperties {
          * 重置密碼憑證的過期時間，單位為分鐘，默認為 30 分鐘
          */
         private int expiration = 30;
+    }
+
+    @Data
+    public static class Cookie {
+        /**
+         * Cookie 憑證是否加密，默認為 true
+         */
+        private boolean secure = true;
+
+        /**
+         * Cookie 憑證是否只能通過 HTTP 協議訪問，默認為 true
+         */
+        private boolean httpOnly = true;
+
+        /**
+         * Cookie 憑證的 SameSite 屬性，默認為 Lax
+         */
+        private String sameSite = "Lax";
     }
 }

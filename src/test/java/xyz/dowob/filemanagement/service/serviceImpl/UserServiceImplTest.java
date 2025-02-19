@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -43,6 +44,9 @@ class UserServiceImplTest {
     @Mock
     private SecurityProperties mockSecurityProperties;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     private UserServiceImpl userServiceImplUnderTest;
 
     @BeforeEach
@@ -51,8 +55,7 @@ class UserServiceImplTest {
                                                        mockValidationService,
                                                        mockAuthorizationService,
                                                        mockTokenService,
-                                                       mockEmailProvider,
-                                                       mockSecurityProperties
+                                                       mockEmailProvider, mockSecurityProperties, passwordEncoder
         );
     }
 

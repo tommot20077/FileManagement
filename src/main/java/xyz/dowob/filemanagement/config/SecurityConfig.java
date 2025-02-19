@@ -78,7 +78,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrfSpec -> csrfSpec
                         .csrfTokenRepository(webSessionServerCsrfTokenRepository())
-                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/web/**").matches(exchange)))
+                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webss/**").matches(exchange)))
+                //.requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webs/**").matches(exchange)))
                 .headers(headers -> headers.contentSecurityPolicy(contentSecurityPolicySpec -> {
                     contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                 }))

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -73,6 +74,11 @@ public class UserServiceImpl implements UserService {
     private final SecurityProperties securityProperties;
 
     /**
+     * 密碼加密器(採用BCrypt加密)
+     */
+    private final PasswordEncoder passwordEncoder;
+
+    /**
      * 此方法之後為UserService接口中的方法實現
      * 用戶註冊
      *
@@ -81,11 +87,11 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> register (RegisterDTO registerUserDTO) {
+    public Mono<Void> register(RegisterDTO registerUserDTO) {
         return validationService.validateRegisterDTO(registerUserDTO).then(Mono.defer(() -> {
             User user = new User();
             user.setUsername(registerUserDTO.getUsername());
-            user.setPassword(registerUserDTO.getPassword());
+            user.setPassword(passwordEncoder.encode(registerUserDTO.getPassword()));
             user.setEmail(registerUserDTO.getEmail());
             return userRepository.save(user).then();
         }));
@@ -101,7 +107,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     @HideSensitive
-    public Mono<String> login (AuthRequestDTO authRequestDTO, ServerWebExchange request) {
+    public Mono<String> login(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
         return validationService.validateNotNull(authRequestDTO).then(authorizationService.authenticate(authRequestDTO, request));
     }
 
@@ -113,7 +119,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> logout (Long userId, ServerWebExchange exchange) {
+    public Mono<Void> logout(Long userId, ServerWebExchange exchange) {
         return exchange
                 .getSession()
                 .flatMap(session -> userRepository
@@ -131,7 +137,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<User> changePassword (User user) {
+    public Mono<User> changePassword(User user) {
         return null;
     }
 
@@ -143,7 +149,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<User> changeEmail (User user) {
+    public Mono<User> changeEmail(User user) {
         return null;
     }
 
@@ -155,7 +161,7 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> sendResetPasswordMail (UserEmailDTO userEmailDTO) {
+    public Mono<Void> sendResetPasswordMail(UserEmailDTO userEmailDTO) {
         return validationService
                 .validateNotNull(userEmailDTO)
                 .then(Mono.defer(() -> userRepository
@@ -180,22 +186,22 @@ public class UserServiceImpl implements UserService {
      * @return 用戶
      */
     @Override
-    public Mono<Void> resetPassword (ResetPasswordDTO resetPasswordDTO) {
+    public Mono<Void> resetPassword(ResetPasswordDTO resetPasswordDTO) {
         return validationService
                 .validateResetPasswordDTO(resetPasswordDTO)
-                .then(Mono.defer(() -> userRepository
-                        .findByEmail(resetPasswordDTO.getEmail())
-                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
-                                                                          resetPasswordDTO.getEmail()
-                        )))
-                        .flatMap(user -> tokenService
-                                .validateToken(resetPasswordDTO.getVerificationCode(), user.getId(), TokenEnum.RESET_PASSWORD_TOKEN)
-                                .then(Mono.defer(() -> {
-                                    user.setPassword(resetPasswordDTO.getNewPassword());
-                                    return userRepository
-                                            .save(user)
-                                            .then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
-                                })))));
+                .then(userRepository
+                              .findByEmail(resetPasswordDTO.getEmail())
+                              .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
+                                                                                resetPasswordDTO.getEmail()
+                              )))
+                              .flatMap(user -> tokenService
+                                      .validateToken(resetPasswordDTO.getVerificationCode(), user.getId(), TokenEnum.RESET_PASSWORD_TOKEN)
+                                      .then(Mono.defer(() -> {
+                                          user.setPassword(passwordEncoder.encode(resetPasswordDTO.getNewPassword()));
+                                          return userRepository
+                                                  .save(user)
+                                                  .then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
+                                      }))));
     }
 
     /**
@@ -209,7 +215,7 @@ public class UserServiceImpl implements UserService {
      * @return Mono<User> 返回用戶對象
      */
     @Override
-    public Mono<User> getUser (ServerWebExchange exchange) {
+    public Mono<User> getUser(ServerWebExchange exchange) {
         final Object[] userId = new Object[1];
 
         return Mono.defer(() -> {
@@ -234,7 +240,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回一個新的實體對象
      */
     @Override
-    public Mono<User> create () {
+    public Mono<User> create() {
         return null;
     }
 
@@ -246,7 +252,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回一個Optional對象
      */
     @Override
-    public Mono<User> getById (Long userId) {
+    public Mono<User> getById(Long userId) {
         return userRepository.findById(userId);
     }
 
@@ -256,7 +262,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @RequirePermission(PermissionEnum.MANAGE)
-    public Flux<User> getAll () {
+    public Flux<User> getAll() {
         return userRepository.findAll();
     }
 
@@ -266,7 +272,7 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
-    public Mono<Void> update (User entity) {
+    public Mono<Void> update(User entity) {
         return null;
     }
 
@@ -276,7 +282,7 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
-    public Mono<Void> delete (User entity) {
+    public Mono<Void> delete(User entity) {
         return null;
     }
 

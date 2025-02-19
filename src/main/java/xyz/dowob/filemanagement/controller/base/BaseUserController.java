@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
@@ -29,6 +30,8 @@ public abstract class BaseUserController implements ResponseUnity {
 
     protected final UserService userService;
 
+    protected final SecurityProperties securityProperties;
+
     /**
      * 用戶登出的請求
      *
@@ -39,8 +42,14 @@ public abstract class BaseUserController implements ResponseUnity {
     public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return userService.getUser(exchange).flatMap(user -> userService.logout(user.getId(), exchange).then(Mono.defer(() -> {
             if (isWeb) {
-                ResponseCookie cookie = ResponseCookie.from("jwtToken", "").httpOnly(true).secure(false) //todo 改成true
-                                                      .maxAge(0).sameSite("Strict").build();
+                ResponseCookie cookie = ResponseCookie
+                        .from("jwtToken", "")
+                        .httpOnly(securityProperties.getCookie().isHttpOnly())
+                        .secure(securityProperties.getCookie().isSecure())
+                        .maxAge(0)
+                        .sameSite(securityProperties.getCookie().getSameSite())
+                        .path("/")
+                        .build();
                 exchange.getResponse().addCookie(cookie);
             }
             return createResponseEntity(createResponse(exchange, "登出成功", null));

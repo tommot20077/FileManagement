@@ -53,6 +53,7 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
         String verificationCode = String.valueOf((int) ((Math.random() * 9 + 1) * verificationCodeInit));
         Mono<Token> tokenMono = tokenRepository.findByUserId(user.getId()).switchIfEmpty(Mono.defer(() -> {
             Token newToken = new Token();
+            newToken.setJwtTokenVersion(Token.generateJwtTokenVersion());
             newToken.setUserId(user.getId());
             return Mono.just(newToken);
         }));

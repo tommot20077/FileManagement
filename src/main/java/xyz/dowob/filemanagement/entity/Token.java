@@ -8,6 +8,7 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.UUID;
 
 /**
  * 憑證實體類，用於定義憑證的數據庫表結構
@@ -97,5 +98,15 @@ public class Token {
         tokenMap.put("id", id);
         tokenMap.put("userId", userId);
         return tokenMap.toString();
+    }
+
+    /**
+     * 生成JWT憑證版本
+     *
+     * @return String
+     */
+    public static String generateJwtTokenVersion() {
+        String uuid = UUID.randomUUID().toString();
+        return uuid.substring(0, 18);
     }
 }

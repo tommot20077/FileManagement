@@ -46,6 +46,9 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      */
     private final TokenService tokenService;
 
+    /**
+     * CSRF Token存儲庫
+     */
     private final ServerCsrfTokenRepository csrfTokenRepository;
 
     /**

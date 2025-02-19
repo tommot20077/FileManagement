@@ -27,7 +27,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -97,7 +96,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         Date now = new Date();
 
         return tokenMono.flatMap(tokenEntity -> {
-            String tokenVersion = generateNewVersion();
+            String tokenVersion = Token.generateJwtTokenVersion();
 
             long expirationMs = (long) securityProperties.getJwtToken().getExpiration() * 1000 * 60;
             Date expirationDate = new Date(now.getTime() + expirationMs);
@@ -158,7 +157,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         return tokenRepository.findByUserId(userId).flatMap(tokenMono -> {
             cacheTokenMap.entrySet().removeIf(entry -> entry.getValue().userId().equals(userId));
 
-            tokenMono.setJwtTokenVersion(generateNewVersion());
+            tokenMono.setJwtTokenVersion(Token.generateJwtTokenVersion());
             tokenMono.setJwtTokenExpireTime(null);
 
             return tokenRepository.save(tokenMono);
@@ -278,16 +277,6 @@ public class JwtTokenProviderImpl implements TokenProvider {
                                                                                           .atZone(ZoneId.systemDefault())
                                                                                           .toInstant()) : null;
         cacheTokenMap.put(token, new TokenCacheEntity(tokenEntity.getJwtTokenVersion(), userId, expireTime));
-    }
-
-    /**
-     * 生成新的 JWT 憑證版本
-     *
-     * @return JWT 憑證版本
-     */
-    private String generateNewVersion() {
-        String uuid = UUID.randomUUID().toString();
-        return uuid.substring(0, 18);
     }
 
     /**
