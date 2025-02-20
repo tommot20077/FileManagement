@@ -46,7 +46,7 @@ public class UserFileDataBO {
     /**
      * 文件名稱
      */
-    private String fileName;
+    private String filename;
     /**
      * 父文件夾ID
      */
@@ -107,7 +107,7 @@ public class UserFileDataBO {
         this.userFileId = userFileMetadata.getId();
         this.serverFileId = serverFileMetadata.getId();
         this.userId = userFileMetadata.getUserId();
-        this.fileName = userFileMetadata.getFilename();
+        this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
         this.fileType = serverFileMetadata.getFileType();
         this.fileSize = serverFileMetadata.getFileSize();
@@ -130,7 +130,7 @@ public class UserFileDataBO {
         this.content = content;
         this.lastModifiedBy = userOnlineFile.getLastModifiedBy();
         this.userId = userFileMetadata.getUserId();
-        this.fileName = userFileMetadata.getFilename();
+        this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.uploadTime = userFileMetadata.getUploadTime();

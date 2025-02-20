@@ -56,23 +56,23 @@ public class GridFsProvider {
      * 將檔案存入 GridFs
      *
      * @param dataBufferFlux 檔案的數據流
-     * @param fileName       檔案名
+     * @param filename       檔案名
      *
      * @return 返回存入的檔案的 ObjectId
      */
-    public Mono<ObjectId> storeFile(Flux<DataBuffer> dataBufferFlux, String fileName) {
-        return gridFsTemplate.store(dataBufferFlux, fileName, uploadOptions);
+    public Mono<ObjectId> storeFile(Flux<DataBuffer> dataBufferFlux, String filename) {
+        return gridFsTemplate.store(dataBufferFlux, filename, uploadOptions);
     }
 
     /**
      * 通過檔案名查找檔案
      *
-     * @param fileName 檔案名
+     * @param filename 檔案名
      *
      * @return 返回查找到的檔案
      */
-    public Mono<GridFSFile> findFileByFileName(String fileName) {
-        return gridFsTemplate.findOne(Query.query(Criteria.where("filename").is(fileName)));
+    public Mono<GridFSFile> findFileByFileName(String filename) {
+        return gridFsTemplate.findOne(Query.query(Criteria.where("filename").is(filename)));
     }
 
     /**
@@ -100,12 +100,12 @@ public class GridFsProvider {
     /**
      * 通過檔案名刪除檔案
      *
-     * @param fileName 檔案名
+     * @param filename 檔案名
      *
      * @return 返回 Mono<Void>
      */
-    public Mono<Void> deleteFileByFilename(String fileName) {
-        return gridFsTemplate.delete(Query.query(Criteria.where("filename").is(fileName)));
+    public Mono<Void> deleteFileByFilename(String filename) {
+        return gridFsTemplate.delete(Query.query(Criteria.where("filename").is(filename)));
     }
 
     /**

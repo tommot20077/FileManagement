@@ -197,7 +197,7 @@ class ValidationServiceImplTest {
     void testValidateFileMetadataDTO() {
         // Setup
         final FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
-        fileMetadataDTO.setFileName("fileName");
+        fileMetadataDTO.setFilename("fileName");
         fileMetadataDTO.setParentFolderId(0L);
         fileMetadataDTO.setMd5("md5");
         fileMetadataDTO.setFileSize(0L);
@@ -214,7 +214,7 @@ class ValidationServiceImplTest {
         // Setup
         final FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setFileId("fileId");
-        fileEditDTO.setFileName("fileName");
+        fileEditDTO.setFilename("fileName");
         fileEditDTO.setParentFolderId(0L);
         fileEditDTO.setShareUserIds(Set.of(0L));
 

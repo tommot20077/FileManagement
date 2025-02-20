@@ -7,12 +7,15 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.Tika;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.bson.types.ObjectId;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -42,6 +45,7 @@ import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserOnlineFileRepository;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 
+import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -56,42 +60,52 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor
 public abstract class AbstractFileService implements FileService {
+
     /**
      * 服務器文件元數據庫操作對象
      */
     protected final ServerFileMetaRepository serverFileMetaRepository;
+
     /**
      * 用戶文件元數據庫操作對象
      */
     protected final UserFileMetaRepository userFileMetaRepository;
+
     /**
      * 用戶在線文件數據庫操作對象
      */
     protected final UserOnlineFileRepository userOnlineFileRepository;
+
     /**
      * 用戶數據庫操作對象
      */
     protected final UserRepository userRepository;
+
     /**
      * Redis操作對象
      */
     protected final RedisProvider redisProvider;
+
     /**
      * GridFs操作對象
      */
     protected final GridFsProvider gridFsProvider;
+
     /**
      * 文件上傳任務管理器
      */
     protected final TransfersTasksManager transfersTasksManager;
+
     /**
      * 文件配置屬性
      */
     protected final FileProperties fileProperties;
+
     /**
-     * 數據庫操作對象
+     * 緩存鍵的格式
      */
-    protected final DatabaseClient databaseClient;
+    private static final String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
+
     /**
      * 斷路器配置
      */
@@ -101,17 +115,24 @@ public abstract class AbstractFileService implements FileService {
      * 文件列表樹提供者
      */
     protected final FolderListTreeProvider folderListTreeProvider;
+
     /**
      * 檔案類型檢驗器
      */
     private final Tika tika = new Tika();
+
     /**
      * 每個分塊的大小
      */
     protected Long CHUNK_SIZE;
-
-    private static final String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
+    /**
+     * 默認緩存時間
+     */
     private static final Duration DEFAULT_CACHE_DURATION = Duration.ofHours(1);
+    /**
+     * 用戶文件元數據庫操作對象
+     */
+    private final R2dbcEntityOperations entityOperations;
 
 
     /**
@@ -140,7 +161,7 @@ public abstract class AbstractFileService implements FileService {
             if (!cachedList.isEmpty()) {
                 return filterAndPageResponse(cachedList, types, currentPage, pageSize);
             }
-            return getFileListFormDB(user, fatherFolderId).collectList().flatMap(dbList -> {
+            return getFileListFormDB(user, fatherFolderId, types).collectList().flatMap(dbList -> {
                 if (!dbList.isEmpty()) {
                     return cacheUserFileList(user, fatherFolderId, Flux.fromIterable(dbList)).then(filterAndPageResponse(dbList,
                                                                                                                          types,
@@ -203,46 +224,32 @@ public abstract class AbstractFileService implements FileService {
                 })));
     }
 
-    /**
-     * 下載文件的共通實現
-     *
-     * @param fileId 文件ID
-     * @param user   用戶信息
-     *
-     * @return Mono<UserFileDataBO>
-     */
-    public Mono<UserFileDataBO> downloadFile(String fileId, User user) {
+    public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
         return userFileMetaRepository
-                .findById(fileId)
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user,
-                                                                    userFileMetadata.getUserId(),
-                                                                    userFileMetadata.getSharedWithUsers(),
-                                                                    userFileMetadata.getId(),
-                                                                    false
-                ).then(isFileOrFolder(userFileMetadata, false)))
-                .flatMap(userFileMetadata -> serverFileMetaRepository
-                        .findById(userFileMetadata.getServerFileId().toString())
-                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
-                                                                       userFileMetadata.getServerFileId(),
-                                                                       fileId
-                        )))
-                        .map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata)))
-                .flatMap(fileData -> gridFsProvider
-                        .findFileById(new ObjectId(fileData.getGridFsId()))
-                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
-                                                                       fileData.getServerFileId()
-                        )))
-                        .flatMap(gridFsFile -> gridFsProvider.getResource(gridFsFile).map(resource -> {
-                            Flux<DataBuffer> dataStream = resource.getDownloadStream().map(dataBuffer -> {
-                                byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                dataBuffer.read(bytes);
-                                DataBufferUtils.release(dataBuffer);
-                                return DefaultDataBufferFactory.sharedInstance.wrap(bytes);
+                .findById(fileId.toString())
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, true)))
+                .flatMap(userFileMetadata -> {
+                    if (folderListTreeProvider != null) {
+                        List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), fileId);
+                        return Mono.just(path);
+                    }
+                    return Flux
+                            .just(userFileMetadata)
+                            .expand(metadata -> metadata.getParentFolderId() == null ? Mono.empty() : userFileMetaRepository.findById(
+                                    metadata.getParentFolderId().toString())).map(FolderListTreeProvider.FolderNode::new)
+                            .collectList()
+                            .map(list -> {
+                                list.add(new FolderListTreeProvider.FolderNode(null, "root"));
+                                return list;
                             });
-                            fileData.setDataStream(dataStream);
-                            return fileData;
-                        })));
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    if (fileId <= 0) {
+                        List<FolderListTreeProvider.FolderNode> list = List.of(new FolderListTreeProvider.FolderNode(null, "root"));
+                        return Mono.just(list);
+                    }
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId));
+                }));
     }
 
     /**
@@ -278,35 +285,6 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
-
-    public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
-        return userFileMetaRepository
-                .findById(fileId.toString())
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, true)))
-                .flatMap(userFileMetadata -> {
-                    if (folderListTreeProvider != null) {
-                        List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), fileId);
-                        return Mono.just(path);
-                    }
-                    return Flux
-                            .just(userFileMetadata)
-                            .expand(metadata -> metadata.getParentFolderId() == null ? Mono.empty() : userFileMetaRepository.findById(
-                                    metadata.getParentFolderId().toString())).map(FolderListTreeProvider.FolderNode::new)
-                            .collectList()
-                            .map(list -> {
-                                list.add(new FolderListTreeProvider.FolderNode(null, "root"));
-                                return list;
-                            });
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    if (fileId == 0L || fileId == -1L) {
-                        List<FolderListTreeProvider.FolderNode> list = List.of(new FolderListTreeProvider.FolderNode(null, "root"));
-                        return Mono.just(list);
-                    }
-                    return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId));
-                }));
-    }
-
     /**
      * 從數據庫中獲取用戶文件列表
      *
@@ -315,17 +293,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
-    private Flux<UserFileListDTO> getFileListFormDB(User user, Long fatherFolderId) {
-        Flux<UserFileMetadata> userFileMetadataFlux;
-        if (fatherFolderId == null || fatherFolderId == 0) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId());
-        } else if (fatherFolderId == -1) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserId(user.getId());
-        } else {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdInOrderByIsFolder(user.getId(),
-                                                                                                            List.of(fatherFolderId)
-            );
-        }
+    private Flux<UserFileListDTO> getFileListFormDB(User user, Long fatherFolderId, List<FileEnum> type) {
+        Flux<UserFileMetadata> userFileMetadataFlux = getUserFileMetadataFlux(user, fatherFolderId, type);
         Set<Long> serverFileIds = new HashSet<>();
         List<UserFileMetadata> folderMetadata = new ArrayList<>();
         HashMap<String, UserFileMetadata> onlineFileMap = new HashMap<>();
@@ -379,13 +348,84 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<Void>
      */
     private Mono<Void> cacheUserFileList(User user, Long fatherFolderId, Flux<UserFileListDTO> userFileListDTOFlux) {
-        if (fatherFolderId == null || fatherFolderId == -1) {
+        if (fatherFolderId == null || fatherFolderId < 0) {
             return Mono.empty();
         }
         String key = getUserFileListBaseKey(user.getId(), fatherFolderId);
         return userFileListDTOFlux.flatMap(userFileListDTO -> redisProvider.insertList(key, userFileListDTO, false, DEFAULT_CACHE_DURATION))
                 .then()
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 獲取用戶文件元數據流
+     *
+     * @param user           用戶信息
+     * @param fatherFolderId 父文件夾ID
+     *
+     * @return Flux<UserFileMetadata> 用戶文件元數據流
+     */
+    private Flux<UserFileMetadata> getUserFileMetadataFlux(User user, Long fatherFolderId, List<FileEnum> type) {
+        Flux<UserFileMetadata> userFileMetadataFlux;
+        if (fatherFolderId == null || fatherFolderId == 0) {
+            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId());
+        } else if (fatherFolderId == -1) {
+            userFileMetadataFlux = userFileMetaRepository.findAllByUserId(user.getId());
+        } else if (fatherFolderId == -2) {
+            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndIsStar(user.getId(), true);
+        } else if (fatherFolderId == -3) {
+            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdOrderByLastAccessTimeDesc(user.getId(), type, entityOperations);
+        } else {
+            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdInOrderByIsFolder(user.getId(),
+                                                                                                            List.of(fatherFolderId)
+            );
+        }
+        return userFileMetadataFlux;
+    }
+
+    /**
+     * 下載文件的共通實現
+     *
+     * @param fileId 文件ID
+     * @param user   用戶信息
+     *
+     * @return Mono<UserFileDataBO>
+     */
+    public Mono<UserFileDataBO> downloadFile(String fileId, User user) {
+        return userFileMetaRepository
+                .findById(fileId)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
+                .flatMap(userFileMetadata -> validateUserPermission(user,
+                                                                    userFileMetadata.getUserId(),
+                                                                    userFileMetadata.getSharedWithUsers(),
+                                                                    userFileMetadata.getId(),
+                                                                    false
+                ).then(isFileOrFolder(userFileMetadata, false))).flatMap(userFileMetadata -> Mono.defer(() -> {
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+                    userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    return serverFileMetaRepository
+                            .findById(userFileMetadata.getServerFileId().toString())
+                            .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
+                                                                           userFileMetadata.getServerFileId(),
+                                                                           fileId
+                            )))
+                            .map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata));
+                }))
+                .flatMap(fileData -> gridFsProvider
+                        .findFileById(new ObjectId(fileData.getGridFsId()))
+                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
+                                                                       fileData.getServerFileId()
+                        )))
+                        .flatMap(gridFsFile -> gridFsProvider.getResource(gridFsFile).map(resource -> {
+                            Flux<DataBuffer> dataStream = resource.getDownloadStream().map(dataBuffer -> {
+                                byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                                dataBuffer.read(bytes);
+                                DataBufferUtils.release(dataBuffer);
+                                return DefaultDataBufferFactory.sharedInstance.wrap(bytes);
+                            });
+                            fileData.setDataStream(dataStream);
+                            return fileData;
+                        })));
     }
 
     /**
@@ -473,29 +513,70 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 關聯用戶與文件的共通實現
+     * 編輯文件的共通實現
+     * 處理文件名、父文件夾ID、共享用戶ID的更新
      *
-     * @param serverFileMetadata 服務器文件ID
-     * @param fileMetadataDTO    文件元數據
+     * @param fileEditDTO 文件ID
+     * @param user        用戶信息
      *
-     * @return Mono<UserFileMetadata>
+     * @return Mono<Void>
      */
-    protected Mono<UserFileMetadata> associateUserFile(ServerFileMetadata serverFileMetadata, FileMetadataDTO fileMetadataDTO) {
-        UserFileMetadata userFileMetadata = new UserFileMetadata();
-        userFileMetadata.setUserId(fileMetadataDTO.getUser().getId());
-        userFileMetadata.setServerFileId(serverFileMetadata.getId());
-        userFileMetadata.setFileType(serverFileMetadata.getFileType());
-        userFileMetadata.setFilename(fileMetadataDTO.getFileName());
-        userFileMetadata.setParentFolderId(fileMetadataDTO.getParentFolderId());
-        userFileMetadata.setUploadTime(LocalDateTime.now());
-        userFileMetadata.setLastAccessTime(LocalDateTime.now());
-        return userFileMetaRepository.save(userFileMetadata);
+    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+        return userFileMetaRepository
+                .findById(fileEditDTO.getFileId())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                  fileEditDTO.getFileId()
+                )))
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata)
+                        .then(isFileOrFolder(userFileMetadata, false))
+                        .then(Mono.defer(() -> {
+                            if (fileEditDTO.getParentFolderId() == null) {
+                                return Mono.just(userFileMetadata);
+                            }
+                            return userFileMetaRepository
+                                    .findById(fileEditDTO.getParentFolderId().toString())
+                                    .flatMap(parentFolder -> validateUserPermission(user, parentFolder)
+                                            .then(Mono.just(userFileMetadata))
+                                            .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED,
+                                                                                              fileEditDTO.getParentFolderId()
+                                            ))))
+                                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
+                                                                                      fileEditDTO.getParentFolderId()
+                                    )));
+                        })).then(redisProvider.deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId())))
+                        .then(Mono.just(userFileMetadata)))
+                .flatMap(userFileMetadata -> {
+                    userFileMetadata.setFilename(fileEditDTO.getFilename());
+                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+
+                    Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
+                    userFileMetadata.setIsStar(isStar);
+
+                    Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(),
+                                                                           userFileMetadata.getSharedWithUsers()
+                    );
+                    userFileMetadata.setSharedWithUsers(sharedWithUsers);
+
+                    return userFileMetaRepository.save(userFileMetadata);
+                }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
     }
 
 
     public FileEnum detectFileType(byte[] fileBytes) {
-        String mimeType = tika.detect(fileBytes);
-        return FileEnum.fromMimeType(mimeType);
+        try {
+            BodyContentHandler handler = new BodyContentHandler(-1);
+            AutoDetectParser parser = new AutoDetectParser();
+            Metadata metadata = new Metadata();
+
+            parser.parse(new ByteArrayInputStream(fileBytes), handler, metadata);
+
+            String contentType = metadata.get("Content-Type");
+
+            return FileEnum.fromMimeType(contentType.split(";")[0].trim());
+        } catch (Exception e) {
+            return FileEnum.OTHER;
+        }
     }
 
     /**
@@ -555,50 +636,19 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 編輯文件的共通實現
-     * 處理文件名、父文件夾ID、共享用戶ID的更新
+     * 確認文件是否為文件或文件夾的共通實現，當文件類型不符時拋出ValidationException
      *
-     * @param fileEditDTO 文件ID
-     * @param user        用戶信息
+     * @param userFileMetadata 文件元數據
+     * @param isFolder         是否為文件夾
      *
-     * @return Mono<Void>
+     * @return Mono<UserFileMetadata>
      */
-    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
-        return userFileMetaRepository
-                .findById(fileEditDTO.getFileId())
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
-                                                                  fileEditDTO.getFileId()
-                )))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata)
-                        .then(isFileOrFolder(userFileMetadata, false))
-                        .then(Mono.defer(() -> {
-                            if (fileEditDTO.getParentFolderId() == null) {
-                                return Mono.just(userFileMetadata);
-                            }
-                            return userFileMetaRepository
-                                    .findById(fileEditDTO.getParentFolderId().toString())
-                                    .flatMap(parentFolder -> validateUserPermission(user, parentFolder)
-                                            .then(Mono.just(userFileMetadata))
-                                            .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED,
-                                                                                              fileEditDTO.getParentFolderId()
-                                            ))))
-                                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
-                                                                                      fileEditDTO.getParentFolderId()
-                                    )));
-                        })).then(redisProvider.deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId())))
-                        .then(Mono.just(userFileMetadata)))
-                .flatMap(userFileMetadata -> {
-                    userFileMetadata.setFilename(fileEditDTO.getFileName());
-                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
-                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
-
-                    Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(),
-                                                                           userFileMetadata.getSharedWithUsers()
-                    );
-                    userFileMetadata.setSharedWithUsers(sharedWithUsers);
-
-                    return userFileMetaRepository.save(userFileMetadata);
-                }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
+    protected Mono<UserFileMetadata> isFileOrFolder(UserFileMetadata userFileMetadata, boolean isFolder) {
+        if (userFileMetadata.getIsFolder() == isFolder) {
+            return Mono.just(userFileMetadata);
+        }
+        ValidationException.ErrorCode errorCode = isFolder ? ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FOLDER : ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FILE;
+        return Mono.error(new ValidationException(errorCode, userFileMetadata.getId()));
     }
 
     /**
@@ -663,12 +713,24 @@ public abstract class AbstractFileService implements FileService {
         return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED, fileId));
     }
 
-    protected Mono<UserFileMetadata> isFileOrFolder(UserFileMetadata userFileMetadata, boolean isFolder) {
-        if (userFileMetadata.getIsFolder() == isFolder) {
-            return Mono.just(userFileMetadata);
-        }
-        ValidationException.ErrorCode errorCode = isFolder ? ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FOLDER : ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FILE;
-        return Mono.error(new ValidationException(errorCode, userFileMetadata.getId()));
+    /**
+     * 關聯用戶與文件的共通實現
+     *
+     * @param serverFileMetadata 服務器文件ID
+     * @param fileMetadataDTO    文件元數據
+     *
+     * @return Mono<UserFileMetadata>
+     */
+    protected Mono<UserFileMetadata> associateUserFile(ServerFileMetadata serverFileMetadata, FileMetadataDTO fileMetadataDTO) {
+        UserFileMetadata userFileMetadata = new UserFileMetadata();
+        userFileMetadata.setUserId(fileMetadataDTO.getUser().getId());
+        userFileMetadata.setServerFileId(serverFileMetadata.getId());
+        userFileMetadata.setFileType(serverFileMetadata.getFileType());
+        userFileMetadata.setFilename(fileMetadataDTO.getFilename());
+        userFileMetadata.setParentFolderId(fileMetadataDTO.getParentFolderId());
+        userFileMetadata.setUploadTime(LocalDateTime.now());
+        userFileMetadata.setLastAccessTime(LocalDateTime.now());
+        return userFileMetaRepository.save(userFileMetadata);
     }
 
     /**
@@ -825,8 +887,7 @@ public abstract class AbstractFileService implements FileService {
             if (serverFileIds.isEmpty()) {
                 return Mono.empty();
             }
-            return userFileMetaRepository
-                    .countByServerFileIdInAndUserId(serverFileIds, user.getId(), databaseClient)
+            return userFileMetaRepository.countByServerFileIdInAndUserId(serverFileIds, user.getId(), entityOperations)
                     .collectList()
                     .flatMap(serverFileMetaCountDaoList -> {
                         Set<Long> serverFileIdList = serverFileMetaCountDaoList

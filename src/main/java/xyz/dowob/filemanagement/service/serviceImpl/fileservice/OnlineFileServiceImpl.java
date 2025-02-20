@@ -6,7 +6,7 @@ import com.github.difflib.DiffUtils;
 import com.github.difflib.patch.Patch;
 import com.github.difflib.patch.PatchFailedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -71,7 +71,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      */
     private final String EMPTY_CONTENT = "{\"delta\":[]}";
 
-    public OnlineFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, UserRepository userRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig, FolderListTreeProvider folderListTreeProvider, UserOnlineFileRepository userOnlineFileRepository, UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper) {
+    public OnlineFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, UserRepository userRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, FolderListTreeProvider folderListTreeProvider, UserOnlineFileRepository userOnlineFileRepository, UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper, R2dbcEntityOperations entityOperations) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -80,9 +80,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              databaseClient,
               circuitBreakerConfig,
-              folderListTreeProvider
+              folderListTreeProvider,
+              entityOperations
         );
         this.userOnlineFileRepository = userOnlineFileRepository;
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
@@ -104,6 +104,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 .flatMap(userOnlineFile -> userFileMetaRepository.findById(userOnlineFile.getId().toString()).flatMap(userFileMetadata -> {
                     try {
                         EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
+                        userFileMetadata.setLastAccessTime(LocalDateTime.now());
+                        userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
                         return Mono.just(new UserFileDataBO(userOnlineFile, userFileMetadata, content));
                     } catch (JsonProcessingException e) {
                         return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
@@ -130,11 +132,12 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }).then(Mono.defer(() -> {
             UserFileMetadata userFileMetadata = new UserFileMetadata();
             userFileMetadata.setUserId(user.getId());
-            userFileMetadata.setFilename(fileMetadataDTO.getFileName());
+            userFileMetadata.setFilename(fileMetadataDTO.getFilename() + ".onf");
             userFileMetadata.setParentFolderId(fileMetadataDTO.getParentFolderId());
             userFileMetadata.setUploadTime(LocalDateTime.now());
             userFileMetadata.setLastAccessTime(LocalDateTime.now());
             userFileMetadata.setFileType(FileEnum.ONLINE_DOCUMENT);
+            userFileMetadata.setIsStar(false);
             return userFileMetaRepository
                     .save(userFileMetadata)
                     .flatMap(newUserFileMetadata -> {

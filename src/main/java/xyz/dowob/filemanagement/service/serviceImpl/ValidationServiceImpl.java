@@ -78,8 +78,7 @@ public class ValidationServiceImpl implements ValidationService {
      */
     @Override
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
-        return validateNotNull(fileMetadataDTO)
-                .then(validFileName(fileMetadataDTO.getFileName(), false))
+        return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFilename(), false))
                 .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
     }
 
@@ -92,7 +91,7 @@ public class ValidationServiceImpl implements ValidationService {
     @Override
     public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
         return validateNotNull(fileEditDTO).then(Mono.defer(() -> switch (fileEditDTO.getEditType()) {
-            case EDIT_METADATA -> validFileName(fileEditDTO.getFileName(), isFolder);
+            case EDIT_METADATA -> validFileName(fileEditDTO.getFilename(), isFolder);
             case EDIT_CONTENT -> validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容");
             case BUILD_HISTORY_RECORD ->
                     validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(),
@@ -237,21 +236,20 @@ public class ValidationServiceImpl implements ValidationService {
      * 當檔案名稱為空、包含非法字符或者長度超過200時、檔案名稱不包含"."時，拋出ValidationException
      * 當檔案為文件夾時，不檢查是否包含"."，但是檢查是否包含非法字符
      *
-     * @param fileName 檔案名稱
+     * @param filename 檔案名稱
      * @param isFolder 是否為文件夾
      *
      * @return Mono<Void>
      */
-    private Mono<Void> validFileName(String fileName, boolean isFolder) {
-        if (fileName == null || fileName.isBlank() || (!isFolder && !fileName.contains(".")) || INVALID_CHARACTERS_PATTERN
-                .matcher(fileName)
+    private Mono<Void> validFileName(String filename, boolean isFolder) {
+        if (filename == null || filename.isBlank() || (!isFolder && !filename.contains(".")) || INVALID_CHARACTERS_PATTERN.matcher(filename)
                 .find()) {
             if (isFolder) {
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FOLDER_NAME));
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FILE_NAME));
         }
-        if (fileName.length() > 200) {
+        if (filename.length() > 200) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.NAME_TOO_LONG));
         }
         return Mono.empty();

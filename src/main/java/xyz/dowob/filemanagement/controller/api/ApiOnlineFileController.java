@@ -71,7 +71,7 @@ public class ApiOnlineFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> downloadFile(@PathVariable String id, ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             return fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).downloadFile(id, user).flatMap(userFileDataBO -> {
-                Map<String, Object> data = Map.of("content", userFileDataBO.getContent(), "filename", userFileDataBO.getFileName());
+                Map<String, Object> data = Map.of("content", userFileDataBO.getContent(), "filename", userFileDataBO.getFilename());
                 return createResponseEntity(createResponse(exchange, "下載成功", data));
             });
         }), exchange);

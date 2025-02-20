@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -57,7 +56,12 @@ public class UserFileListDTO {
     /**
      * 是否為文件夾
      */
-    private boolean isFolder;
+    private Boolean isFolder;
+
+    /**
+     * 是否為星標文件
+     */
+    private Boolean isStar;
 
     /**
      * 文件大小
@@ -101,6 +105,7 @@ public class UserFileListDTO {
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
         this.isFolder = userFileMetadata.getIsFolder();
+        this.isStar = userFileMetadata.getIsStar();
 
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
@@ -122,6 +127,7 @@ public class UserFileListDTO {
         this.fileSize = userOnlineFile.getFileSize();
         this.fileType = userFileMetadata.getFileType();
         this.isFolder = userFileMetadata.getIsFolder();
+        this.isStar = userFileMetadata.getIsStar();
 
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
@@ -142,28 +148,9 @@ public class UserFileListDTO {
         this.fileType = userFileMetadata.getFileType();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.isFolder = userFileMetadata.getIsFolder();
+        this.isStar = userFileMetadata.getIsStar();
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
-        }
-    }
-
-    /**
-     * 用戶文件列表數據傳輸對象構造函數
-     *
-     * @param userFileDataBO 用戶文件數據業務對象
-     */
-    public UserFileListDTO(UserFileDataBO userFileDataBO) {
-        this.id = userFileDataBO.getUserFileId();
-        this.filename = userFileDataBO.getFileName();
-        this.parentFolderId = userFileDataBO.getParentFolderId();
-        this.createTime = userFileDataBO.getUploadTime();
-        this.lastAccessTime = userFileDataBO.getLastAccessTime();
-        this.fileSize = userFileDataBO.getFileSize();
-        this.fileType = userFileDataBO.getFileType();
-        this.gridFsId = userFileDataBO.getGridFsId();
-        this.md5 = userFileDataBO.getMd5();
-        if (userFileDataBO.getShareUsers() != null) {
-            shareUsers.addAll(userFileDataBO.getShareUsers());
         }
     }
 }

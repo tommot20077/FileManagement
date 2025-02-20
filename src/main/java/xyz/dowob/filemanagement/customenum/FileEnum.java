@@ -88,15 +88,17 @@ public enum FileEnum {
         // 文檔類型
         MIME_TYPE_MAPPING.put("application/pdf", FileEnum.DOCUMENT);
         MIME_TYPE_MAPPING.put("application/msword", FileEnum.DOCUMENT);
+        MIME_TYPE_MAPPING.put("application/vnd.ms-excel", FileEnum.DOCUMENT);
+        MIME_TYPE_MAPPING.put("application/x-tika-ooxml", FileEnum.DOCUMENT);
+        MIME_TYPE_MAPPING.put("application/vnd.ms-powerpoint", FileEnum.DOCUMENT);
+        MIME_TYPE_MAPPING.put("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", FileEnum.DOCUMENT);
         MIME_TYPE_MAPPING.put("application/vnd.openxmlformats-officedocument.wordprocessingml.document", FileEnum.DOCUMENT);
+        MIME_TYPE_MAPPING.put("application/vnd.openxmlformats-officedocument.presentationml.presentation", FileEnum.DOCUMENT);
 
         // 壓縮文件類型
         MIME_TYPE_MAPPING.put("application/zip", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-rar-compressed", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-7z-compressed", FileEnum.ZIP);
-
-        // 線上文件類型
-        MIME_TYPE_MAPPING.put("application/json", FileEnum.ONLINE_DOCUMENT);
     }
 
     static {
@@ -151,12 +153,12 @@ public enum FileEnum {
     /**
      * 根據文件名獲取文件類型，如果找不到對應的文件類型，則返回其他類型
      *
-     * @param fileName 文件名
+     * @param filename 文件名
      *
      * @return 返回文件類型
      */
-    public static String getMediaType(FileEnum fileEnum, String fileName) {
-        String extension = FilenameUtils.getExtension(fileName).toLowerCase();
+    public static String getMediaType(FileEnum fileEnum, String filename) {
+        String extension = FilenameUtils.getExtension(filename).toLowerCase();
         Map<String, String> extensionMap = FILE_ENUM_MAP.get(fileEnum);
         if (extensionMap != null) {
             return extensionMap.getOrDefault(extension, getDefaultMediaType(fileEnum));

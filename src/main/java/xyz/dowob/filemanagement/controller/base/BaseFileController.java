@@ -14,8 +14,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * 檔案控制器的基礎類
@@ -66,6 +65,23 @@ public abstract class BaseFileController implements ResponseUnity {
                 return createResponseEntity(createResponse(exchange, "獲取用戶文件列表成功", result));
             });
         }), exchange);
+    }
+
+    /**
+     * 獲取文件類型
+     *
+     * @param type 文件類型
+     *
+     * @return 返回文件類型列表
+     */
+    protected List<FileEnum> getFileEnums(List<String> type) {
+        return Optional.ofNullable(type).orElse(Collections.emptyList()).stream().map(t -> {
+            try {
+                return FileEnum.valueOf(t.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }).filter(Objects::nonNull).toList();
     }
 
 }

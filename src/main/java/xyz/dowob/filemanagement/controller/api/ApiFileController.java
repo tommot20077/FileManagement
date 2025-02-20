@@ -6,6 +6,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -74,36 +75,30 @@ public class ApiFileController extends BaseFileController {
      */
     @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
-        return handleError(userService
-                                   .getUser(exchange)
-                                   .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
-                                   .flatMap(user -> {
-                                       UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-                                       if (!userLimiter.tryAcquire(user.getId())) {
-                                           return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                                                     UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                                           ));
-                                       }
-                                       return validationService
-                                               .validateFileMetadataDTO(fileMetadataDTO, user).then(fileServiceStrategy.getFileService()
-                                                             .uploadFile(fileMetadataDTO, user)
-                                                             .flatMap(transferResponseDTO -> {
-                                                                 ApiResponseDTO<?> apiResponse;
-                                                                 if (transferResponseDTO.getIsFinished()) {
-                                                                     apiResponse = createResponse(exchange,
-                                                                                                  "上傳成功",
-                                                                                                  transferResponseDTO
-                                                                     );
-                                                                 } else {
-                                                                     apiResponse = createResponse(exchange,
-                                                                                                  "建立任務成功",
-                                                                                                  transferResponseDTO
-                                                                     );
-                                                                 }
-                                                                 return createResponseEntity(apiResponse);
-                                                             }))
-                                               .doFinally(signalType -> userLimiter.release(user.getId()));
-                                   }), exchange);
+        Mono<ResponseEntity<?>> action = userService
+                .getUser(exchange)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED)))
+                .flatMap(user -> {
+                    UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
+                    if (!userLimiter.tryAcquire(user.getId())) {
+                        return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                                  UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                        ));
+                    }
+                    return validationService
+                            .validateFileMetadataDTO(fileMetadataDTO, user)
+                            .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
+                                ApiResponseDTO<?> apiResponse;
+                                if (transferResponseDTO.getIsFinished()) {
+                                    apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                                } else {
+                                    apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                                }
+                                return createResponseEntity(apiResponse);
+                            }))
+                            .doFinally(signalType -> userLimiter.release(user.getId()));
+                });
+        return handleError(action, exchange);
     }
 
 
@@ -119,20 +114,20 @@ public class ApiFileController extends BaseFileController {
      */
     @GetMapping("/{id}")
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
-            @PathVariable String id,
-            @RequestParam(value = "action", defaultValue = "preview", required = false) String action, ServerWebExchange exchange) {
+            @RequestParam(value = "action", defaultValue = "preview", required = false) String action,
+            @PathVariable String id, ServerWebExchange exchange) {
         return userService
                 .getUser(exchange)
                 .flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
                     HttpHeaders headers = new HttpHeaders();
                     if ("download".equals(action)) {
                         headers.add(HttpHeaders.CONTENT_DISPOSITION,
-                                    "attachment; filename=" + URLEncoder.encode(userFileDataBO.getFileName(), StandardCharsets.UTF_8)
+                                    "attachment; filename=" + URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8)
                         );
                         headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
                     } else {
                         headers.add(HttpHeaders.CONTENT_TYPE,
-                                    FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFileName())
+                                    FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename())
                         );
                     }
                     headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
@@ -179,7 +174,7 @@ public class ApiFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回編輯文件的結果
      */
     @PutMapping("")
-    public Mono<ResponseEntity<?>> editFile(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> editFile(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, false)
                                    .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))

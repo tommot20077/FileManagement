@@ -1,7 +1,7 @@
 package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
 @Service
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
-    public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, UserOnlineFileRepository userOnlineFileRepository, UserRepository userRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig, FolderListTreeProvider folderListTreeProvider) {
+    public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, UserOnlineFileRepository userOnlineFileRepository, UserRepository userRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, FolderListTreeProvider folderListTreeProvider, R2dbcEntityOperations entityOperations) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -51,9 +51,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              databaseClient,
               circuitBreakerConfig,
-              folderListTreeProvider
+              folderListTreeProvider,
+              entityOperations
         );
     }
     //todo 後期加入下載資料夾的功能
@@ -77,7 +77,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         }).then(Mono.defer(() -> {
             UserFileMetadata folder = new UserFileMetadata();
             folder.setUserId(user.getId());
-            folder.setFilename(fileEditDTO.getFileName());
+            folder.setFilename(fileEditDTO.getFilename());
             folder.setIsFolder(true);
             folder.setParentFolderId(fileEditDTO.getParentFolderId());
             folder.setLastAccessTime(LocalDateTime.now());
@@ -132,10 +132,10 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     return Mono.just(userFileMetadata);
                 })
                 .flatMap(userFileMetadata -> redisProvider
-                        .deleteZset(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
+                        .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
                         .then(Mono.just(userFileMetadata)))
                 .flatMap(userFileMetadata -> {
-                    userFileMetadata.setFilename(fileEditDTO.getFileName());
+                    userFileMetadata.setFilename(fileEditDTO.getFilename());
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
@@ -149,8 +149,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     }
                     return userFileMetaRepository
                             .save(userFileMetadata)
-                            .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()
-                            ));
+                            .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
                 });
     }
 

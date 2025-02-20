@@ -71,7 +71,9 @@ public class FolderListTreeManager implements ApplicationRunner {
         Flux<User> userMono = userIds.length == 0 ? userRepository.findAll() : userRepository.findAllById(Flux.fromArray(userIds));
 
         userMono
-                .doOnNext(user -> folderListTreeProvider.getUserFileListTree().remove(user.getId()))
+                .doOnNext(user -> folderListTreeProvider
+                        .getUserFileListTree()
+                        .computeIfPresent(user.getId(), (id, node) -> folderListTreeProvider.getUserFileListTree().remove(id)))
                 .flatMap(user -> fetchAllUserFiles(user).doOnNext(pageList -> {
 
                     try {
@@ -91,7 +93,8 @@ public class FolderListTreeManager implements ApplicationRunner {
         return fileServiceStrategy.getFileService().getUserFileList(user, -1L, 1, pageSize, null).expand(pagedResponseDTO -> {
             int nextPage = pagedResponseDTO.getCurrentPage() + 1;
             return nextPage <= pagedResponseDTO.getTotalPages() ? (fileServiceStrategy
-                    .getFileService().getUserFileList(user, -1L, nextPage, pageSize, null)) : Mono.empty();
+                    .getFileService()
+                    .getUserFileList(user, -1L, nextPage, pageSize, null)) : Mono.empty();
         }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
     }
 }

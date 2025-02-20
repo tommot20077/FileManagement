@@ -2,7 +2,7 @@ package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import jakarta.annotation.Nullable;
-import org.springframework.r2dbc.core.DatabaseClient;
+import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
@@ -31,19 +31,20 @@ import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 @Service
 @FileHandlerType(FileEnum.OTHER)
 public class GeneralFileServiceImpl extends AbstractFileService {
-    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, DatabaseClient databaseClient, CircuitBreakerConfig circuitBreakerConfig,
+    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig,
                                   @Nullable
-                                  FolderListTreeProvider folderListTreeProvider, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository) {
+                                  FolderListTreeProvider folderListTreeProvider, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations) {
         super(serverFileMetaRepository,
-              userFileMetaRepository, userOnlineFileRepository,
+              userFileMetaRepository,
+              userOnlineFileRepository,
               userRepository,
               redisProvider,
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              databaseClient,
               circuitBreakerConfig,
-              folderListTreeProvider
+              folderListTreeProvider,
+              entityOperations
         );
     }
 }

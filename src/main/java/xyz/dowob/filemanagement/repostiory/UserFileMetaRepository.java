@@ -1,12 +1,15 @@
 package xyz.dowob.filemanagement.repostiory;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.data.r2dbc.repository.Query;
+import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
-import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
@@ -34,6 +37,15 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserId(Long userId);
 
+    /**
+     * 根據用戶ID查詢所有檔案元數據，並進行分頁
+     *
+     * @param userId 用戶ID
+     * @param limit  限制條數
+     * @param offset 偏移量
+     *
+     * @return Flux<UserFileMetadata>
+     */
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
     Flux<UserFileMetadata> findAllByUserIdWithPagination(
             @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
@@ -96,31 +108,56 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNullWithPagination(
             @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
 
+    /**
+     * 查詢所有星標檔案
+     *
+     * @param userId 用戶ID
+     * @param isStar 是否為星標檔案
+     **/
+    Flux<UserFileMetadata> findAllByUserIdAndIsStar(Long userId, Boolean isStar);
+
+    /**
+     * 根據用戶ID和最後訪問時間查詢檔案元數據
+     *
+     * @param userId 用戶ID
+     *
+     * @return Flux<UserFileMetadata> 返回所有檔案元數據
+     */
+    default Flux<UserFileMetadata> findAllByUserIdOrderByLastAccessTimeDesc(Long userId, List<FileEnum> type, R2dbcEntityOperations entityOperations) {
+
+        Criteria criteria = Criteria.where("user_id").is(userId).and("is_folder").is(false);
+
+        if (type != null && !type.isEmpty()) {
+            List<String> typeList = type.stream().map(FileEnum::name).toList();
+            criteria = criteria.and("file_type").in(typeList);
+        }
+
+        org.springframework.data.relational.core.query.Query query = org.springframework.data.relational.core.query.Query
+                .query(criteria)
+                .limit(20)
+                .sort(Sort.by(Sort.Direction.DESC, "last_access_time"));
+
+        return entityOperations.select(query, UserFileMetadata.class);
+    }
 
     /**
      * 計算該用戶擁有同一伺服器檔案的檔案數量
      *
-     * @param userId         用戶ID
-     * @param serverFileIds  伺服器檔案ID
-     * @param databaseClient 數據庫客戶端
+     * @param userId           用戶ID
+     * @param serverFileIds    伺服器檔案ID
+     * @param entityOperations R2dbc實體操作
      *
      * @return Mono<Long> 返回檔案數量
      */
     default Flux<ServerFileMetaCountDao> countByServerFileIdInAndUserId(
-            @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, DatabaseClient databaseClient) {
-        return databaseClient
-                .sql("SELECT server_file_id as serverFileId, COUNT(*) AS count FROM user_file_metadata WHERE server_file_id IN (:serverFileIds) AND user_id = :userId GROUP BY server_file_id")
+            @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, R2dbcEntityOperations entityOperations) {
+
+        return entityOperations
+                .getDatabaseClient()
+                .sql("SELECT server_file_id, COUNT(*) as count FROM user_file_metadata WHERE server_file_id IN (:serverFileIds) AND user_id = :userId GROUP BY server_file_id")
                 .bind("serverFileIds", serverFileIds)
                 .bind("userId", userId)
-                .fetch()
-                .all()
-                .mapNotNull(row -> {
-                    Long serverFileId = (Long) row.get("serverFileId");
-                    Long count = (Long) row.get("count");
-                    if (serverFileId != null && count != null) {
-                        return new ServerFileMetaCountDao(serverFileId, count);
-                    }
-                    return null;
-                });
+                .map((row, metadata) -> new ServerFileMetaCountDao(row.get("server_file_id", Long.class), row.get("count", Long.class)))
+                .all();
     }
 }

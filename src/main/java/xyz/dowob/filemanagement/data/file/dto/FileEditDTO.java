@@ -26,7 +26,7 @@ public class FileEditDTO {
      * 文件名稱
      */
     @NotBlank(message = "文件名稱不能為空")
-    private String fileName;
+    private String filename;
 
     /**
      * 文件父資料夾ID
@@ -37,6 +37,11 @@ public class FileEditDTO {
      * 分享用戶ID
      */
     private Set<Long> shareUserIds;
+
+    /**
+     * 是否為星標文件
+     */
+    private Boolean isStar;
 
     /**
      * 編輯類型

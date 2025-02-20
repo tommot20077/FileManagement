@@ -64,6 +64,12 @@ public class UserFileMetadata {
     private Boolean isFolder = false;
 
     /**
+     * 是否為星標文件
+     */
+    @Column("is_star")
+    private Boolean isStar = false;
+
+    /**
      * 文件類型，此與ServerFileMetadata的fileType相同
      * 部分自定義檔案無伺服器文件元數據，因此需要在此處定義
      */

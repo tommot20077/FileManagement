@@ -25,7 +25,7 @@ public class FileMetadataDTO {
      * 文件名稱
      */
     @NotBlank(message = "文件名稱不能為空")
-    private String fileName;
+    private String filename;
 
     /**
      * 文件路徑
@@ -59,7 +59,7 @@ public class FileMetadataDTO {
      */
     public UserFileMetadata formatToUserFileMetadata(Long serverFileId) {
         UserFileMetadata userFileMetadata = new UserFileMetadata();
-        userFileMetadata.setFilename(this.fileName);
+        userFileMetadata.setFilename(this.filename);
         userFileMetadata.setParentFolderId(this.parentFolderId);
         userFileMetadata.setServerFileId(serverFileId);
         userFileMetadata.setUserId(this.user.getId());
@@ -80,7 +80,7 @@ public class FileMetadataDTO {
         UploadTaskBO task = new UploadTaskBO();
         task.setTransferTaskId(uploadTaskId);
         task.setParentFolderId(parentFolderId);
-        task.setFileName(this.getFileName());
+        task.setFilename(this.getFilename());
         task.setMd5(this.getMd5());
         task.setUser(this.user);
         task.setMessage(message);

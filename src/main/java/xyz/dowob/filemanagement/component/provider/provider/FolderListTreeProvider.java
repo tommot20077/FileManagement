@@ -11,6 +11,7 @@ import xyz.dowob.filemanagement.exception.ProcessException;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 用戶檔案列表樹提供者，用於提供用戶的檔案列表樹，用於加快檔案列表的查詢速度
@@ -33,7 +34,7 @@ public class FolderListTreeProvider {
     private final Map<Long, FolderTree> userFileListTree;
 
     public FolderListTreeProvider() {
-        this.userFileListTree = new HashMap<>();
+        this.userFileListTree = new ConcurrentHashMap<>();
     }
 
     /**
@@ -131,7 +132,7 @@ public class FolderListTreeProvider {
         if (folderTree != null) {
             return folderTree.getPath(folderId);
         }
-        return Collections.singletonList(new FolderNode(null, "root"));
+        return Collections.singletonList(new FolderNode(0L, "root"));
     }
 
     /**
@@ -169,7 +170,7 @@ public class FolderListTreeProvider {
         public FolderNode(Long folderId, String name) {
             this.folderId = folderId;
             this.name = name;
-            this.children = new HashMap<>();
+            this.children = new ConcurrentHashMap<>();
         }
 
         /**
@@ -180,7 +181,7 @@ public class FolderListTreeProvider {
         public FolderNode(UserFileMetadata userFileMetadata) {
             this.folderId = userFileMetadata.getId();
             this.name = userFileMetadata.getFilename();
-            this.children = new HashMap<>();
+            this.children = new ConcurrentHashMap<>();
         }
     }
 
@@ -206,10 +207,10 @@ public class FolderListTreeProvider {
          * FolderTree 構造方法
          */
         public FolderTree() {
-            this.root = new FolderNode(null, "root");
-            this.folderMap = new HashMap<>();
-            this.folderMap.put(null, this.root);
-            this.pendingNodes = new HashMap<>();
+            this.root = new FolderNode(0L, "root");
+            this.folderMap = new ConcurrentHashMap<>();
+            this.folderMap.put(0L, this.root);
+            this.pendingNodes = new ConcurrentHashMap<>();
         }
 
 
@@ -237,6 +238,7 @@ public class FolderListTreeProvider {
                 oldParent.getChildren().remove(metadata.getId());
             }
 
+            newParentId = newParentId != null ? newParentId : 0L;
             FolderNode newParent = folderMap.get(newParentId);
             if (newParent != null) {
                 linkNodes(newParent, node);
@@ -318,7 +320,7 @@ public class FolderListTreeProvider {
          * @throws ProcessException 初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
          */
         private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
-            folderList.stream().filter(UserFileListDTO::isFolder).forEach(this::addFolder);
+            folderList.stream().filter(UserFileListDTO::getIsFolder).forEach(this::addFolder);
 
             if (isLastPage) {
                 for (Long parentId : pendingNodes.keySet()) {
@@ -342,12 +344,12 @@ public class FolderListTreeProvider {
          * @throws RuntimeException 添加資料夾失敗，當存在循環引用時，拋出此異常
          */
         private void addFolder(UserFileListDTO userFileListDTO) {
-            if (!userFileListDTO.isFolder()) {
+            if (!userFileListDTO.getIsFolder()) {
                 return;
             }
 
             Long folderId = userFileListDTO.getId();
-            Long parentFolderId = userFileListDTO.getParentFolderId();
+            Long parentFolderId = userFileListDTO.getParentFolderId() != null ? userFileListDTO.getParentFolderId() : 0L;
             if (hasCircularReference(parentFolderId)) {
                 throw new RuntimeException("存在循環引用");
             }
@@ -375,10 +377,10 @@ public class FolderListTreeProvider {
          *
          * @return 是否存在循環引用
          */
-        private boolean hasCircularReference(Long parentId) {
+        private boolean hasCircularReference(long parentId) {
             Set<Long> visited = new HashSet<>();
-            Long currentId = parentId;
-            while (currentId != null) {
+            long currentId = parentId;
+            while (currentId != 0L) {
                 if (!visited.add(currentId)) {
                     return true;
                 }
@@ -386,7 +388,7 @@ public class FolderListTreeProvider {
                 if (parent == null) {
                     return false;
                 }
-                currentId = parent.getParentFolder() != null ? parent.getParentFolder().getFolderId() : null;
+                currentId = parent.getParentFolder() != null ? parent.getParentFolder().getFolderId() : 0L;
             }
             return false;
         }

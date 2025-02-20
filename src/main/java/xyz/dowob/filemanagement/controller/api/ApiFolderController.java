@@ -11,13 +11,13 @@ import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -60,16 +60,58 @@ public class ApiFolderController extends BaseFileController {
     @HideOverLength
     public Mono<ResponseEntity<?>> getFolderFiles(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type, ServerWebExchange exchange) {
-        List<FileEnum> fileEnums = Optional.ofNullable(type).orElse(Collections.emptyList()).stream().map(t -> {
-            try {
-                return FileEnum.valueOf(t.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
-        }).filter(Objects::nonNull).toList();
-        return super.getUserFileList(exchange, id, page, size, fileEnums);
+            @RequestParam(required = false, defaultValue = "1") Integer page, ServerWebExchange exchange,
+            @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+    }
+
+    /**
+     * 獲取星標檔案列表
+     *
+     * @param exchange 請求對象
+     * @param page     分頁頁碼
+     * @param size     分頁大小
+     * @param type     檔案類型
+     *
+     * @return 星標檔案列表
+     */
+    @GetMapping("/star")
+    public Mono<ResponseEntity<?>> getStarFiles(ServerWebExchange exchange,
+                                                @RequestParam(required = false, defaultValue = "1") Integer page,
+                                                @RequestParam(required = false) Integer size,
+                                                @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, -2L, page, size, getFileEnums(type));
+    }
+
+    /**
+     * 獲取最近使用檔案列表
+     *
+     * @param exchange 請求對象
+     * @param type     檔案類型
+     *
+     * @return 最近檔案列表
+     */
+    @GetMapping("recently")
+    public Mono<ResponseEntity<?>> getRecentlyFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, -3L, 1, null, getFileEnums(type));
+    }
+
+    /**
+     * 獲取所有檔案列表
+     *
+     * @param exchange 請求對象
+     * @param page     分頁頁碼
+     * @param size     分頁大小
+     * @param type     檔案類型
+     *
+     * @return 所有檔案列表
+     */
+    @GetMapping("/all")
+    public Mono<ResponseEntity<?>> getAllFiles(ServerWebExchange exchange,
+                                               @RequestParam(required = false, defaultValue = "1") Integer page,
+                                               @RequestParam(required = false) Integer size,
+                                               @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, -1L, page, size, getFileEnums(type));
     }
 
     /**
@@ -99,7 +141,8 @@ public class ApiFolderController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
                                    .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
-                                   .then(userService.getUser(exchange)).flatMap(user -> folderService.editFolder(fileEditDTO, user))
+                                   .then(userService.getUser(exchange))
+                                   .flatMap(user -> folderService.editFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null))), exchange);
     }
 
@@ -112,10 +155,11 @@ public class ApiFolderController extends BaseFileController {
      * @return 創建結果
      */
     @PostMapping
-    public Mono<ResponseEntity<?>> createFolder(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> createFolder(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
-                                   .then(userService.getUser(exchange)).flatMap(user -> folderService.createFolder(fileEditDTO, user))
+                                   .then(userService.getUser(exchange))
+                                   .flatMap(user -> folderService.createFolder(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
     }
 

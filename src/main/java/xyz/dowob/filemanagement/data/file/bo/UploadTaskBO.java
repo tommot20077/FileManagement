@@ -33,7 +33,7 @@ public class UploadTaskBO {
      * 檔案名稱
      */
     @NotBlank(message = "檔案名稱不能為空")
-    private String fileName;
+    private String filename;
 
     /**
      * 檔案類型
@@ -71,7 +71,7 @@ public class UploadTaskBO {
      */
     public FileMetadataDTO formatToFileMetadata() {
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
-        fileMetadataDTO.setFileName(this.fileName);
+        fileMetadataDTO.setFilename(this.filename);
         fileMetadataDTO.setParentFolderId(this.parentFolderId);
         fileMetadataDTO.setMd5(this.md5);
         fileMetadataDTO.setFileSize(this.fileSize);
