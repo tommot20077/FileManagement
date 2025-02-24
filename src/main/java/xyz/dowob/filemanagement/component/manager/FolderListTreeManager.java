@@ -11,13 +11,18 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
+import xyz.dowob.filemanagement.unity.DynamicThreadPoolExecutor;
+
+import java.util.Collections;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 用戶檔案列表樹管理器，用於初始化用戶的檔案列表樹
@@ -56,6 +61,16 @@ public class FolderListTreeManager implements ApplicationRunner {
     private final FileProperties fileProperties;
 
     /**
+     * 動態線程池執行器
+     */
+    private final DynamicThreadPoolExecutor dynamicThreadPoolExecutor = new DynamicThreadPoolExecutor(2,
+                                                                                                      10,
+                                                                                                      60,
+                                                                                                      TimeUnit.SECONDS,
+                                                                                                      new LinkedBlockingQueue<>(1)
+    );
+
+    /**
      * 初始化用戶的檔案列表樹
      *
      * @param args 啟動參數
@@ -79,14 +94,17 @@ public class FolderListTreeManager implements ApplicationRunner {
                     .getUserFileListTree()
                     .computeIfPresent(user.getId(), (id, node) -> folderListTreeProvider.getUserFileListTree().remove(id));
             return fetchAllUserFiles(user).flatMap(pageList -> {
-                try {
-                    folderListTreeProvider.initializeTree(user.getId(), pageList.getData(), pageList.getCurrentPage() == pageList.getTotalPages());
-                } catch (ProcessException e) {
-                    return Flux.error(new ProcessException(ProcessException.ErrorCode.BUILD_FILE_TREE_FAILED));
-                }
+                dynamicThreadPoolExecutor.submit(() -> {
+                    try {
+                        boolean isLastPage = pageList.getCurrentPage() == pageList.getTotalPages();
+                        folderListTreeProvider.initializeTree(user.getId(), pageList.getData(), isLastPage);
+                    } catch (Exception e) {
+                        log.error("初始化用戶 {}的檔案列表樹失敗", user.getId(), e);
+                    }
+                });
                 return Mono.just(user);
             });
-        }).doOnComplete(() -> log.info("初始化用戶的檔案列表樹完成")).subscribe();
+        }).subscribe();
     }
 
     /**
@@ -98,7 +116,12 @@ public class FolderListTreeManager implements ApplicationRunner {
      */
     private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user) {
         int pageSize = fileProperties.getGlobal().getPageSize();
-        FileFilterDTO fileFilterDTO = FileFilterDTO.builder().folderId(ReservedSearchIdEnum.ALL_FILE_ID.getId()).pageSize(pageSize).build();
+        FileFilterDTO fileFilterDTO = FileFilterDTO
+                .builder()
+                .folderId(ReservedSearchIdEnum.ALL_FILE_ID.getId())
+                .pageSize(pageSize)
+                .types(Collections.singletonList(FileEnum.FOLDER))
+                .build();
 
         return fileServiceStrategy.getFileService().getUserFileList(user, fileFilterDTO).expand(pagedResponseDTO -> {
             int nextPage = pagedResponseDTO.getCurrentPage() + 1;

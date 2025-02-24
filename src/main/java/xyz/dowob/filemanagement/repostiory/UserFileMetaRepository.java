@@ -249,7 +249,6 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
             sql.append(" AND is_deleted = 0");
         }
 
-        System.out.println(sql.toString());
         DatabaseClient.GenericExecuteSpec bindSpec = r2dbcEntityOperations.getDatabaseClient().sql(sql.toString()).bind("userId", userId);
 
         if (keyword != null && !keyword.isEmpty()) {

@@ -100,6 +100,12 @@ public class ProcessException extends Exception {
          * 錯誤信息: 線上檔案ID: %s 版本: %s ，存在差異文件和快照
          */
         EXISTING_DIFF_AND_SNAPSHOT(1213, "線上檔案ID: %s 版本: %s ，存在差異文件和快照"),
+
+        /**
+         * 錯誤碼: 1214
+         * 錯誤信息: 文件夾樹存在循環引用
+         */
+        FOLDER_TREE_EXISTING_CYCLE(1214, "文件夾樹存在循環引用"),
         ;
 
 

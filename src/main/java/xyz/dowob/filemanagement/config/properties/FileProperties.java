@@ -89,8 +89,16 @@ public class FileProperties {
     public static class global {
         /**
          * 是否啟用用戶文件列表樹，默認為 true
+         * 建議啟用，可以有效提升檔案路徑查詢效率。
+         * 若關閉時查詢檔案路徑時則不會顯示檔案路徑，以及無法啟用資料夾深度限制
          */
         private Boolean enableUserFolderListTree = true;
+
+        /**
+         * 文件列表樹最大深度，默認為 20
+         * 此參數僅在啟用用戶文件列表樹時生效
+         */
+        private Integer maxFolderDepth = 20;
 
         /**
          * 文件列表每頁顯示數量，默認為 100
@@ -102,7 +110,6 @@ public class FileProperties {
          */
         private Integer showRecentFileCount = 20;
 
-        //private Integer maxFolderDepth = 10;
     }
 
     @Data

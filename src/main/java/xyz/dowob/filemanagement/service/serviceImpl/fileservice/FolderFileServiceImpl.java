@@ -24,6 +24,7 @@ import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileShareRecord;
+import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.*;
 import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
@@ -66,8 +67,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               folderListTreeProvider,
               fileTrashRecordRepository,
               entityOperations,
-              transactionalOperator,
-              userFIleShareRecordRepository, objectMapper, cacheManager
+              transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
         );
     }
     //todo 後期加入下載資料夾的功能
@@ -90,20 +90,24 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             folder.setLastAccessTime(LocalDateTime.now());
             folder.setUploadTime(LocalDateTime.now());
             folder.setFileType(FileEnum.FOLDER);
-
-            return userFileMetaRepository.save(folder).flatMap(newFolder -> {
+            Mono<Void> action = userFileMetaRepository.save(folder).flatMap(newFolder -> {
+                if (folderListTreeProvider != null) {
+                    try {
+                        folderListTreeProvider.addFolder(user.getId(), folder);
+                    } catch (ProcessException | ValidationException e) {
+                        return Mono.error(e);
+                    }
+                }
                 List<UserFileShareRecord> userFileShareRecords = new ArrayList<>();
                 fileEditDTO.getShareUsers().forEach(shareUserEditPO -> {
                     userFileShareRecords.add(new UserFileShareRecord(shareUserEditPO.getUserId(), newFolder.getId()));
                 });
-
-                if (folderListTreeProvider != null) {
-                    folderListTreeProvider.addFolder(user.getId(), newFolder);
-                }
                 return userFIleShareRecordRepository
                         .saveAll(userFileShareRecords)
                         .then(cleanUserListCache(user.getId(), newFolder.getParentFolderId()));
+
             });
+            return transactionalOperator.transactional(action).then();
         });
     }
 
@@ -133,11 +137,20 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         });
                     }
                        return Mono.just(fileEditDTO.getUserFileMetadata());
-                })
-                .flatMap(userFileMetadata -> redisProvider
+                }).doOnNext(userFileMetadata -> redisProvider
                         .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
-                        .then(Mono.just(userFileMetadata)))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .subscribe())
                 .flatMap(userFileMetadata -> {
+                    if (folderListTreeProvider != null) {
+                        try {
+                            folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO);
+                        } catch (ValidationException e) {
+                            return Mono.error(e);
+                        }
+                    }
+
+
                     userFileMetadata.setFilename(fileEditDTO.getFilename());
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
@@ -147,10 +160,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
                     Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
                     userFileMetadata.setIsStar(isStar);
-
-                    if (folderListTreeProvider != null) {
-                        folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO.getParentFolderId());
-                    }
 
                     if (fileEditDTO.getRecursiveSetting()) {
                         Mono<Void> handleChildFolder = findAllChildFolder(Collections.singletonList(userFileMetadata.getId()),
@@ -250,7 +259,11 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                                     })
                                     .then(Mono.defer(() -> {
                                         if (folderListTreeProvider != null) {
-                                            folderListTreeProvider.addFolders(user.getId(), childFolderList);
+                                            try {
+                                                folderListTreeProvider.addFolders(user.getId(), childFolderList);
+                                            } catch (ProcessException | ValidationException e) {
+                                                return Mono.error(e);
+                                            }
                                         }
                                         return Mono.just(folder);
                                     }));

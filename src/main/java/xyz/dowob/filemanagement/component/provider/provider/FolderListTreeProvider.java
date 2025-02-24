@@ -5,14 +5,21 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ProcessException;
+import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.unity.DynamicThreadPoolExecutor;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 用戶檔案列表樹提供者，用於提供用戶的檔案列表樹，用於加快檔案列表的查詢速度
@@ -34,19 +41,42 @@ public class FolderListTreeProvider {
      */
     private final Map<Long, FolderTree> userFileListTree;
 
+    /**
+     * 最大資料夾深度
+     */
+    private final int maxFolderDepth;
 
-    public FolderListTreeProvider() {
+    /**
+     * FolderListTreeProvider 構造方法
+     * 初始化用戶檔案列表樹映射
+     */
+    public FolderListTreeProvider(FileProperties fileProperties) {
+        this.maxFolderDepth = fileProperties.getGlobal().getMaxFolderDepth();
         this.userFileListTree = new ConcurrentHashMap<>();
     }
+
+    /**
+     * 線程池執行器，用於執行線程池任務
+     */
+    private static final DynamicThreadPoolExecutor threadPoolExecutor = new DynamicThreadPoolExecutor(2,
+                                                                                                      4,
+                                                                                                      60,
+                                                                                                      TimeUnit.SECONDS,
+                                                                                                      new LinkedBlockingQueue<>(1024)
+    );
+
 
     /**
      * 添加新的資料夾到用戶的檔案列表樹中
      *
      * @param userId           用戶ID
      * @param userFileMetadata 文件夾元數據
+     *
+     * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
+     * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
      */
-    public void addFolder(Long userId, UserFileMetadata userFileMetadata) {
-        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
+    public void addFolder(Long userId, UserFileMetadata userFileMetadata) throws ProcessException, ValidationException {
+        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
         folderTree.addFolder(userFileMetadata.getFileType() == FileEnum.FOLDER,
                              userFileMetadata.getId(),
                              userFileMetadata.getParentFolderId(),
@@ -60,14 +90,19 @@ public class FolderListTreeProvider {
      *
      * @param userId               用戶ID
      * @param userFileMetadataList 文件夾元數據列表
+     *
+     * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
+     * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
      */
-    public void addFolders(Long userId, List<UserFileMetadata> userFileMetadataList) {
-        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
-        userFileMetadataList.forEach(userFileListDTO -> folderTree.addFolder(userFileListDTO.getFileType() == FileEnum.FOLDER,
-                                                                             userFileListDTO.getId(),
-                                                                             userFileListDTO.getParentFolderId(),
-                                                                             userFileListDTO.getFilename()
-        ));
+    public void addFolders(Long userId, List<UserFileMetadata> userFileMetadataList) throws ProcessException, ValidationException {
+        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
+        for (UserFileMetadata userFileListDTO : userFileMetadataList) {
+            folderTree.addFolder(userFileListDTO.getFileType() == FileEnum.FOLDER,
+                                 userFileListDTO.getId(),
+                                 userFileListDTO.getParentFolderId(),
+                                 userFileListDTO.getFilename()
+            );
+        }
     }
 
 
@@ -79,7 +114,7 @@ public class FolderListTreeProvider {
      * @return 用戶的檔案列表樹
      */
     public FolderTree createAndGetFileTree(Long userId) {
-        return userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
+        return userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
     }
 
     /**
@@ -99,26 +134,31 @@ public class FolderListTreeProvider {
      * @param userId     用戶ID
      * @param folderList 文件夾列表
      * @param isLastPage 是否為最後一頁
+     *
+     * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
+     * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
      */
-    public void initializeTree(Long userId, List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
-        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
+    public void initializeTree(Long userId, List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException, ValidationException {
+        FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
         folderTree.initializeTree(folderList, isLastPage);
     }
 
     /**
      * 更新資料夾的父資料夾
      *
-     * @param userId               用戶ID
-     * @param userFileMetadataList 資料夾元數據
-     * @param newParentId          新的父資料夾ID
+     * @param userId           用戶ID
+     * @param userFileMetadata 資料夾元數據
+     * @param editDTO          文件編輯DTO
      */
-    public void updateFolder(Long userId, UserFileMetadata userFileMetadataList, Long newParentId) {
+    public void updateFolder(Long userId, UserFileMetadata userFileMetadata, FileEditDTO editDTO) throws ValidationException {
+        boolean isMoveFolder = !Objects.equals(editDTO.getParentFolderId(), userFileMetadata.getParentFolderId());
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
-            folderTree.updateFolder(userFileMetadataList.getFileType() == FileEnum.FOLDER,
-                                    userFileMetadataList.getId(),
-                                    userFileMetadataList.getFilename(),
-                                    newParentId
+            folderTree.updateFolder(userFileMetadata.getFileType() == FileEnum.FOLDER,
+                                    userFileMetadata.getId(),
+                                    editDTO.getFilename(),
+                                    editDTO.getParentFolderId(),
+                                    isMoveFolder
             );
         }
     }
@@ -144,6 +184,7 @@ public class FolderListTreeProvider {
      *
      * @return 資料夾的路徑列表
      */
+    @SkipRecord
     public List<FolderNode> getPath(Long userId, Long folderId) {
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
@@ -151,6 +192,23 @@ public class FolderListTreeProvider {
         }
         return Collections.singletonList(new FolderNode(0L, "root"));
     }
+
+    /**
+     * 獲取資料夾的深度
+     *
+     * @param userId   用戶ID
+     * @param folderId 資料夾ID
+     *
+     * @return 資料夾的深度
+     */
+    public int getFolderDepth(Long userId, Long folderId) {
+        FolderTree folderTree = userFileListTree.get(userId);
+        if (folderTree != null) {
+            return folderTree.getPath(folderId).size() - 1;
+        }
+        return 0;
+    }
+
 
     /**
      * 子類: 資料夾節點
@@ -182,6 +240,16 @@ public class FolderListTreeProvider {
         private Map<Long, FolderNode> children;
 
         /**
+         * 當前資料夾深度
+         */
+        private int currentDepth = 0;
+
+        /**
+         * 最大子資料夾深度
+         */
+        private int maxSubTreeDepth = 0;
+
+        /**
          * FolderNode 構造方法
          *
          * @param folderId 資料夾ID
@@ -202,6 +270,23 @@ public class FolderListTreeProvider {
             this.folderId = userFileMetadata.getId();
             this.name = userFileMetadata.getFilename();
             this.children = new ConcurrentHashMap<>();
+        }
+
+        /**
+         * 更新最大子資料夾深度
+         */
+        public void updateMaxSubtreeDepth() {
+            if (this.children.isEmpty()) {
+                this.maxSubTreeDepth = 0;
+                return;
+            }
+
+            this.maxSubTreeDepth = this.children
+                    .values()
+                    .stream()
+                    .max(Comparator.comparingInt(FolderNode::getMaxSubTreeDepth))
+                    .map(node -> node.getMaxSubTreeDepth() + 1)
+                    .orElse(0);
         }
     }
 
@@ -226,29 +311,98 @@ public class FolderListTreeProvider {
         private final Map<Long, List<FolderNode>> pendingNodes;
 
         /**
+         * 最大資料夾深度
+         */
+        private final int maxFolderDepthLimit;
+
+        /**
          * FolderTree 構造方法
          */
-        public FolderTree() {
+        public FolderTree(int maxFolderDepthLimit) {
             this.root = new FolderNode(0L, "root");
+            this.pendingNodes = new ConcurrentHashMap<>();
             this.folderMap = new ConcurrentHashMap<>();
             this.folderMap.put(0L, this.root);
-            this.pendingNodes = new ConcurrentHashMap<>();
+            this.maxFolderDepthLimit = maxFolderDepthLimit;
         }
 
 
         /**
+         * 添加資料夾
+         *
+         * @param isFolder       是否為資料夾
+         * @param folderId       資料夾ID
+         * @param parentFolderId 父資料夾ID
+         * @param filename       資料夾名稱
+         *
+         * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
+         * @throws ProcessException    當資料夾樹存在循環引用時，拋出此異常
+         */
+        private void addFolder(Boolean isFolder, Long folderId, Long parentFolderId, String filename) throws ValidationException, ProcessException {
+            if (!isFolder) {
+                return;
+            }
+
+            parentFolderId = Objects.requireNonNullElse(parentFolderId, 0L);
+            if (hasCircularReference(parentFolderId)) {
+                throw new ProcessException(ProcessException.ErrorCode.FOLDER_TREE_EXISTING_CYCLE);
+            }
+
+            FolderNode parentFolder = folderMap.get(parentFolderId);
+
+            int maxFolderDepth = Objects.requireNonNullElse(parentFolder, root).getCurrentDepth() + 1;
+            if (parentFolder != null && maxFolderDepth > maxFolderDepthLimit) {
+                throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, maxFolderDepth);
+            }
+
+            FolderNode folderNode = new FolderNode(folderId, filename);
+            folderMap.put(folderId, folderNode);
+
+
+            if (parentFolder != null) {
+                linkNodes(parentFolder, folderNode);
+            } else {
+                pendingNodes.computeIfAbsent(parentFolderId, k -> new ArrayList<>()).add(folderNode);
+            }
+
+            List<FolderNode> children = pendingNodes.remove(folderId);
+            if (children != null) {
+                children.forEach(child -> linkNodes(folderNode, child));
+            }
+        }
+
+        /**
          * 更新資料夾樹
          *
-         * @param isFolder    是否為資料夾
-         * @param folderId    資料夾ID
-         * @param filename    資料夾名稱
-         * @param newParentId 新的父資料夾ID
+         * @param isFolder     是否為資料夾
+         * @param folderId     資料夾ID
+         * @param filename     資料夾名稱
+         * @param newParentId  新的父資料夾ID
+         * @param isMoveFolder 是否移動資料夾
+         *
+         * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
          */
-        private void updateFolder(Boolean isFolder, Long folderId, String filename, Long newParentId) {
+        private void updateFolder(Boolean isFolder, Long folderId, String filename, Long newParentId, boolean isMoveFolder) throws ValidationException {
             FolderNode node = folderMap.get(folderId);
             if (node == null || !isFolder) {
                 return;
             }
+
+            if (!isMoveFolder) {
+                node.setName(filename);
+                return;
+            }
+
+            newParentId = Objects.requireNonNullElse(newParentId, 0L);
+            FolderNode newParent = folderMap.get(newParentId);
+
+            if (newParent != null) {
+                int potentialDepth = newParent.getCurrentDepth() + 1 + node.getMaxSubTreeDepth();
+                if (potentialDepth > maxFolderDepthLimit) {
+                    throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, potentialDepth);
+                }
+            }
+
             node.setName(filename);
 
             if (node.getChildren() != null) {
@@ -262,8 +416,6 @@ public class FolderListTreeProvider {
                 oldParent.getChildren().remove(folderId);
             }
 
-            newParentId = Objects.requireNonNullElse(newParentId, 0L);
-            FolderNode newParent = folderMap.get(newParentId);
             if (newParent != null) {
                 linkNodes(newParent, node);
             } else {
@@ -274,7 +426,7 @@ public class FolderListTreeProvider {
             if (children != null) {
                 children.forEach(child -> linkNodes(node, child));
             }
-            CompletableFuture.runAsync(() -> synchronizeTree(node));
+            threadPoolExecutor.submit(() -> synchronizeTree(node));
         }
 
         /**
@@ -287,53 +439,41 @@ public class FolderListTreeProvider {
             if (node == null) {
                 return;
             }
+            ConcurrentLinkedQueue<FolderNode> toDelete = new ConcurrentLinkedQueue<>();
+            toDelete.offer(node);
 
-            unlinkNode(node);
-            removeSubtree(node);
-        }
 
-        /**
-         * 獲取資料夾的路徑
-         *
-         * @param folderId 資料夾ID
-         *
-         * @return 資料夾的路徑列表
-         */
-        private List<FolderNode> getPath(Long folderId) {
-            List<FolderNode> path = new ArrayList<>();
-            FolderNode current = folderMap.get(folderId);
-            while (current != null) {
-                path.add(current);
-                current = current.getParentFolder();
-            }
-            return path;
-        }
-
-        /**
-         * 清除連接的節點將指定的節點從父節點中移除並將父節點設置為空
-         *
-         * @param node 資料夾節點
-         */
-        private void unlinkNode(FolderNode node) {
-            FolderNode parent = node.getParentFolder();
-            if (parent != null) {
-                parent.getChildren().remove(node.getFolderId());
-            }
-            node.setParentFolder(null);
+            threadPoolExecutor.submit(() -> {
+                while (!toDelete.isEmpty()) {
+                    FolderNode current = toDelete.poll();
+                    if (current == null) {
+                        continue;
+                    }
+                    removeSubtree(current, toDelete);
+                }
+            });
         }
 
         /**
          * 移除子樹，將指定節點的子樹從資料夾映射中移除此操作用於批量刪除資料夾
+         * 並清除連接的節點將指定的節點從父節點中移除並將父節點設置為空
          *
          * @param node 資料夾節點
          */
-        private void removeSubtree(FolderNode node) {
-            for (FolderNode child : new ArrayList<>(node.getChildren().values())) {
-                removeSubtree(child);
+        private void removeSubtree(FolderNode node, Queue<FolderNode> toDelete) {
+            for (FolderNode child : node.getChildren().values()) {
+                toDelete.offer(child);
             }
+
+            FolderNode parent = node.getParentFolder();
+            if (parent != null) {
+                parent.getChildren().remove(node.getFolderId());
+            }
+
             folderMap.remove(node.getFolderId());
             pendingNodes.remove(node.getFolderId());
             node.getChildren().clear();
+            node.setParentFolder(null);
         }
 
         /**
@@ -342,12 +482,15 @@ public class FolderListTreeProvider {
          * @param folderList 文件夾列表
          * @param isLastPage 是否為最後一頁
          *
-         * @throws ProcessException 初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
+         * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
+         * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
          */
-        private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
-            folderList
-                    .stream().filter(folder -> folder.getFileType() == FileEnum.FOLDER)
-                    .forEach(folder -> addFolder(true, folder.getId(), folder.getParentFolderId(), folder.getFilename()));
+        private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException, ValidationException {
+            for (UserFileListDTO folder : folderList) {
+                if (folder.getFileType() == FileEnum.FOLDER) {
+                    addFolder(true, folder.getId(), folder.getParentFolderId(), folder.getFilename());
+                }
+            }
 
             if (isLastPage) {
                 for (Long parentId : pendingNodes.keySet()) {
@@ -358,44 +501,7 @@ public class FolderListTreeProvider {
                 if (!validateTree()) {
                     throw new ProcessException(ProcessException.ErrorCode.BUILD_FILE_TREE_FAILED, "初始化資料夾樹失敗，存在無效的節點");
                 }
-                CompletableFuture.runAsync(() -> synchronizeTree(root));
-            }
-        }
-
-
-        /**
-         * 添加資料夾
-         *
-         * @param isFolder       是否為資料夾
-         * @param folderId       資料夾ID
-         * @param parentFolderId 父資料夾ID
-         * @param filename       資料夾名稱
-         *
-         * @throws RuntimeException 添加資料夾失敗，當存在循環引用時，拋出此異常
-         */
-        private void addFolder(Boolean isFolder, Long folderId, Long parentFolderId, String filename) {
-            if (!isFolder) {
-                return;
-            }
-
-            parentFolderId = Objects.requireNonNullElse(parentFolderId, 0L);
-            if (hasCircularReference(parentFolderId)) {
-                throw new RuntimeException("存在循環引用");
-            }
-
-            FolderNode folderNode = new FolderNode(folderId, filename);
-            folderMap.put(folderId, folderNode);
-
-            FolderNode parentFolder = folderMap.get(parentFolderId);
-            if (parentFolder != null) {
-                linkNodes(parentFolder, folderNode);
-            } else {
-                pendingNodes.computeIfAbsent(parentFolderId, k -> new ArrayList<>()).add(folderNode);
-            }
-
-            List<FolderNode> children = pendingNodes.remove(folderId);
-            if (children != null) {
-                children.forEach(child -> linkNodes(folderNode, child));
+                threadPoolExecutor.submit(() -> synchronizeTree(root));
             }
         }
 
@@ -430,10 +536,42 @@ public class FolderListTreeProvider {
          */
         private void linkNodes(FolderNode parent, FolderNode child) {
             child.setParentFolder(parent);
+            child.setCurrentDepth(parent.getCurrentDepth() + 1);
+
+            updateChildrenDepths(child);
+
             parent.getChildren().put(child.getFolderId(), child);
+
+            updateAncestorDepths(parent);
 
             folderMap.put(child.getFolderId(), child);
             folderMap.put(parent.getFolderId(), parent);
+        }
+
+        /**
+         * 更新子資料夾的深度
+         *
+         * @param node 資料夾節點
+         */
+        private void updateChildrenDepths(FolderNode node) {
+            for (FolderNode child : node.getChildren().values()) {
+                child.setCurrentDepth(node.getCurrentDepth() + 1);
+                updateChildrenDepths(child);
+            }
+            node.updateMaxSubtreeDepth();
+        }
+
+        /**
+         * 更新父節點的深度
+         *
+         * @param node 資料夾節點
+         */
+        private void updateAncestorDepths(FolderNode node) {
+            FolderNode current = node;
+            while (current != null) {
+                current.updateMaxSubtreeDepth();
+                current = current.getParentFolder();
+            }
         }
 
         /**
@@ -465,6 +603,24 @@ public class FolderListTreeProvider {
                     synchronizeTree(child);
                 }
             }
+        }
+
+
+        /**
+         * 獲取資料夾的路徑
+         *
+         * @param folderId 資料夾ID
+         *
+         * @return 資料夾的路徑列表
+         */
+        private List<FolderNode> getPath(Long folderId) {
+            List<FolderNode> path = new ArrayList<>();
+            FolderNode current = folderMap.get(folderId);
+            while (current != null) {
+                path.add(current);
+                current = current.getParentFolder();
+            }
+            return path;
         }
     }
 }

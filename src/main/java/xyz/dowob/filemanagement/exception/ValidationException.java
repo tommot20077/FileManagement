@@ -324,6 +324,13 @@ public class ValidationException extends Exception {
          * 錯誤信息: 不支持的操作
          */
         UNSUPPORTED_OPERATION(1147, "不支持的操作"),
+
+        /**
+         * 錯誤碼: 1148
+         * HTTP狀態碼: 400
+         * 錯誤信息: 超過最大文件夾深度限制
+         */
+        EXCEED_MAX_FOLDER_DEPTH(1148, "超過最大文件夾深度限制: %s，預計更新深度: %s"),
         ;
 
 

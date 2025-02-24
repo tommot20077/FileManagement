@@ -25,6 +25,7 @@ import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -254,6 +255,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<List < FolderListTreeProvider.FolderNode>> 用戶文件路徑節點
      */
+    @SkipRecord
     public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(UserFileMetadata file, User user) {
         return Mono.just(file).flatMap(userFileMetadata -> {
             if (folderListTreeProvider != null) {
@@ -399,7 +401,6 @@ public abstract class AbstractFileService implements FileService {
                 for (UserFileListOrderEnum orderEnum : orderEnums) {
                     resultList.addAll(data.get(orderEnum));
                 }
-
 
                 return resultList;
             })).flatMap(Flux::fromIterable);
