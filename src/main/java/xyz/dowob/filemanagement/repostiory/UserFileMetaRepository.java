@@ -8,9 +8,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
+import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.util.List;
@@ -37,28 +37,15 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserId(Long userId);
 
+
     /**
-     * 根據用戶ID查詢所有檔案元數據，並進行分頁
+     * 根據用戶ID查詢所有檔案元數據並可指定是否需要顯示刪除檔案
      *
      * @param userId 用戶ID
-     * @param limit  限制條數
-     * @param offset 偏移量
      *
      * @return Flux<UserFileMetadata>
      */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
-    Flux<UserFileMetadata> findAllByUserIdWithPagination(
-            @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
-
-    /**
-     * 根據用戶ID和檔案名稱查詢檔案元數據
-     *
-     * @param userId   用戶ID
-     * @param filename 檔案名稱
-     *
-     * @return Mono<UserFileMetadata>
-     */
-    Mono<UserFileMetadata> findByUserIdAndFilenameOrderByIsFolder(Long userId, String filename);
+    Flux<UserFileMetadata> findAllByUserIdAndIsDeleted(Long userId, Boolean isDeleted);
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
@@ -71,19 +58,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInOrderByIsFolder(Long userId, List<Long> parentFolderId);
 
     /**
-     * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據，並進行分頁
+     * 根據用戶ID和父文件夾ID查詢檔案元數據並可指定是否需要顯示刪除檔案，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
      * @param userId         用戶ID
      * @param parentFolderId 父文件夾ID
-     * @param limit          限制條數
-     * @param offset         偏移量
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IN (:parentFolderId) ORDER BY IF(is_folder = 1, 0, 1), filename LIMIT :limit OFFSET :offset")
-    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInWithPagination(
-            @Param("userId") Long userId,
-            @Param("parentFolderId") List<Long> parentFolderId, @Param("limit") int limit, @Param("offset") int offset);
+    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInAndIsDeletedOrderByIsFolder(Long userId, List<Long> parentFolderId, Boolean isDeleted);
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)
@@ -92,21 +74,8 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
      */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename")
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL AND is_deleted = 0 ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
-
-    /**
-     * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)，並進行分頁
-     *
-     * @param userId 用戶ID
-     * @param limit  限制條數
-     * @param offset 偏移量
-     *
-     * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
-     */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename LIMIT :limit OFFSET :offset")
-    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNullWithPagination(
-            @Param("userId") Long userId, @Param("limit") int limit, @Param("offset") int offset);
 
     /**
      * 查詢所有星標檔案
@@ -114,7 +83,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @param userId 用戶ID
      * @param isStar 是否為星標檔案
      **/
-    Flux<UserFileMetadata> findAllByUserIdAndIsStar(Long userId, Boolean isStar);
+    Flux<UserFileMetadata> findAllByUserIdAndIsStarAndIsDeleted(Long userId, Boolean isStar, Boolean isDeleted);
 
     /**
      * 根據用戶ID和最後訪問時間查詢檔案元數據
@@ -125,7 +94,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     default Flux<UserFileMetadata> findAllByUserIdOrderByLastAccessTimeDesc(Long userId, List<FileEnum> type, R2dbcEntityOperations entityOperations) {
 
-        Criteria criteria = Criteria.where("user_id").is(userId).and("is_folder").is(false);
+        Criteria criteria = Criteria.where("user_id").is(userId).and("is_folder").is(false).and("is_deleted").is(false);
 
         if (type != null && !type.isEmpty()) {
             List<String> typeList = type.stream().map(FileEnum::name).toList();
@@ -159,5 +128,31 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                 .bind("userId", userId)
                 .map((row, metadata) -> new ServerFileMetaCountDao(row.get("server_file_id", Long.class), row.get("count", Long.class)))
                 .all();
+    }
+
+    /**
+     * 根據用戶ID查詢所有位於回收站的檔案元數據，並轉換查詢為UserFileMetadata結果，並按照是否為資料夾和檔案名稱排序
+     *
+     * @param userId 用戶ID
+     *
+     * @return Flux<UserFileMetadata>
+     */
+    default Flux<UserFileMetadata> findAllByUserIdOrderByIsFolder(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+        return r2dbcEntityOperations
+                .select(FileTrashRecord.class)
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("user_id").is(userId)))
+                .all()
+                .collectList()
+                .flatMapMany(fileIds -> {
+                    if (fileIds.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return r2dbcEntityOperations
+                            .select(UserFileMetadata.class)
+                            .matching(org.springframework.data.relational.core.query.Query
+                                              .query(Criteria.where("id").in(fileIds))
+                                              .sort(Sort.by(Sort.Order.asc("is_folder"), Sort.Order.asc("filename"))))
+                            .all();
+                });
     }
 }

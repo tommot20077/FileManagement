@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.convert.CustomConversions;
 import org.springframework.data.r2dbc.convert.R2dbcCustomConversions;
+import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import xyz.dowob.filemanagement.convert.EntityByteBooleanMapper;
 import xyz.dowob.filemanagement.convert.EntityJsonSetMapper;
 
@@ -35,6 +37,18 @@ public class R2dbcConfig {
                                                 new EntityByteBooleanMapper.ByteToBooleanConverter()
         );
         return new R2dbcCustomConversions(CustomConversions.StoreConversions.NONE, converters);
+    }
+
+    /**
+     * 用於配置 ReactiveTransactionManager，用於事務管理
+     *
+     * @param transactionManager 事務管理器
+     *
+     * @return ReactiveTransactionManager 返回一個 ReactiveTransactionManager 對象
+     */
+    @Bean
+    public TransactionalOperator transactionalOperator(ReactiveTransactionManager transactionManager) {
+        return TransactionalOperator.create(transactionManager);
     }
 
 }

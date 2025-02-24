@@ -241,6 +241,33 @@ public class ValidationException extends Exception {
          * 錯誤信息: 與上次紀錄內容相同
          */
         NO_CHANGE_IN_CONTENT(1135, "與上次紀錄內容相同"),
+        /**
+         * 錯誤碼: 1136
+         * HTTP狀態碼: 409
+         * 錯誤信息: 部分檔案已被刪除
+         */
+        SOME_FILE_ALREADY_DELETED(1136, HttpStatus.CONFLICT, "部分檔案已被刪除，檔案ID: %s"),
+
+        /**
+         * 錯誤碼: 1137
+         * HTTP狀態碼: 409
+         * 錯誤信息: 檔案未被刪除
+         */
+        NOT_DELETED_FILE(1137, HttpStatus.CONFLICT, "檔案未被刪除，檔案ID: %s"),
+
+        /**
+         * 錯誤碼: 1138
+         * HTTP狀態碼: 400
+         * 錯誤信息: 檔案類型與請求路徑不符合
+         */
+        FILE_TYPE_WITH_WRONG_REQUEST_PATH(1138, "檔案類型與請求路徑不符合，預期類型: %s，實際類型: %s"),
+
+        /**
+         * 錯誤碼: 1139
+         * HTTP狀態碼: 409
+         * 錯誤信息: 檔案已被刪除
+         */
+        ALREADY_DELETED_FILE(1139, HttpStatus.CONFLICT, "檔案已被刪除，檔案ID: %s"),
         ;
 
 

@@ -97,6 +97,12 @@ public class UserFileMetadata {
     private Set<Long> sharedWithUsers = new HashSet<>();
 
     /**
+     * 是否標記為刪除
+     */
+    @Column("is_deleted")
+    private Boolean isDeleted = false;
+
+    /**
      * 重寫hashCode方法，獲取對象的hashCode
      *
      * @return hashCode
@@ -142,6 +148,7 @@ public class UserFileMetadata {
         map.put("uploadTime", uploadTime);
         map.put("lastAccessTime", lastAccessTime);
         map.put("sharedWithUsers", sharedWithUsers);
+        map.put("isDeleted", isDeleted);
         return map.toString();
     }
 }

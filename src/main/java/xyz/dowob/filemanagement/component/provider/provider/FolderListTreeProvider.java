@@ -33,6 +33,7 @@ public class FolderListTreeProvider {
      */
     private final Map<Long, FolderTree> userFileListTree;
 
+
     public FolderListTreeProvider() {
         this.userFileListTree = new ConcurrentHashMap<>();
     }
@@ -40,24 +41,34 @@ public class FolderListTreeProvider {
     /**
      * 添加新的資料夾到用戶的檔案列表樹中
      *
-     * @param userId          用戶ID
-     * @param userFileListDTO 文件夾元數據
+     * @param userId           用戶ID
+     * @param userFileMetadata 文件夾元數據
      */
-    public void addFolder(Long userId, UserFileListDTO userFileListDTO) {
+    public void addFolder(Long userId, UserFileMetadata userFileMetadata) {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
-        folderTree.addFolder(userFileListDTO);
+        folderTree.addFolder(userFileMetadata.getIsFolder(),
+                             userFileMetadata.getId(),
+                             userFileMetadata.getParentFolderId(),
+                             userFileMetadata.getFilename()
+        );
     }
+
 
     /**
      * 添加新的資料夾到用戶的檔案列表樹中，用於批量添加
      *
-     * @param userId              用戶ID
-     * @param userFileListDTOList 文件夾元數據列表
+     * @param userId               用戶ID
+     * @param userFileMetadataList 文件夾元數據列表
      */
-    public void addFolders(Long userId, List<UserFileListDTO> userFileListDTOList) {
+    public void addFolders(Long userId, List<UserFileMetadata> userFileMetadataList) {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
-        userFileListDTOList.forEach(folderTree::addFolder);
+        userFileMetadataList.forEach(userFileListDTO -> folderTree.addFolder(userFileListDTO.getIsFolder(),
+                                                                             userFileListDTO.getId(),
+                                                                             userFileListDTO.getParentFolderId(),
+                                                                             userFileListDTO.getFilename()
+        ));
     }
+
 
     /**
      * 獲取用戶的檔案列表樹，當用戶的檔案列表樹不存在時，創建一個新的檔案列表樹
@@ -86,6 +97,7 @@ public class FolderListTreeProvider {
      *
      * @param userId     用戶ID
      * @param folderList 文件夾列表
+     * @param isLastPage 是否為最後一頁
      */
     public void initializeTree(Long userId, List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
@@ -102,20 +114,20 @@ public class FolderListTreeProvider {
     public void updateFolder(Long userId, UserFileMetadata folderMetadata, Long newParentId) {
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
-            folderTree.updateFolder(folderMetadata, newParentId);
+            folderTree.updateFolder(folderMetadata.getIsFolder(), folderMetadata.getId(), folderMetadata.getFilename(), newParentId);
         }
     }
 
     /**
      * 刪除資料夾
      *
-     * @param userId         用戶ID
-     * @param folderMetadata 資料夾元數據
+     * @param userId           用戶ID
+     * @param folderMetadataId 資料夾元數據ID
      */
-    public void deleteFolder(Long userId, UserFileMetadata folderMetadata) {
+    public void deleteFolder(Long userId, Long folderMetadataId) {
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
-            folderTree.deleteFolder(folderMetadata);
+            folderTree.deleteFolder(folderMetadataId);
         }
     }
 
@@ -125,7 +137,7 @@ public class FolderListTreeProvider {
      * @param userId   用戶ID
      * @param folderId 資料夾ID
      *
-     * @return 資料夾的路徑
+     * @return 資料夾的路徑列表
      */
     public List<FolderNode> getPath(Long userId, Long folderId) {
         FolderTree folderTree = userFileListTree.get(userId);
@@ -146,15 +158,18 @@ public class FolderListTreeProvider {
          * 資料夾ID
          */
         private Long folderId;
+
         /**
          * 資料夾名稱
          */
         private String name;
+
         /**
          * 父資料夾
          */
         @JsonIgnore
         private FolderNode parentFolder;
+
         /**
          * 子資料夾
          */
@@ -194,10 +209,12 @@ public class FolderListTreeProvider {
          * 根節點
          */
         private final FolderNode root;
+
         /**
          * 資料夾映射
          */
         private final Map<Long, FolderNode> folderMap;
+
         /**
          * 待處理節點
          */
@@ -215,17 +232,19 @@ public class FolderListTreeProvider {
 
 
         /**
-         * 添加資料夾
+         * 更新資料夾樹
          *
-         * @param metadata 資料夾元數據
+         * @param isFolder    是否為資料夾
+         * @param folderId    資料夾ID
+         * @param filename    資料夾名稱
+         * @param newParentId 新的父資料夾ID
          */
-        private void updateFolder(UserFileMetadata metadata, Long newParentId) {
-            FolderNode node = folderMap.get(metadata.getId());
-            if (node == null) {
+        private void updateFolder(Boolean isFolder, Long folderId, String filename, Long newParentId) {
+            FolderNode node = folderMap.get(folderId);
+            if (node == null || !isFolder) {
                 return;
             }
-
-            node.setName(metadata.getFilename());
+            node.setName(filename);
 
             if (node.getChildren() != null) {
                 for (FolderNode child : node.getChildren().values()) {
@@ -235,10 +254,10 @@ public class FolderListTreeProvider {
 
             FolderNode oldParent = node.getParentFolder();
             if (oldParent != null) {
-                oldParent.getChildren().remove(metadata.getId());
+                oldParent.getChildren().remove(folderId);
             }
 
-            newParentId = newParentId != null ? newParentId : 0L;
+            newParentId = Objects.requireNonNullElse(newParentId, 0L);
             FolderNode newParent = folderMap.get(newParentId);
             if (newParent != null) {
                 linkNodes(newParent, node);
@@ -256,10 +275,10 @@ public class FolderListTreeProvider {
         /**
          * 刪除資料夾
          *
-         * @param metadata 資料夾元數據
+         * @param folderId 資料夾元數據ID
          */
-        private void deleteFolder(UserFileMetadata metadata) {
-            FolderNode node = folderMap.get(metadata.getId());
+        private void deleteFolder(Long folderId) {
+            FolderNode node = folderMap.get(folderId);
             if (node == null) {
                 return;
             }
@@ -273,7 +292,7 @@ public class FolderListTreeProvider {
          *
          * @param folderId 資料夾ID
          *
-         * @return 資料夾的路徑
+         * @return 資料夾的路徑列表
          */
         private List<FolderNode> getPath(Long folderId) {
             List<FolderNode> path = new ArrayList<>();
@@ -316,11 +335,15 @@ public class FolderListTreeProvider {
          * 初始化資料夾樹，當用戶的資料夾樹不存在時，創建一個新的資料夾樹
          *
          * @param folderList 文件夾列表
+         * @param isLastPage 是否為最後一頁
          *
          * @throws ProcessException 初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
          */
         private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
-            folderList.stream().filter(UserFileListDTO::getIsFolder).forEach(this::addFolder);
+            folderList
+                    .stream()
+                    .filter(UserFileListDTO::getIsFolder)
+                    .forEach(folder -> addFolder(true, folder.getId(), folder.getParentFolderId(), folder.getFilename()));
 
             if (isLastPage) {
                 for (Long parentId : pendingNodes.keySet()) {
@@ -339,22 +362,24 @@ public class FolderListTreeProvider {
         /**
          * 添加資料夾
          *
-         * @param userFileListDTO 文件夾元數據
+         * @param isFolder       是否為資料夾
+         * @param folderId       資料夾ID
+         * @param parentFolderId 父資料夾ID
+         * @param filename       資料夾名稱
          *
          * @throws RuntimeException 添加資料夾失敗，當存在循環引用時，拋出此異常
          */
-        private void addFolder(UserFileListDTO userFileListDTO) {
-            if (!userFileListDTO.getIsFolder()) {
+        private void addFolder(Boolean isFolder, Long folderId, Long parentFolderId, String filename) {
+            if (!isFolder) {
                 return;
             }
 
-            Long folderId = userFileListDTO.getId();
-            Long parentFolderId = userFileListDTO.getParentFolderId() != null ? userFileListDTO.getParentFolderId() : 0L;
+            parentFolderId = Objects.requireNonNullElse(parentFolderId, 0L);
             if (hasCircularReference(parentFolderId)) {
                 throw new RuntimeException("存在循環引用");
             }
 
-            FolderNode folderNode = new FolderNode(folderId, userFileListDTO.getFilename());
+            FolderNode folderNode = new FolderNode(folderId, filename);
             folderMap.put(folderId, folderNode);
 
             FolderNode parentFolder = folderMap.get(parentFolderId);

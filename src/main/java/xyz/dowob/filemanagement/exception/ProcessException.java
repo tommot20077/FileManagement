@@ -84,6 +84,11 @@ public class ProcessException extends Exception {
          * 錯誤信息: 計算文件差異失敗
          */
         CALCULATE_CONTENT_DIFFERENCE_FAILED(1210, "計算文件差異失敗"),
+        /**
+         * 錯誤碼: 1211
+         * 錯誤信息: 文件垃圾桶記錄不存在
+         */
+        NOT_EXISTING_FILE_TRASH_RECORD(1211, "文件回收記錄不存在 ID: %s"),
         ;
 
 

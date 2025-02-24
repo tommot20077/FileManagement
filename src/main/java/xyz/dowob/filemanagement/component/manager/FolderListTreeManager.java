@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -90,11 +91,13 @@ public class FolderListTreeManager implements ApplicationRunner {
 
     private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user) {
         int pageSize = fileProperties.getGlobal().getPageSize();
-        return fileServiceStrategy.getFileService().getUserFileList(user, -1L, 1, pageSize, null).expand(pagedResponseDTO -> {
+        return fileServiceStrategy
+                .getFileService()
+                .getUserFileList(user, ReservedSearchIdEnum.ALL_FILE_ID.getId(), 1, pageSize, null)
+                .expand(pagedResponseDTO -> {
             int nextPage = pagedResponseDTO.getCurrentPage() + 1;
             return nextPage <= pagedResponseDTO.getTotalPages() ? (fileServiceStrategy
-                    .getFileService()
-                    .getUserFileList(user, -1L, nextPage, pageSize, null)) : Mono.empty();
+                    .getFileService().getUserFileList(user, ReservedSearchIdEnum.ALL_FILE_ID.getId(), nextPage, pageSize, null)) : Mono.empty();
         }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
     }
 }

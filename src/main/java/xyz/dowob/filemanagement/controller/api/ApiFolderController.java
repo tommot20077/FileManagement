@@ -11,6 +11,8 @@ import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
+import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -36,14 +38,12 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping("/api/folders")
 public class ApiFolderController extends BaseFileController {
     private final FolderListTreeManager folderListTreeManager;
-    private final ValidationService validationService;
     private final FolderService folderService;
 
     public ApiFolderController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, @Nullable
     FolderListTreeManager folderListTreeManager, ValidationService validationService, FolderService folderService) {
-        super(userService, fileServiceStrategy, fileProperties);
+        super(userService, fileServiceStrategy, fileProperties, validationService);
         this.folderListTreeManager = folderListTreeManager;
-        this.validationService = validationService;
         this.folderService = folderService;
     }
 
@@ -78,9 +78,8 @@ public class ApiFolderController extends BaseFileController {
     @GetMapping("/star")
     public Mono<ResponseEntity<?>> getStarFiles(ServerWebExchange exchange,
                                                 @RequestParam(required = false, defaultValue = "1") Integer page,
-                                                @RequestParam(required = false) Integer size,
-                                                @RequestParam(required = false) List<String> type) {
-        return super.getUserFileList(exchange, -2L, page, size, getFileEnums(type));
+                                                @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.STAR_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
     /**
@@ -93,7 +92,7 @@ public class ApiFolderController extends BaseFileController {
      */
     @GetMapping("recently")
     public Mono<ResponseEntity<?>> getRecentlyFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
-        return super.getUserFileList(exchange, -3L, 1, null, getFileEnums(type));
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
 
     /**
@@ -109,9 +108,8 @@ public class ApiFolderController extends BaseFileController {
     @GetMapping("/all")
     public Mono<ResponseEntity<?>> getAllFiles(ServerWebExchange exchange,
                                                @RequestParam(required = false, defaultValue = "1") Integer page,
-                                               @RequestParam(required = false) Integer size,
-                                               @RequestParam(required = false) List<String> type) {
-        return super.getUserFileList(exchange, -1L, page, size, getFileEnums(type));
+                                               @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
     /**
@@ -163,6 +161,14 @@ public class ApiFolderController extends BaseFileController {
                                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
     }
 
+    /**
+     * 獲取資料夾路徑
+     *
+     * @param exchange 請求對象
+     * @param fileId   資料夾ID
+     *
+     * @return 資料夾路徑
+     */
     @GetMapping("/path/{fileId}")
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, @PathVariable Long fileId) {
         return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
@@ -175,6 +181,13 @@ public class ApiFolderController extends BaseFileController {
     }
 
 
+    /**
+     * 建立用戶檔案樹
+     *
+     * @param exchange 請求對象
+     *
+     * @return 建立結果
+     */
     @PostMapping("/fileTree")
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
@@ -188,4 +201,29 @@ public class ApiFolderController extends BaseFileController {
         }), exchange);
     }
 
+    /**
+     * 移動資料夾到回收站
+     *
+     * @param exchange 請求對象
+     * @param id       資料夾ID
+     *
+     * @return 刪除結果
+     */
+    @PostMapping("/remove/{id}")
+    public Mono<ResponseEntity<?>> removeFile(ServerWebExchange exchange, @PathVariable String id) {
+        return super.removeFile(exchange, id, FileEnum.FOLDER);
+    }
+
+    /**
+     * 還原資料夾
+     *
+     * @param exchange 請求對象
+     * @param id       資料夾ID
+     *
+     * @return 還原結果
+     */
+    @PostMapping("/restore/{id}")
+    public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
+        return super.restoreFile(exchange, id, FileEnum.FOLDER);
+    }
 }

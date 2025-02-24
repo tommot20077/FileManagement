@@ -4,15 +4,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.ByteEnum;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
 /**
@@ -34,6 +38,11 @@ public class ValidationServiceImpl implements ValidationService {
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
+
+    /**
+     * 文件元數據庫操作對象
+     */
+    private final UserFileMetaRepository userFileMetaRepository;
 
     /**
      * 非法字符正則表達式，用於檢查文件名是否包含非法字符
@@ -94,12 +103,32 @@ public class ValidationServiceImpl implements ValidationService {
             case EDIT_METADATA -> validFileName(fileEditDTO.getFilename(), isFolder);
             case EDIT_CONTENT -> validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容");
             case BUILD_HISTORY_RECORD ->
-                    validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(),
-                                                                                                        1000,
-                                                                                                        "備註"
-                    ));
+                    validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(), 1000, "備註"));
             case REVERT_HISTORY_RECORD -> Mono.empty();
         }));
+    }
+
+    /**
+     * @param fileId   文件ID
+     * @param fileType 文件類型
+     *
+     * @return Mono<UserFileMetadata>
+     */
+    @Override
+    public Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType) {
+        return userFileMetaRepository
+                .findById(fileId.toString())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
+                .flatMap(userFileMetadata -> {
+                    if (fileType.length == 0 || Arrays.stream(fileType).anyMatch(fileEnum -> fileEnum == userFileMetadata.getFileType())) {
+                        return Mono.just(userFileMetadata);
+                    }
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_TYPE_WITH_WRONG_REQUEST_PATH,
+                                                              Arrays.toString(fileType),
+                                                              userFileMetadata.getFileType().name()
+                    ));
+
+                });
     }
 
     /**
@@ -242,8 +271,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @return Mono<Void>
      */
     private Mono<Void> validFileName(String filename, boolean isFolder) {
-        if (filename == null || filename.isBlank() || (!isFolder && !filename.contains(".")) || INVALID_CHARACTERS_PATTERN.matcher(filename)
-                .find()) {
+        if (filename == null || filename.isBlank() || (!isFolder && !filename.contains(".")) || INVALID_CHARACTERS_PATTERN.matcher(filename).find()) {
             if (isFolder) {
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FOLDER_NAME));
             }

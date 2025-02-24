@@ -20,34 +20,42 @@ import java.util.Map;
 @Getter
 @RequiredArgsConstructor
 public enum FileEnum {
+
     /**
      * 照片類型
      */
     IMAGE("照片"),
+
     /**
      * 影片類型
      */
     VIDEO("影片"),
+
     /**
      * 音樂類型
      */
     MUSIC("音樂"),
+
     /**
      * 文件類型
      */
     DOCUMENT("文件"),
+
     /**
      * 壓縮檔類型
      */
     ZIP("壓縮檔"),
+
     /**
      * 個人文件類型
      */
     ONLINE_DOCUMENT("線上文件"),
+
     /**
      * 資料夾類型
      */
     FOLDER("資料夾"),
+
     /**
      * 其他類型
      */
@@ -57,6 +65,11 @@ public enum FileEnum {
      * 文件類型
      */
     private final String type;
+
+    /**
+     * 通用文件類型
+     */
+    public static final FileEnum[] GENERAL_FILE_TYPE = {IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER};
 
     /**
      * MIME類型與文件類型的映射

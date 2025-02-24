@@ -7,15 +7,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.Tika;
-import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.AutoDetectParser;
-import org.apache.tika.sax.BodyContentHandler;
 import org.bson.types.ObjectId;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -29,23 +27,21 @@ import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.*;
+import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserOnlineFileRepository;
-import xyz.dowob.filemanagement.repostiory.UserRepository;
+import xyz.dowob.filemanagement.repostiory.*;
 
-import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -102,11 +98,6 @@ public abstract class AbstractFileService implements FileService {
     protected final FileProperties fileProperties;
 
     /**
-     * 緩存鍵的格式
-     */
-    private static final String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
-
-    /**
      * 斷路器配置
      */
     protected final CircuitBreakerConfig circuitBreakerConfig;
@@ -117,6 +108,21 @@ public abstract class AbstractFileService implements FileService {
     protected final FolderListTreeProvider folderListTreeProvider;
 
     /**
+     * 檔案垃圾桶記錄數據庫操作對象
+     */
+    protected final FileTrashRecordRepository fileTrashRecordRepository;
+
+    /**
+     * 用戶文件元數據庫操作對象
+     */
+    protected final R2dbcEntityOperations entityOperations;
+
+    /**
+     * 事務操作器
+     */
+    protected final TransactionalOperator transactionalOperator;
+
+    /**
      * 檔案類型檢驗器
      */
     private final Tika tika = new Tika();
@@ -125,15 +131,16 @@ public abstract class AbstractFileService implements FileService {
      * 每個分塊的大小
      */
     protected Long CHUNK_SIZE;
+
     /**
      * 默認緩存時間
      */
     private static final Duration DEFAULT_CACHE_DURATION = Duration.ofHours(1);
-    /**
-     * 用戶文件元數據庫操作對象
-     */
-    private final R2dbcEntityOperations entityOperations;
 
+    /**
+     * 緩存鍵的格式
+     */
+    private static final String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
 
     /**
      * 初始化方法，獲取文件配置中的分塊大小
@@ -214,9 +221,7 @@ public abstract class AbstractFileService implements FileService {
                                 .build();
 
                         if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
-                            combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks())
-                                    .subscribeOn(Schedulers.boundedElastic())
-                                    .subscribe();
+                            combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks()).subscribeOn(Schedulers.boundedElastic()).subscribe();
                             responseDTO.setIsFinished(true);
                         }
                         return Mono.just(responseDTO);
@@ -224,6 +229,14 @@ public abstract class AbstractFileService implements FileService {
                 })));
     }
 
+    /**
+     * 獲取用戶文件列表的共通實現
+     *
+     * @param fileId 文件ID
+     * @param user   用戶信息
+     *
+     * @return Mono<List < FolderListTreeProvider.FolderNode>> 用戶文件路徑節點
+     */
     public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(Long fileId, User user) {
         return userFileMetaRepository
                 .findById(fileId.toString())
@@ -235,8 +248,10 @@ public abstract class AbstractFileService implements FileService {
                     }
                     return Flux
                             .just(userFileMetadata)
-                            .expand(metadata -> metadata.getParentFolderId() == null ? Mono.empty() : userFileMetaRepository.findById(
-                                    metadata.getParentFolderId().toString())).map(FolderListTreeProvider.FolderNode::new)
+                            .expand(metadata -> metadata.getParentFolderId() == null ? Mono.empty() : userFileMetaRepository.findById(metadata
+                                                                                                                                              .getParentFolderId()
+                                                                                                                                              .toString()))
+                            .map(FolderListTreeProvider.FolderNode::new)
                             .collectList()
                             .map(list -> {
                                 list.add(new FolderListTreeProvider.FolderNode(null, "root"));
@@ -293,13 +308,23 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
+
+    //todo 後期改這這查詢分發子類型
+    //todo 檔案還沒處理完就獲取問題
     private Flux<UserFileListDTO> getFileListFormDB(User user, Long fatherFolderId, List<FileEnum> type) {
+        Mono<UserFileMetadata> userFileMetadataMono = userFileMetaRepository.findById(fatherFolderId.toString()).flatMap(metadata -> {
+            if (metadata.getIsDeleted() && !ReservedSearchIdEnum.RECYCLE_FILE_ID.contain(fatherFolderId)) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.ALREADY_DELETED_FILE, fatherFolderId));
+            }
+            return validateUserPermission(user, metadata).then(isFileOrFolder(metadata, true));
+        });
+
         Flux<UserFileMetadata> userFileMetadataFlux = getUserFileMetadataFlux(user, fatherFolderId, type);
         Set<Long> serverFileIds = new HashSet<>();
         List<UserFileMetadata> folderMetadata = new ArrayList<>();
         HashMap<String, UserFileMetadata> onlineFileMap = new HashMap<>();
 
-        return userFileMetadataFlux.collectList().flatMap(userFileMetadataList -> {
+        return userFileMetadataMono.thenMany(userFileMetadataFlux.collectList().flatMap(userFileMetadataList -> {
             userFileMetadataList.forEach(userFileMetadata -> {
                 if (userFileMetadata.getServerFileId() != null) {
                     serverFileIds.add(userFileMetadata.getServerFileId());
@@ -335,8 +360,9 @@ public abstract class AbstractFileService implements FileService {
                         .map(userOnlineFile -> new UserFileListDTO(userOnlineFile, onlineFileMap.get(userOnlineFile.getId().toString())));
             }
             return Flux.concat(folderListDTO, onlineFileListDTO, fileListDTO);
-        }));
+        })));
     }
+
 
     /**
      * 緩存用戶文件列表
@@ -366,21 +392,21 @@ public abstract class AbstractFileService implements FileService {
      * @return Flux<UserFileMetadata> 用戶文件元數據流
      */
     private Flux<UserFileMetadata> getUserFileMetadataFlux(User user, Long fatherFolderId, List<FileEnum> type) {
-        Flux<UserFileMetadata> userFileMetadataFlux;
-        if (fatherFolderId == null || fatherFolderId == 0) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId());
-        } else if (fatherFolderId == -1) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserId(user.getId());
-        } else if (fatherFolderId == -2) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndIsStar(user.getId(), true);
-        } else if (fatherFolderId == -3) {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdOrderByLastAccessTimeDesc(user.getId(), type, entityOperations);
-        } else {
-            userFileMetadataFlux = userFileMetaRepository.findAllByUserIdAndParentFolderIdInOrderByIsFolder(user.getId(),
-                                                                                                            List.of(fatherFolderId)
+        return switch (ReservedSearchIdEnum.format(fatherFolderId)) {
+            case ROOT_FOLDER_ID -> userFileMetaRepository.findAllByUserIdAndParentFolderIdIsNull(user.getId());
+
+            case ALL_FILE_ID -> userFileMetaRepository.findAllByUserIdAndIsDeleted(user.getId(), false);
+
+            case STAR_FILE_ID -> userFileMetaRepository.findAllByUserIdAndIsStarAndIsDeleted(user.getId(), true, false);
+
+            case RECENT_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByLastAccessTimeDesc(user.getId(), type, entityOperations);
+
+            case RECYCLE_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByIsFolder(user.getId(), entityOperations);
+
+            case null ->
+                    userFileMetaRepository.findAllByUserIdAndParentFolderIdInAndIsDeletedOrderByIsFolder(user.getId(), List.of(fatherFolderId), false
             );
-        }
-        return userFileMetadataFlux;
+        };
     }
 
     /**
@@ -395,12 +421,10 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user,
-                                                                    userFileMetadata.getUserId(),
-                                                                    userFileMetadata.getSharedWithUsers(),
-                                                                    userFileMetadata.getId(),
-                                                                    false
-                ).then(isFileOrFolder(userFileMetadata, false))).flatMap(userFileMetadata -> Mono.defer(() -> {
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, false, false).then(isFileOrFolder(userFileMetadata,
+                                                                                                                              false
+                )))
+                .flatMap(userFileMetadata -> Mono.defer(() -> {
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
                     userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
                     return serverFileMetaRepository
@@ -413,9 +437,7 @@ public abstract class AbstractFileService implements FileService {
                 }))
                 .flatMap(fileData -> gridFsProvider
                         .findFileById(new ObjectId(fileData.getGridFsId()))
-                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
-                                                                       fileData.getServerFileId()
-                        )))
+                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND, fileData.getServerFileId())))
                         .flatMap(gridFsFile -> gridFsProvider.getResource(gridFsFile).map(resource -> {
                             Flux<DataBuffer> dataStream = resource.getDownloadStream().map(dataBuffer -> {
                                 byte[] bytes = new byte[dataBuffer.readableByteCount()];
@@ -470,7 +492,6 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<UploadResponseDTO>
      */
-
     public Mono<UploadResponseDTO> uploadFile(FileMetadataDTO fileMetadataDTO, User user) {
         fileMetadataDTO.setUser(user);
         return Mono.defer(() -> {
@@ -524,9 +545,7 @@ public abstract class AbstractFileService implements FileService {
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         return userFileMetaRepository
                 .findById(fileEditDTO.getFileId())
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
-                                                                  fileEditDTO.getFileId()
-                )))
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileEditDTO.getFileId())))
                 .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata)
                         .then(isFileOrFolder(userFileMetadata, false))
                         .then(Mono.defer(() -> {
@@ -553,30 +572,25 @@ public abstract class AbstractFileService implements FileService {
                     Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
                     userFileMetadata.setIsStar(isStar);
 
-                    Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(),
-                                                                           userFileMetadata.getSharedWithUsers()
-                    );
+                    Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(), userFileMetadata.getSharedWithUsers());
                     userFileMetadata.setSharedWithUsers(sharedWithUsers);
 
                     return userFileMetaRepository.save(userFileMetadata);
-                }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
+                })
+                .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
     }
 
 
+    /**
+     * 依照數據流來辨識檔案類型
+     *
+     * @param fileBytes 檔案數據流
+     *
+     * @return FileEnum 檔案類型
+     */
     public FileEnum detectFileType(byte[] fileBytes) {
-        try {
-            BodyContentHandler handler = new BodyContentHandler(-1);
-            AutoDetectParser parser = new AutoDetectParser();
-            Metadata metadata = new Metadata();
-
-            parser.parse(new ByteArrayInputStream(fileBytes), handler, metadata);
-
-            String contentType = metadata.get("Content-Type");
-
-            return FileEnum.fromMimeType(contentType.split(";")[0].trim());
-        } catch (Exception e) {
-            return FileEnum.OTHER;
-        }
+        String mimeType = tika.detect(fileBytes);
+        return FileEnum.fromMimeType(mimeType);
     }
 
     /**
@@ -596,23 +610,6 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 檢驗用戶檔案權限的共通實現，此為重載方法默認限定只有擁有者才有權限
-     *
-     * @param user             用戶信息
-     * @param userFileMetadata 用戶文件元數據
-     *
-     * @return Mono<Void>
-     */
-    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
-        return validateUserPermission(user,
-                                      userFileMetadata.getUserId(),
-                                      userFileMetadata.getSharedWithUsers(),
-                                      userFileMetadata.getId(),
-                                      true
-        );
-    }
-
-    /**
      * 刪除文件的共通實現
      *
      * @param fileId 文件ID
@@ -624,14 +621,15 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, false)))
-                .flatMap(userFileMetadata -> updateOwner(List.of(userFileMetadata), user).then(Mono.defer(() -> {
+                .flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, true, true).then(isFileOrFolder(userFileMetadata, false)))
+                .flatMap(userFileMetadata -> updateOwner(List.of(userFileMetadata), user.getId()).then(Mono.defer(() -> {
                     Mono<Void> deleteFile = Mono.empty();
                     if (userFileMetadata.getServerFileId() != null) {
                         deleteFile = handleUserStorage(user, List.of(userFileMetadata.getServerFileId()));
                     }
-                    return deleteFile.then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()).then(
-                            userFileMetaRepository.deleteById(userFileMetadata.getId().toString())));
+                    return deleteFile.then(cleanUserListCache(user.getId(),
+                                                              userFileMetadata.getParentFolderId()
+                    ).then(userFileMetaRepository.deleteById(userFileMetadata.getId().toString())));
                 })));
     }
 
@@ -668,49 +666,39 @@ public abstract class AbstractFileService implements FileService {
                 .then();
     }
 
-    private Mono<Void> handleUserStorage(User user, long fileSize, boolean isDelete) {
-        return Mono.defer(() -> {
-            if (isDelete) {
-                return userRepository.findById(user.getId()).flatMap(userEntity -> {
-                    long newStorageUsed = Math.max(userEntity.getUsedStorage() - fileSize, 0);
-                    userEntity.setUsedStorage(newStorageUsed);
-                    return userRepository.save(userEntity).then();
-                });
-            }
-
-            if (user.getStorageLimit() == -1 || user.getStorageLimit() - fileSize >= 0) {
-                return userRepository.findById(user.getId()).flatMap(userEntity -> {
-                    long newStorageUsed = userEntity.getUsedStorage() + fileSize;
-                    userEntity.setUsedStorage(newStorageUsed);
-                    return userRepository.save(userEntity).then();
-                });
-            }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
-                                                      ByteEnum.toReadableSize(user.getStorageLimit()),
-                                                      ByteEnum.toReadableSize(user.getUsedStorage()),
-                                                      ByteEnum.toReadableSize(fileSize)
-            ));
-        });
-    }
 
     /**
      * 驗證用戶權限的抽象方法
      *
-     * @param user       用戶信息
-     * @param Owner      文件擁有者
-     * @param shareUsers 共享用戶ID
-     * @param fileId     文件ID
-     * @param ownerOnly  是否僅擁有者有權限
+     * @param user             用戶信息
+     * @param userFileMetadata 用戶文件元數據
+     * @param ownerOnly        是否僅擁有者有權限
      *
      * @return Mono<Void>
      */
-    protected Mono<Void> validateUserPermission(User user, Long Owner, Set<Long> shareUsers, Long fileId, boolean ownerOnly) {
-        boolean isOwner = Owner.equals(user.getId());
-        boolean isShared = !ownerOnly && shareUsers.contains(user.getId());
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata, boolean ownerOnly, boolean includeDeleted) {
+        boolean isOwner = userFileMetadata.getUserId().equals(user.getId());
+        boolean isShared = !ownerOnly && userFileMetadata.getSharedWithUsers().contains(user.getId());
+        if (userFileMetadata.getIsDeleted() && !includeDeleted) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.ALREADY_DELETED_FILE, userFileMetadata.getId()));
+        }
+
         if (isOwner || isShared) {
             return Mono.empty();
         }
-        return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED, fileId));
+        return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED, userFileMetadata.getId()));
+    }
+
+    /**
+     * 檢驗用戶檔案權限的共通實現，此為重載方法默認限定只有擁有者才有權限
+     *
+     * @param user             用戶信息
+     * @param userFileMetadata 用戶文件元數據
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> validateUserPermission(User user, UserFileMetadata userFileMetadata) {
+        return validateUserPermission(user, userFileMetadata, true, false);
     }
 
     /**
@@ -788,6 +776,14 @@ public abstract class AbstractFileService implements FileService {
         }));
     }
 
+    /**
+     * 檢查文件的狀態的共通實現
+     *
+     * @param combinedBytes 合併後的數據
+     * @param uploadTaskBO  任務
+     *
+     * @return Mono<Void>
+     */
     protected Mono<Void> checkFileStatus(byte[] combinedBytes, UploadTaskBO uploadTaskBO) {
         return Mono.defer(() -> {
             if (combinedBytes.length != uploadTaskBO.getFileSize()) {
@@ -856,9 +852,7 @@ public abstract class AbstractFileService implements FileService {
                                           .flatMap(serverFile -> associateUserFile(serverFile, uploadTaskBO.formatToFileMetadata()))
                                           .flatMap(userFileMetadata -> userFileMetaRepository
                                                   .save(userFileMetadata)
-                                                  .then(cleanUserListCache(userFileMetadata.getUserId(),
-                                                                           userFileMetadata.getParentFolderId()
-                                                  ))))
+                                                  .then(cleanUserListCache(userFileMetadata.getUserId(), userFileMetadata.getParentFolderId()))))
                             .then(removeTempData(uploadTaskBO))
                             .then();
                 });
@@ -869,25 +863,17 @@ public abstract class AbstractFileService implements FileService {
      * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
      *
      * @param userFileList 文件元數據列表
-     * @param user         用戶信息
+     * @param userId       用戶ID
      *
      * @return Mono<Void>
      */
-    protected Mono<Void> updateOwner(List<UserFileMetadata> userFileList, User user) {
+    protected Mono<Void> updateOwner(List<UserFileMetadata> userFileList, Long userId) {
         return Mono.defer(() -> {
-            List<Long> serverFileIds = userFileList
-                    .stream()
-                    .map(UserFileMetadata::getServerFileId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
-            if (userFileList.isEmpty()) {
+            List<Long> serverFileIds = userFileList.stream().map(UserFileMetadata::getServerFileId).filter(Objects::nonNull).distinct().toList();
+            if (userFileList.isEmpty() || serverFileIds.isEmpty()) {
                 return Mono.empty();
             }
-            if (serverFileIds.isEmpty()) {
-                return Mono.empty();
-            }
-            return userFileMetaRepository.countByServerFileIdInAndUserId(serverFileIds, user.getId(), entityOperations)
+            return userFileMetaRepository.countByServerFileIdInAndUserId(serverFileIds, userId, entityOperations)
                     .collectList()
                     .flatMap(serverFileMetaCountDaoList -> {
                         Set<Long> serverFileIdList = serverFileMetaCountDaoList
@@ -900,7 +886,7 @@ public abstract class AbstractFileService implements FileService {
                         }
                         return serverFileMetaRepository.findAllByIdIn(serverFileIdList).collectList().flatMap(serverFileMetadataList -> {
                             serverFileMetadataList.forEach(serverFileMetadata -> {
-                                serverFileMetadata.getOwners().remove(user.getId());
+                                serverFileMetadata.getOwners().remove(userId);
                                 serverFileMetadata.setLastAccessTime(LocalDateTime.now());
                             });
                             return serverFileMetaRepository.saveAll(serverFileMetadataList).then();
@@ -910,6 +896,13 @@ public abstract class AbstractFileService implements FileService {
     }
 
     //todo 線上檔案沒有serverFileId暫不紀錄
+
+    /**
+     * 處理用戶儲存空間的共通實現
+     * @param user 用戶信息
+     * @param serverFileIds 服務器文件ID列表
+     * @return Mono<Void>
+     */
     protected Mono<Void> handleUserStorage(User user, List<Long> serverFileIds) {
         if (serverFileIds.isEmpty()) {
             return Mono.empty();
@@ -927,13 +920,54 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
-    protected Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
-        CompletableFuture.runAsync(() -> {
-            Arrays
-                    .stream(folderIds)
-                    .distinct()
-                    .forEach(folderId -> redisProvider.deleteList(getUserFileListBaseKey(userId, folderId)).subscribe());
+    /**
+     * 更新用戶儲存空間的共通實現
+     *
+     * @param user     用戶信息
+     * @param fileSize 要更新的文件大小
+     * @param isDelete 是否為刪除操作
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> handleUserStorage(User user, long fileSize, boolean isDelete) {
+        return Mono.defer(() -> {
+            if (isDelete) {
+                return userRepository.findById(user.getId()).flatMap(userEntity -> {
+                    long newStorageUsed = Math.max(userEntity.getUsedStorage() - fileSize, 0);
+                    userEntity.setUsedStorage(newStorageUsed);
+                    return userRepository.save(userEntity).then();
+                });
+            }
+
+            if (user.getStorageLimit() == -1 || user.getStorageLimit() - fileSize >= 0) {
+                return userRepository.findById(user.getId()).flatMap(userEntity -> {
+                    long newStorageUsed = userEntity.getUsedStorage() + fileSize;
+                    userEntity.setUsedStorage(newStorageUsed);
+                    return userRepository.save(userEntity).then();
+                });
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
+                                                      ByteEnum.toReadableSize(user.getStorageLimit()),
+                                                      ByteEnum.toReadableSize(user.getUsedStorage()),
+                                                      ByteEnum.toReadableSize(fileSize)
+            ));
         });
+    }
+
+
+    /**
+     * 清除用戶文件列表緩存的共通實現
+     *
+     * @param userId    用戶ID
+     * @param folderIds 文件夾ID列表
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
+        CompletableFuture.runAsync(() -> Arrays
+                .stream(folderIds)
+                .distinct()
+                .forEach(folderId -> redisProvider.deleteList(getUserFileListBaseKey(userId, folderId)).subscribe()));
         return Mono.empty();
     }
 
@@ -1042,13 +1076,165 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
+     * 從回收站還原文件
+     *
+     * @param userFileMetadata 文件
+     * @param user             用戶
+     *
+     * @return Mono<UserFileMetadata> 還原後的文件
+     */
+    public Mono<UserFileMetadata> restoreFile(UserFileMetadata userFileMetadata, User user) {
+        return restoreFile(List.of(userFileMetadata), user).next();
+    }
+
+    /**
+     * 從回收站批量還原文件
+     *
+     * @param userFileMetadataIterable 文件列表
+     * @param user                     用戶
+     *
+     * @return Flux<UserFileMetadata> 還原後的文件列表
+     */
+    public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> userFileMetadataIterable, User user) {
+        return Flux.defer(() -> {
+            Map<Long, UserFileMetadata> userFileMetadataMap = new HashMap<>();
+            Set<Long> problemFileIdsSet = new HashSet<>();
+
+            return Flux
+                    .fromIterable(userFileMetadataIterable).flatMap(userFileMetadata -> validateUserPermission(user, userFileMetadata, true, true)
+                            .then(isFileOrFolder(userFileMetadata, false))
+                            .then(Mono.defer(() -> {
+                                if (!userFileMetadata.getIsDeleted()) {
+                                    return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_DELETED_FILE,
+                                                                              userFileMetadata.getId()
+                                    ));
+                                }
+                                userFileMetadataMap.put(userFileMetadata.getId(), userFileMetadata);
+                                return Mono.just(userFileMetadata);
+                            })))
+                    .collectList()
+                    .flatMapMany(validatedFiles -> {
+                        if (userFileMetadataMap.isEmpty()) {
+                            return Flux.empty();
+                        }
+                        return transactionalOperator
+                                .transactional(recoverFileMethod(userFileMetadataMap, problemFileIdsSet).then(Mono.just(true)))
+                                .thenMany(Flux.fromIterable(userFileMetadataMap.values()));
+
+                    });
+        });
+    }
+
+    /**
+     * 還原文件輔助方法
+     *
+     * @param userFileMetadataMap 文件Map
+     * @param problemFileIdsSet   問題文件ID集合
+     *
+     * @return Flux<UserFileMetadata> 還原後的文件列表
+     */
+    private Flux<UserFileMetadata> recoverFileMethod(Map<Long, UserFileMetadata> userFileMetadataMap, Set<Long> problemFileIdsSet) {
+        return fileTrashRecordRepository.findAllById(userFileMetadataMap.keySet()).flatMap(fileTrashRecord -> {
+            UserFileMetadata userFileMetadata = userFileMetadataMap.get(fileTrashRecord.getFileId());
+            if (userFileMetadata == null) {
+                problemFileIdsSet.add(fileTrashRecord.getFileId());
+                return Mono.empty();
+            }
+            userFileMetadata.setIsDeleted(false);
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+
+            if (userFileMetadata.getParentFolderId() == null) {
+                return Mono.just(userFileMetadata);
+            }
+            return userFileMetaRepository.findById(userFileMetadata.getParentFolderId().toString()).flatMap(fatherFolder -> {
+                if (fatherFolder.getIsDeleted()) {
+                    userFileMetadata.setParentFolderId(null);
+                }
+                return Mono.just(userFileMetadata);
+            });
+        }).collectList().flatMapMany(processedMetadata -> {
+            if (!problemFileIdsSet.isEmpty()) {
+                return Flux.error(new ProcessException(ProcessException.ErrorCode.NOT_EXISTING_FILE_TRASH_RECORD, problemFileIdsSet));
+            }
+
+            return fileTrashRecordRepository
+                    .deleteAllById(userFileMetadataMap.keySet())
+                    .thenMany(userFileMetaRepository.saveAll(userFileMetadataMap.values()))
+                    .collectList()
+                    .flatMapMany(metadataList -> {
+                        Long[] parentFolderIds = metadataList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
+                        return cleanUserListCache(metadataList.getFirst().getUserId(), parentFolderIds).thenMany(Flux.fromIterable(metadataList));
+                    });
+        });
+    }
+
+    /**
+     * 刪除文件到回收站
+     *
+     * @param userFileMetadata 文件
+     * @param user             用戶
+     *
+     * @return Mono<Boolean> 是否刪除成功
+     */
+    public Mono<Boolean> removeFile(UserFileMetadata userFileMetadata, User user) {
+        return removeFile(List.of(userFileMetadata), user);
+    }
+
+    /**
+     * 將檔案批量刪除到回收站
+     *
+     * @param userFileMetadataIterable 用戶文件元數據
+     * @param user                     用戶信息
+     *
+     * @return Mono<Boolean> 是否刪除成功
+     */
+    public Mono<Boolean> removeFile(Iterable<UserFileMetadata> userFileMetadataIterable, User user) {
+        return Mono.defer(() -> {
+            Set<Long> alreadyDeleted = new HashSet<>();
+            return Flux.fromIterable(userFileMetadataIterable).flatMap(userFileMetadata -> {
+                if (userFileMetadata.getIsDeleted()) {
+                    alreadyDeleted.add(userFileMetadata.getId());
+                    return Mono.empty();
+                }
+                return validateUserPermission(user, userFileMetadata).then(isFileOrFolder(userFileMetadata, false));
+            }).then(Mono.just(alreadyDeleted)).flatMap(deleteSet -> {
+                if (!deleteSet.isEmpty()) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.SOME_FILE_ALREADY_DELETED, deleteSet));
+                }
+
+                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getGlobal().getRetentionTime());
+                Set<FileTrashRecord> fileTrashRecords = new HashSet<>();
+
+                userFileMetadataIterable.forEach(userFile -> {
+                    FileTrashRecord fileTrashRecord = new FileTrashRecord(userFile, deleteTime);
+                    fileTrashRecords.add(fileTrashRecord);
+                    userFile.setIsDeleted(true);
+                });
+
+
+                Mono<Boolean> result = fileTrashRecordRepository
+                        .insertAll(fileTrashRecords, entityOperations)
+                        .thenMany(userFileMetaRepository.saveAll(userFileMetadataIterable))
+                        .collectList()
+                        .flatMap(fileMeta -> {
+                            Long[] parentFolderIds = fileMeta.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
+                            return cleanUserListCache(fileMeta.getFirst().getUserId(), parentFolderIds);
+                        })
+                        .thenReturn(true)
+                        .onErrorReturn(false);
+                return transactionalOperator.transactional(result);
+            });
+        });
+    }
+
+
+    /**
      * 創建一個新的用戶文件元數據實體
      *
      * @return 返回一個新的實體對象
      */
-
     public Mono<UserFileMetadata> createUserFileMetadata() {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -1058,7 +1244,6 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return 用戶文件元數據實體對象
      */
-
     public Mono<UserFileMetadata> getUserFileMetadataById(Long id) {
         if (id == null) {
             return Mono.empty();
@@ -1069,9 +1254,8 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 獲取所有用戶文件元數據實體
      */
-
     public Flux<UserFileMetadata> getAllUserFileMetadata() {
-        return null;
+        return Flux.empty();
     }
 
     /**
@@ -1079,9 +1263,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 用戶文件元數據實體對象
      */
-
     public Mono<Void> updateUserFileMetadata(UserFileMetadata entity) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -1089,9 +1272,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 用戶文件元數據實體對象
      */
-
     public Mono<Void> deleteUserFileMetadata(UserFileMetadata entity) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -1099,9 +1281,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return 返回一個新的服務器文件元數據實體對象
      */
-
     public Mono<ServerFileMetadata> createServerFileMetadata() {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -1111,17 +1292,15 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return 服務器文件元數據實體對象
      */
-
     public Mono<ServerFileMetadata> getByServerFileMetadataId(Long id) {
-        return null;
+        return Mono.empty();
     }
 
     /**
      * 獲取所有服務器文件元數據實體
      */
-
     public Flux<ServerFileMetadata> getAllServerFileMetadata() {
-        return null;
+        return Flux.empty();
     }
 
     /**
@@ -1129,9 +1308,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 服務器文件元數據實體對象
      */
-
     public Mono<ServerFileMetadata> updateServerFileMetadata(ServerFileMetadata entity) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -1139,8 +1317,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 服務器文件元數據實體對象
      */
-
     public Mono<ServerFileMetadata> deleteServerFileMetadata(ServerFileMetadata entity) {
-        return null;
+        return Mono.empty();
     }
 }

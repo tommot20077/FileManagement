@@ -20,14 +20,17 @@ public enum TransfersStatusEnum {
      * 上傳檔案中
      */
     UPLOADING("上傳檔案中"),
+
     /**
      * 下載檔案中
      */
     DOWNLOADING("下載檔案中"),
+
     /**
      * 已完成
      */
     COMPLETED("已完成"),
+
     /**
      * 失敗
      */

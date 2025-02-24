@@ -6,11 +6,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 class ValidationServiceTest {
@@ -39,6 +41,11 @@ class ValidationServiceTest {
             @Override
             public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
                 return Mono.empty();
+            }
+
+            @Override
+            public Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType) {
+                return null;
             }
         };
     }

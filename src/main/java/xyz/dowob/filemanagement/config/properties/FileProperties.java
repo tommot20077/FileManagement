@@ -70,7 +70,22 @@ public class FileProperties {
      */
     @Data
     public static class global {
+        /**
+         * 是否啟用用戶文件列表樹，默認為 true
+         */
         private Boolean enableUserFolderListTree = true;
+
+        /**
+         * 文件列表每頁顯示數量，默認為 100
+         */
         private Integer pageSize = 100;
+
+        /**
+         * 文件保留時間，默認為 30，單位為天
+         */
+        private Integer retentionTime = 30;
+
+        //private Integer maxFolderDepth = 10;
+
     }
 }

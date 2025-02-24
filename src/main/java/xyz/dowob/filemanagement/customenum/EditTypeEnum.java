@@ -14,14 +14,17 @@ public enum EditTypeEnum {
      * 檔案編輯，不包含文件內容的編輯
      */
     EDIT_METADATA,
+
     /**
      * 包含文件內容的編輯
      */
     EDIT_CONTENT,
+
     /**
      * 建立歷程記錄
      */
     BUILD_HISTORY_RECORD,
+
     /**
      * 還原歷程記錄
      */

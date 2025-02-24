@@ -32,6 +32,7 @@ public enum RoleEnum {
                  PermissionEnum.SHARE,
                  PermissionEnum.UPDATE, PermissionEnum.MANAGE
     ), ByteEnum.convertToByte(-1L)),
+
     /**
      * 高級用戶所擁有的權限: 寫入、讀取、刪除、上傳、下載、分享、更新
      * 高級用戶的存儲限制為 50GB
@@ -43,6 +44,7 @@ public enum RoleEnum {
                          PermissionEnum.DOWNLOAD,
                          PermissionEnum.UPDATE, PermissionEnum.SHARE
     ), ByteEnum.convertToByte(50L)),
+
     /**
      * 用戶所擁有的權限: 寫入、讀取、刪除、上傳、下載、更新
      * 用戶的存儲限制為 15GB
@@ -53,6 +55,7 @@ public enum RoleEnum {
                 PermissionEnum.UPLOAD,
                 PermissionEnum.DOWNLOAD, PermissionEnum.UPDATE
     ), ByteEnum.convertToByte(15L)),
+
     /**
      * 訪客所擁有的權限: 讀取
      * 訪客的存儲限制為 0GB
@@ -70,6 +73,10 @@ public enum RoleEnum {
      * 角色名稱以及對應的權限
      */
     private final Set<PermissionEnum> permissions;
+
+    /**
+     * 默認存儲限制
+     */
     private final Long defaultStorageLimit;
 
     /**

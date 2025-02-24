@@ -89,6 +89,11 @@ public class UserFileListDTO {
     private Set<Long> shareUsers = new HashSet<>();
 
     /**
+     * 是否刪除
+     */
+    private Boolean isDeleted = false;
+
+    /**
      * 用戶文件列表數據傳輸對象構造函數
      *
      * @param serverFileMetadata 服務器文件元數據對象
@@ -106,6 +111,7 @@ public class UserFileListDTO {
         this.md5 = serverFileMetadata.getMd5();
         this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
+        this.isDeleted = userFileMetadata.getIsDeleted();
 
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
@@ -128,6 +134,7 @@ public class UserFileListDTO {
         this.fileType = userFileMetadata.getFileType();
         this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
+        this.isDeleted = userFileMetadata.getIsDeleted();
 
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
@@ -149,6 +156,7 @@ public class UserFileListDTO {
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
+        this.isDeleted = userFileMetadata.getIsDeleted();
         if (userFileMetadata.getSharedWithUsers() != null) {
             shareUsers.addAll(userFileMetadata.getSharedWithUsers());
         }

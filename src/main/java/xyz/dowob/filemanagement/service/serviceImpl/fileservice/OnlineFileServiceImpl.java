@@ -6,8 +6,10 @@ import com.github.difflib.DiffUtils;
 import com.github.difflib.patch.Patch;
 import com.github.difflib.patch.PatchFailedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import jakarta.annotation.Nullable;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -58,20 +60,24 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 在線文件數據庫操作接口
      */
     private final UserOnlineFileRepository userOnlineFileRepository;
+
     /**
      * 在線文件歷史數據庫操作接口
      */
     private final UserOnlineFileHistoryRepository userOnlineFileHistoryRepository;
+
     /**
      * 對象映射器
      */
     private final ObjectMapper objectMapper;
+
     /**
      * 預設空內容的JSON
      */
     private final String EMPTY_CONTENT = "{\"delta\":[]}";
 
-    public OnlineFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, UserRepository userRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, FolderListTreeProvider folderListTreeProvider, UserOnlineFileRepository userOnlineFileRepository, UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper, R2dbcEntityOperations entityOperations) {
+    public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
+                                 @Nullable FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -81,8 +87,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,
-              folderListTreeProvider,
-              entityOperations
+              folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
         );
         this.userOnlineFileRepository = userOnlineFileRepository;
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
@@ -99,8 +104,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      */
     @Override
     public Mono<UserFileDataBO> downloadFile(String fileId, User user) {
-        return findUserOnlineFileById(fileId)
-                .flatMap(userOnlineFile -> validateUserPermission(user, userOnlineFile, false).then(Mono.just(userOnlineFile)))
+        return findUserOnlineFileById(fileId).flatMap(userOnlineFile -> validateUserPermission(user, userOnlineFile).then(Mono.just(userOnlineFile)))
                 .flatMap(userOnlineFile -> userFileMetaRepository.findById(userOnlineFile.getId().toString()).flatMap(userFileMetadata -> {
                     try {
                         EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
@@ -155,13 +159,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                             .insertWithId(userOnlineFile)
                             .then(createInitialHistory(userOnlineFile))
                             .then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()))
-                            .thenReturn(UploadResponseDTO
-                                                .builder()
-                                                .progress(100.0)
-                                                .isSuccess(true)
-                                                .isFinished(true)
-                                                .message("上傳成功")
-                                                .build()));
+                            .thenReturn(UploadResponseDTO.builder().progress(100.0).isSuccess(true).isFinished(true).message("上傳成功").build()));
         }));
     }
 
@@ -190,42 +188,47 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         return findUserOnlineFileById(fileEditDTO.getFileId()).flatMap(userOnlineFile -> switch (fileEditDTO.getEditType()) {
             case EDIT_METADATA -> super.editFile(fileEditDTO, user);
-            case EDIT_CONTENT -> validateUserPermission(user, userOnlineFile, false).then(saveContent(userOnlineFile, fileEditDTO, user));
-            case BUILD_HISTORY_RECORD ->
-                    validateUserPermission(user, userOnlineFile, false).then(BuildHistoryRecord(userOnlineFile, fileEditDTO, user));
-            case REVERT_HISTORY_RECORD -> validateUserPermission(user, userOnlineFile, false).then(revertHistoryRecord(userOnlineFile,
-                                                                                                                       fileEditDTO.getVersion(),
-                                                                                                                       user.getId()
+            case EDIT_CONTENT -> validateUserPermission(user, userOnlineFile).then(saveContent(userOnlineFile, fileEditDTO, user));
+            case BUILD_HISTORY_RECORD -> validateUserPermission(user, userOnlineFile).then(BuildHistoryRecord(userOnlineFile, fileEditDTO, user));
+            case REVERT_HISTORY_RECORD ->
+                    validateUserPermission(user, userOnlineFile).then(revertHistoryRecord(userOnlineFile, fileEditDTO.getVersion(), user.getId()
             ));
         });
     }
 
+    /**
+     * 獲取文件版本列表
+     *
+     * @param user   用戶
+     * @param fileId 文件ID
+     * @param page   當前頁碼
+     * @param size   每頁大小
+     *
+     * @return 文件版本列表
+     */
     @Override
     @HideOverLength
     public Mono<PagedResponseDTO<FileVersionDTO>> getFileVersionList(User user, String fileId, Integer page, Integer size) {
         int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
         int currentPage = Math.max(1, Objects.requireNonNullElse(page, 1));
         int offset = (currentPage - 1) * pageSize;
-        return findUserOnlineFileById(fileId).flatMap(userOnlineFile -> validateUserPermission(user, userOnlineFile, false).then(
-                userOnlineFileHistoryRepository
-                        .findAllByFileIdOrderByVersionDesc(userOnlineFile.getId())
-                        .collectList()
-                        .flatMap(historyList -> {
-                            int totalElements = historyList.size();
-                            List<FileVersionDTO> fileVersionDTOList = historyList
-                                    .subList(offset, Math.min(offset + pageSize, totalElements))
-                                    .stream()
-                                    .map(FileVersionDTO::new)
-                                    .toList();
+        return findUserOnlineFileById(fileId).flatMap(userOnlineFile -> validateUserPermission(user, userOnlineFile).then(
+                userOnlineFileHistoryRepository.findAllByFileIdOrderByVersionDesc(userOnlineFile.getId()).collectList().flatMap(historyList -> {
+                    int totalElements = historyList.size();
+                    List<FileVersionDTO> fileVersionDTOList = historyList
+                            .subList(offset, Math.min(offset + pageSize, totalElements))
+                            .stream()
+                            .map(FileVersionDTO::new)
+                            .toList();
 
-                            PagedResponseDTO<FileVersionDTO> pagedResponseDTO = new PagedResponseDTO<>();
-                            pagedResponseDTO.setTotalElements(totalElements);
-                            pagedResponseDTO.setTotalPages((int) Math.ceil((double) totalElements / pageSize));
-                            pagedResponseDTO.setCurrentPage(currentPage);
-                            pagedResponseDTO.setPageSize(pageSize);
-                            pagedResponseDTO.setData(fileVersionDTOList);
-                            return Mono.just(pagedResponseDTO);
-                        })));
+                    PagedResponseDTO<FileVersionDTO> pagedResponseDTO = new PagedResponseDTO<>();
+                    pagedResponseDTO.setTotalElements(totalElements);
+                    pagedResponseDTO.setTotalPages((int) Math.ceil((double) totalElements / pageSize));
+                    pagedResponseDTO.setCurrentPage(currentPage);
+                    pagedResponseDTO.setPageSize(pageSize);
+                    pagedResponseDTO.setData(fileVersionDTOList);
+                    return Mono.just(pagedResponseDTO);
+                })));
     }
 
 
@@ -247,22 +250,15 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @param user           用戶
      * @param userOnlineFile 用戶在線文件
-     * @param ownerOnly      是否只檢查擁有者權限
      *
      * @return 空Mono
      */
-    private Mono<Void> validateUserPermission(User user, UserOnlineFile userOnlineFile, boolean ownerOnly) {
+    private Mono<Void> validateUserPermission(User user, UserOnlineFile userOnlineFile) {
         return userFileMetaRepository
                 .findById(userOnlineFile.getId().toString())
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE,
                                                                   userOnlineFile.getId().toString()
-                )))
-                .flatMap(userFileMetadata -> super.validateUserPermission(user,
-                                                                          userFileMetadata.getUserId(),
-                                                                          userFileMetadata.getSharedWithUsers(),
-                                                                          userFileMetadata.getId(),
-                                                                          ownerOnly
-                ));
+                ))).flatMap(userFileMetadata -> super.validateUserPermission(user, userFileMetadata, false, false));
     }
 
     /**
@@ -387,6 +383,11 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
     /**
      * 應用歷史鏈進行還原
+     * 這裡的還原是指將歷史鏈上的所有差異應用到基礎內容上
+     *
+     * @param historyChain 歷史鏈
+     *
+     * @return 還原後的文件內容
      */
     private Mono<EditorContentDTO> applyHistoryChain(List<UserOnlineFileHistory> historyChain) {
         Collections.reverse(historyChain);
@@ -578,9 +579,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
             return userOnlineFileHistoryRepository
                     .findByFileIdAndVersion(userOnlineFile.getId(), targetVersion)
-                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_HISTORY_RECORD,
-                                                                      targetVersion
-                    )));
+                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_HISTORY_RECORD, targetVersion)));
         }).flatMap(targetHistory -> {
             if (targetHistory.getIsSnapshot()) {
                 return restoreFromSnapshot(userOnlineFile, targetHistory, userId);
@@ -639,10 +638,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             userOnlineFileHistory.setPreviousVersion(null);
             userOnlineFileHistory.setIsSnapshot(true);
             userOnlineFileHistory.setSnapshotContent(userOnlineFile.getContent());
-            String note = String.format("修改者:%s 還原到 %d 版本 (此為自動建立的快照，用於恢復到還原操作之前的版本)",
-                                        userId,
-                                        targetVersion
-            );
+            String note = String.format("修改者:%s 還原到 %d 版本 (此為自動建立的快照，用於恢復到還原操作之前的版本)", userId, targetVersion);
             userOnlineFileHistory.setNote(note);
 
             userOnlineFile.setLastModifiedBy(userId);

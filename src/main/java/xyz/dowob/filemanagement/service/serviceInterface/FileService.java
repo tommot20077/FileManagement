@@ -7,6 +7,7 @@ import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.unity.FileCrudService;
 
 /**
@@ -19,7 +20,7 @@ import xyz.dowob.filemanagement.unity.FileCrudService;
  * @create 2024-09-30 20:13
  * @Version 1.0
  **/
-public interface FileService extends FileCrudService, BaseFileService {
+public interface FileService extends FileCrudService, BaseFileService, RecoverableFile<UserFileMetadata> {
 
     /**
      * 上傳文件的接口

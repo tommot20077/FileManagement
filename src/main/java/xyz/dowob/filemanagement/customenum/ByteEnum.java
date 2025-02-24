@@ -20,18 +20,22 @@ public enum ByteEnum {
      * Byte類型的枚舉
      */
     BYTE(1L, "B"),
+
     /**
      * KB類型的枚舉
      */
     KILOBYTE(1024L, "KB"),
+
     /**
      * MB類型的枚舉
      */
     MEGABYTE(1024L * 1024, "MB"),
+
     /**
      * GB類型的枚舉
      */
     GIGABYTE(1024L * 1024 * 1024, "GB"),
+
     /**
      * TB類型的枚舉
      */
@@ -41,6 +45,7 @@ public enum ByteEnum {
      * 單位對應的字節數
      */
     private final long bytes;
+
     /**
      * 單位的名稱
      */

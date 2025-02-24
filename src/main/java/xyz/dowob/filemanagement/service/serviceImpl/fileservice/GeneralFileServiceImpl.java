@@ -4,6 +4,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import jakarta.annotation.Nullable;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -11,10 +12,7 @@ import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserOnlineFileRepository;
-import xyz.dowob.filemanagement.repostiory.UserRepository;
+import xyz.dowob.filemanagement.repostiory.*;
 import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 
 /**
@@ -31,9 +29,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 @Service
 @FileHandlerType(FileEnum.OTHER)
 public class GeneralFileServiceImpl extends AbstractFileService {
-    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig,
-                                  @Nullable
-                                  FolderListTreeProvider folderListTreeProvider, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations) {
+    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
+                                  @Nullable FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -43,8 +40,7 @@ public class GeneralFileServiceImpl extends AbstractFileService {
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,
-              folderListTreeProvider,
-              entityOperations
+              folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
         );
     }
 }

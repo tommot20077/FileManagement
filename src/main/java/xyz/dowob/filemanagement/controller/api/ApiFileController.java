@@ -3,9 +3,12 @@ package xyz.dowob.filemanagement.controller.api;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.Part;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
@@ -18,6 +21,7 @@ import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -54,14 +58,16 @@ public class ApiFileController extends BaseFileController {
      * ObjectMapper 用於對象與 JSON 之間的轉換
      */
     private final ObjectMapper objectMapper;
+
+    /**
+     * 用戶限制策略
+     */
     private final UserLimiterStrategy userLimiterStrategy;
-    private final ValidationService validationService;
 
     public ApiFileController(UserService userService, FileServiceStrategy fileServiceStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties, ObjectMapper objectMapper) {
-        super(userService, fileServiceStrategy, fileProperties);
+        super(userService, fileServiceStrategy, fileProperties, validationService);
         this.objectMapper = objectMapper;
         this.userLimiterStrategy = userLimiterStrategy;
-        this.validationService = validationService;
     }
 
     /**
@@ -116,39 +122,35 @@ public class ApiFileController extends BaseFileController {
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
             @RequestParam(value = "action", defaultValue = "preview", required = false) String action,
             @PathVariable String id, ServerWebExchange exchange) {
-        return userService
-                .getUser(exchange)
-                .flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
-                    HttpHeaders headers = new HttpHeaders();
-                    if ("download".equals(action)) {
-                        headers.add(HttpHeaders.CONTENT_DISPOSITION,
-                                    "attachment; filename=" + URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8)
-                        );
-                        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
-                    } else {
-                        headers.add(HttpHeaders.CONTENT_TYPE,
-                                    FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename())
-                        );
-                    }
-                    headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
-                    headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(userFileDataBO.getFileSize()));
-                    return ResponseEntity.ok().headers(headers).body(userFileDataBO.getDataStream());
-                }))
-                .onErrorResume(ValidationException.class, e -> {
-                    String errorMessage = String.format("下載失敗: %s", e.getMessage());
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-                    try {
-                        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-                        return Mono.just(ResponseEntity.status(e.getErrorCode().getHttpStatus())
-                                                 .contentType(MediaType.APPLICATION_JSON)
-                                                 .body(Flux.just(exchange
-                                                                         .getResponse()
-                                                                         .bufferFactory()
-                                                                         .wrap(objectMapper.writeValueAsString(apiResponse).getBytes()))));
-                    } catch (JsonProcessingException ex) {
-                        return Mono.error(new RuntimeException(ex));
-                    }
-                });
+        return userService.getUser(exchange).flatMap(user -> fileServiceStrategy.getFileService().downloadFile(id, user).map(userFileDataBO -> {
+            HttpHeaders headers = new HttpHeaders();
+            if ("download".equals(action)) {
+                headers.add(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=" + URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8)
+                );
+                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
+            } else {
+                headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
+            }
+            headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
+            headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(userFileDataBO.getFileSize()));
+            return ResponseEntity.ok().headers(headers).body(userFileDataBO.getDataStream());
+        })).onErrorResume(ValidationException.class, e -> {
+            String errorMessage = String.format("下載失敗: %s", e.getMessage());
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+            try {
+                objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+                return Mono.just(ResponseEntity
+                                         .status(e.getErrorCode().getHttpStatus())
+                                         .contentType(MediaType.APPLICATION_JSON)
+                                         .body(Flux.just(exchange
+                                                                 .getResponse()
+                                                                 .bufferFactory()
+                                                                 .wrap(objectMapper.writeValueAsString(apiResponse).getBytes()))));
+            } catch (JsonProcessingException ex) {
+                return Mono.error(new RuntimeException(ex));
+            }
+        });
     }
 
     /**
@@ -216,20 +218,19 @@ public class ApiFileController extends BaseFileController {
             if (transferResponseDTO.getIsSuccess()) {
                 apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
             } else {
-                apiResponse = createResponse(exchange, 400, "上傳失敗", transferResponseDTO);
+                apiResponse = createResponse(exchange, HttpStatus.BAD_REQUEST.value(), "上傳失敗", transferResponseDTO);
             }
             return createResponseEntity(apiResponse);
         }), exchange);
     }
 
 
-    /*
     // todo 暫不使用
     private Mono<ResponseEntity<?>> handleMultipartUpload(
             @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
         return formatPartToBytes(filePart).flatMap(bytes -> {
             UploadChunkDTO uploadChunkDTO = new UploadChunkDTO(transferTaskId, 1, 1, bytes);
-            return fileStrategy.getFileService(null).uploadFileChunk(uploadChunkDTO);
+            return fileServiceStrategy.getFileService().uploadFileChunk(uploadChunkDTO);
         }).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsFinished()) {
@@ -253,8 +254,6 @@ public class ApiFileController extends BaseFileController {
             return bytes;
         });
     }
-    */
-
 
     /**
      * 獲取用戶文件列表的API請求
@@ -276,6 +275,32 @@ public class ApiFileController extends BaseFileController {
                 return null;
             }
         }).filter(Objects::nonNull).toList();
-        return super.getUserFileList(exchange, -1L, page, size, fileEnums);
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, fileEnums);
+    }
+
+    /**
+     * 將檔案移動到回收站的 API 請求
+     *
+     * @param exchange 請求對象
+     * @param id       檔案 ID
+     *
+     * @return Mono<ResponseEntity < ?>> 返回檔案移動到回收站的結果
+     */
+    @PostMapping("/remove/{id}")
+    public Mono<ResponseEntity<?>> removeFile(ServerWebExchange exchange, @PathVariable String id) {
+        return super.removeFile(exchange, id, null);
+    }
+
+    /**
+     * 還原檔案的 API 請求
+     *
+     * @param exchange 請求對象
+     * @param id       檔案 ID
+     *
+     * @return Mono<ResponseEntity < ?>> 返回還原檔案的結果
+     */
+    @PostMapping("/restore/{id}")
+    public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
+        return super.restoreFile(exchange, id, null);
     }
 }

@@ -12,6 +12,7 @@ import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 
 import java.util.Set;
@@ -24,11 +25,14 @@ class ValidationServiceImplTest {
     @Mock
     private UserRepository mockUserRepository;
 
+    @Mock
+    private UserFileMetaRepository mockUserFileMetaRepository;
+
     private ValidationServiceImpl validationServiceImplUnderTest;
 
     @BeforeEach
     void setUp() {
-        validationServiceImplUnderTest = new ValidationServiceImpl(mockUserRepository);
+        validationServiceImplUnderTest = new ValidationServiceImpl(mockUserRepository, mockUserFileMetaRepository);
     }
 
     @Test

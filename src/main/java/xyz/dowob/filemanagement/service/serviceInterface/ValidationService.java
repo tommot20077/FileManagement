@@ -1,11 +1,13 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.lang.reflect.Field;
@@ -52,6 +54,16 @@ public interface ValidationService {
      * @param isFolder    是否為文件夾
      */
     Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder);
+
+    /**
+     * 驗證檔案類型是否合法
+     *
+     * @param fileId   文件ID
+     * @param fileType 規範的文件類型
+     *
+     * @return Mono<UserFileMetadata> 返回文件元數據
+     */
+    Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType);
 
     /**
      * 驗證數據傳輸對象是否為空

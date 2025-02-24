@@ -20,6 +20,7 @@ public enum TokenEnum {
     /**
      * JWT 憑證
      */
+
     JWT_AUTHORIZATION_TOKEN("JWT 憑證"),
     /**
      * 重製密碼憑證

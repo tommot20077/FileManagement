@@ -30,14 +30,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/docs")
 public class ApiOnlineFileController extends BaseFileController {
-    /**
-     * 驗證服務
-     */
-    private final ValidationService validationService;
-
     public ApiOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService) {
-        super(userService, fileServiceStrategy, fileProperties);
-        this.validationService = validationService;
+        super(userService, fileServiceStrategy, fileProperties, validationService);
+
     }
 
     /**
@@ -108,9 +103,7 @@ public class ApiOnlineFileController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, false)
                                    .then(userService.getUser(exchange))
-                                   .flatMap(user -> fileServiceStrategy
-                                           .getFileService(FileEnum.ONLINE_DOCUMENT)
-                                           .editFile(fileEditDTO, user))
+                                   .flatMap(user -> fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).editFile(fileEditDTO, user))
                                    .then(createResponseEntity(createResponse(exchange, "編輯成功", null))), exchange);
     }
 

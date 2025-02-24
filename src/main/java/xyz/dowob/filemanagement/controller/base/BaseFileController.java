@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.controller.base;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -8,10 +9,15 @@ import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvid
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.*;
@@ -40,11 +46,12 @@ public abstract class BaseFileController implements ResponseUnity {
      */
     protected final FileProperties fileProperties;
 
+    protected final ValidationService validationService;
+
     /**
      * 獲取用戶文件列表，此 ID 為資料夾 ID
-     * 有2個特定的ID作為特殊用途
-     * 1. 0: 獲取用戶根目錄文件列表
-     * 2. -1: 獲取用戶所有文件列表
+     * 根據預留Id實現不同的功能
+     * {@link ReservedSearchIdEnum}
      *
      * @param exchange 請求對象
      *
@@ -82,6 +89,57 @@ public abstract class BaseFileController implements ResponseUnity {
                 return null;
             }
         }).filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * 移除檔案到回收站
+     *
+     * @param exchange 請求對象
+     * @param id       檔案ID
+     * @param type     檔案類型
+     *
+     * @return 返回刪除結果
+     */
+    protected Mono<ResponseEntity<?>> removeFile(ServerWebExchange exchange, String id, FileEnum type) {
+        FileEnum[] fileType = type == null ? FileEnum.GENERAL_FILE_TYPE : new FileEnum[]{type};
+
+        return handleError(Mono.defer(() -> {
+            Mono<User> userMono = userService.getUser(exchange);
+            Mono<UserFileMetadata> userFileMetadataMono = validationService.validateFileType(Long.parseLong(id), fileType);
+            return Mono
+                    .zip(userMono, userFileMetadataMono)
+                    .flatMap(tuple -> fileServiceStrategy.getFileService(type).removeFile(tuple.getT2(), tuple.getT1()))
+                    .flatMap(result -> {
+                        String message = result ? "回收檔案成功" : "回收檔案失敗";
+                        int status = result ? HttpStatus.OK.value() : HttpStatus.BAD_REQUEST.value();
+                        ApiResponseDTO<?> apiResponse = createResponse(exchange, status, message, null);
+                        return createResponseEntity(apiResponse);
+                    });
+        }), exchange);
+    }
+
+    /**
+     * 還原檔案
+     *
+     * @param exchange 請求對象
+     * @param id       檔案ID
+     * @param type     檔案類型
+     *
+     * @return 返回還原結果
+     */
+    protected Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, String id, FileEnum type) {
+        FileEnum[] fileType = type == null ? FileEnum.GENERAL_FILE_TYPE : new FileEnum[]{type};
+        return handleError(Mono.defer(() -> {
+            Mono<User> userMono = userService.getUser(exchange);
+            Mono<UserFileMetadata> userFileMetadataMono = validationService.validateFileType(Long.parseLong(id), fileType);
+            return Mono
+                    .zip(userMono, userFileMetadataMono)
+                    .flatMap(tuple -> fileServiceStrategy.getFileService(type).restoreFile(tuple.getT2(), tuple.getT1()))
+                    .then(Mono.defer(() -> {
+                        ApiResponseDTO<?> apiResponse = createResponse(exchange, "還原檔案成功", null);
+                        return createResponseEntity(apiResponse);
+                    }));
+        }), exchange);
     }
 
 }
