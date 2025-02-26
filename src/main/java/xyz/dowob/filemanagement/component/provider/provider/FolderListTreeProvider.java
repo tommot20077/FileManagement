@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ProcessException;
@@ -46,7 +47,7 @@ public class FolderListTreeProvider {
      */
     public void addFolder(Long userId, UserFileMetadata userFileMetadata) {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
-        folderTree.addFolder(userFileMetadata.getIsFolder(),
+        folderTree.addFolder(userFileMetadata.getFileType() == FileEnum.FOLDER,
                              userFileMetadata.getId(),
                              userFileMetadata.getParentFolderId(),
                              userFileMetadata.getFilename()
@@ -62,7 +63,7 @@ public class FolderListTreeProvider {
      */
     public void addFolders(Long userId, List<UserFileMetadata> userFileMetadataList) {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree());
-        userFileMetadataList.forEach(userFileListDTO -> folderTree.addFolder(userFileListDTO.getIsFolder(),
+        userFileMetadataList.forEach(userFileListDTO -> folderTree.addFolder(userFileListDTO.getFileType() == FileEnum.FOLDER,
                                                                              userFileListDTO.getId(),
                                                                              userFileListDTO.getParentFolderId(),
                                                                              userFileListDTO.getFilename()
@@ -107,14 +108,18 @@ public class FolderListTreeProvider {
     /**
      * 更新資料夾的父資料夾
      *
-     * @param userId         用戶ID
-     * @param folderMetadata 資料夾元數據
-     * @param newParentId    新的父資料夾ID
+     * @param userId               用戶ID
+     * @param userFileMetadataList 資料夾元數據
+     * @param newParentId          新的父資料夾ID
      */
-    public void updateFolder(Long userId, UserFileMetadata folderMetadata, Long newParentId) {
+    public void updateFolder(Long userId, UserFileMetadata userFileMetadataList, Long newParentId) {
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
-            folderTree.updateFolder(folderMetadata.getIsFolder(), folderMetadata.getId(), folderMetadata.getFilename(), newParentId);
+            folderTree.updateFolder(userFileMetadataList.getFileType() == FileEnum.FOLDER,
+                                    userFileMetadataList.getId(),
+                                    userFileMetadataList.getFilename(),
+                                    newParentId
+            );
         }
     }
 
@@ -341,8 +346,7 @@ public class FolderListTreeProvider {
          */
         private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException {
             folderList
-                    .stream()
-                    .filter(UserFileListDTO::getIsFolder)
+                    .stream().filter(folder -> folder.getFileType() == FileEnum.FOLDER)
                     .forEach(folder -> addFolder(true, folder.getId(), folder.getParentFolderId(), folder.getFilename()));
 
             if (isLastPage) {

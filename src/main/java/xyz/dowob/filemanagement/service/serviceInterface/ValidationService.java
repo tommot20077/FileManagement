@@ -58,12 +58,12 @@ public interface ValidationService {
     /**
      * 驗證檔案類型是否合法
      *
-     * @param fileId   文件ID
+     * @param file   文件
      * @param fileType 規範的文件類型
      *
      * @return Mono<UserFileMetadata> 返回文件元數據
      */
-    Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType);
+    Mono<UserFileMetadata> validateFileType(UserFileMetadata file, FileEnum... fileType);
 
     /**
      * 驗證數據傳輸對象是否為空

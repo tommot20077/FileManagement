@@ -4,6 +4,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.relational.core.query.Criteria;
+import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.stereotype.Repository;
@@ -55,7 +56,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInOrderByIsFolder(Long userId, List<Long> parentFolderId);
+    default Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIn(Long userId, List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
+        return entityOperations
+                .select(UserFileMetadata.class)
+                .matching(org.springframework.data.relational.core.query.Query
+                                  .query(Criteria.where("user_id").is(userId).and("parent_folder_id").in(parentFolderId))
+                                  .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
+                .all();
+    }
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據並可指定是否需要顯示刪除檔案，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
@@ -65,7 +73,20 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInAndIsDeletedOrderByIsFolder(Long userId, List<Long> parentFolderId, Boolean isDeleted);
+    default Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInAndIsDeleted(Long userId, List<Long> parentFolderId, Boolean isDeleted, R2dbcEntityOperations entityOperations) {
+        return entityOperations
+                .select(UserFileMetadata.class)
+                .matching(org.springframework.data.relational.core.query.Query
+                                  .query(Criteria
+                                                 .where("user_id")
+                                                 .is(userId)
+                                                 .and("parent_folder_id")
+                                                 .in(parentFolderId)
+                                                 .and("is_deleted")
+                                                 .is(isDeleted))
+                                  .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
+                .all();
+    }
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)
@@ -94,7 +115,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     default Flux<UserFileMetadata> findAllByUserIdOrderByLastAccessTimeDesc(Long userId, List<FileEnum> type, R2dbcEntityOperations entityOperations) {
 
-        Criteria criteria = Criteria.where("user_id").is(userId).and("is_folder").is(false).and("is_deleted").is(false);
+        Criteria criteria = Criteria.where("user_id").is(userId).and("file_type").not("FOLDER").and("is_deleted").is(false);
 
         if (type != null && !type.isEmpty()) {
             List<String> typeList = type.stream().map(FileEnum::name).toList();
@@ -151,7 +172,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                             .select(UserFileMetadata.class)
                             .matching(org.springframework.data.relational.core.query.Query
                                               .query(Criteria.where("id").in(fileIds))
-                                              .sort(Sort.by(Sort.Order.asc("is_folder"), Sort.Order.asc("filename"))))
+                                              .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END, filename")))
                             .all();
                 });
     }

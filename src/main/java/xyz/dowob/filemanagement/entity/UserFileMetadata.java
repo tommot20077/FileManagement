@@ -58,12 +58,6 @@ public class UserFileMetadata {
     private Long parentFolderId;
 
     /**
-     * 是否為資料夾
-     */
-    @Column("is_folder")
-    private Boolean isFolder = false;
-
-    /**
      * 是否為星標文件
      */
     @Column("is_star")
@@ -144,7 +138,6 @@ public class UserFileMetadata {
         map.put("serverFile", serverFileId);
         map.put("parentFolder", parentFolderId);
         map.put("filename", filename);
-        map.put("isFolder", isFolder);
         map.put("uploadTime", uploadTime);
         map.put("lastAccessTime", lastAccessTime);
         map.put("sharedWithUsers", sharedWithUsers);

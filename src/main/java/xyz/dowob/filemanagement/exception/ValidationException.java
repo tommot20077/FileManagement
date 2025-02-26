@@ -253,7 +253,7 @@ public class ValidationException extends Exception {
          * HTTP狀態碼: 409
          * 錯誤信息: 檔案未被刪除
          */
-        NOT_DELETED_FILE(1137, HttpStatus.CONFLICT, "檔案未被刪除，檔案ID: %s"),
+        SOME_FILE_NOT_DELETED(1137, HttpStatus.CONFLICT, "部分檔案未刪除無法復原，檔案ID: %s"),
 
         /**
          * 錯誤碼: 1138

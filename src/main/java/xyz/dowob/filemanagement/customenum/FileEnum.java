@@ -67,11 +67,6 @@ public enum FileEnum {
     private final String type;
 
     /**
-     * 通用文件類型
-     */
-    public static final FileEnum[] GENERAL_FILE_TYPE = {IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER};
-
-    /**
      * MIME類型與文件類型的映射
      */
     private static final Map<String, FileEnum> MIME_TYPE_MAPPING = new HashMap<>();

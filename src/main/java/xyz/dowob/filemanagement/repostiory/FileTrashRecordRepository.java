@@ -7,6 +7,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 
+import java.time.LocalDateTime;
+
 /**
  * 文件回收站記錄數據庫操作接口，用於操作文件回收站記錄數據庫
  *
@@ -67,4 +69,13 @@ public interface FileTrashRecordRepository extends ReactiveCrudRepository<FileTr
                         .rowsUpdated()
                         .thenReturn(record));
     }
+
+    /**
+     * 查詢用戶過期的檔案回收站記錄
+     *
+     * @param userId 用戶ID
+     *
+     * @return 過期的檔案回收站記錄
+     */
+    Flux<FileTrashRecord> findAllByUserIdAndDeleteTimeBefore(Long userId, LocalDateTime deleteTime);
 }

@@ -109,26 +109,23 @@ public class ValidationServiceImpl implements ValidationService {
     }
 
     /**
-     * @param fileId   文件ID
+     * @param file     文件
      * @param fileType 文件類型
      *
      * @return Mono<UserFileMetadata>
      */
     @Override
-    public Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType) {
-        return userFileMetaRepository
-                .findById(fileId.toString())
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)))
-                .flatMap(userFileMetadata -> {
-                    if (fileType.length == 0 || Arrays.stream(fileType).anyMatch(fileEnum -> fileEnum == userFileMetadata.getFileType())) {
-                        return Mono.just(userFileMetadata);
-                    }
-                    return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_TYPE_WITH_WRONG_REQUEST_PATH,
-                                                              Arrays.toString(fileType),
-                                                              userFileMetadata.getFileType().name()
-                    ));
+    public Mono<UserFileMetadata> validateFileType(UserFileMetadata file, FileEnum... fileType) {
+        return Mono.just(file).flatMap(userFileMetadata -> {
+            if (fileType.length == 0 || Arrays.stream(fileType).anyMatch(fileEnum -> fileEnum == userFileMetadata.getFileType())) {
+                return Mono.just(userFileMetadata);
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_TYPE_WITH_WRONG_REQUEST_PATH,
+                                                      Arrays.toString(fileType),
+                                                      userFileMetadata.getFileType().name()
+            ));
 
-                });
+        });
     }
 
     /**

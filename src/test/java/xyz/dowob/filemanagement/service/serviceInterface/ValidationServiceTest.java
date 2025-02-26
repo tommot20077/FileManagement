@@ -44,7 +44,7 @@ class ValidationServiceTest {
             }
 
             @Override
-            public Mono<UserFileMetadata> validateFileType(Long fileId, FileEnum... fileType) {
+            public Mono<UserFileMetadata> validateFileType(UserFileMetadata fileMetadata, FileEnum... fileType) {
                 return null;
             }
         };

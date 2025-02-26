@@ -54,11 +54,6 @@ public class UserFileListDTO {
     private LocalDateTime lastAccessTime;
 
     /**
-     * 是否為文件夾
-     */
-    private Boolean isFolder;
-
-    /**
      * 是否為星標文件
      */
     private Boolean isStar;
@@ -109,7 +104,6 @@ public class UserFileListDTO {
         this.fileType = serverFileMetadata.getFileType();
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
-        this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
 
@@ -132,7 +126,6 @@ public class UserFileListDTO {
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.fileSize = userOnlineFile.getFileSize();
         this.fileType = userFileMetadata.getFileType();
-        this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
 
@@ -154,7 +147,6 @@ public class UserFileListDTO {
         this.createTime = userFileMetadata.getUploadTime();
         this.fileType = userFileMetadata.getFileType();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
-        this.isFolder = userFileMetadata.getIsFolder();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
         if (userFileMetadata.getSharedWithUsers() != null) {

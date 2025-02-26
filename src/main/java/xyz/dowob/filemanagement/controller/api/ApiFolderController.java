@@ -12,12 +12,16 @@ import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
+import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -40,9 +44,10 @@ public class ApiFolderController extends BaseFileController {
     private final FolderListTreeManager folderListTreeManager;
     private final FolderService folderService;
 
-    public ApiFolderController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, @Nullable
-    FolderListTreeManager folderListTreeManager, ValidationService validationService, FolderService folderService) {
-        super(userService, fileServiceStrategy, fileProperties, validationService);
+    public ApiFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties,
+                               @Nullable
+                               FolderListTreeManager folderListTreeManager, ValidationService validationService, FolderService folderService) {
+        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService);
         this.folderListTreeManager = folderListTreeManager;
         this.folderService = folderService;
     }
@@ -122,8 +127,14 @@ public class ApiFolderController extends BaseFileController {
      */
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFolder(@PathVariable String id, ServerWebExchange exchange) {
-        return handleError(userService.getUser(exchange).flatMap(user -> folderService.deleteFolder(id, user))
-                                   .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null))), exchange);
+        return handleError(userService
+                                   .getUser(exchange)
+                                   .flatMap(user -> permissionService
+                                           .validateUserPermission(user, Long.parseLong(id))
+                                           .flatMap(file -> validationService
+                                                   .validateFileType(file, FileEnum.FOLDER)
+                                                   .then(folderService.deleteFolder(file, user)))
+                                           .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null)))), exchange);
     }
 
     /**
@@ -139,8 +150,24 @@ public class ApiFolderController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
                                    .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
-                                   .then(userService.getUser(exchange))
-                                   .flatMap(user -> folderService.editFolder(fileEditDTO, user))
+                                   .then(userService.getUser(exchange)).flatMap(user -> {
+                    List<Long> fileIds = new ArrayList<>(Integer.parseInt(fileEditDTO.getFileId()));
+                    if (fileEditDTO.getParentFolderId() != null) {
+                        fileIds.add(fileEditDTO.getParentFolderId());
+                    }
+                    return permissionService.validateUserPermission(user, fileIds).collectList().flatMap(fileList -> {
+                        fileList.forEach(file -> {
+                            if (file.getId().equals(fileEditDTO.getParentFolderId())) {
+                                fileEditDTO.setParentFolderFileMetadata(file);
+                            } else if (file.getId().toString().equals(fileEditDTO.getFileId())) {
+                                fileEditDTO.setUserFileMetadata(file);
+                            }
+                        });
+                        return validationService
+                                .validateFileType(fileEditDTO.getUserFileMetadata(), FileEnum.FOLDER)
+                                .then(folderService.editFolder(fileEditDTO, user));
+                    });
+                })
                                    .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null))), exchange);
     }
 
@@ -157,8 +184,12 @@ public class ApiFolderController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, true)
                                    .then(userService.getUser(exchange))
-                                   .flatMap(user -> folderService.createFolder(fileEditDTO, user))
-                                   .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null))), exchange);
+                                   .flatMap(user -> permissionService
+                                           .validateUserPermission(user, fileEditDTO.getParentFolderId())
+                                           .flatMap(file -> validationService
+                                                   .validateFileType(file, FileEnum.FOLDER)
+                                                   .then(folderService.createFolder(fileEditDTO, user)))
+                                           .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null)))), exchange);
     }
 
     /**
@@ -173,10 +204,14 @@ public class ApiFolderController extends BaseFileController {
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, @PathVariable Long fileId) {
         return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
             HashMap<String, Object> result = new HashMap<>();
-            return folderService.getUserFilePaths(fileId, user).flatMap(list -> {
-                result.put("filePaths", list);
-                return Mono.just(result);
-            });
+            return permissionService
+                    .validateUserPermission(user, fileId, FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
+                    .flatMap(file -> validationService
+                            .validateFileType(file, FileEnum.FOLDER)
+                            .then(folderService.getUserFilePaths(file, user).flatMap(list -> {
+                                result.put("filePaths", list);
+                                return Mono.just(result);
+                            })));
         }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
     }
 

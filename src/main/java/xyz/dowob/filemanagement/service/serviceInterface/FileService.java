@@ -50,24 +50,24 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
     /**
      * 下載文件的接口
      *
-     * @param fileId 文件ID
+     * @param file 文件
      * @param user   用戶信息
      *
      * @return 返回文件下載流
      */
-    default Mono<UserFileDataBO> downloadFile(String fileId, User user) {
+    default Mono<UserFileDataBO> downloadFile(UserFileMetadata file, User user) {
         return Mono.empty();
     }
 
     /**
      * 刪除文件的接口
      *
-     * @param fileId 文件ID
+     * @param file 文件
      * @param user   用戶信息
      *
      * @return 返回刪除結果
      */
-    default Mono<Void> deleteFile(String fileId, User user) {
+    default Mono<Void> deleteFile(UserFileMetadata file, User user) {
         return Mono.empty();
     }
 

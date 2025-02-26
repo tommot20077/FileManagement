@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 /**
  * 文件夾業務邏輯接口，定義了文件夾業務邏輯的相關方法
@@ -46,12 +47,12 @@ public interface FolderService extends BaseFileService {
     /**
      * 刪除文件夾的接口
      *
-     * @param folderId 文件夾ID
+     * @param folder 文件夾
      * @param user     用戶信息
      *
      * @return 返回刪除結果
      */
-    default Mono<Void> deleteFolder(String folderId, User user) {
+    default Mono<Void> deleteFolder(UserFileMetadata folder, User user) {
         return Mono.empty();
     }
 
