@@ -2,9 +2,7 @@ package xyz.dowob.filemanagement.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,9 +14,6 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
-import org.springframework.security.web.server.csrf.WebSessionServerCsrfTokenRepository;
-import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -46,7 +41,6 @@ import java.util.List;
  **/
 
 @Configuration
-@RequiredArgsConstructor
 @EnableWebFluxSecurity
 @Log4j2
 public class SecurityConfig {
@@ -71,9 +65,16 @@ public class SecurityConfig {
     @Resource(name = "contextWebFilter")
     private WebFilter contextWebFilter;
 
-    @PostConstruct
-    public void init() {
-        log.info("SecurityProperties: {}", securityProperties.getCors());
+    /**
+     * WebFilter 用於處理 CSRF Token 的過濾器
+     */
+    @Resource(name = "csrfValidationFilter")
+    private WebFilter csrfTokenResponseFilter;
+
+    public SecurityConfig(JwtSecurityContextRepository securityContextRepository, ObjectMapper objectMapper, SecurityProperties securityProperties) {
+        this.securityContextRepository = securityContextRepository;
+        this.objectMapper = objectMapper;
+        this.securityProperties = securityProperties;
     }
 
     /**
@@ -88,23 +89,18 @@ public class SecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrfSpec -> csrfSpec
-                        .csrfTokenRepository(webSessionServerCsrfTokenRepository())
-                        .requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webss/**").matches(exchange)))
-                //.requireCsrfProtectionMatcher(exchange -> ServerWebExchangeMatchers.pathMatchers("/webs/**").matches(exchange)))
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .headers(headers -> headers.contentSecurityPolicy(contentSecurityPolicySpec -> {
                     contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                 }))
 
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .authorizeExchange(exchange -> exchange
-                        .pathMatchers("/web/guest/**", "/api/guest/**", "/docs/**", "/ws/**")
-                        .permitAll()
-                        //.pathMatchers("/api/user/getAllUserInfo")
-                        //.hasRole("ADMIN")
-                        .anyExchange()
-                        .authenticated())
+                .authorizeExchange(exchange -> exchange.pathMatchers("/web/guest/**", "/api/guest/**", "/docs/**", "/ws/**").permitAll()
+                                                       //.pathMatchers("/api/user/getAllUserInfo")
+                                                       //.hasRole("ADMIN")
+                                                       .anyExchange().authenticated())
                 .securityContextRepository(securityContextRepository)
+                .addFilterAt(csrfTokenResponseFilter, SecurityWebFiltersOrder.CSRF)
                 .addFilterAt(contextWebFilter, SecurityWebFiltersOrder.EXCEPTION_TRANSLATION)
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                         .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.UNAUTHORIZED))
@@ -140,7 +136,7 @@ public class SecurityConfig {
         for (String exposedHeader : securityProperties.getCors().getAllowExposedHeaders()) {
             configuration.addExposedHeader(exposedHeader);
         }
-        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.AUTHORIZATION, "X-CSRF-TOKEN"));
+        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.AUTHORIZATION, "X-Csrf-Token"));
 
         configuration.setAllowCredentials(securityProperties.getCors().isAllowCredentials());
 
@@ -153,18 +149,6 @@ public class SecurityConfig {
     }
 
     /**
-     * 配置 CSRF Token Repository
-     *
-     * @return CSRF憑證庫
-     */
-    @Bean
-    public ServerCsrfTokenRepository webSessionServerCsrfTokenRepository() {
-        WebSessionServerCsrfTokenRepository csrfTokenRepository = new WebSessionServerCsrfTokenRepository();
-        csrfTokenRepository.setHeaderName("X-CSRF-TOKEN");
-        return csrfTokenRepository;
-    }
-
-    /**
      * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息
      *
      * @param exchange 請求交換對象
@@ -174,8 +158,10 @@ public class SecurityConfig {
      */
     private Mono<Void> writeJsonResponse(ServerWebExchange exchange, ValidationException.ErrorCode error) {
         try {
-            ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(), error.getCode(),
-                                                                       exchange.getRequest().getPath().value(), error.getMessage(),
+            ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),
+                                                                       error.getCode(),
+                                                                       exchange.getRequest().getPath().value(),
+                                                                       error.getMessage(),
                                                                        null
             );
             exchange.getResponse().getHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);

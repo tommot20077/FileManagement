@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceImpl;
 
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.csrf.CsrfToken;
@@ -49,6 +50,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     /**
      * CSRF Token存儲庫
      */
+    @Resource(name = "customServerCsrfTokenRepository")
     private final ServerCsrfTokenRepository csrfTokenRepository;
 
     /**

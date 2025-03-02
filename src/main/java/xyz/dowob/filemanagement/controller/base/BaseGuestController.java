@@ -100,24 +100,25 @@ public abstract class BaseGuestController implements ResponseUnity {
      */
     @GetMapping("/checkAuthenticationStatus")
     public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
-        return userService.getUser(exchange).flatMap(user -> {
-            HashMap<String, Object> data = new HashMap<>();
-            HashMap<String, Object> userMap = new HashMap<>();
-            userMap.put("userId", user.getId());
-            userMap.put("userName", user.getUsername());
-            userMap.put("userMail", user.getEmail());
-            userMap.put("userRole", user.getRole());
-            data.put("user", userMap);
-            data.put("isAuthenticated", true);
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "用戶已授權", data);
-            return createResponseEntity(apiResponse);
-        }).switchIfEmpty(Mono.defer(() -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
-            return createResponseEntity(apiResponse);
-        })).onErrorResume(ValidationException.class, e -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
-            return createResponseEntity(apiResponse);
-        });
+        return userService
+                .getUser(exchange)
+                .flatMap(user -> {
+                    HashMap<String, Object> data = new HashMap<>();
+                    HashMap<String, Object> userMap = new HashMap<>();
+                    userMap.put("userId", user.getId());
+                    userMap.put("userName", user.getUsername());
+                    userMap.put("userMail", user.getEmail());
+                    userMap.put("userRole", user.getRole());
+                    data.put("user", userMap);
+                    data.put("isAuthenticated", true);
+                    ApiResponseDTO<?> apiResponse = createResponse(exchange, "用戶已授權", data);
+                    return createResponseEntity(apiResponse);
+                })
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
+                .onErrorResume(ValidationException.class, e -> {
+                    ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
+                    return createResponseEntity(apiResponse);
+                });
 
     }
 

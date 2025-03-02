@@ -44,6 +44,12 @@ public class SecurityProperties {
     private Cors cors = new Cors();
 
     /**
+     * CSRF 憑證配置
+     */
+    private Csrf csrf = new Csrf();
+
+
+    /**
      * 驗證 JWT 密鑰是否配置
      */
     @PostConstruct
@@ -140,6 +146,24 @@ public class SecurityProperties {
          * 跨域請求是否允許憑證，默認為 true
          */
         private boolean allowCredentials = true;
+    }
+
+    @Data
+    public static class Csrf {
+        /**
+         * CSRF 憑證的名稱，默認為 X-Csrf-Token
+         */
+        private String headerName = "X-Csrf-Token";
+
+        /**
+         * CSRF 憑證的參數名稱，默認為 _csrf
+         */
+        private String parameterName = "_csrf";
+
+        /**
+         * CSRF 憑證的過期時間，默認為 5 分鐘
+         */
+        private long expiration = 5;
     }
 
 

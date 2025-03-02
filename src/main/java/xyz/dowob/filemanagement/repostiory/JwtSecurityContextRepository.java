@@ -30,7 +30,6 @@ import java.util.regex.Pattern;
  **/
 @Component
 @RequiredArgsConstructor
-
 public class JwtSecurityContextRepository implements ServerSecurityContextRepository {
     /**
      * JWT 憑證的前綴

@@ -268,6 +268,20 @@ public class ValidationException extends Exception {
          * 錯誤信息: 檔案已被刪除
          */
         ALREADY_DELETED_FILE(1139, HttpStatus.CONFLICT, "檔案已被刪除，檔案ID: %s"),
+
+        /**
+         * 錯誤碼: 1140
+         * HTTP狀態碼: 403
+         * 錯誤信息: 缺少 CSRF 憑證
+         */
+        MISSING_CSRF_TOKEN(1140, HttpStatus.FORBIDDEN, "缺少 CSRF 憑證"),
+
+        /**
+         * 錯誤碼: 1141
+         * HTTP狀態碼: 403
+         * 錯誤信息: 無效的 CSRF 憑證
+         */
+        INVALID_CSRF_TOKEN(1141, HttpStatus.FORBIDDEN, "無效的 CSRF 憑證"),
         ;
 
 

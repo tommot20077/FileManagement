@@ -42,21 +42,21 @@ public class LoggerAspect {
      * 定義 ServiceInterface 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.service..*)")
-    public void serviceLayerPointcut () {
+    public void serviceLayerPointcut() {
     }
 
     /**
      * 定義 Component 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.component..*)")
-    public void componentLayerPointcut () {
+    public void componentLayerPointcut() {
     }
 
     /**
      * 定義 Controller 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.controller..*)")
-    public void controllerLayerPointcut () {
+    public void controllerLayerPointcut() {
     }
 
     /**
@@ -72,7 +72,7 @@ public class LoggerAspect {
      * @return Object 方法的返回值
      */
     @Around("serviceLayerPointcut() || componentLayerPointcut() || controllerLayerPointcut()")
-    public Object logAround (ProceedingJoinPoint joinPoint) throws Throwable {
+    public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         try {
@@ -118,7 +118,7 @@ public class LoggerAspect {
      *
      * @return String 處理後的日誌顯示的返回值
      */
-    private String processMethodSignature (Method method, Object result) {
+    private String processMethodSignature(Method method, Object result) {
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
         boolean isOverLength = method.isAnnotationPresent(HideOverLength.class);
 
@@ -202,8 +202,11 @@ public class LoggerAspect {
     private String[] getUserNameAndUserId(ServerWebExchange exchange) {
         String requestUsername;
         String requsetUserId;
-        if (exchange == null || exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
+        if (exchange == null) {
             requestUsername = "未知";
+            requsetUserId = null;
+        } else if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
+            requestUsername = "請求者 IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
             requsetUserId = null;
         } else {
             requestUsername = (String) exchange.getAttribute("username");

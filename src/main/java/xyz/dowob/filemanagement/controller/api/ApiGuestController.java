@@ -1,21 +1,21 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+
+import java.util.HashMap;
 
 /**
  * 用於處理訪客相關的API請求的控制器
@@ -89,6 +89,25 @@ public class ApiGuestController extends BaseGuestController {
     @PutMapping("/resetPassword")
     public Mono<ResponseEntity<?>> resetPassword (ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return super.resetPassword(resetPasswordDTO, exchange);
+    }
+
+    /**
+     * 獲取CSRF Token
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity> 返回CSRF Token
+     */
+    @GetMapping("/csrf/token")
+    public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
+        return handleError(authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
+            HashMap<String, Object> data = new HashMap<>();
+            data.put("token", csrfToken.getToken());
+            data.put("headerName", csrfToken.getHeaderName());
+            data.put("parameterName", csrfToken.getParameterName());
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取CSRF Token成功", data);
+            return createResponseEntity(apiResponse);
+        }), exchange);
     }
 
 }

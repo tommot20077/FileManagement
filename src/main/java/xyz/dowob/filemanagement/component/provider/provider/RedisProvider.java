@@ -12,6 +12,7 @@ import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 此類用於提供 Redis 的操作方法，透過自定義方法操作 RedisTemplate 來對數據進行操作
@@ -169,8 +170,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return setHashMap(hashKey, innerKey, value);
         }
-        return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, expireTime))
-                .then();
+        return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, expireTime)).then();
     }
 
     /**
@@ -211,6 +211,26 @@ public class RedisProvider {
     }
 
     /**
+     * 獲取指定Key 中的所有數據
+     *
+     * @param hashKey    Hash 的鍵
+     * @param KeyClass   Key 的類型
+     * @param ValueClass Value 的類型
+     *
+     * @return 返回 Flux<Map.Entry<Object, Object>> 對象
+     */
+    public <K, V> Flux<Map.Entry<K, V>> getAllHashMap(String hashKey, Class<K> KeyClass, Class<V> ValueClass) {
+        return redisTemplate.opsForHash().entries(hashKey).map(entry -> {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+            if (KeyClass.isInstance(key) && ValueClass.isInstance(value)) {
+                return Map.entry(KeyClass.cast(key), ValueClass.cast(value));
+            }
+            return Map.entry(objectMapper.convertValue(key, KeyClass), objectMapper.convertValue(value, ValueClass));
+        });
+    }
+
+    /**
      * 對 Hash 中的數據進行自增操作
      *
      * @param hashKey  Hash 的鍵
@@ -236,7 +256,8 @@ public class RedisProvider {
     public Mono<Object> incrementHashMap(String hashKey, String innerKey, long delta, Duration expireTime) {
         return redisTemplate
                 .opsForHash()
-                .increment(hashKey, innerKey, delta).flatMap(incrementResult -> redisTemplate.expire(hashKey, expireTime).thenReturn(incrementResult));
+                .increment(hashKey, innerKey, delta)
+                .flatMap(incrementResult -> redisTemplate.expire(hashKey, expireTime).thenReturn(incrementResult));
     }
 
     /**
@@ -287,8 +308,8 @@ public class RedisProvider {
     /**
      * 將數據存入 Redis 的 Set 中
      *
-     * @param key   鍵
-     * @param value 值
+     * @param key        鍵
+     * @param value      值
      * @param expireTime 過期時間
      *
      * @return 返回 Mono<Void> 對象
@@ -567,11 +588,7 @@ public class RedisProvider {
      */
     @HideOverLength
     public <T> Flux<T> getListFromZset(String key, int page, Class<T> clazz) {
-        return redisTemplate
-                .opsForZSet()
-                .rangeByScore(key, Range.just((double) page))
-                .next()
-                .flatMapMany(object -> convertObjectList(object, clazz));
+        return redisTemplate.opsForZSet().rangeByScore(key, Range.just((double) page)).next().flatMapMany(object -> convertObjectList(object, clazz));
     }
 
 
