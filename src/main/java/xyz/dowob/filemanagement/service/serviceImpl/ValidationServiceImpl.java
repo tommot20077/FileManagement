@@ -109,6 +109,9 @@ public class ValidationServiceImpl implements ValidationService {
     }
 
     /**
+     * 驗證檔案類型是否合法，當檔案類型不在指定的類型中時，拋出ValidationException
+     * 如果不指定檔案類型，則不進行檢查
+     *
      * @param file     文件
      * @param fileType 文件類型
      *
@@ -116,8 +119,13 @@ public class ValidationServiceImpl implements ValidationService {
      */
     @Override
     public Mono<UserFileMetadata> validateFileType(UserFileMetadata file, FileEnum... fileType) {
+        if (file == null) {
+            return Mono.empty();
+        }
         return Mono.just(file).flatMap(userFileMetadata -> {
-            if (fileType.length == 0 || Arrays.stream(fileType).anyMatch(fileEnum -> fileEnum == userFileMetadata.getFileType())) {
+            if (fileType == null || fileType.length == 0 || Arrays
+                    .stream(fileType)
+                    .anyMatch(fileEnum -> fileEnum == userFileMetadata.getFileType())) {
                 return Mono.just(userFileMetadata);
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_TYPE_WITH_WRONG_REQUEST_PATH,

@@ -69,24 +69,21 @@ public class FolderListTreeManager implements ApplicationRunner {
      * @param userIds 用戶ID
      */
     public void initializeTree(Long... userIds) {
-        Flux<User> userMono = userIds.length == 0 ? userRepository.findAll() : userRepository.findAllById(Flux.fromArray(userIds));
+        Flux<User> userFlux = userIds.length == 0 ? userRepository.findAll() : userRepository.findAllById(Flux.fromArray(userIds));
 
-        userMono
-                .doOnNext(user -> folderListTreeProvider
-                        .getUserFileListTree()
-                        .computeIfPresent(user.getId(), (id, node) -> folderListTreeProvider.getUserFileListTree().remove(id)))
-                .flatMap(user -> fetchAllUserFiles(user).doOnNext(pageList -> {
-
-                    try {
-                        folderListTreeProvider.initializeTree(user.getId(),
-                                                              pageList.getData(),
-                                                              pageList.getCurrentPage() == pageList.getTotalPages()
-                        );
-                    } catch (ProcessException e) {
-                        throw new RuntimeException(e);
-                    }
-                }))
-                .subscribe();
+        userFlux.flatMap(user -> {
+            folderListTreeProvider
+                    .getUserFileListTree()
+                    .computeIfPresent(user.getId(), (id, node) -> folderListTreeProvider.getUserFileListTree().remove(id));
+            return fetchAllUserFiles(user).flatMap(pageList -> {
+                try {
+                    folderListTreeProvider.initializeTree(user.getId(), pageList.getData(), pageList.getCurrentPage() == pageList.getTotalPages());
+                } catch (ProcessException e) {
+                    return Flux.error(new ProcessException(ProcessException.ErrorCode.BUILD_FILE_TREE_FAILED));
+                }
+                return Mono.just(user);
+            });
+        }).doOnComplete(() -> log.info("初始化用戶的檔案列表樹完成")).subscribe();
     }
 
     private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user) {
@@ -95,9 +92,10 @@ public class FolderListTreeManager implements ApplicationRunner {
                 .getFileService()
                 .getUserFileList(user, ReservedSearchIdEnum.ALL_FILE_ID.getId(), 1, pageSize, null)
                 .expand(pagedResponseDTO -> {
-            int nextPage = pagedResponseDTO.getCurrentPage() + 1;
-            return nextPage <= pagedResponseDTO.getTotalPages() ? (fileServiceStrategy
-                    .getFileService().getUserFileList(user, ReservedSearchIdEnum.ALL_FILE_ID.getId(), nextPage, pageSize, null)) : Mono.empty();
-        }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
+                    int nextPage = pagedResponseDTO.getCurrentPage() + 1;
+                    return nextPage <= pagedResponseDTO.getTotalPages() ? (fileServiceStrategy
+                            .getFileService()
+                            .getUserFileList(user, ReservedSearchIdEnum.ALL_FILE_ID.getId(), nextPage, pageSize, null)) : Mono.empty();
+                }).limitRate(20).takeUntil(pagedResponseDTO -> pagedResponseDTO.getCurrentPage() == pagedResponseDTO.getTotalPages());
     }
 }

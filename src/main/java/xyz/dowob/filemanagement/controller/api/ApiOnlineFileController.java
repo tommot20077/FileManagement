@@ -53,12 +53,19 @@ public class ApiOnlineFileController extends BaseFileController {
     @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            return permissionService
-                    .validateUserPermission(user, fileMetadataDTO.getParentFolderId())
-                    .flatMap(folder -> fileServiceStrategy
-                            .getFileService(FileEnum.ONLINE_DOCUMENT)
-                            .uploadFile(fileMetadataDTO, user)
-                            .flatMap(uploadResponseDTO -> createResponseEntity(createResponse(exchange, "上傳成功", uploadResponseDTO))));
+            Mono<UserFileMetadata> parentFolderMono = Mono.empty();
+            if (fileMetadataDTO.getParentFolderId() != null) {
+                parentFolderMono = permissionService
+                        .validateUserPermission(user, fileMetadataDTO.getParentFolderId())
+                        .flatMap(file -> validationService.validateFileType(file, FileEnum.FOLDER));
+            }
+
+            Mono<ResponseEntity<?>> responseEntityMono = fileServiceStrategy
+                    .getFileService(FileEnum.ONLINE_DOCUMENT)
+                    .uploadFile(fileMetadataDTO, user)
+                    .flatMap(uploadResponseDTO -> createResponseEntity(createResponse(exchange, "上傳成功", uploadResponseDTO)));
+
+            return parentFolderMono.then(responseEntityMono);
         }), exchange);
     }
 
@@ -117,10 +124,11 @@ public class ApiOnlineFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> editFile(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService.validateEditFileDTO(fileEditDTO, false).then(userService.getUser(exchange)).flatMap(user -> {
             List<Long> fileIds = new ArrayList<>();
-            List<Permission<UserFileMetadata>> rules = new ArrayList<>(FilePermissionRule.DefaultRule.ONLY_OWNER.getRules());
+            List<Permission<UserFileMetadata>> rules = new ArrayList<>();
             fileIds.add(Long.parseLong(fileEditDTO.getFileId()));
-            if (fileEditDTO.getParentFolderId() != null) {
+            if (fileEditDTO.getParentFolderId() != null && fileEditDTO.getEditType() == EditTypeEnum.EDIT_METADATA) {
                 fileIds.add(fileEditDTO.getParentFolderId());
+                rules.add(FilePermissionRule.ALLOW_OWNER);
             }
             if (fileEditDTO.getEditType() != EditTypeEnum.EDIT_METADATA) {
                 rules.add(FilePermissionRule.ALLOW_SHARED);
@@ -136,6 +144,7 @@ public class ApiOnlineFileController extends BaseFileController {
                 });
                 return validationService
                         .validateFileType(fileEditDTO.getUserFileMetadata(), FileEnum.ONLINE_DOCUMENT)
+                        .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(), FileEnum.FOLDER))
                         .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).editFile(fileEditDTO, user));
             });
         }).then(createResponseEntity(createResponse(exchange, "編輯成功", null))), exchange);

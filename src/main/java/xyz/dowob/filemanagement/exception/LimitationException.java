@@ -27,7 +27,14 @@ public class LimitationException extends Exception {
          * 錯誤碼: 1113
          * 錯誤信息: 用戶限制
          */
-        USER_EXCEED_LIMIT(1301, HttpStatus.TOO_MANY_REQUESTS, "%s");
+        USER_EXCEED_LIMIT(1301, HttpStatus.TOO_MANY_REQUESTS, "%s"),
+
+        /**
+         * 錯誤碼: 1114
+         * 錯誤信息: 獲取文件分塊超出限制
+         */
+        FILE_CHUNK_EXCEED_LIMIT(1302, HttpStatus.TOO_MANY_REQUESTS, "%s"),
+        ;
 
         private final int code;
         private final HttpStatus httpStatus;

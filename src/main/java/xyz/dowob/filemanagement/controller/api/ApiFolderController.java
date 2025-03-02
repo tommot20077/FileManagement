@@ -147,10 +147,11 @@ public class ApiFolderController extends BaseFileController {
      */
     @PutMapping()
     public Mono<ResponseEntity<?>> editFolder(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
-        return handleError(validationService
-                                   .validateEditFileDTO(fileEditDTO, true)
-                                   .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
-                                   .then(userService.getUser(exchange)).flatMap(user -> {
+        Mono<ResponseEntity<?>> responseEntityMono = validationService
+                .validateEditFileDTO(fileEditDTO, true)
+                .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
+                .then(userService.getUser(exchange))
+                .flatMap(user -> {
                     List<Long> fileIds = new ArrayList<>(Integer.parseInt(fileEditDTO.getFileId()));
                     if (fileEditDTO.getParentFolderId() != null) {
                         fileIds.add(fileEditDTO.getParentFolderId());
@@ -165,10 +166,13 @@ public class ApiFolderController extends BaseFileController {
                         });
                         return validationService
                                 .validateFileType(fileEditDTO.getUserFileMetadata(), FileEnum.FOLDER)
+                                .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(), FileEnum.FOLDER))
                                 .then(folderService.editFolder(fileEditDTO, user));
                     });
                 })
-                                   .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null))), exchange);
+                .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null)));
+
+        return handleError(responseEntityMono, exchange);
     }
 
     /**
@@ -181,15 +185,18 @@ public class ApiFolderController extends BaseFileController {
      */
     @PostMapping
     public Mono<ResponseEntity<?>> createFolder(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
-        return handleError(validationService
-                                   .validateEditFileDTO(fileEditDTO, true)
-                                   .then(userService.getUser(exchange))
-                                   .flatMap(user -> permissionService
-                                           .validateUserPermission(user, fileEditDTO.getParentFolderId())
-                                           .flatMap(file -> validationService
-                                                   .validateFileType(file, FileEnum.FOLDER)
-                                                   .then(folderService.createFolder(fileEditDTO, user)))
-                                           .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null)))), exchange);
+        return handleError(validationService.validateEditFileDTO(fileEditDTO, true).then(userService.getUser(exchange)).flatMap(user -> {
+            Mono<UserFileMetadata> parentFolderMono = Mono.empty();
+
+            if (fileEditDTO.getParentFolderId() != null) {
+                parentFolderMono = permissionService
+                        .validateUserPermission(user, fileEditDTO.getParentFolderId())
+                        .flatMap(file -> validationService.validateFileType(file, FileEnum.FOLDER));
+            }
+            return parentFolderMono
+                    .then(folderService.createFolder(fileEditDTO, user))
+                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null)));
+        }), exchange);
     }
 
     /**

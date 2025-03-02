@@ -91,7 +91,9 @@ public class ApiFileController extends BaseFileController {
 
             return validationService
                     .validateFileMetadataDTO(fileMetadataDTO, user)
-                    .thenMany(permissionService.validateUserPermission(user, fileIds))
+                    .thenMany(permissionService
+                                      .validateUserPermission(user, fileIds)
+                                      .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
                     .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
                         ApiResponseDTO<?> apiResponse;
                         if (transferResponseDTO.getIsFinished()) {
@@ -193,25 +195,29 @@ public class ApiFileController extends BaseFileController {
         return handleError(validationService
                                    .validateEditFileDTO(fileEditDTO, false)
                                    .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
-                                   .then(userService.getUser(exchange)).flatMap(user -> {
-                    List<Long> fileIds = new ArrayList<>(List.of(Long.parseLong(fileEditDTO.getFileId())));
-                    if (fileEditDTO.getParentFolderId() != null) {
-                        fileIds.add(fileEditDTO.getParentFolderId());
-                    }
+                                   .then(userService.getUser(exchange))
+                                   .flatMap(user -> {
+                                       List<Long> fileIds = new ArrayList<>(List.of(Long.parseLong(fileEditDTO.getFileId())));
+                                       if (fileEditDTO.getParentFolderId() != null) {
+                                           fileIds.add(fileEditDTO.getParentFolderId());
+                                       }
 
-                    return permissionService.validateUserPermission(user, fileIds).collectList().flatMap(fileList -> {
-                        for (UserFileMetadata file : fileList) {
-                            if (file.getId().equals(fileEditDTO.getParentFolderId())) {
-                                fileEditDTO.setParentFolderFileMetadata(file);
-                            } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
-                                fileEditDTO.setUserFileMetadata(file);
-                            }
-                        }
-                        return validationService
-                                .validateFileType(fileEditDTO.getUserFileMetadata(), CUSTOM_FILE_TYPE)
-                                .then(fileServiceStrategy.getFileService().editFile(fileEditDTO, user));
-                    });
-                })
+                                       return permissionService.validateUserPermission(user, fileIds).collectList().flatMap(fileList -> {
+                                           for (UserFileMetadata file : fileList) {
+                                               if (file.getId().equals(fileEditDTO.getParentFolderId())) {
+                                                   fileEditDTO.setParentFolderFileMetadata(file);
+                                               } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
+                                                   fileEditDTO.setUserFileMetadata(file);
+                                               }
+                                           }
+                                           return validationService
+                                                   .validateFileType(fileEditDTO.getUserFileMetadata(), CUSTOM_FILE_TYPE)
+                                                   .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(),
+                                                                                            FileEnum.FOLDER
+                                                   ))
+                                                   .then(fileServiceStrategy.getFileService().editFile(fileEditDTO, user));
+                                       });
+                                   })
                                    .then(createResponseEntity(createResponse(exchange, "資料更新成功", null))), exchange);
     }
 
@@ -276,6 +282,13 @@ public class ApiFileController extends BaseFileController {
         });
     }
 
+    /**
+     * 將 Part 對象轉換為 byte[] 類型
+     *
+     * @param multipartFile Part 對象
+     *
+     * @return Mono<byte [ ]> 返回 byte[] 類型
+     */
     private Mono<byte[]> formatPartToBytes(Mono<Part> multipartFile) {
         return multipartFile.flatMap(part -> part.content().reduce(DataBuffer::write)).map(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];

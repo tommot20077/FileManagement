@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,8 @@ import java.util.stream.Collectors;
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
     public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                 @Nullable FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator) {
+                                 @Nullable
+                                 FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -52,7 +54,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              circuitBreakerConfig, folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
+              circuitBreakerConfig,
+              rateLimiterConfig,
+              folderListTreeProvider,
+              fileTrashRecordRepository,
+              entityOperations,
+              transactionalOperator
         );
     }
     //todo 後期加入下載資料夾的功能
@@ -151,7 +158,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             }
             List<UserFileMetadata> userFileList = new ArrayList<>();
             List<Long> parentFolderIdList = new ArrayList<>(List.of(userFileMetadata.getId()));
-            return findAllChildFolder(user.getId(), parentFolderIdList, userFileList)
+            return findAllChildFolder(parentFolderIdList, userFileList)
                     .flatMap(childFolderList -> {
                         List<Long> serverFileIds = childFolderList.stream().map(UserFileMetadata::getServerFileId).filter(Objects::nonNull).toList();
                         return handleUserStorage(user, serverFileIds);
@@ -173,46 +180,38 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     @Override
     public Mono<UserFileMetadata> restoreFile(UserFileMetadata folder, User user) {
         return Mono.defer(() -> {
-                    if (!folder.getIsDeleted()) {
-                        return Mono.error(new ValidationException(ValidationException.ErrorCode.SOME_FILE_NOT_DELETED, folder.getId()));
-                    }
+            if (!folder.getIsDeleted()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.SOME_FILE_NOT_DELETED, folder.getId()));
+            }
 
-                    folder.setIsDeleted(false);
-                    folder.setLastAccessTime(LocalDateTime.now());
-                    if (folder.getParentFolderId() != null) {
-                        return userFileMetaRepository.findById(folder.getParentFolderId().toString()).flatMap(parentFolder -> {
-                            if (parentFolder.getIsDeleted()) {
-                                folder.setParentFolderId(null);
-                            }
-                            return Mono.just(folder);
-                        });
+            folder.setIsDeleted(false);
+            folder.setLastAccessTime(LocalDateTime.now());
+            if (folder.getParentFolderId() != null) {
+                return userFileMetaRepository.findById(folder.getParentFolderId().toString()).flatMap(parentFolder -> {
+                    if (parentFolder.getIsDeleted()) {
+                        folder.setParentFolderId(null);
                     }
                     return Mono.just(folder);
-                   })
-                .then(Mono.defer(() -> findAllChildFolder(folder.getUserId(), List.of(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(
-                        childFolderList -> {
-                            childFolderList.forEach(userFile -> {
-                                userFile.setIsDeleted(false);
-                            });
-                            return fileTrashRecordRepository
-                                    .deleteById(folder.getId())
-                                    .thenMany(userFileMetaRepository.saveAll(childFolderList))
-                                    .collectList()
-                                    .flatMap(userfileList -> {
-                                        Long[] parentFolderIds = userfileList
-                                                .stream()
-                                                .map(UserFileMetadata::getParentFolderId)
-                                                .distinct()
-                                                .toArray(Long[]::new);
-                                        return cleanUserListCache(userfileList.getFirst().getUserId(), parentFolderIds);
-                                    })
-                                    .then(Mono.defer(() -> {
-                                        if (folderListTreeProvider != null) {
-                                            folderListTreeProvider.addFolders(user.getId(), childFolderList);
-                                        }
-                                        return Mono.just(folder);
-                                    }));
-                        })));
+                });
+            }
+            return Mono.just(folder);
+        }).then(Mono.defer(() -> findAllChildFolder(List.of(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(childFolderList -> {
+            childFolderList.forEach(userFile -> userFile.setIsDeleted(false));
+            return fileTrashRecordRepository
+                    .deleteById(folder.getId())
+                    .thenMany(userFileMetaRepository.saveAll(childFolderList))
+                    .collectList()
+                    .flatMap(userfileList -> {
+                        Long[] parentFolderIds = userfileList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
+                        return cleanUserListCache(userfileList.getFirst().getUserId(), parentFolderIds);
+                    })
+                    .then(Mono.defer(() -> {
+                        if (folderListTreeProvider != null) {
+                            folderListTreeProvider.addFolders(user.getId(), childFolderList);
+                        }
+                        return Mono.just(folder);
+                    }));
+        })));
     }
 
     /**
@@ -238,7 +237,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      */
     @Override
     public Mono<Boolean> removeFile(UserFileMetadata folder, User user) {
-        return findAllChildFolder(folder.getUserId(), List.of(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(childFolderList -> {
+        return findAllChildFolder(List.of(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(childFolderList -> {
             boolean isAnyDeleted = childFolderList.stream().anyMatch(UserFileMetadata::getIsDeleted);
             if (isAnyDeleted) {
                 return Mono.just(false);
@@ -246,9 +245,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             return Mono.defer(() -> {
                 LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getGlobal().getRetentionTime());
                 FileTrashRecord fileTrashRecord = new FileTrashRecord(childFolderList.getFirst(), deleteTime);
-                childFolderList.forEach(userFile -> {
-                    userFile.setIsDeleted(true);
-                });
+                childFolderList.forEach(userFile -> userFile.setIsDeleted(true));
                 Mono<Boolean> result = fileTrashRecordRepository
                         .insert(fileTrashRecord, entityOperations)
                         .thenMany(userFileMetaRepository.saveAll(childFolderList))
@@ -286,33 +283,30 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     /**
      * 遞歸刪除文件夾的共通實現
      *
-     * @param userId             用戶ID
      * @param parentFolderIdList 父文件夾ID列表
      * @param childFolderList    服務器文件列表
      *
      * @return Mono<Void>
      */
-    private Mono<List<UserFileMetadata>> findAllChildFolder(Long userId, List<Long> parentFolderIdList, List<UserFileMetadata> childFolderList) {
-        return findFoldersWithSameParentFolderId(userId, parentFolderIdList).flatMap(nextChildFolder -> {
+    private Mono<List<UserFileMetadata>> findAllChildFolder(List<Long> parentFolderIdList, List<UserFileMetadata> childFolderList) {
+        return findFoldersWithSameParentFolderId(parentFolderIdList).flatMap(nextChildFolder -> {
             childFolderList.addAll(nextChildFolder);
             if (nextChildFolder.isEmpty()) {
                 return childFolderList.isEmpty() ? Mono.empty() : Mono.just(childFolderList);
             }
-            return findAllChildFolder(userId, nextChildFolder.stream().map(UserFileMetadata::getId).toList(), childFolderList);
+            return findAllChildFolder(nextChildFolder.stream().map(UserFileMetadata::getId).toList(), childFolderList);
         });
     }
 
     /**
      * 查詢具有相同父文件夾ID的文件夾
      *
-     * @param userId         用戶ID
      * @param parentFolderId 父文件夾ID
      *
      * @return Mono<List < Long>>
      */
-    private Mono<List<UserFileMetadata>> findFoldersWithSameParentFolderId(Long userId, List<Long> parentFolderId) {
-        return userFileMetaRepository
-                .findAllByUserIdAndParentFolderIdIn(userId, parentFolderId, entityOperations)
+    private Mono<List<UserFileMetadata>> findFoldersWithSameParentFolderId(List<Long> parentFolderId) {
+        return userFileMetaRepository.findAllByParentFolderIdIn(parentFolderId, entityOperations)
                 .collectList()
                 .map(userFileMetadataList -> userFileMetadataList
                         .stream()
@@ -320,6 +314,4 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         .collect(Collectors.toList()))
                 .switchIfEmpty(Mono.just(Collections.emptyList()));
     }
-
-    //todo isFileOrFolder方法放到驗證類中
 }

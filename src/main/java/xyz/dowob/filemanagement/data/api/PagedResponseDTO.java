@@ -22,22 +22,27 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class PagedResponseDTO<T> {
+
     /**
      * 數據
      */
     private List<T> data = List.of();
+
     /**
      * 總頁數
      */
     private int totalPages = 0;
+
     /**
      * 當前頁碼
      */
     private int currentPage = 0;
+
     /**
      * 每頁大小
      */
     private int pageSize = 0;
+
     /**
      * 總元素數量
      */

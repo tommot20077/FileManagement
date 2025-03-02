@@ -73,4 +73,14 @@ public class EditorContentDTO {
 
         return Objects.equals(delta, that.delta);
     }
+
+    /**
+     * 重寫哈希碼方法，返回對象的哈希碼
+     *
+     * @return 對象的哈希碼
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hash(delta);
+    }
 }

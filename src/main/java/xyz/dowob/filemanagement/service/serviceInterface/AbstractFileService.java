@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -19,6 +19,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -38,6 +39,7 @@ import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.*;
@@ -98,9 +100,14 @@ public abstract class AbstractFileService implements FileService {
     protected final FileProperties fileProperties;
 
     /**
-     * 斷路器配置
+     * 斷路器設定
      */
     protected final CircuitBreakerConfig circuitBreakerConfig;
+
+    /**
+     * 速率器設定
+     */
+    protected final RateLimiterConfig rateLimiterConfig;
 
     /**
      * 文件列表樹提供者
@@ -306,8 +313,6 @@ public abstract class AbstractFileService implements FileService {
      */
 
     //todo 後期改這這查詢分發子類型
-    //todo 檔案還沒處理完就獲取問題
-    //todo 分享用戶查詢不帶User
     private Flux<UserFileListDTO> getFileListFormDB(User user, Long fatherFolderId, List<FileEnum> type) {
         Flux<UserFileMetadata> userFileMetadataFlux = getUserFileMetadataFlux(user, fatherFolderId, type);
         Set<Long> serverFileIds = new HashSet<>();
@@ -393,11 +398,7 @@ public abstract class AbstractFileService implements FileService {
 
             case RECYCLE_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByIsFolder(user.getId(), entityOperations);
 
-            case null -> userFileMetaRepository.findAllByUserIdAndParentFolderIdInAndIsDeleted(user.getId(),
-                                                                                               List.of(fatherFolderId),
-                                                                                               false,
-                                                                                               entityOperations
-            );
+            case null -> userFileMetaRepository.findAllByParentFolderIdInAndIsDeleted(List.of(fatherFolderId), false, entityOperations);
         };
     }
 
@@ -416,7 +417,8 @@ public abstract class AbstractFileService implements FileService {
                     return serverFileMetaRepository
                             .findById(userFileMetadata.getServerFileId().toString())
                             .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
-                                                                           userFileMetadata.getServerFileId(), userFileMetadata.getId()
+                                                                           userFileMetadata.getServerFileId(),
+                                                                           userFileMetadata.getId()
                             )))
                             .map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata));
                    })
@@ -485,6 +487,7 @@ public abstract class AbstractFileService implements FileService {
             return serverFileMetaRepository.save(existingFile).then(associateUserFile(existingFile, fileMetadataDTO)
                                   .flatMap(userFileMetaRepository::save)
                                   .then(handleUserStorage(user, existingFile.getFileSize(), false))
+                                  .then(cleanUserListCache(user.getId(), fileMetadataDTO.getParentFolderId()))
                                   .thenReturn(UploadResponseDTO
                                                       .builder()
                                                       .progress(100.0)
@@ -570,22 +573,6 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 確認文件是否為文件或文件夾的共通實現，當文件類型不符時拋出ValidationException
-     *
-     * @param userFileMetadata 文件元數據
-     * @param isFolder         是否為文件夾
-     *
-     * @return Mono<UserFileMetadata>
-     */
-    protected Mono<UserFileMetadata> isFileOrFolder(UserFileMetadata userFileMetadata, boolean isFolder) {
-        if ((userFileMetadata.getFileType() == FileEnum.FOLDER) == isFolder) {
-            return Mono.just(userFileMetadata);
-        }
-        ValidationException.ErrorCode errorCode = isFolder ? ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FOLDER : ValidationException.ErrorCode.THIS_OBJECT_ID_NOT_FILE;
-        return Mono.error(new ValidationException(errorCode, userFileMetadata.getId()));
-    }
-
-    /**
      * 刪除暫存分塊數據的共通實現
      *
      * @param uploadTaskBO 傳輸任務
@@ -633,41 +620,45 @@ public abstract class AbstractFileService implements FileService {
      */
     protected Mono<ObjectId> combineChunks(String transferTaskId, int totalChunks) {
         record ChunkData(int index, byte[] data) {
-            static Comparator<Object> comparator() {
-                return Comparator.comparingInt(a -> ((ChunkData) a).index);
+            static Comparator<ChunkData> comparator() {
+                return Comparator.comparingInt(ChunkData::index);
             }
         }
 
         String key = "upload_task:" + transferTaskId;
-        return redisProvider.getHashMap(key, "DTO", UploadTaskBO.class).flatMap(uploadTaskBO -> Mono.defer(() -> {
-            Flux<byte[]> chunkFiles = Flux
-                    .range(1, totalChunks)
-                    .parallel(transfersTasksManager.getAvailableThreadCount())
-                    .runOn(Schedulers.boundedElastic())
-                    .flatMap(index -> CircuitBreakerOperator
-                            .of(CircuitBreaker.of("chunkProcessor", this.circuitBreakerConfig))
-                            .apply(this.gridFsProvider
-                                           .findFileByFileName(transferTaskId + "_chunk_" + index)
-                                           .flatMap(this.gridFsProvider::getResource)
-                                           .flatMap(resource -> DataBufferUtils
-                                                   .join(resource.getDownloadStream())
-                                                   .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM,
-                                                                                                       transferTaskId + "_chunk_" + index
-                                                   )))
-                                                   .map(dataBuffer -> {
-                                                       try {
-                                                           byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                                           dataBuffer.read(bytes);
-                                                           return new ChunkData(index, bytes);
-                                                       } finally {
-                                                           DataBufferUtils.release(dataBuffer);
-                                                       }
-                                                   }))))
-                    .sequential()
-                    .sort(ChunkData.comparator())
-                    .cast(ChunkData.class)
-                    .map((ChunkData -> ChunkData.data));
-            return chunkFiles
+        return redisProvider.getHashMap(key, "DTO", UploadTaskBO.class).flatMap(uploadTaskBO -> {
+            RateLimiter rateLimiter = RateLimiter.of("combineChunk", this.rateLimiterConfig);
+            Flux<ChunkData> chunkFiles = Flux.range(1, totalChunks).flatMapSequential(index -> {
+
+                Mono<ChunkData> chunkOperation = this.gridFsProvider
+                        .findFileByFileName(transferTaskId + "_chunk_" + index)
+                        .flatMap(this.gridFsProvider::getResource)
+                        .flatMap(resource -> DataBufferUtils
+                                .join(resource.getDownloadStream())
+                                .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM,
+                                                                                    transferTaskId + "_chunk_" + index
+                                )))
+                                .map(dataBuffer -> {
+                                    try {
+                                        byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                                        dataBuffer.read(bytes);
+                                        return new ChunkData(index, bytes);
+                                    } finally {
+                                        DataBufferUtils.release(dataBuffer);
+                                    }
+                                }));
+
+                return Mono.defer(() -> {
+                               if (rateLimiter.acquirePermission()) {
+                                   return chunkOperation;
+                               }
+                               return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT));
+                           })
+                        .retryWhen(Retry.backoff(5, Duration.ofSeconds(1)).filter(e -> e instanceof LimitationException)
+                                           .maxBackoff(Duration.ofSeconds(5)).jitter(0.3));
+            });
+
+            return chunkFiles.sort(ChunkData.comparator()).map(ChunkData::data)
                     .collectList()
                     .flatMap(this::combineBytes)
                     .flatMap(combinedBytes -> checkFileStatus(combinedBytes, uploadTaskBO).then(Mono.defer(() -> {
@@ -675,8 +666,9 @@ public abstract class AbstractFileService implements FileService {
                         processFileAfterFileCheck(uploadTaskBO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
                         return Mono.just(new ObjectId());
                     })));
-        }));
+        });
     }
+
 
     /**
      * 檢查文件的狀態的共通實現
@@ -1207,4 +1199,5 @@ public abstract class AbstractFileService implements FileService {
     public Mono<ServerFileMetadata> deleteServerFileMetadata(ServerFileMetadata entity) {
         return Mono.empty();
     }
+
 }

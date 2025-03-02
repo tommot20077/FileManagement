@@ -6,6 +6,7 @@ import com.github.difflib.DiffUtils;
 import com.github.difflib.patch.Patch;
 import com.github.difflib.patch.PatchFailedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
@@ -77,7 +78,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     private final String EMPTY_CONTENT = "{\"delta\":[]}";
 
     public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                 @Nullable FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator) {
+                                 @Nullable
+                                 FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -86,7 +88,12 @@ public class OnlineFileServiceImpl extends AbstractFileService {
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              circuitBreakerConfig, folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
+              circuitBreakerConfig,
+              rateLimiterConfig,
+              folderListTreeProvider,
+              fileTrashRecordRepository,
+              entityOperations,
+              transactionalOperator
         );
         this.userOnlineFileRepository = userOnlineFileRepository;
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;

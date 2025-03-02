@@ -5,6 +5,8 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 /**
  * 安全配置文件，用於配置安全相關的參數，在 application 中配置 security
  *
@@ -35,6 +37,11 @@ public class SecurityProperties {
      * Cookie 憑證配置
      */
     private Cookie cookie = new Cookie();
+
+    /**
+     * 跨域配置
+     */
+    private Cors cors = new Cors();
 
     /**
      * 驗證 JWT 密鑰是否配置
@@ -95,4 +102,45 @@ public class SecurityProperties {
          */
         private String sameSite = "Lax";
     }
+
+    @Data
+    public static class Cors {
+        /**
+         * 跨域請求的允許來源，默認為空
+         */
+        private List<String> allowedOrigins = List.of();
+
+        /**
+         * 跨域請求的允許來源正則表達式，默認為空
+         */
+        private List<String> allowedOriginsPattern = List.of();
+
+        /**
+         * 跨域請求的允許暴露標頭，默認為空
+         * Content-Disposition、Authorization、X-CSRF-TOKEN 會自動添加
+         */
+        private List<String> allowExposedHeaders = List.of();
+
+        /**
+         * 跨域請求的允許方法，默認為全部方法
+         */
+        private List<String> allowedMethods = List.of("*");
+
+        /**
+         * 跨域請求的允許標頭，默認為全部標頭
+         */
+        private List<String> allowedHeaders = List.of("*");
+
+        /**
+         * 跨域請求的暫存時間，默認為 3600 秒
+         */
+        private long maxAge = 3600;
+
+        /**
+         * 跨域請求是否允許憑證，默認為 true
+         */
+        private boolean allowCredentials = true;
+    }
+
+
 }

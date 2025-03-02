@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -24,6 +25,7 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
@@ -59,10 +61,20 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
 
     /**
+     * SecurityProperties 用於配置安全相關的參數
+     */
+    private final SecurityProperties securityProperties;
+
+    /**
      * WebFilter 用於處理安全上下文的過濾器
      */
     @Resource(name = "contextWebFilter")
     private WebFilter contextWebFilter;
+
+    @PostConstruct
+    public void init() {
+        log.info("SecurityProperties: {}", securityProperties.getCors());
+    }
 
     /**
      * 配置安全過濾器鏈
@@ -109,13 +121,34 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.addAllowedOriginPattern("*");
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION));
+        for (String allowedOrigin : securityProperties.getCors().getAllowedOrigins()) {
+            configuration.addAllowedOrigin(allowedOrigin);
+        }
+
+        for (String allowedOriginPattern : securityProperties.getCors().getAllowedOriginsPattern()) {
+            configuration.addAllowedOriginPattern(allowedOriginPattern);
+        }
+
+        for (String allowedMethod : securityProperties.getCors().getAllowedMethods()) {
+            configuration.addAllowedMethod(allowedMethod);
+        }
+
+        for (String allowedHeader : securityProperties.getCors().getAllowedHeaders()) {
+            configuration.addAllowedHeader(allowedHeader);
+        }
+
+        for (String exposedHeader : securityProperties.getCors().getAllowExposedHeaders()) {
+            configuration.addExposedHeader(exposedHeader);
+        }
+        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION, HttpHeaders.AUTHORIZATION, "X-CSRF-TOKEN"));
+
+        configuration.setAllowCredentials(securityProperties.getCors().isAllowCredentials());
+
+        configuration.setMaxAge(securityProperties.getCors().getMaxAge());
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 

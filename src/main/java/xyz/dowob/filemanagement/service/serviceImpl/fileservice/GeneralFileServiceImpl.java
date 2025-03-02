@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 @FileHandlerType(FileEnum.OTHER)
 public class GeneralFileServiceImpl extends AbstractFileService {
     public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                  @Nullable FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator) {
+                                  @Nullable
+                                  FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -39,8 +41,7 @@ public class GeneralFileServiceImpl extends AbstractFileService {
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              circuitBreakerConfig,
-              folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
+              circuitBreakerConfig, rateLimiterConfig, folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
         );
     }
 }

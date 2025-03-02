@@ -7,8 +7,10 @@
  * 4. CrudService 用於定義基本的增刪改查方法 {@link xyz.dowob.filemanagement.service.serviceInterface.CrudService}
  * 5. FileService 用於定義文件相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.FileService}
  * 6. FolderService 用於定義文件夾相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.FolderService}
- * 7. TokenService 用於定義 token 相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.TokenService}
- * 8. UserService 用於定義用戶相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.UserService}
- * 9. ValidationService 用於定義驗證相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.ValidationService}
+ * 7. PermissionService 用於定義權限相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.PermissionService}
+ * 8. RecoverableFile 用於定義文件恢復相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.RecoverableFile}
+ * 9. TokenService 用於定義 token 相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.TokenService}
+ * 10. UserService 用於定義用戶相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.UserService}
+ * 11. ValidationService 用於定義驗證相關的方法 {@link xyz.dowob.filemanagement.service.serviceInterface.ValidationService}
  */
 package xyz.dowob.filemanagement.service.serviceInterface;

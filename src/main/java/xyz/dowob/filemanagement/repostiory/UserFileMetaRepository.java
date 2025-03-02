@@ -51,16 +51,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
-     * @param userId         用戶ID
      * @param parentFolderId 父文件夾ID
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    default Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIn(Long userId, List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
+    default Flux<UserFileMetadata> findAllByParentFolderIdIn(List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
         return entityOperations
                 .select(UserFileMetadata.class)
-                .matching(org.springframework.data.relational.core.query.Query
-                                  .query(Criteria.where("user_id").is(userId).and("parent_folder_id").in(parentFolderId))
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("parent_folder_id").in(parentFolderId))
                                   .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
                 .all();
     }
@@ -68,22 +66,15 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據並可指定是否需要顯示刪除檔案，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
-     * @param userId         用戶ID
      * @param parentFolderId 父文件夾ID
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
-    default Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdInAndIsDeleted(Long userId, List<Long> parentFolderId, Boolean isDeleted, R2dbcEntityOperations entityOperations) {
+    default Flux<UserFileMetadata> findAllByParentFolderIdInAndIsDeleted(List<Long> parentFolderId, Boolean isDeleted, R2dbcEntityOperations entityOperations) {
         return entityOperations
                 .select(UserFileMetadata.class)
                 .matching(org.springframework.data.relational.core.query.Query
-                                  .query(Criteria
-                                                 .where("user_id")
-                                                 .is(userId)
-                                                 .and("parent_folder_id")
-                                                 .in(parentFolderId)
-                                                 .and("is_deleted")
-                                                 .is(isDeleted))
+                                  .query(Criteria.where("parent_folder_id").in(parentFolderId).and("is_deleted").is(isDeleted))
                                   .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
                 .all();
     }
