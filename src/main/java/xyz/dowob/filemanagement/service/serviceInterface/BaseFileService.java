@@ -2,8 +2,8 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileVersionDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -26,15 +26,12 @@ public interface BaseFileService {
     /**
      * 獲取用戶文件列表的接口
      *
-     * @param user     用戶信息
-     * @param searchId 文件夾ID
-     * @param page     分頁頁碼
-     * @param pageSize 分頁大小
-     * @param types    文件類型
+     * @param user          用戶信息
+     * @param fileFilterDTO 文件過濾條件
      *
      * @return 返回用戶文件列表
      */
-    default Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long searchId, Integer page, Integer pageSize, List<FileEnum> types) {
+    default Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, FileFilterDTO fileFilterDTO) {
         return Mono.empty();
     }
 
@@ -42,7 +39,7 @@ public interface BaseFileService {
      * 獲取用戶文件路徑的接口
      *
      * @param file 文件
-     * @param user   用戶信息
+     * @param user 用戶信息
      *
      * @return 返回用戶文件路徑
      */
@@ -54,13 +51,25 @@ public interface BaseFileService {
      * 獲取文件版本列表的接口
      *
      * @param user     用戶信息
-     * @param file   文件
+     * @param file     文件
      * @param page     分頁頁碼
      * @param pageSize 分頁大小
      *
      * @return 返回文件版本列表
      */
     default Mono<PagedResponseDTO<FileVersionDTO>> getFileVersionList(User user, UserFileMetadata file, Integer page, Integer pageSize) {
+        return Mono.empty();
+    }
+
+    /**
+     * 搜索用戶文件的接口
+     *
+     * @param user          用戶信息
+     * @param fileFilterDTO 文件過濾條件
+     *
+     * @return 返回搜索用戶文件
+     */
+    default Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
         return Mono.empty();
     }
 

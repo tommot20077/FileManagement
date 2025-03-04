@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -64,6 +65,13 @@ public interface ValidationService {
      * @return Mono<UserFileMetadata> 返回文件元數據
      */
     Mono<UserFileMetadata> validateFileType(UserFileMetadata file, FileEnum... fileType);
+
+    /**
+     * 驗證文件過濾DTO中的數據是否合法
+     *
+     * @param fileFilterDTO 文件過濾DTO
+     */
+    Mono<Void> validateFileFilterDTO(FileFilterDTO fileFilterDTO);
 
     /**
      * 驗證數據傳輸對象是否為空

@@ -282,6 +282,34 @@ public class ValidationException extends Exception {
          * 錯誤信息: 無效的 CSRF 憑證
          */
         INVALID_CSRF_TOKEN(1141, HttpStatus.FORBIDDEN, "無效的 CSRF 憑證"),
+
+        /**
+         * 錯誤碼: 1142
+         * HTTP狀態碼: 400
+         * 錯誤信息: 搜索條件不能為空
+         */
+        SEARCH_CRITERIA_EMPTY(1142, "搜索條件不能為空"),
+
+        /**
+         * 錯誤碼: 1143
+         * HTTP狀態碼: 400
+         * 錯誤信息: 無效的搜索條件
+         */
+        INVALID_SEARCH_CRITERIA(1143, "無效的搜索條件: %s"),
+
+        /**
+         * 錯誤碼: 1144
+         * HTTP狀態碼: 400
+         * 錯誤信息: 關鍵字過長
+         */
+        KEYWORD_TOO_LONG(1144, "關鍵字過長，不能超過 50 字元"),
+
+        /**
+         * 錯誤碼: 1145
+         * HTTP狀態碼: 400
+         * 錯誤信息: 關鍵字過短
+         */
+        KEYWORD_TOO_SHORT(1145, "關鍵字過短，不能少於 2 字元"),
         ;
 
 

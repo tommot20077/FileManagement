@@ -6,13 +6,13 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
@@ -38,11 +38,6 @@ public class ValidationServiceImpl implements ValidationService {
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
-
-    /**
-     * 文件元數據庫操作對象
-     */
-    private final UserFileMetaRepository userFileMetaRepository;
 
     /**
      * 非法字符正則表達式，用於檢查文件名是否包含非法字符
@@ -134,6 +129,38 @@ public class ValidationServiceImpl implements ValidationService {
             ));
 
         });
+    }
+
+    /**
+     * 驗證文件過濾DTO中的數據是否合法
+     *
+     * @param fileFilterDTO 文件過濾DTO
+     */
+    @Override
+    public Mono<Void> validateFileFilterDTO(FileFilterDTO fileFilterDTO) {
+        return validateNotNull(fileFilterDTO).then(Mono.defer(() -> {
+            if (fileFilterDTO.isFilterEmpty()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.SEARCH_CRITERIA_EMPTY));
+            }
+            if (fileFilterDTO.getFolderId() != null && fileFilterDTO.getFolderId() < 0) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "無效的資料夾Id"));
+            }
+            if (fileFilterDTO.getKeyword() != null) {
+                if (fileFilterDTO.getKeyword().trim().length() > 50) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.KEYWORD_TOO_LONG));
+                } else if (fileFilterDTO.getKeyword().trim().length() < 2) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.KEYWORD_TOO_SHORT));
+                }
+            }
+
+            if (fileFilterDTO.getStartTime() != null && fileFilterDTO.getEndTime() != null) {
+                if (fileFilterDTO.getStartTime().isAfter(fileFilterDTO.getEndTime())) {
+                    return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "開始時間不能晚於結束時間"));
+                }
+            }
+
+            return Mono.empty();
+        }));
     }
 
     /**

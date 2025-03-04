@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,6 +35,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -122,10 +124,9 @@ public class ApiFileController extends BaseFileController {
     @GetMapping("/{id}")
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
             @RequestParam(value = "action", defaultValue = "preview", required = false) String action,
-            @PathVariable String id, ServerWebExchange exchange) {
+            @PathVariable Long id, ServerWebExchange exchange) {
         return userService.getUser(exchange).flatMap(user -> {
-            return permissionService
-                    .validateUserPermission(user, Long.parseLong(id), FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
+            return permissionService.validateUserPermission(user, id, FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
                     .flatMap(file -> validationService
                             .validateFileType(file, CUSTOM_FILE_TYPE)
                             .then(fileServiceStrategy.getFileService().downloadFile(file, user).map(userFileDataBO -> {
@@ -346,4 +347,33 @@ public class ApiFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
         return super.restoreFile(exchange, id, null);
     }
+
+    /**
+     * 搜索文件的 API 請求
+     *
+     * @param exchange  請求對象
+     * @param keyword   關鍵字
+     * @param folderId  文件夾 ID
+     * @param page      頁碼
+     * @param size      每頁大小
+     * @param types     文件類型
+     * @param startDate 開始時間
+     * @param endDate   結束時間
+     *
+     * @return Mono<ResponseEntity < ?>> 返回搜索文件的結果
+     */
+    @GetMapping("/search")
+    public Mono<ResponseEntity<?>> test(ServerWebExchange exchange,
+                                        @RequestParam(value = "keyword", required = false) String keyword,
+                                        @RequestParam(value = "folder", required = false) Long folderId,
+                                        @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+                                        @RequestParam(value = "size", required = false) Integer size,
+                                        @RequestParam(value = "type", required = false) List<String> types,
+                                        @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                        LocalDateTime startDate,
+                                        @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                        LocalDateTime endDate) {
+        return super.searchFile(exchange, keyword, folderId, page, size, getFileEnums(types), startDate, endDate);
+    }
+
 }

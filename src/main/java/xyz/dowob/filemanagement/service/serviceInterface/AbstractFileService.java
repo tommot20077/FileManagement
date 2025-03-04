@@ -165,26 +165,27 @@ public abstract class AbstractFileService implements FileService {
      * @return Flux<UserFileListDTO>
      */
     @HideOverLength
-    public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, Long searchId, Integer page, Integer size, List<FileEnum> types) {
-        int pageSize = Objects.requireNonNullElse(size, fileProperties.getGlobal().getPageSize());
-        int currentPage = Math.max(1, Objects.requireNonNullElse(page, 1));
+    public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, FileFilterDTO fileFilterDTO) {
+        int pageSize = Objects.requireNonNullElse(fileFilterDTO.getPageSize(), fileProperties.getGlobal().getPageSize());
+        int currentPage = Math.max(1, Objects.requireNonNullElse(fileFilterDTO.getPage(), 1));
+        fileFilterDTO.setPage(currentPage);
+        fileFilterDTO.setPageSize(pageSize);
 
-        String key = getUserFileListBaseKey(user.getId(), searchId);
+        String key = getUserFileListBaseKey(user.getId(), fileFilterDTO.getFolderId());
 
         return getFileListFormCache(key).collectList().flatMap(cachedList -> {
             if (!cachedList.isEmpty()) {
-                return filterAndPageResponse(cachedList, types, currentPage, pageSize);
+                return filterAndPageResponse(cachedList, fileFilterDTO);
             }
-            return getFileListFormDB(user, searchId, types).collectList().flatMap(dbList -> {
-                if (!dbList.isEmpty()) {
-                    return cacheUserFileList(user, searchId, Flux.fromIterable(dbList)).then(filterAndPageResponse(dbList,
-                                                                                                                   types,
-                                                                                                                   currentPage,
-                                                                                                                   pageSize
-                    ));
-                }
-                return filterAndPageResponse(dbList, types, currentPage, pageSize);
-            });
+            return formatUserFileMetaToListDto(getUserFileMetadataFlux(user, fileFilterDTO.getFolderId(), fileFilterDTO.getTypes()))
+                    .collectList()
+                    .flatMap(dbList -> {
+                        if (!dbList.isEmpty()) {
+                            Mono<Void> cacheMono = cacheUserFileList(user, fileFilterDTO.getFolderId(), Flux.fromIterable(dbList));
+                            return cacheMono.then(filterAndPageResponse(dbList, fileFilterDTO));
+                        }
+                        return filterAndPageResponse(dbList, fileFilterDTO);
+                    });
         });
     }
 
@@ -284,15 +285,16 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 過濾所需的檔案元素並分頁
      *
-     * @param list        檔案列表
-     * @param types       檔案類型
-     * @param currentPage 當前頁碼
-     * @param pageSize    每頁條數
+     * @param list 檔案列表
      *
      * @return Mono<PagedResponseDTO < UserFileListDTO>> 檔案總數和分頁後的檔案列表
+     *
+     * @
      */
-    private Mono<PagedResponseDTO<UserFileListDTO>> filterAndPageResponse(List<UserFileListDTO> list, List<FileEnum> types, int currentPage, int pageSize) {
-        return filterPageElements(Flux.fromIterable(list), types, currentPage, pageSize).flatMap(tuple -> {
+    private Mono<PagedResponseDTO<UserFileListDTO>> filterAndPageResponse(List<UserFileListDTO> list, FileFilterDTO fileFilterDTO) {
+        return filterPageElements(Flux.fromIterable(list), fileFilterDTO).flatMap(tuple -> {
+            int pageSize = fileFilterDTO.getPageSize();
+            int currentPage = fileFilterDTO.getPage();
             PagedResponseDTO<UserFileListDTO> pagedResponseDTO = new PagedResponseDTO<>();
             pagedResponseDTO.setData(tuple.getT2());
             pagedResponseDTO.setTotalElements(tuple.getT1());
@@ -306,15 +308,13 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 從數據庫中獲取用戶文件列表
      *
-     * @param user           用戶信息
-     * @param fatherFolderId 父文件夾ID
+     * @param userFileMetadataFlux 用戶文件元數據流
      *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
 
     //todo 後期改這這查詢分發子類型
-    private Flux<UserFileListDTO> getFileListFormDB(User user, Long fatherFolderId, List<FileEnum> type) {
-        Flux<UserFileMetadata> userFileMetadataFlux = getUserFileMetadataFlux(user, fatherFolderId, type);
+    private Flux<UserFileListDTO> formatUserFileMetaToListDto(Flux<UserFileMetadata> userFileMetadataFlux) {
         Set<Long> serverFileIds = new HashSet<>();
         List<UserFileMetadata> folderMetadata = new ArrayList<>();
         HashMap<String, UserFileMetadata> onlineFileMap = new HashMap<>();
@@ -338,15 +338,7 @@ public abstract class AbstractFileService implements FileService {
             Flux<UserFileListDTO> onlineFileListDTO = Flux.empty();
 
             if (!serverFileIds.isEmpty()) {
-                fileListDTO = serverFileMetaRepository
-                        .findAllByIdIn(serverFileIds)
-                        .collectMap(ServerFileMetadata::getId)
-                        .flatMapMany(serverFileMetadataMap -> userFileMetadataFlux
-                                .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
-                                .map(userFileMetadata -> {
-                                    ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
-                                    return new UserFileListDTO(serverFileMetadata, userFileMetadata);
-                                }));
+                fileListDTO = getUserFileListDtoFromServerId(serverFileIds, userFileMetadataFlux);
             }
 
             if (!onlineFileMap.isEmpty()) {
@@ -440,14 +432,15 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 過濾所需的檔案元素並分頁
      *
-     * @param flux        檔案列表流
-     * @param type        檔案類型
-     * @param currentPage 當前頁碼
-     * @param pageSize    每頁條數
+     * @param flux<UserFileListDTO> 檔案列表流
+     * @param fileFilterDTO         文件過濾DTO
      *
      * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
      */
-    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, List<FileEnum> type, int currentPage, int pageSize) {
+    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
+        List<FileEnum> type = fileFilterDTO.getTypes();
+        int currentPage = fileFilterDTO.getPage();
+        int pageSize = fileFilterDTO.getPageSize();
         if (type != null && !type.isEmpty()) {
             flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
         }
@@ -648,14 +641,18 @@ public abstract class AbstractFileService implements FileService {
                                     }
                                 }));
 
-                return Mono.defer(() -> {
-                               if (rateLimiter.acquirePermission()) {
-                                   return chunkOperation;
-                               }
-                               return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT));
-                           })
-                        .retryWhen(Retry.backoff(5, Duration.ofSeconds(1)).filter(e -> e instanceof LimitationException)
-                                           .maxBackoff(Duration.ofSeconds(5)).jitter(0.3));
+                return Mono
+                        .defer(() -> {
+                            if (rateLimiter.acquirePermission()) {
+                                return chunkOperation;
+                            }
+                            return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT));
+                        })
+                        .retryWhen(Retry
+                                           .backoff(5, Duration.ofSeconds(1))
+                                           .filter(e -> e instanceof LimitationException)
+                                           .maxBackoff(Duration.ofSeconds(5))
+                                           .jitter(0.3));
             });
 
             return chunkFiles.sort(ChunkData.comparator()).map(ChunkData::data)
@@ -807,13 +804,10 @@ public abstract class AbstractFileService implements FileService {
         Map<Long, Long> serverFileIdMap = new ConcurrentHashMap<>();
         serverFileIds.forEach(serverFileId -> serverFileIdMap.put(serverFileId, serverFileIdMap.getOrDefault(serverFileId, 0L) + 1));
 
-        return serverFileMetaRepository.findAllByIdIn(serverFileIdMap.keySet()).collectList().flatMap(serverFileMetadataList -> {
-            serverFileMetadataList.forEach(serverFileMetadata -> {
-                long size = serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId());
-                totalSize.addAndGet(size);
-            });
-            return handleUserStorage(user, totalSize.get(), true);
-        });
+        return serverFileMetaRepository.findAllByIdIn(serverFileIdMap.keySet()).doOnNext(serverFileMetadata -> {
+            long size = serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId());
+            totalSize.addAndGet(size);
+        }).then(handleUserStorage(user, totalSize.get(), true));
     }
 
     /**
@@ -1106,6 +1100,37 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+    /**
+     * 搜索用戶文件
+     *
+     * @return Mono<PagedResponseDTO < UserFileListDTO>> 用戶文件列表
+     */
+    public Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
+        Flux<UserFileMetadata> fileMetadataFlux = userFileMetaRepository.findAllByUserIdAndFilterDTO(user.getId(), fileFilterDTO, entityOperations);
+        return formatUserFileMetaToListDto(fileMetadataFlux).collectList().flatMap(dbList -> filterAndPageResponse(dbList, fileFilterDTO));
+    }
+
+
+    /**
+     * 格式化用戶文件元數據為列表DTO
+     * 此方法會批量獲取服務器文件元數據並將其與用戶文件元數據進行合併成UserFileListDTO
+     *
+     * @param userFileMetadataFlux 用戶文件元數據流
+     *
+     * @return Flux<UserFileListDTO> 用戶文件列表DTO流
+     */
+    private Flux<UserFileListDTO> getUserFileListDtoFromServerId(Set<Long> serverFileIds, Flux<UserFileMetadata> userFileMetadataFlux) {
+        return serverFileMetaRepository
+                .findAllByIdIn(serverFileIds)
+                .collectMap(ServerFileMetadata::getId)
+                .flatMapMany(serverFileMetadataMap -> userFileMetadataFlux
+                        .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
+                        .mapNotNull(userFileMetadata -> {
+                            ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
+                            return Objects.nonNull(serverFileMetadata) ? new UserFileListDTO(serverFileMetadata, userFileMetadata) : null;
+                        }));
+    }
+
 
     /**
      * 創建一個新的用戶文件元數據實體
@@ -1113,7 +1138,7 @@ public abstract class AbstractFileService implements FileService {
      * @return 返回一個新的實體對象
      */
     public Mono<UserFileMetadata> createUserFileMetadata() {
-        return Mono.empty();
+        return Mono.just(new UserFileMetadata());
     }
 
     /**

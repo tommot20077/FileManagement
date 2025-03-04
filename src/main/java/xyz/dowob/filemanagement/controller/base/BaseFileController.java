@@ -13,6 +13,7 @@ import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.functionInterface.Permission;
@@ -22,6 +23,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static xyz.dowob.filemanagement.customenum.FileEnum.*;
@@ -86,7 +88,9 @@ public abstract class BaseFileController implements ResponseUnity {
             }
 
             return permissionService.validateUserPermission(user, folderId, rules).flatMap(folder -> {
-                Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, folderId, page, size, types);
+                FileFilterDTO fileFilterDTO = FileFilterDTO.builder().folderId(folderId).types(types).page(page).pageSize(size).build();
+
+                Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, fileFilterDTO);
                 Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folder, user);
                 return validationService.validateFileType(folder, FOLDER).then(Mono.zip(fileListMono, filePathsMono).flatMap(tuple -> {
                     HashMap<String, Object> result = new HashMap<>();
@@ -149,6 +153,35 @@ public abstract class BaseFileController implements ResponseUnity {
                     ApiResponseDTO<?> apiResponse = createResponse(exchange, "還原檔案成功", null);
                     return createResponseEntity(apiResponse);
                 }))), exchange);
+    }
+
+
+    /**
+     * 搜索文件，根據FileFilterDTO中的條件搜索文件，並返回搜索結果
+     *
+     * @param exchange  請求對象
+     * @param keyword   關鍵字
+     * @param folderId  資料夾ID
+     * @param page      頁碼
+     * @param size      每頁條數
+     * @param types     文件類型
+     * @param startTime 開始時間
+     * @param endTime   結束時間
+     *
+     * @return 返回搜索結果
+     */
+    protected Mono<ResponseEntity<?>> searchFile(ServerWebExchange exchange, String keyword, Long folderId, Integer page, Integer size, List<FileEnum> types, LocalDateTime startTime, LocalDateTime endTime) {
+        return handleError(userService.getUser(exchange).flatMap(user -> {
+            FileService fileService = fileServiceStrategy.getFileService();
+            FileFilterDTO fileFilterDTO = new FileFilterDTO(keyword, folderId, types, page, size, startTime, endTime);
+            return validationService.validateFileFilterDTO(fileFilterDTO).then(fileService.searchUserFile(user, fileFilterDTO).flatMap(files -> {
+                HashMap<String, Object> result = new HashMap<>();
+                result.put("userId", user.getId());
+                result.put("username", user.getUsername());
+                result.put("files", files);
+                return createResponseEntity(createResponse(exchange, "搜索文件成功", result));
+            }));
+        }), exchange);
     }
 
 

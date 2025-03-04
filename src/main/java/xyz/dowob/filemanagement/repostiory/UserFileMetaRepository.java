@@ -7,13 +7,16 @@ import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -166,5 +169,65 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                                               .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END, filename")))
                             .all();
                 });
+    }
+
+    /**
+     * 根據用戶ID和過濾條件查詢檔案元數據
+     *
+     * @param userId                用戶ID
+     * @param fileFilterDTO         過濾條件
+     * @param r2dbcEntityOperations R2dbc實體操作
+     *
+     * @return Flux<UserFileMetadata>
+     */
+    default Flux<UserFileMetadata> findAllByUserIdAndFilterDTO(Long userId, FileFilterDTO fileFilterDTO, R2dbcEntityOperations r2dbcEntityOperations) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM user_file_metadata WHERE user_id = :userId");
+        String keyword = fileFilterDTO.getKeyword();
+        Long folderId = fileFilterDTO.getFolderId();
+        LocalDateTime startTime = fileFilterDTO.getStartTime();
+        LocalDateTime endTime = fileFilterDTO.getEndTime();
+        List<FileEnum> types = fileFilterDTO.getTypes();
+
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND MATCH(filename) AGAINST(:keyword IN NATURAL LANGUAGE MODE) AND is_deleted = 0");
+        }
+        if (folderId != null) {
+            if (folderId == 0) {
+                sql.append(" AND parent_folder_id IS NULL");
+            } else {
+                sql.append(" AND parent_folder_id = :folderId");
+            }
+        }
+        if (types != null && !types.isEmpty()) {
+            sql.append(" AND file_type IN (:types)");
+        }
+
+        if (startTime != null) {
+            sql.append(" AND last_access_time >= :startTime");
+        }
+
+        if (endTime != null) {
+            sql.append(" AND last_access_time <= :endTime");
+        }
+
+        DatabaseClient.GenericExecuteSpec bindSpec = r2dbcEntityOperations.getDatabaseClient().sql(sql.toString()).bind("userId", userId);
+
+        if (keyword != null && !keyword.isEmpty()) {
+            bindSpec = bindSpec.bind("keyword", keyword);
+        }
+        if (folderId != null && folderId != 0) {
+            bindSpec = bindSpec.bind("folderId", folderId);
+        }
+        if (types != null && !types.isEmpty()) {
+            bindSpec = bindSpec.bind("types", types);
+        }
+        if (startTime != null) {
+            bindSpec = bindSpec.bind("startTime", startTime);
+        }
+        if (endTime != null) {
+            bindSpec = bindSpec.bind("endTime", endTime);
+        }
+
+        return bindSpec.map((row, metadata) -> r2dbcEntityOperations.getConverter().read(UserFileMetadata.class, row, metadata)).all();
     }
 }

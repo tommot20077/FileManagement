@@ -127,4 +127,4 @@ public class User {
     }
 }
 
-//todo 前端預覽更多類型和載入進度
+//todo 前端預覽更多類型

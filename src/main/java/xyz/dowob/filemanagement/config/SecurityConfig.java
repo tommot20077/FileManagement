@@ -25,6 +25,7 @@ import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -84,16 +85,16 @@ public class SecurityConfig {
      *
      * @return 返回配置好的安全過濾器鏈
      */
-    // todo 補上HSTS
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .headers(headers -> headers.contentSecurityPolicy(contentSecurityPolicySpec -> {
-                    contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
-                }))
-
+                .headers(headerSpec -> headerSpec
+                        .hsts(hsts -> hsts.includeSubdomains(true).maxAge(Duration.ofDays(365)))
+                        .contentSecurityPolicy(contentSecurityPolicySpec -> {
+                            contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
+                        }))
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .authorizeExchange(exchange -> exchange.pathMatchers("/web/guest/**", "/api/guest/**", "/docs/**", "/ws/**").permitAll()
                                                        //.pathMatchers("/api/user/getAllUserInfo")
