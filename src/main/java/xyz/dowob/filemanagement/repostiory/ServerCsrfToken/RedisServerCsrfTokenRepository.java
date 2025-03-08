@@ -1,69 +1,46 @@
-package xyz.dowob.filemanagement.repostiory;
+package xyz.dowob.filemanagement.repostiory.ServerCsrfToken;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.security.web.server.csrf.DefaultCsrfToken;
-import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.manager.CronTaskManager;
+import xyz.dowob.filemanagement.annotation.CsrfRepositoryType;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.CsrfTokenRepositoryEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 
 /**
- * 自定義的 CSRF Token 存儲庫，用於CSRF 的相關操作
- * 主要實現 ServerCsrfTokenRepository 接口
- * 用於生成、保存、加載 CSRF Token
- * 這裡省略了保存 Token 的操作，因為我們在生成 Token 的時候就已經保存，所以這裡只需要生成和加載即可
- * 這裡的 Token 是保存在 Redis 中的，並且設置了過期時間，而還有使用{@link CronTaskManager}定時清理過期的 Token
- * 這邊的屬性都可以在配置文件中配置 {@link SecurityProperties}
+ * Redis CSRF Token 存儲庫，繼承 AbstractServerCsrfTokenRepository
+ * 這類將CSRF 憑證管理交由 Redis 進行，在一般情況下，Redis 會比本地存儲更加安全
+ * 並可以進行持久化存儲，適合用於分布式系統
  *
  * @author yuan
  * @program FileManagement
- * @ClassName CustomServerCsrfTokenRepository
+ * @ClassName RedisServerCsrfTokenRepository
  * @create 2025/3/2
  * @Version 1.0
  **/
 @Component
-
-public class CustomServerCsrfTokenRepository implements ServerCsrfTokenRepository {
+@CsrfRepositoryType(CsrfTokenRepositoryEnum.REDIS)
+public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepository {
     /**
      * Redis 提供者
      */
     private final RedisProvider redisProvider;
-    /**
-     * 安全相關設定
-     */
-    private final SecurityProperties securityProperties;
-    /**
-     * CSRF Token 的 Header 名稱
-     */
-    private String CSRF_TOKEN_HEADER;
-    /**
-     * CSRF Token 的參數名稱
-     */
-    private String CSRF_TOKEN_PARAMETER;
-    /**
-     * CSRF Token 過期時間
-     */
-    private Long EXPIRE_TIME;
 
-    public CustomServerCsrfTokenRepository(RedisProvider redisProvider, SecurityProperties securityProperties) {
+    /**
+     * 初始化屬性
+     */
+    public RedisServerCsrfTokenRepository(SecurityProperties securityProperties, RedisProvider redisProvider) {
+        super(securityProperties);
         this.redisProvider = redisProvider;
-        this.securityProperties = securityProperties;
-    }
-
-    @PostConstruct
-    public void init() {
-        CSRF_TOKEN_HEADER = securityProperties.getCsrf().getHeaderName();
-        CSRF_TOKEN_PARAMETER = securityProperties.getCsrf().getParameterName();
-        EXPIRE_TIME = securityProperties.getCsrf().getExpiration();
     }
 
 
@@ -110,8 +87,31 @@ public class CustomServerCsrfTokenRepository implements ServerCsrfTokenRepositor
             return Mono.error(new ValidationException(ValidationException.ErrorCode.MISSING_CSRF_TOKEN));
         }
         return redisProvider
-                .getHashMap(CSRF_TOKEN_HEADER, userToken)
+                .getHashMap(CSRF_TOKEN_HEADER, userToken, Integer.class)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN)))
-                .map(time -> new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, userToken));
+                .flatMap(time -> {
+                    if (time < Instant.now().getEpochSecond()) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN));
+                    }
+                    return Mono.just(new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, userToken));
+                });
+    }
+
+    /**
+     * 清理憑證
+     */
+    @Override
+    public Mono<Void> deleteToken(CsrfToken token) {
+        Long expireTime = Instant.now().getEpochSecond();
+        if (token != null) {
+            return redisProvider.deleteHash(CSRF_TOKEN_HEADER, token.getToken());
+        }
+
+        return redisProvider
+                .getAllHashMap(CSRF_TOKEN_HEADER, String.class, Long.class)
+                .filter(entry -> entry.getValue() < expireTime)
+                .map(Map.Entry::getKey)
+                .collectList()
+                .flatMap(expireTokens -> redisProvider.deleteHash(CSRF_TOKEN_HEADER, expireTokens));
     }
 }

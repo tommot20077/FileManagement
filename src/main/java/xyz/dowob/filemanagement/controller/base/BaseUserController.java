@@ -13,31 +13,43 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 /**
  * 用戶控制器的基礎類
- * 主要提供用戶控制器的基本方法，並交由子類繼承方法，減少代碼重複
- * 實現BaseController{@link ResponseUnity}
- * 此類會處理請求中發生的ValidationException異常，並回傳對應的錯誤信息
+ * 此類提供用戶控制器的基本方法，並交由子類繼承方法，減少代碼重複。它實現了 {@link ResponseUnity} 接口。
+ * 此類處理請求過程中發生的 ValidationException 異常，並返回對應的錯誤信息。
+ * 主要功能包括處理用戶的登出、查詢用戶信息等操作。
  *
  * @author yuan
  * @program File-Management
  * @ClassName BaseUserController
- * @description
  * @create 2024-09-17 00:23
  * @Version 1.0
- **/
+ */
 @RequiredArgsConstructor
 public abstract class BaseUserController implements ResponseUnity {
+
+    /**
+     * 文件策略，用於選擇適當的文件服務
+     */
     protected final FileServiceStrategy fileServiceStrategy;
 
+    /**
+     * 用戶業務層對象，負責處理用戶相關業務邏輯
+     */
     protected final UserService userService;
 
+    /**
+     * 安全性設定，用於設置安全相關配置，如 Cookie 配置
+     */
     protected final SecurityProperties securityProperties;
 
     /**
-     * 用戶登出的請求
+     * 處理用戶登出的請求
+     * 登出用戶並清除 JWT Token，若是 Web 請求，會清除瀏覽器的登錄 Cookie。
+     * 如果用戶未認證，將返回未認證的錯誤信息。
      *
-     * @param exchange 處理用戶登出的請求
+     * @param exchange 處理登出請求的 Web 交換對象
+     * @param isWeb    是否為 Web 登出請求
      *
-     * @return Mono<ResponseEntity> 返回登出結果
+     * @return Mono<ResponseEntity < ?>> 返回登出結果，若登出成功，則返回成功消息，若未認證則返回錯誤消息
      */
     public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return userService.getUser(exchange).flatMap(user -> userService.logout(user.getId(), exchange).then(Mono.defer(() -> {
@@ -54,17 +66,17 @@ public abstract class BaseUserController implements ResponseUnity {
             }
             return createResponseEntity(createResponse(exchange, "登出成功", null));
         }))).switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));
-
     }
 
     /**
-     * 獲取所有用戶信息的請求
+     * 獲取所有用戶信息的請求（管理員使用）
+     * 該方法用於管理員查詢所有用戶的信息。
      *
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity> 返回用戶信息
+     * @return Mono<ResponseEntity < ?>> 返回所有用戶的信息，若成功則返回用戶信息列表
      */
-    //todo 改成管理員使用
+    // todo 改成管理員使用
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return handleError(userService.getAll().collectList().flatMap(userList -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", userList);
@@ -73,11 +85,12 @@ public abstract class BaseUserController implements ResponseUnity {
     }
 
     /**
-     * 獲取所有用戶信息的請求
+     * 獲取當前用戶信息的請求
+     * 該方法用於查詢當前認證用戶的詳細信息。
      *
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity> 返回用戶信息
+     * @return Mono<ResponseEntity < ?>> 返回當前用戶的詳細信息
      */
     // 此方法為管理員方法
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {

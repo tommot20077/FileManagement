@@ -13,7 +13,8 @@ import xyz.dowob.filemanagement.controller.base.BaseUserController;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 
 /**
- * 用於處理用戶相關的API請求的控制器
+ * 用於處理用戶API 控制器，用於處理用戶的API請求。
+ * 此類繼承自 BaseUserController，提供用戶登出、獲取用戶信息等功能。
  *
  * @author yuan
  * @program File-Management
@@ -23,7 +24,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
  * @Version 1.0
  **/
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/v1/user")
 public class ApiUserController extends BaseUserController {
     public ApiUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties) {
         super(fileServiceStrategy, userService, securityProperties);
@@ -36,8 +37,9 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回登出結果
      */
-    @PostMapping("/logout")
+
     @Override
+    @PostMapping("/logout")
     public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return super.logout(exchange, false);
     }
@@ -50,8 +52,9 @@ public class ApiUserController extends BaseUserController {
      * @return Mono<ResponseEntity> 返回用戶信息
      */
 
-    @GetMapping("/getAllUserInfo")
+
     @Override
+    @GetMapping("/getAllUserInfo")
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
     }
@@ -63,8 +66,9 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
-    @GetMapping("/info")
+
     @Override
+    @GetMapping("/info")
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return super.getUserInfo(exchange);
     }

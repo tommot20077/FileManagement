@@ -1,0 +1,68 @@
+spring:
+  r2dbc:
+    url: r2dbc:mysql://your_mysql_host/db_name
+    username: username
+    password: password
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+  mail:
+    username: your_email
+    password: your_password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+    host: smtp.host
+    port: 587
+  data:
+    mongodb:
+      uri: mongodb://username:password@your_mongodb_host/db_name
+    redis:
+      host: your_redis_host
+      password: your_redis_password
+  main:
+    lazy-initialization: true
+  servlet:
+    multipart:
+      max-request-size: 10GB
+      max-file-size: 5GB
+  codec:
+    max-in-memory-size: 16MB
+
+security:
+  reset-password-token:
+    expiration: 10
+    length: 6
+  jwt-token:
+    secret: YourJwtSecretLengthNeedOver128BytesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    expiration: 144000
+  cookie:
+    secure: false
+  cors:
+    allowed-origins-pattern: "*localhost*"
+    allow-credentials: true
+  csrf:
+    csrf-token-repository: local
+
+
+
+springdoc:
+  api-docs:
+    path: /docs/api-docs
+  swagger-ui:
+    path: /docs/swagger-ui/index.html
+  paths-to-match: /api/**
+server:
+  servlet:
+    session:
+      timeout: 3h
+logging:
+  pattern:
+    dateformat: yyyy-MM-dd HH:mm:ss.SSS
+file:
+  upload:
+    chunk-size: 2
+

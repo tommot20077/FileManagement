@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.controller.api;
+package xyz.dowob.filemanagement.controller.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
@@ -19,18 +19,19 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 /**
- * 在線文件 API 控制器，用於處理在線文件的相關請求。
- * 此類繼承自 BaseOnlineFileController，提供文件上傳、下載、刪除、編輯等功能。
+ * 在線文件 API 控制器，用於處理在線文件的相關請求
+ * 此類繼承自 BaseFileController，用於處理文件相關的請求
  *
  * @author yuan
  * @program FileManagement
- * @ClassName ApiOnlineFileController
+ * @ClassName WebOnlineFileController
  * @create 2025/2/11
  * @Version 1.0
- */
+ **/
 @RestController
-@RequestMapping("/api/v1/docs")
-public class ApiOnlineFileController extends BaseOnlineFileController {
+@RequestMapping("/web/v1/docs")
+public class WebOnlineFileController extends BaseOnlineFileController {
+
     /**
      * 构造函數，用於初始化基本的業務層服務
      *
@@ -42,17 +43,17 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
      * @param userLimiterStrategy 用戶限制策略
      * @param objectMapper        用於處理對象映射的工具
      */
-    public ApiOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper) {
+    public WebOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper) {
         super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, userLimiterStrategy, objectMapper);
     }
 
     /**
-     * 創建新的可編輯文件。
+     * 上傳文件
      *
-     * @param fileMetadataDTO 包含文件名稱、類型等信息的 DTO。
-     * @param exchange        當前請求上下文。
+     * @param fileMetadataDTO 文件元數據傳輸對象
+     * @param exchange        服務器 Web 交換對象
      *
-     * @return Mono<ResponseEntity < ?>>，包含創建結果。
+     * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
@@ -60,12 +61,12 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
     }
 
     /**
-     * 下載指定文件。
+     * 下載文件
      *
-     * @param id       目標文件的 ID。
-     * @param exchange 當前請求上下文。
+     * @param id       文件 ID
+     * @param exchange 服務器 Web 交換對象
      *
-     * @return Mono<ResponseEntity < ?>>，包含文件下載鏈接或內容。
+     * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @GetMapping("/{id}")
     @HideOverLength
@@ -74,12 +75,12 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
     }
 
     /**
-     * 刪除指定文件。
+     * 獲取文件元數據
      *
-     * @param id       目標文件的 ID。
-     * @param exchange 當前請求上下文。
+     * @param id       文件 ID
+     * @param exchange 服務器 Web 交換對象
      *
-     * @return Mono<ResponseEntity < ?>>，包含刪除結果。
+     * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @DeleteMapping("/{id}")
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
@@ -87,12 +88,12 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
     }
 
     /**
-     * 編輯指定文件內容。
+     * 編輯文件
      *
-     * @param fileEditDTO 包含編輯內容的 DTO。
-     * @param exchange    當前請求上下文。
+     * @param fileEditDTO 文件編輯數據傳輸對象
+     * @param exchange    服務器 Web 交換對象
      *
-     * @return Mono<ResponseEntity < ?>>，包含編輯結果。
+     * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @PutMapping("")
     public Mono<ResponseEntity<?>> editFile(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
@@ -100,14 +101,12 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
     }
 
     /**
-     * 獲取指定文件的歷史版本列表。
+     * 獲取文件歷史資料列表
      *
-     * @param id       目標文件的 ID。
-     * @param page     分頁參數，默認為 1。
-     * @param pageSize 每頁數量，默認值根據後端配置。
-     * @param exchange 當前請求上下文。
+     * @param exchange 服務器 Web 交換對象
+     * @param id       文件 ID
      *
-     * @return Mono<ResponseEntity < ?>>，包含歷史版本列表。
+     * @return 返回 Mono<ResponseEntity<?>> 用於異步處理請求
      */
     @GetMapping("/history/{id}")
     public Mono<ResponseEntity<?>> getHistory(ServerWebExchange exchange,
@@ -118,28 +117,28 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
     }
 
     /**
-     * 將指定文件移動到回收站。
+     * 將檔案移動到回收站的 API 請求
      *
-     * @param id       目標文件的 ID。
-     * @param exchange 當前請求上下文。
+     * @param exchange 請求對象
+     * @param id       檔案 ID
      *
-     * @return Mono<ResponseEntity < ?>>，包含移動結果。
+     * @return Mono<ResponseEntity < ?>> 返回檔案移動到回收站的結果
      */
     @PostMapping("/remove/{id}")
     public Mono<ResponseEntity<?>> removeFile(ServerWebExchange exchange, @PathVariable String id) {
-        return super.removeFile(exchange, id, null);
+        return super.removeFile(exchange, id);
     }
 
     /**
-     * 還原回收站中的指定文件。
+     * 還原檔案的 API 請求
      *
-     * @param id       目標文件的 ID。
-     * @param exchange 當前請求上下文。
+     * @param exchange 請求對象
+     * @param id       檔案 ID
      *
-     * @return Mono<ResponseEntity < ?>>，包含還原結果。
+     * @return Mono<ResponseEntity < ?>> 返回還原檔案的結果
      */
     @PostMapping("/restore/{id}")
     public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
-        return super.restoreFile(exchange, id, null);
+        return super.restoreFile(exchange, id);
     }
 }

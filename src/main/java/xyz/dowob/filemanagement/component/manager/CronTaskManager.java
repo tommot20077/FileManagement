@@ -5,9 +5,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
-import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.repostiory.FileTrashRecordRepository;
@@ -15,7 +14,6 @@ import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.Map;
@@ -63,8 +61,10 @@ public class CronTaskManager {
      */
     private final TransactionalOperator transactionalOperator;
 
-    private final RedisProvider redisProvider;
-    private final SecurityProperties securityProperties;
+    /**
+     * CSRF 憑證儲存庫策略
+     */
+    private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
     /**
      * 清理過期的 JWT緩存憑證
@@ -147,14 +147,12 @@ public class CronTaskManager {
         });
     }
 
-    @Scheduled(cron = "0 */5 * * * ?")
+    /**
+     * 清理過期的 CSRF 憑證
+     * 每 1 小時執行一次
+     */
+    @Scheduled(cron = "0 0 */1 * * ?")
     public void clearExpiredToken() {
-        Long expireTime = Instant.now().getEpochSecond();
-        redisProvider.getAllHashMap(securityProperties.getCsrf().getHeaderName(), String.class, Long.class).flatMap(entry -> {
-            if (entry.getValue() < expireTime) {
-                return redisProvider.deleteHash(securityProperties.getCsrf().getHeaderName(), entry.getKey());
-            }
-            return Mono.empty();
-        }).subscribe();
+        csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(null).subscribe();
     }
 }

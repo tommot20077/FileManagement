@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
@@ -26,19 +27,14 @@ import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvid
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.ByteEnum;
-import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
-import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
+import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.*;
-import xyz.dowob.filemanagement.entity.FileTrashRecord;
-import xyz.dowob.filemanagement.entity.ServerFileMetadata;
-import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
+import xyz.dowob.filemanagement.entity.*;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -52,6 +48,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 檔案服務的抽象類，包含共通的上傳、下載邏輯
@@ -128,6 +125,16 @@ public abstract class AbstractFileService implements FileService {
      * 事務操作器
      */
     protected final TransactionalOperator transactionalOperator;
+
+    /**
+     * 用戶文件分享記錄數據庫操作對象
+     */
+    protected final UserFIleShareRecordRepository userFIleShareRecordRepository;
+
+    /**
+     * 映射轉換器
+     */
+    protected final ObjectMapper objectMapper;
 
     /**
      * 檔案類型檢驗器
@@ -306,53 +313,100 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 從數據庫中獲取用戶文件列表
+     * 從數據庫中獲取用戶文件列表，並格式化為 {@link UserFileListDTO} 對象
+     * 這邊會將文件元數據和其對應的共享用戶表、檔案數據表進行關聯輸出
+     * 最後將其按照文件類型進行排序，排列順序定義在 {@link UserFileListOrderEnum} 可以自行擴展
      *
      * @param userFileMetadataFlux 用戶文件元數據流
      *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
-
     //todo 後期改這這查詢分發子類型
     private Flux<UserFileListDTO> formatUserFileMetaToListDto(Flux<UserFileMetadata> userFileMetadataFlux) {
         Set<Long> serverFileIds = new HashSet<>();
+        Set<Long> userFileIds = new HashSet<>();
+        Map<Long, Set<Long>> shareUserMap = new HashMap<>();
         List<UserFileMetadata> folderMetadata = new ArrayList<>();
         HashMap<String, UserFileMetadata> onlineFileMap = new HashMap<>();
 
-        return userFileMetadataFlux.collectList().flatMap(userFileMetadataList -> {
-            userFileMetadataList.forEach(userFileMetadata -> {
-                if (userFileMetadata.getServerFileId() != null) {
-                    serverFileIds.add(userFileMetadata.getServerFileId());
-                }
-                if (userFileMetadata.getFileType() == FileEnum.ONLINE_DOCUMENT) {
-                    onlineFileMap.put(userFileMetadata.getId().toString(), userFileMetadata);
-                }
-                if (userFileMetadata.getFileType() == FileEnum.FOLDER) {
-                    folderMetadata.add(userFileMetadata);
-                }
-            });
-            return Mono.empty();
+        return userFileMetadataFlux.doOnNext(userFileMetadata -> {
+            if (userFileMetadata.getServerFileId() != null) {
+                serverFileIds.add(userFileMetadata.getServerFileId());
+            }
+            if (userFileMetadata.getFileType() == FileEnum.ONLINE_DOCUMENT) {
+                onlineFileMap.put(userFileMetadata.getId().toString(), userFileMetadata);
+            }
+            if (userFileMetadata.getFileType() == FileEnum.FOLDER) {
+                folderMetadata.add(userFileMetadata);
+            }
+            userFileIds.add(userFileMetadata.getId());
         }).thenMany(Flux.defer(() -> {
-            Flux<UserFileListDTO> folderListDTO = Flux.fromIterable(folderMetadata).map(UserFileListDTO::new);
-            Flux<UserFileListDTO> fileListDTO = Flux.empty();
-            Flux<UserFileListDTO> onlineFileListDTO = Flux.empty();
-
-            if (!serverFileIds.isEmpty()) {
-                fileListDTO = getUserFileListDtoFromServerId(serverFileIds, userFileMetadataFlux);
+            if (userFileIds.isEmpty()) {
+                return Flux.empty();
             }
 
-            if (!onlineFileMap.isEmpty()) {
+            Mono<Void> searchShareUserMono = userFIleShareRecordRepository.findAllByFileIdIn(userFileIds).doOnNext(shareUserRecord -> {
+                Set<Long> shareUsers = shareUserMap.getOrDefault(shareUserRecord.getFileId(), new HashSet<>());
+                shareUsers.add(shareUserRecord.getUserId());
+                shareUserMap.put(shareUserRecord.getFileId(), shareUsers);
+            }).then();
+
+
+            Mono<Map<UserFileListOrderEnum, List<UserFileListDTO>>> folderListDTO = Flux
+                    .fromIterable(folderMetadata)
+                    .mapNotNull(folder -> new UserFileListDTO(folder, shareUserMap.get(folder.getId())))
+                    .collectList()
+                    .map(List -> Map.of(UserFileListOrderEnum.FOLDER, List));
+
+
+            Mono<Map<UserFileListOrderEnum, List<UserFileListDTO>>> onlineFileListDTO;
+            if (onlineFileMap.isEmpty()) {
+                onlineFileListDTO = Mono.just(Map.of(UserFileListOrderEnum.ONLINE_DOCUMENT, new ArrayList<>()));
+            } else {
                 onlineFileListDTO = userOnlineFileRepository
                         .findAllById(onlineFileMap.keySet())
-                        .map(userOnlineFile -> new UserFileListDTO(userOnlineFile, onlineFileMap.get(userOnlineFile.getId().toString())));
+                        .map(userOnlineFile -> new UserFileListDTO(userOnlineFile,
+                                                                   onlineFileMap.get(userOnlineFile.getId().toString()),
+                                                                   shareUserMap.get(userOnlineFile.getId())
+                        ))
+                        .collectList()
+                        .map(list -> Map.of(UserFileListOrderEnum.ONLINE_DOCUMENT, list));
             }
-            return Flux.concat(folderListDTO, onlineFileListDTO, fileListDTO);
+
+            Mono<Map<UserFileListOrderEnum, List<UserFileListDTO>>> fileListDTO = getUserFileListDtoFromServerId(serverFileIds,
+                                                                                                                 userFileMetadataFlux,
+                                                                                                                 shareUserMap
+            ).collectList().map(list -> Map.of(UserFileListOrderEnum.GENERAL_FILE, list));
+
+
+            return searchShareUserMono.thenMany(Mono.zip(folderListDTO, onlineFileListDTO, fileListDTO).map(tuple -> {
+                List<UserFileListDTO> resultList = new ArrayList<>();
+                Map<UserFileListOrderEnum, List<UserFileListDTO>> data = new HashMap<>();
+                data.putAll(tuple.getT1());
+                data.putAll(tuple.getT2());
+                data.putAll(tuple.getT3());
+
+                List<UserFileListOrderEnum> orderEnums = Stream
+                        .of(tuple.getT1().keySet().iterator().next(),
+                            tuple.getT2().keySet().iterator().next(),
+                            tuple.getT3().keySet().iterator().next()
+                        )
+                        .sorted(Comparator.comparing(UserFileListOrderEnum::getOrder))
+                        .toList();
+
+                for (UserFileListOrderEnum orderEnum : orderEnums) {
+                    resultList.addAll(data.get(orderEnum));
+                }
+
+
+                return resultList;
+            })).flatMap(Flux::fromIterable);
+
         }));
     }
 
-
     /**
-     * 緩存用戶文件列表
+     * 緩存用戶文件列表，而若父文件夾ID為空或是小於0則不進行緩存
      *
      * @param user                用戶信息
      * @param fatherFolderId      父文件夾ID
@@ -502,19 +556,22 @@ public abstract class AbstractFileService implements FileService {
      */
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         UserFileMetadata userFileMetadata = fileEditDTO.getUserFileMetadata();
-        return redisProvider.deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId())).then(Mono.defer(() -> {
-            userFileMetadata.setFilename(fileEditDTO.getFilename());
-            userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
-            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+        Mono<UserFileMetadata> processShareUserMono = processShareUser(userFileMetadata, fileEditDTO);
+        Mono<UserFileMetadata> processFileMono = redisProvider
+                .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
+                .then(Mono.defer(() -> {
+                    userFileMetadata.setFilename(fileEditDTO.getFilename());
+                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
-            Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
-            userFileMetadata.setIsStar(isStar);
+                    Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
+                    userFileMetadata.setIsStar(isStar);
+                    return userFileMetaRepository.save(userFileMetadata);
+                }));
 
-            Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(), userFileMetadata.getSharedWithUsers());
-            userFileMetadata.setSharedWithUsers(sharedWithUsers);
-
-            return userFileMetaRepository.save(userFileMetadata);
-        }).flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId())));
+        return Mono
+                .zip(processShareUserMono, processFileMono)
+                .flatMap(tuple2 -> cleanUserListCache(user.getId(), tuple2.getT2().getParentFolderId()));
     }
 
 
@@ -1119,7 +1176,10 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO> 用戶文件列表DTO流
      */
-    private Flux<UserFileListDTO> getUserFileListDtoFromServerId(Set<Long> serverFileIds, Flux<UserFileMetadata> userFileMetadataFlux) {
+    private Flux<UserFileListDTO> getUserFileListDtoFromServerId(Set<Long> serverFileIds, Flux<UserFileMetadata> userFileMetadataFlux, Map<Long, Set<Long>> shareUserMap) {
+        if (serverFileIds.isEmpty()) {
+            return Flux.empty();
+        }
         return serverFileMetaRepository
                 .findAllByIdIn(serverFileIds)
                 .collectMap(ServerFileMetadata::getId)
@@ -1127,10 +1187,53 @@ public abstract class AbstractFileService implements FileService {
                         .filter(userFileMetadata -> userFileMetadata.getServerFileId() != null)
                         .mapNotNull(userFileMetadata -> {
                             ServerFileMetadata serverFileMetadata = serverFileMetadataMap.get(userFileMetadata.getServerFileId());
-                            return Objects.nonNull(serverFileMetadata) ? new UserFileListDTO(serverFileMetadata, userFileMetadata) : null;
+                            if (serverFileMetadata == null) {
+                                return null;
+                            }
+                            return new UserFileListDTO(serverFileMetadata, userFileMetadata, shareUserMap.get(userFileMetadata.getId()));
                         }));
     }
 
+    /**
+     * 處理檔案元數據的共享用戶的變更方法
+     *
+     * @param userFileMetadata 用戶檔案元數據
+     * @param fileEditDTO      檔案編輯DTO
+     *
+     * @return Mono<UserFileMetadata> 處理後的用戶檔案元數據
+     */
+    protected Mono<UserFileMetadata> processShareUser(UserFileMetadata userFileMetadata, FileEditDTO fileEditDTO) {
+        List<UserFileShareRecord> removeRecords = new ArrayList<>();
+        List<UserFileShareRecord> editRecords = new ArrayList<>();
+
+        Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO
+                .getShareUserIds()
+                .stream()
+                .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
+        if (editUsers.isEmpty()) {
+            return Mono.just(userFileMetadata);
+        }
+
+        return userFIleShareRecordRepository.findAllByUserIdIn(editUsers.keySet()).flatMap(record -> {
+            ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
+            switch (editType) {
+                case REMOVE -> removeRecords.add(record);
+                case UPDATE -> editRecords.add(record);
+            }
+            return Mono.just(userFileMetadata);
+        }).then(Mono.defer(() -> {
+            if (!editUsers.isEmpty()) {
+                editUsers.forEach((userId, editType) -> {
+                    UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
+                    editRecords.add(record);
+                });
+            }
+            return userFIleShareRecordRepository
+                    .saveAll(editRecords)
+                    .then(userFIleShareRecordRepository.deleteAll(removeRecords))
+                    .thenReturn(userFileMetadata);
+        }));
+    }
 
     /**
      * 創建一個新的用戶文件元數據實體

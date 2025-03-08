@@ -7,11 +7,10 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareType;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * 用於定義用戶文件元數據表
@@ -71,6 +70,12 @@ public class UserFileMetadata {
     private FileEnum fileType = FileEnum.OTHER;
 
     /**
+     * 分享類型，默認為不分享
+     */
+    @Column("share_type")
+    private FileShareType shareType = FileShareType.NONE;
+
+    /**
      * 上傳時間
      */
     @Column("upload_time")
@@ -84,11 +89,6 @@ public class UserFileMetadata {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
 
-    /**
-     * 文件共享給的用戶
-     */
-    @Column("shared_with_users")
-    private Set<Long> sharedWithUsers = new HashSet<>();
 
     /**
      * 是否標記為刪除
@@ -140,8 +140,9 @@ public class UserFileMetadata {
         map.put("filename", filename);
         map.put("uploadTime", uploadTime);
         map.put("lastAccessTime", lastAccessTime);
-        map.put("sharedWithUsers", sharedWithUsers);
         map.put("isDeleted", isDeleted);
+        map.put("isStar", isStar);
+        map.put("fileType", fileType);
         return map.toString();
     }
 }

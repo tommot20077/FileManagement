@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.repostiory;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -61,7 +62,11 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
     /**
      * 從請求中獲取 JWT Token，若存在則進行驗證
+     * 分成 API 和 WEB 兩種請求類型
+     * 其中 API請求只會從請求頭中獲取 JWT Token，WEB請求則會從請求頭和 Cookie 中獲取 JWT Token
+     * 避免 CSRF 攻擊
      * 驗證成功則返回 SecurityContext
+     * 驗證失敗則返回 Mono.empty()
      *
      * @param exchange 請求
      *
@@ -70,10 +75,13 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
         AtomicReference<String> token = new AtomicReference<>();
+        RequestType requestType = RequestType.getRequestType(exchange);
+
         String cookie = exchange.getRequest().getHeaders().getFirst(HttpHeaders.COOKIE);
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-        extractJwtFromHeader(cookie).ifPresent(token::set);
+        if (requestType == RequestType.WEB) {
+            extractJwtFromHeader(cookie).ifPresent(token::set);
+        }
 
         if (token.get() == null && authHeader != null && authHeader.startsWith(TOKEN_PREFIX)) {
             token.set(authHeader.substring(TOKEN_PREFIX.length()));
@@ -86,7 +94,14 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
         return Mono.empty();
     }
 
-    public Optional<String> extractJwtFromHeader(String cookieHeader) {
+    /**
+     * 從 Cookie 中提取 JWT Token
+     *
+     * @param cookieHeader Cookie
+     *
+     * @return JWT Token
+     */
+    private Optional<String> extractJwtFromHeader(String cookieHeader) {
         if (cookieHeader == null) {
             return Optional.empty();
         }
@@ -96,5 +111,41 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
             return Optional.of(matcher.group(1));
         }
         return Optional.empty();
+    }
+
+    @Getter
+    @RequiredArgsConstructor
+    enum RequestType {
+
+        /**
+         * API 請求，此為默認請求類型，從請求頭中獲取 JWT Token
+         */
+        API("API協議"),
+
+        /**
+         * WEB 請求，從請求頭和 Cookie 中獲取 JWT Token
+         */
+        WEB("WEB協議");
+
+        /**
+         * 請求類型名稱
+         */
+        private final String name;
+
+        /**
+         * 獲取請求類型
+         *
+         * @param exchange 請求
+         *
+         * @return 請求類型
+         */
+        public static RequestType getRequestType(ServerWebExchange exchange) {
+            String path = exchange.getRequest().getPath().value();
+            if (path.startsWith("/web")) {
+                return WEB;
+            }
+            return API;
+        }
+
     }
 }

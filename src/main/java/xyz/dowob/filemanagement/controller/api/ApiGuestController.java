@@ -18,85 +18,83 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import java.util.HashMap;
 
 /**
- * 用於處理訪客相關的API請求的控制器
+ * 訪客 API 控制器，提供註冊、登入、密碼重置、CSRF Token 獲取等功能。
+ *
+ * <p>此控制器繼承 {@link BaseGuestController}，覆蓋相關方法，避免代碼重複。</p>
  *
  * @author yuan
- * @program File-Management
- * @ClassName ApiBaseGuestController
- * @description
- * @create 2024-09-14 20:22
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 2024-09-14
+ */
 @RestController
-@RequestMapping("/api/guest")
+@RequestMapping("/api/v1/guest")
 public class ApiGuestController extends BaseGuestController {
-    public ApiGuestController (UserService userService, AuthorizationService authorizationService, SecurityProperties securityProperties) {
+
+    /**
+     * 構造函數，初始化訪客控制器。
+     *
+     * @param authorizationService 授權服務
+     * @param userService          用戶服務
+     * @param securityProperties   安全屬性配置
+     */
+    protected ApiGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties) {
         super(authorizationService, userService, securityProperties);
     }
 
     /**
-     * 訪客註冊的API請求
+     * 訪客註冊 API
      *
      * @param registerUserDTO 註冊用戶的數據傳輸對象
-     * @param exchange        請求對象
-     *
-     * @return Mono<ResponseEntity> 返回註冊結果
+     * @param exchange        當前請求對象
+     * @return Mono<ResponseEntity < ?>> 註冊結果
      */
-    @Override
     @PostMapping("/register")
-    public Mono<ResponseEntity<?>> register (RegisterDTO registerUserDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> register(@RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return super.register(registerUserDTO, exchange);
     }
 
     /**
-     * 訪客登入的API請求
+     * 訪客登入 API
      *
-     * @param authRequestDTO 登入用戶的數據傳輸對象
-     * @param exchange       請求對象
-     *
-     * @return Mono<ResponseEntity> 返回登入結果
+     * @param authRequestDTO 登入請求數據
+     * @param exchange       當前請求對象
+     * @return Mono<ResponseEntity < ?>> 登入結果
      */
-    @Override
     @HideSensitive
     @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login (AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
+    public Mono<ResponseEntity<?>> login(@RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
         return super.login(authRequestDTO, exchange, false);
     }
 
     /**
-     * 訪客發送重置密碼驗證信的API請求
+     * 訪客請求重置密碼驗證信 API
      *
-     * @param userMail 用戶信箱的數據傳輸對象
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity> 返回發送重置密碼驗證信結果
+     * @param userMail 用戶電子郵件
+     * @param exchange 當前請求對象
+     * @return Mono<ResponseEntity < ?>> 發送驗證信結果
      */
-    @Override
     @PostMapping("/sendResetPasswordMail")
-    public Mono<ResponseEntity<?>> sendResetPasswordMail (UserEmailDTO userMail, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> sendResetPasswordMail(@RequestBody UserEmailDTO userMail, ServerWebExchange exchange) {
         return super.sendResetPasswordMail(userMail, exchange);
     }
 
     /**
-     * 訪客重置密碼的API請求
+     * 訪客重置密碼 API
      *
-     * @param resetPasswordDTO 重置密碼的數據傳輸對象
-     * @param exchange         請求對象
-     *
-     * @return Mono<ResponseEntity> 返回重置密碼結果
+     * @param resetPasswordDTO 重置密碼請求數據
+     * @param exchange         當前請求對象
+     * @return Mono<ResponseEntity < ?>> 重置密碼結果
      */
-    @Override
     @PutMapping("/resetPassword")
-    public Mono<ResponseEntity<?>> resetPassword (ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> resetPassword(@RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return super.resetPassword(resetPasswordDTO, exchange);
     }
 
     /**
-     * 獲取CSRF Token
+     * 獲取 CSRF Token API
      *
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity> 返回CSRF Token
+     * @param exchange 當前請求對象
+     * @return Mono<ResponseEntity < ?>> 返回 CSRF Token
      */
     @GetMapping("/csrf/token")
     public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
@@ -105,9 +103,22 @@ public class ApiGuestController extends BaseGuestController {
             data.put("token", csrfToken.getToken());
             data.put("headerName", csrfToken.getHeaderName());
             data.put("parameterName", csrfToken.getParameterName());
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取CSRF Token成功", data);
+            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取 CSRF Token 成功", data);
             return createResponseEntity(apiResponse);
         }), exchange);
     }
 
+    /**
+     * 確認當前用戶授權狀態，並返回用戶信息
+     * 用於檢查當前用戶是否已經授權，並返回用戶的基本信息。
+     * 如果用戶未授權，會返回401 Unauthorized錯誤。
+     *
+     * @param exchange 請求對象，包含請求上下文
+     *
+     * @return Mono<ResponseEntity < ?>> 返回用戶授權狀態的結果
+     */
+    @GetMapping("/checkAuthenticationStatus")
+    public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
+        return super.checkAuthenticationStatus(exchange);
+    }
 }

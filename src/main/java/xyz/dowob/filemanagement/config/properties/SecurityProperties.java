@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import xyz.dowob.filemanagement.customenum.CsrfTokenRepositoryEnum;
 
 import java.util.List;
 
@@ -164,6 +165,11 @@ public class SecurityProperties {
          * CSRF 憑證的過期時間，默認為 5 分鐘
          */
         private long expiration = 5;
+
+        /**
+         * CSRF 憑證的存儲方式，默認為 LOCAL
+         */
+        private CsrfTokenRepositoryEnum csrfTokenRepository = CsrfTokenRepositoryEnum.LOCAL;
     }
 
 

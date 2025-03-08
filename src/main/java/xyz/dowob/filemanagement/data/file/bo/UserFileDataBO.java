@@ -8,12 +8,15 @@ import lombok.Setter;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareType;
 import xyz.dowob.filemanagement.data.file.dto.EditorContentDTO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.entity.UserFileShareRecord;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -59,6 +62,10 @@ public class UserFileDataBO {
      * 文件大小
      */
     private Long fileSize;
+    /**
+     * 共享類型
+     */
+    private FileShareType shareType;
     /**
      * 共享用戶
      */
@@ -115,7 +122,12 @@ public class UserFileDataBO {
         this.uploadTime = userFileMetadata.getUploadTime();
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
-        this.shareUsers = userFileMetadata.getSharedWithUsers();
+        this.shareType = userFileMetadata.getShareType();
+    }
+
+    public UserFileDataBO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, Collection<UserFileShareRecord> userFileShareRecords) {
+        UserFileDataBO userFileDataBO = new UserFileDataBO(serverFileMetadata, userFileMetadata);
+        userFileShareRecords.forEach(record -> userFileDataBO.shareUsers.add(record.getUserId()));
     }
 
     /**
@@ -134,6 +146,10 @@ public class UserFileDataBO {
         this.parentFolderId = userFileMetadata.getParentFolderId();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.uploadTime = userFileMetadata.getUploadTime();
-        this.shareUsers = userFileMetadata.getSharedWithUsers();
+    }
+
+    public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, EditorContentDTO content, Collection<UserFileShareRecord> userFileShareRecords) {
+        UserFileDataBO userFileDataBO = new UserFileDataBO(userOnlineFile, userFileMetadata, content);
+        userFileShareRecords.forEach(record -> userFileDataBO.shareUsers.add(record.getUserId()));
     }
 }

@@ -96,10 +96,13 @@ public class SecurityConfig {
                             contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                         }))
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .authorizeExchange(exchange -> exchange.pathMatchers("/web/guest/**", "/api/guest/**", "/docs/**", "/ws/**").permitAll()
-                                                       //.pathMatchers("/api/user/getAllUserInfo")
-                                                       //.hasRole("ADMIN")
-                                                       .anyExchange().authenticated())
+                .authorizeExchange(exchange -> exchange
+                        .pathMatchers("/web/v1/guest/**", "/api/v1/guest/**", "/docs/**", "/ws/**", "/actuator/health")
+                        .permitAll()
+                        //.pathMatchers("/api/user/getAllUserInfo")
+                        //.hasRole("ADMIN")
+                        .anyExchange()
+                        .authenticated())
                 .securityContextRepository(securityContextRepository)
                 .addFilterAt(csrfTokenResponseFilter, SecurityWebFiltersOrder.CSRF)
                 .addFilterAt(contextWebFilter, SecurityWebFiltersOrder.EXCEPTION_TRANSLATION)

@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
@@ -30,9 +31,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 @Service
 @FileHandlerType(FileEnum.OTHER)
 public class GeneralFileServiceImpl extends AbstractFileService {
-    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                  @Nullable
-                                  FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
+    public GeneralFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper,
+                                  @Nullable FolderListTreeProvider folderListTreeProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -41,7 +41,14 @@ public class GeneralFileServiceImpl extends AbstractFileService {
               gridFsProvider,
               transfersTasksManager,
               fileProperties,
-              circuitBreakerConfig, rateLimiterConfig, folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator
+              circuitBreakerConfig,
+              rateLimiterConfig,
+              folderListTreeProvider,
+              fileTrashRecordRepository,
+              entityOperations,
+              transactionalOperator,
+              userFIleShareRecordRepository,
+              objectMapper
         );
     }
 }

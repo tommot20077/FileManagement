@@ -1,14 +1,13 @@
 package xyz.dowob.filemanagement.service.serviceImpl;
 
-import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.csrf.CsrfToken;
-import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -48,10 +47,9 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     private final TokenService tokenService;
 
     /**
-     * CSRF Token存儲庫
+     * CSRF Token 存儲庫策略
      */
-    @Resource(name = "customServerCsrfTokenRepository")
-    private final ServerCsrfTokenRepository csrfTokenRepository;
+    private final CsrfTokenRepositoryStrategy csrfTokenRepository;
 
     /**
      * 根據用戶請求頭中的JWT憑證進行授權
@@ -124,7 +122,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      * @return 返回CSRF Token
      */
     @Override
-    public Mono<CsrfToken> getCSRFToken (ServerWebExchange request) {
-        return csrfTokenRepository.generateToken(request);
+    public Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {
+        return csrfTokenRepository.getCsrfTokenRepository().generateToken(request);
     }
 }

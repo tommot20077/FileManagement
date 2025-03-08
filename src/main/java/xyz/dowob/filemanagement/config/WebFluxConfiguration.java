@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerCodecConfigurer;
-import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
+import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -21,6 +21,7 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * WebFlux 配置類，用於配置 WebFlux 相關的配置，實現 WebFluxConfigurer 接口
@@ -45,31 +46,27 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
     private final SecurityProperties securityProperties;
 
     /**
-     * CSRF Token 存儲庫
-     */
-    private final ServerCsrfTokenRepository csrfTokenRepository;
-
-    /**
      * ObjectMapper 用於對象與 JSON 之間的轉換
      */
     private final ObjectMapper objectMapper;
 
     /**
-     * Redis 提供者
+     * 不需要驗證CSRF的方法
      */
-    private final RedisProvider redisProvider;
+    private final List<HttpMethod> PASS_METHODS = List.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.TRACE);
+
+    private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
     /**
      * 帶參數的構造方法
      *
      * @param fileProperties 文件配置文件
      */
-    public WebFluxConfiguration(FileProperties fileProperties, SecurityProperties securityProperties, ServerCsrfTokenRepository csrfTokenRepository, ObjectMapper objectMapper, RedisProvider redisProvider) {
+    public WebFluxConfiguration(FileProperties fileProperties, SecurityProperties securityProperties, ObjectMapper objectMapper, CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy) {
         this.fileProperties = fileProperties;
         this.securityProperties = securityProperties;
-        this.csrfTokenRepository = csrfTokenRepository;
         this.objectMapper = objectMapper;
-        this.redisProvider = redisProvider;
+        this.csrfTokenRepositoryStrategy = csrfTokenRepositoryStrategy;
     }
 
     /**
@@ -102,22 +99,18 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
     @Bean
     public WebFilter csrfValidationFilter() {
         return (exchange, chain) -> {
-            if (!exchange.getRequest().getPath().toString().startsWith("/web")) {
+            if (!exchange.getRequest().getPath().toString().startsWith("/web") || isPassMethod(exchange)) {
                 return chain.filter(exchange);
             }
 
-            String csrfHeaderName = securityProperties.getCsrf().getHeaderName();
-            return csrfTokenRepository
+            return csrfTokenRepositoryStrategy
+                    .getCsrfTokenRepository()
                     .loadToken(exchange)
-                    .flatMap(token -> chain.filter(exchange))
-                    .onErrorResume(ValidationException.class, e -> writeJsonResponse(exchange, e.getErrorCode()))
-                    .publishOn(Schedulers.boundedElastic())
-                    .doFinally(signalType -> {
-                        if (exchange.getRequest().getHeaders().containsKey(csrfHeaderName)) {
-                            redisProvider.deleteHash(csrfHeaderName, exchange.getRequest().getHeaders().getFirst(csrfHeaderName)).subscribe();
-                        }
-                        ;
-                    });
+                    .flatMap(token -> chain.filter(exchange).doFinally(signalType -> {
+                        csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(token).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    }))
+                    .onErrorResume(ValidationException.class, e -> writeJsonResponse(exchange, e.getErrorCode()));
+
         };
     }
 
@@ -147,4 +140,9 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
             return Mono.error(jsonProcessingException);
         }
     }
+
+    public boolean isPassMethod(ServerWebExchange exchange) {
+        return PASS_METHODS.contains(exchange.getRequest().getMethod());
+    }
+
 }

@@ -10,6 +10,7 @@ import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -94,7 +95,7 @@ public class UserFileListDTO {
      * @param serverFileMetadata 服務器文件元數據對象
      * @param userFileMetadata   用戶文件元數據對象
      */
-    public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
+    public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
@@ -107,8 +108,8 @@ public class UserFileListDTO {
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
 
-        if (userFileMetadata.getSharedWithUsers() != null) {
-            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        if (shareUsers != null) {
+            this.shareUsers.addAll(shareUsers);
         }
     }
 
@@ -118,7 +119,7 @@ public class UserFileListDTO {
      * @param userOnlineFile   用戶在線文件對象
      * @param userFileMetadata 用戶文件元數據對象
      */
-    public UserFileListDTO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata) {
+    public UserFileListDTO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
@@ -129,8 +130,8 @@ public class UserFileListDTO {
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
 
-        if (userFileMetadata.getSharedWithUsers() != null) {
-            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        if (shareUsers != null) {
+            this.shareUsers.addAll(shareUsers);
         }
     }
 
@@ -140,7 +141,7 @@ public class UserFileListDTO {
      *
      * @param userFileMetadata 用戶文件元數據對象
      */
-    public UserFileListDTO(UserFileMetadata userFileMetadata) {
+    public UserFileListDTO(UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
         this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
@@ -149,8 +150,8 @@ public class UserFileListDTO {
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
-        if (userFileMetadata.getSharedWithUsers() != null) {
-            shareUsers.addAll(userFileMetadata.getSharedWithUsers());
+        if (shareUsers != null) {
+            this.shareUsers.addAll(shareUsers);
         }
     }
 }

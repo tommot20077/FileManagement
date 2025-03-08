@@ -31,8 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
-/mvnw
-/mvnw.cmd
 /src/main/resources/application.yml
 /src/main/resources/application-prod.yml
 /docker-compose.yml

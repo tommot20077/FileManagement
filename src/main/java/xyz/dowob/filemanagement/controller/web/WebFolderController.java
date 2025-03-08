@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.controller.api;
+package xyz.dowob.filemanagement.controller.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jetbrains.annotations.Nullable;
@@ -24,7 +24,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import java.util.List;
 
 /**
- * 資料夾 API 控制器
+ * 資料夾 Web 控制器
  * <p>
  * 提供資料夾相關的操作，包括：
  * - 查詢資料夾內的檔案列表
@@ -35,8 +35,8 @@ import java.util.List;
  * 此類繼承自 {@link BaseFolderController}，並透過 RESTful API 提供對外的資料夾管理功能。
  */
 @RestController
-@RequestMapping("/api/v1/folders")
-public class ApiFolderController extends BaseFolderController {
+@RequestMapping("/web/v1/folders")
+public class WebFolderController extends BaseFolderController {
     /**
      * 依賴注入的構造方法，用於初始化資料夾控制器。
      *
@@ -50,7 +50,7 @@ public class ApiFolderController extends BaseFolderController {
      * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
      * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
      */
-    public ApiFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper,
+    public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper,
                                @Nullable FolderListTreeManager folderListTreeManager) {
         super(userService,
               permissionService,

@@ -68,18 +68,12 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     private final UserOnlineFileHistoryRepository userOnlineFileHistoryRepository;
 
     /**
-     * 對象映射器
-     */
-    private final ObjectMapper objectMapper;
-
-    /**
      * 預設空內容的JSON
      */
     private final String EMPTY_CONTENT = "{\"delta\":[]}";
 
-    public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ObjectMapper objectMapper, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                 @Nullable
-                                 FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
+    public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper,
+                                 @Nullable FolderListTreeProvider folderListTreeProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -91,13 +85,10 @@ public class OnlineFileServiceImpl extends AbstractFileService {
               circuitBreakerConfig,
               rateLimiterConfig,
               folderListTreeProvider,
-              fileTrashRecordRepository,
-              entityOperations,
-              transactionalOperator
+              fileTrashRecordRepository, entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper
         );
         this.userOnlineFileRepository = userOnlineFileRepository;
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
-        this.objectMapper = objectMapper;
     }
 
     /**

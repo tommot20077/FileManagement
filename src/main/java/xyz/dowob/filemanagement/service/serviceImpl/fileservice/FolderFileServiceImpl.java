@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceImpl.fileservice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
@@ -19,13 +20,17 @@ import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.entity.UserFileShareRecord;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.*;
 import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -43,9 +48,8 @@ import java.util.stream.Collectors;
 @Service
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
-    public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository,
-                                 @Nullable
-                                 FolderListTreeProvider folderListTreeProvider, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig) {
+    public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper,
+                                 @Nullable FolderListTreeProvider folderListTreeProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -57,9 +61,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               circuitBreakerConfig,
               rateLimiterConfig,
               folderListTreeProvider,
-              fileTrashRecordRepository,
-              entityOperations,
-              transactionalOperator
+              fileTrashRecordRepository, entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper
         );
     }
     //todo 後期加入下載資料夾的功能
@@ -83,14 +85,18 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             folder.setUploadTime(LocalDateTime.now());
             folder.setFileType(FileEnum.FOLDER);
 
-            Set<Long> shareUserIds = fileEditDTO.getShareUserIds() == null ? new HashSet<>() : fileEditDTO.getShareUserIds();
-            folder.setSharedWithUsers(shareUserIds);
-
             return userFileMetaRepository.save(folder).flatMap(newFolder -> {
+                List<UserFileShareRecord> userFileShareRecords = new ArrayList<>();
+                fileEditDTO.getShareUserIds().forEach(shareUserEditPO -> {
+                    userFileShareRecords.add(new UserFileShareRecord(shareUserEditPO.getUserId(), newFolder.getId()));
+                });
+
                 if (folderListTreeProvider != null) {
                     folderListTreeProvider.addFolder(user.getId(), newFolder);
                 }
-                return cleanUserListCache(user.getId(), newFolder.getParentFolderId());
+                return userFIleShareRecordRepository
+                        .saveAll(userFileShareRecords)
+                        .then(cleanUserListCache(user.getId(), newFolder.getParentFolderId()));
             });
         });
     }
@@ -106,8 +112,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     @Override
     public Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
         return Mono.defer(() -> {
-                    if (fileEditDTO.getParentFolderId() != null) {
-                        return getUserFilePaths(fileEditDTO.getUserFileMetadata(), user).flatMap(nodeList -> {
+                       if (fileEditDTO.getParentFolderFileMetadata() != null) {
+                           return getUserFilePaths(fileEditDTO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
                             if (nodeList
                                     .stream()
                                     .filter(node -> Objects.nonNull(node.getFolderId()))
@@ -130,15 +136,18 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
-                    Set<Long> sharedWithUsers = Objects.requireNonNullElse(fileEditDTO.getShareUserIds(), userFileMetadata.getSharedWithUsers());
-                    userFileMetadata.setSharedWithUsers(sharedWithUsers);
+                    Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
+                    userFileMetadata.setIsStar(isStar);
 
                     if (folderListTreeProvider != null) {
                         folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO.getParentFolderId());
                     }
-                    return userFileMetaRepository
-                            .save(userFileMetadata)
-                            .flatMap(newUserFileMetadata -> cleanUserListCache(user.getId(), newUserFileMetadata.getParentFolderId()));
+
+                    Mono<UserFileMetadata> processShareUserMono = processShareUser(userFileMetadata, fileEditDTO);
+
+                    return Mono
+                            .zip(processShareUserMono, userFileMetaRepository.save(userFileMetadata))
+                            .flatMap(tuple2 -> cleanUserListCache(user.getId(), tuple2.getT2().getParentFolderId()));
                 });
     }
 

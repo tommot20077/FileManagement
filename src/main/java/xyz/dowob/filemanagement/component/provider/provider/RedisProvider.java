@@ -283,7 +283,7 @@ public class RedisProvider {
     }
 
     /**
-     * 刪除 Hash 中的數據
+     * 刪除 Hash 中指定外部Key中內部Key的數據
      *
      * @param key      Hash 的鍵
      * @param innerKey Hash 內部的鍵
@@ -294,8 +294,12 @@ public class RedisProvider {
         return redisTemplate.opsForHash().remove(key, innerKey).then();
     }
 
+    public Mono<Void> deleteHash(String key, List<String> innerKey) {
+        return redisTemplate.opsForHash().remove(key, innerKey.toArray()).then();
+    }
+
     /**
-     * 刪除 Hash 中的數據
+     * 刪除 Hash 指定Key中的所有數據
      *
      * @param key Hash 的鍵
      *
