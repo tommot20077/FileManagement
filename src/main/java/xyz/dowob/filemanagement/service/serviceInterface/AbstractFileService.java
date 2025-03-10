@@ -271,7 +271,7 @@ public abstract class AbstractFileService implements FileService {
                     });
         }).switchIfEmpty(Mono.defer(() -> {
             if (file.getId() <= 0) {
-                List<FolderListTreeProvider.FolderNode> list = List.of(new FolderListTreeProvider.FolderNode(null, "root"));
+                List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
                 return Mono.just(list);
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, file.getId()));
@@ -444,7 +444,8 @@ public abstract class AbstractFileService implements FileService {
 
             case RECYCLE_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByIsFolder(user.getId(), entityOperations);
 
-            case null -> userFileMetaRepository.findAllByParentFolderIdInAndIsDeleted(List.of(fatherFolderId), false, entityOperations);
+            case null ->
+                    userFileMetaRepository.findAllByParentFolderIdInAndIsDeleted(Collections.singletonList(fatherFolderId), false, entityOperations);
         };
     }
 
@@ -612,10 +613,10 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<Void>
      */
     public Mono<Void> deleteFile(UserFileMetadata userFileMetadata, User user) {
-        return updateOwner(List.of(userFileMetadata), user.getId()).then(Mono.defer(() -> {
+        return updateOwner(Collections.singletonList(userFileMetadata), user.getId()).then(Mono.defer(() -> {
             Mono<Void> deleteFile = Mono.empty();
             if (userFileMetadata.getServerFileId() != null) {
-                deleteFile = handleUserStorage(user, List.of(userFileMetadata.getServerFileId()));
+                deleteFile = handleUserStorage(user, Collections.singletonList(userFileMetadata.getServerFileId()));
             }
             return deleteFile.then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()).then(userFileMetaRepository.deleteById(
                     userFileMetadata.getId().toString())));
@@ -1031,7 +1032,7 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<UserFileMetadata> 還原後的文件
      */
     public Mono<UserFileMetadata> restoreFile(UserFileMetadata userFileMetadata, User user) {
-        return restoreFile(List.of(userFileMetadata), user).next();
+        return restoreFile(Collections.singletonList(userFileMetadata), user).next();
     }
 
     /**
@@ -1115,7 +1116,7 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<Boolean> 是否刪除成功
      */
     public Mono<Boolean> removeFile(UserFileMetadata userFileMetadata, User user) {
-        return removeFile(List.of(userFileMetadata), user);
+        return removeFile(Collections.singletonList(userFileMetadata), user);
     }
 
     /**
@@ -1206,8 +1207,7 @@ public abstract class AbstractFileService implements FileService {
         List<UserFileShareRecord> removeRecords = new ArrayList<>();
         List<UserFileShareRecord> editRecords = new ArrayList<>();
 
-        Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO
-                .getShareUserIds()
+        Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO.getShareUsers()
                 .stream()
                 .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
         if (editUsers.isEmpty()) {
@@ -1228,9 +1228,7 @@ public abstract class AbstractFileService implements FileService {
                     editRecords.add(record);
                 });
             }
-            return userFIleShareRecordRepository
-                    .saveAll(editRecords)
-                    .then(userFIleShareRecordRepository.deleteAll(removeRecords))
+            return Mono.when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
                     .thenReturn(userFileMetadata);
         }));
     }

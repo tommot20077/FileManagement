@@ -77,7 +77,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Token> create() {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -89,7 +89,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Token> getById(Long tokenId) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -97,7 +97,19 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Flux<Token> getAll() {
-        return null;
+        return Flux.empty();
+    }
+
+    /**
+     * 獲取所有實體，根據參數進行過濾
+     *
+     * @param args 參數
+     *
+     * @return 返回所有實體
+     */
+    @Override
+    public Flux<Token> getAllByParams(Object... args) {
+        return Flux.empty();
     }
 
     /**
@@ -107,7 +119,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Void> update(Token token) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -117,6 +129,6 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     public Mono<Void> delete(Token token) {
-        return null;
+        return Mono.empty();
     }
 }

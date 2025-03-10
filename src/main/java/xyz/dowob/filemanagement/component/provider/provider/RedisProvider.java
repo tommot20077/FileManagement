@@ -13,6 +13,7 @@ import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 此類用於提供 Redis 的操作方法，透過自定義方法操作 RedisTemplate 來對數據進行操作
@@ -33,7 +34,17 @@ public class RedisProvider {
      */
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
 
+
+    /**
+     * ObjectMapper 用於對象的序列化和反序列化
+     */
     private final ObjectMapper objectMapper;
+
+    /**
+     * 隨機緩存過期時間比例
+     */
+    @SuppressWarnings("FieldCanBeLocal")
+    private final Float RANDOM_CACHE_EXPIRE_TIME_RATIO = 0.2f;
 
     public RedisProvider(ReactiveRedisTemplate<String, Object> redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
@@ -53,7 +64,7 @@ public class RedisProvider {
         if (expireTime == null || expireTime.isNegative()) {
             return setValue(key, value);
         }
-        return redisTemplate.opsForValue().set(key, value).then(redisTemplate.expire(key, expireTime)).then();
+        return redisTemplate.opsForValue().set(key, value).then(setExpire(key, expireTime));
     }
 
     /**
@@ -110,28 +121,6 @@ public class RedisProvider {
         return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
     }
 
-    /**
-     * 轉換數據為指定類型的列表
-     *
-     * @param objects 數據
-     * @param clazz   類型
-     * @param <T>     泛型
-     *
-     * @return 返回 Flux<T> 對象
-     */
-    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
-        if (!(objects instanceof List<?> list)) {
-            return Flux.empty();
-        }
-        List<T> finalList = list.stream().map(object -> {
-            if (clazz.isInstance(object)) {
-                return clazz.cast(object);
-            }
-            return objectMapper.convertValue(object, clazz);
-        }).toList();
-        return Flux.fromIterable(finalList);
-    }
-
 
     /**
      * 對數據進行自增操作
@@ -170,7 +159,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return setHashMap(hashKey, innerKey, value);
         }
-        return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(redisTemplate.expire(hashKey, expireTime)).then();
+        return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(setExpire(hashKey, expireTime));
     }
 
     /**
@@ -184,6 +173,34 @@ public class RedisProvider {
      */
     public Mono<Void> setHashMap(String hashKey, String innerKey, Object value) {
         return redisTemplate.opsForHash().put(hashKey, innerKey, value).then();
+    }
+
+
+    /**
+     * 將數據存入 Redis 的 Hash 中
+     *
+     * @param hashKey Hash 的鍵
+     * @param value   Hash 內部的鍵和值
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setHashMapAll(String hashKey, Map<String, Object> value, Duration expireTime) {
+        if (expireTime.isNegative()) {
+            return setHashMapAll(hashKey, value);
+        }
+        return redisTemplate.opsForHash().putAll(hashKey, value).then(setExpire(hashKey, expireTime));
+    }
+
+    /**
+     * 將數據存入 Redis 的 Hash 中，此為批量設定
+     *
+     * @param hashKey Hash 的鍵
+     * @param value   Hash 內部的鍵和值
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> setHashMapAll(String hashKey, Map<String, Object> value) {
+        return redisTemplate.opsForHash().putAll(hashKey, value).then();
     }
 
     /**
@@ -208,6 +225,30 @@ public class RedisProvider {
      */
     public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
         return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
+    }
+
+    /**
+     * 根據 Hash 的鍵和內部的鍵獲取數據，此適用於列表形式
+     *
+     * @param hashKey   Hash 的鍵
+     * @param innerKeys Hash 內部的鍵的集合
+     *
+     * @return 返回 Mono<Object> 對象
+     */
+    public <T> Flux<T> getHashMapList(String hashKey, List<String> innerKeys, Class<T> clazz) {
+        List<Object> innerKeyList = innerKeys.stream().map(innerKey -> (Object) innerKey).toList();
+        return redisTemplate.opsForHash().multiGet(hashKey, innerKeyList).flatMapMany(list -> {
+            List<Object> filteredList = list.stream().filter(Objects::nonNull).toList();
+
+            if (filteredList.isEmpty()) {
+                return Flux.empty();
+            }
+
+            if (clazz.isInstance(filteredList.getFirst())) {
+                return Flux.fromIterable(filteredList).cast(clazz);
+            }
+            return Flux.fromIterable(filteredList).map(object -> objectMapper.convertValue(object, clazz));
+        });
     }
 
     /**
@@ -256,8 +297,7 @@ public class RedisProvider {
     public Mono<Object> incrementHashMap(String hashKey, String innerKey, long delta, Duration expireTime) {
         return redisTemplate
                 .opsForHash()
-                .increment(hashKey, innerKey, delta)
-                .flatMap(incrementResult -> redisTemplate.expire(hashKey, expireTime).thenReturn(incrementResult));
+                .increment(hashKey, innerKey, delta).flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
     }
 
     /**
@@ -294,6 +334,14 @@ public class RedisProvider {
         return redisTemplate.opsForHash().remove(key, innerKey).then();
     }
 
+    /**
+     * 刪除 Hash 中指定外部Key中內部Key的數據，此為批量刪除
+     *
+     * @param key      Hash 的鍵
+     * @param innerKey Hash 內部的鍵的列表
+     *
+     * @return 返回 Mono<Void> 對象
+     */
     public Mono<Void> deleteHash(String key, List<String> innerKey) {
         return redisTemplate.opsForHash().remove(key, innerKey.toArray()).then();
     }
@@ -322,7 +370,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return setSet(key, value);
         }
-        return redisTemplate.opsForSet().add(key, value).then(redisTemplate.expire(key, expireTime)).then();
+        return redisTemplate.opsForSet().add(key, value).then(setExpire(key, expireTime));
     }
 
     /**
@@ -395,7 +443,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return setList(key, value);
         }
-        return redisTemplate.opsForList().rightPush(key, value).then(redisTemplate.expire(key, expireTime)).then();
+        return redisTemplate.opsForList().rightPush(key, value).then(setExpire(key, expireTime));
     }
 
     /**
@@ -470,7 +518,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return insertList(key, value, isLeft);
         }
-        return insertList(key, value, isLeft).then(redisTemplate.expire(key, expireTime)).then();
+        return insertList(key, value, isLeft).then(setExpire(key, expireTime));
     }
 
     /**
@@ -502,6 +550,14 @@ public class RedisProvider {
         return redisTemplate.opsForList().remove(key, 1, value).then();
     }
 
+
+    /**
+     * 刪除 List 中的數據
+     *
+     * @param key 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
     public Mono<Void> deleteList(String key) {
         return redisTemplate.opsForList().delete(key).then();
     }
@@ -521,7 +577,7 @@ public class RedisProvider {
         if (expireTime.isNegative()) {
             return setZset(key, value, score);
         }
-        return setZset(key, value, score).then(redisTemplate.expire(key, expireTime)).then();
+        return setZset(key, value, score).then(setExpire(key, expireTime));
     }
 
     /**
@@ -668,5 +724,41 @@ public class RedisProvider {
      */
     public Mono<Boolean> isChunkSetPending(String key, int chunkIndex) {
         return redisTemplate.opsForSet().isMember(key, chunkIndex);
+    }
+
+    /**
+     * 設定過期時間，避免緩存雪崩的情況，會在原有的過期時間上增加隨機的過期時間
+     *
+     * @param key        鍵
+     * @param expireTime 過期時間
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    private Mono<Void> setExpire(String key, Duration expireTime) {
+        Duration randomExpireTime = Duration.ofSeconds(Math.round(expireTime.getSeconds() * RANDOM_CACHE_EXPIRE_TIME_RATIO));
+        return redisTemplate.expire(key, randomExpireTime).then();
+    }
+
+
+    /**
+     * 轉換數據為指定類型的列表
+     *
+     * @param objects 數據
+     * @param clazz   類型
+     * @param <T>     泛型
+     *
+     * @return 返回 Flux<T> 對象
+     */
+    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
+        if (!(objects instanceof List<?> list)) {
+            return Flux.empty();
+        }
+        List<T> finalList = list.stream().map(object -> {
+            if (clazz.isInstance(object)) {
+                return clazz.cast(object);
+            }
+            return objectMapper.convertValue(object, clazz);
+        }).toList();
+        return Flux.fromIterable(finalList);
     }
 }

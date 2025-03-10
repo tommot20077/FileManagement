@@ -1,16 +1,16 @@
 package xyz.dowob.filemanagement.controller.web;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
+
+import java.util.Set;
 
 /**
  * 用於處理用戶 Web 控制器，用於處理用戶的Web請求。
@@ -26,8 +26,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 @RestController
 @RequestMapping("/web/v1/user")
 public class WebUserController extends BaseUserController {
-    public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties) {
-        super(fileServiceStrategy, userService, securityProperties);
+    public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
+        super(fileServiceStrategy, userService, securityProperties, validationService);
     }
 
     /**
@@ -37,7 +37,6 @@ public class WebUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回登出結果
      */
-    @Override
     @PostMapping("/logout")
     public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return super.logout(exchange, true);
@@ -51,9 +50,23 @@ public class WebUserController extends BaseUserController {
      * @return Mono<ResponseEntity> 返回用戶信息
      */
     @GetMapping("/info")
-    @Override
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return super.getUserInfo(exchange);
     }
+
+    /**
+     * 搜索用戶信息的Web請求
+     *
+     * @param exchange   用於處理Web請求的交換器
+     * @param searchList 搜索列表
+     *
+     * @return Mono<ResponseEntity> 返回搜索結果
+     */
+    @GetMapping("/info/search")
+    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, @RequestBody Set<String> searchList) {
+        return super.searchUserInfo(exchange, searchList);
+    }
+
+
 
 }

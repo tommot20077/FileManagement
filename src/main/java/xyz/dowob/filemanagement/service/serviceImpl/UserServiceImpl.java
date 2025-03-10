@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
+import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
@@ -26,6 +28,11 @@ import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 用戶業務邏輯實現類，主要用於處理用戶相關的業務邏輯
@@ -66,10 +73,8 @@ public class UserServiceImpl implements UserService {
      */
     private final EmailProvider emailProvider;
 
-
     /**
      * 安全配置屬性
-     * 1.用於獲取重置密碼憑證的過期時間
      */
     private final SecurityProperties securityProperties;
 
@@ -77,6 +82,11 @@ public class UserServiceImpl implements UserService {
      * 密碼加密器(採用BCrypt加密)
      */
     private final PasswordEncoder passwordEncoder;
+
+    /**
+     * Cache提供者
+     */
+    private final CacheProvider cacheProvider;
 
     /**
      * 此方法之後為UserService接口中的方法實現
@@ -166,9 +176,7 @@ public class UserServiceImpl implements UserService {
                 .validateNotNull(userEmailDTO)
                 .then(Mono.defer(() -> userRepository
                         .findByEmail(userEmailDTO.getEmail())
-                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
-                                                                          userEmailDTO.getEmail()
-                        )))
+                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
                         .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
                             String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
                                                            token,
@@ -217,21 +225,37 @@ public class UserServiceImpl implements UserService {
     @Override
     public Mono<User> getUser(ServerWebExchange exchange) {
         final Object[] userId = new Object[1];
-
         return Mono.defer(() -> {
             userId[0] = exchange.getAttributes().getOrDefault("userId", null);
             if (userId[0] == null) {
                 return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
                     if (authentication != null && authentication.isAuthenticated()) {
                         userId[0] = Long.valueOf(authentication.getPrincipal().toString());
-                        return userRepository.findById((Long) userId[0]);
+                        return getUserFromCacheOrDB(userId);
                     }
                     return Mono.empty();
                 });
             }
-            return userRepository.findById((Long) userId[0]);
+            return getUserFromCacheOrDB(userId);
         }).switchIfEmpty(Mono.empty());
     }
+
+    /**
+     * 根據用戶ID從緩存或數據庫中獲取用戶對象
+     *
+     * @param userId 用戶ID
+     *
+     * @return 用戶實體
+     */
+    private Mono<User> getUserFromCacheOrDB(Object[] userId) {
+        return cacheProvider.get(userId[0].toString(), User.class).doOnNext(user -> {
+        }).switchIfEmpty(Mono.defer(() -> userRepository.findById((Long) userId[0]).doOnNext(user -> {
+            Mono<Void> usernameCache = cacheProvider.set(user.getUsername(), user);
+            Mono<Void> idCache = cacheProvider.set(user.getId().toString(), user);
+            Mono.when(usernameCache, idCache).subscribeOn(Schedulers.boundedElastic()).subscribe();
+        })));
+    }
+
 
     /**
      * 此方法之後為CrudService接口中的方法實現
@@ -241,7 +265,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<User> create() {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -267,13 +291,52 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 根據參數獲取所有實體
+     *
+     * @param args 參數
+     *
+     * @return 返回所有實體
+     */
+    @Override
+    public Flux<User> getAllByParams(Object... args) {
+        if (args.length == 0) {
+            return Flux.empty();
+        }
+
+        List<String> usernameList = new LinkedList<>();
+
+        Stream.of(args).forEach(arg -> {
+            usernameList.add(arg.toString());
+        });
+
+        Flux<User> cacheUserFlux = cacheProvider.getAll(usernameList, User.class).doOnNext(user -> {
+            usernameList.remove(user.getUsername());
+        });
+
+        if (usernameList.isEmpty()) {
+            return cacheUserFlux;
+        }
+
+        Flux<User> userRepositoryFlux = userRepository.findAllByUsernameIn(usernameList).collectList().doOnNext(userList -> {
+            if (userList.isEmpty()) {
+                return;
+            }
+            Mono<Void> usernameCache = cacheProvider.setAll(userList.stream().collect(Collectors.toMap(User::getUsername, user -> user)));
+            Mono<Void> idCache = cacheProvider.setAll(userList.stream().collect(Collectors.toMap(user -> user.getId().toString(), user -> user)));
+            Mono.when(usernameCache, idCache).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+        }).flatMapMany(Flux::fromIterable);
+        return cacheUserFlux.concatWith(userRepositoryFlux);
+    }
+
+    /**
      * 更新一個實體
      *
      * @param entity 實體對象
      */
     @Override
     public Mono<Void> update(User entity) {
-        return null;
+        return Mono.empty();
     }
 
     /**
@@ -283,7 +346,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<Void> delete(User entity) {
-        return null;
+        return Mono.empty();
     }
 
 

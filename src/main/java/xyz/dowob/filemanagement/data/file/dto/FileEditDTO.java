@@ -1,12 +1,14 @@
 package xyz.dowob.filemanagement.data.file.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 文件編輯的數據傳輸對象，用於規範文件編輯的數據傳輸對象，紀錄文件編輯的數據
@@ -38,7 +40,8 @@ public class FileEditDTO {
     /**
      * 分享用戶ID
      */
-    private List<ShareUserEditPO> shareUserIds = List.of();
+    @Valid
+    private Set<ShareUserEditPO> shareUsers = new HashSet<>();
 
     /**
      * 是否為星標文件

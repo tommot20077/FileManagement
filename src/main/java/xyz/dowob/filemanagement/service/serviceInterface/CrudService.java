@@ -46,6 +46,13 @@ public interface CrudService <T, ID> {
     Flux<T> getAll();
 
     /**
+     * 獲取所有實體
+     *
+     * @param args 可變參數，用於條件查詢
+     */
+    Flux<T> getAllByParams(Object... args);
+
+    /**
      * 更新一個實體
      *
      * @param entity 實體對象

@@ -88,5 +88,4 @@ public interface UserService extends CrudService<User, Long> {
      * @return Mono<User> 返回用戶對象
      */
     Mono<User> getUser(ServerWebExchange exchange);
-
 }

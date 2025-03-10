@@ -17,6 +17,7 @@ import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.regex.Pattern;
 
 /**
@@ -161,6 +162,22 @@ public class ValidationServiceImpl implements ValidationService {
 
             return Mono.empty();
         }));
+    }
+
+    /**
+     * 驗證用戶搜索列表是否合法，當搜索列表為空或者搜索列表數量超過20時，拋出ValidationException
+     *
+     * @param searchList 搜索列表
+     */
+    @Override
+    public Mono<Void> validateUserSearchList(Collection<String> searchList) {
+        if (searchList == null || searchList.isEmpty()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.SEARCH_CRITERIA_EMPTY));
+        }
+        if (searchList.size() > 20) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "請求搜索用戶數量不能超過20位"));
+        }
+        return Mono.empty();
     }
 
     /**

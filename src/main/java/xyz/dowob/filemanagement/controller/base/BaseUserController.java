@@ -8,8 +8,15 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 用戶控制器的基礎類
@@ -40,6 +47,8 @@ public abstract class BaseUserController implements ResponseUnity {
      * 安全性設定，用於設置安全相關配置，如 Cookie 配置
      */
     protected final SecurityProperties securityProperties;
+
+    protected final ValidationService validationService;
 
     /**
      * 處理用戶登出的請求
@@ -78,7 +87,7 @@ public abstract class BaseUserController implements ResponseUnity {
      */
     // todo 改成管理員使用
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
-        return handleError(userService.getAll().collectList().flatMap(userList -> {
+        return handleError(userService.getAllByParams().collectList().flatMap(userList -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", userList);
             return createResponseEntity(responseEntity);
         }), exchange);
@@ -92,11 +101,35 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity < ?>> 返回當前用戶的詳細信息
      */
-    // 此方法為管理員方法
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
             return createResponseEntity(responseEntity);
         }), exchange);
+    }
+
+    /**
+     * 查詢用戶信息的請求
+     * 該方法用於查詢指定用戶的詳細信息。
+     *
+     * @param exchange 請求對象
+     * @param username 用戶名
+     *
+     * @return Mono<ResponseEntity < ?>> 返回指定用戶的詳細信息
+     */
+    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, Set<String> username) {
+        Mono<ResponseEntity<?>> entityMono = validationService
+                .validateUserSearchList(username)
+                .then(userService.getAllByParams(username.toArray()).collectMap(User::getUsername, User::getId).flatMap(userMap -> {
+                    Set<String> inValidUser = new HashSet<>(username);
+                    inValidUser.removeAll(userMap.keySet());
+
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("foundUser", userMap);
+                    result.put("notFoundUser", inValidUser);
+                    ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", result);
+                    return createResponseEntity(responseEntity);
+                }));
+        return handleError(entityMono, exchange);
     }
 }

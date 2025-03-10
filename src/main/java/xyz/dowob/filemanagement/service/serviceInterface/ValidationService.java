@@ -13,6 +13,7 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -72,6 +73,13 @@ public interface ValidationService {
      * @param fileFilterDTO 文件過濾DTO
      */
     Mono<Void> validateFileFilterDTO(FileFilterDTO fileFilterDTO);
+
+    /**
+     * 驗證用戶搜索列表是否合法
+     *
+     * @param searchList 搜索列表
+     */
+    Mono<Void> validateUserSearchList(Collection<String> searchList);
 
     /**
      * 驗證數據傳輸對象是否為空

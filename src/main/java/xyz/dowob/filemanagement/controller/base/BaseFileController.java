@@ -149,7 +149,7 @@ public abstract class BaseFileController implements ResponseUnity {
                 result.put("userId", user.getId());
                 result.put("username", user.getUsername());
                 result.put("files", files);
-                result.put("filePaths", List.of(new FolderListTreeProvider.FolderNode(null, "root")));
+                result.put("filePaths", Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root")));
                 return createResponseEntity(createResponse(exchange, "搜索文件成功", result));
             }));
         }), exchange);
