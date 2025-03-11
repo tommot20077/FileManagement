@@ -45,87 +45,87 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 根據key獲取緩存數據
      *
-     * @param key   key
+     * @param hashKey   key
      * @param clazz 類型
      *
      * @return Mono<T>
      */
     @Override
-    public <T> Mono<T> get(String key, Class<T> clazz) {
-        return redisProvider.getHashMap(USER_INFO_CACHE_PREFIX, key, clazz);
+    public <T> Mono<T> get(String hashKey, Class<T> clazz) {
+        return redisProvider.getHashMap(USER_INFO_CACHE_PREFIX, hashKey, clazz);
     }
 
     /**
      * 根據key獲取緩存數據，此為批量查詢
      *
-     * @param key   key集合
+     * @param hashKeys   key集合
      * @param clazz 類型
      *
      * @return Flux<T>
      */
     @Override
-    public <T> Flux<T> getAll(Collection<String> key, Class<T> clazz) {
-        if (key == null || key.isEmpty()) {
+    public <T> Flux<T> getAll(Collection<String> hashKeys, Class<T> clazz) {
+        if (hashKeys == null || hashKeys.isEmpty()) {
             return redisProvider.getHashMapAll(USER_INFO_CACHE_PREFIX, clazz);
         }
-        return redisProvider.getHashMapList(USER_INFO_CACHE_PREFIX, key.stream().toList(), clazz);
+        return redisProvider.getHashMapList(USER_INFO_CACHE_PREFIX, hashKeys.stream().toList(), clazz);
     }
 
     /**
      * 設定緩存數據
      *
-     * @param key    查詢key
+     * @param hashKey    查詢key
      * @param value  存儲value
      * @param expire 過期時間
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> set(String key, Object value, Duration... expire) {
+    public Mono<Void> set(String hashKey, Object value, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, key, value, DEFAULT_EXPIRE);
+            return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, DEFAULT_EXPIRE);
         }
-        return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, key, value, expire[0]);
+        return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, expire[0]);
     }
 
     /**
      * 設定緩存數據，此為批量設定
      *
-     * @param value  key-value 集合
+     * @param keyValues  key-value 集合
      * @param expire 過期時間
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> setAll(Map<String, Object> value, Duration... expire) {
+    public Mono<Void> setAll(Map<String, Object> keyValues, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, value, DEFAULT_EXPIRE);
+            return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, DEFAULT_EXPIRE);
         }
-        return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, value, expire[0]);
+        return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, expire[0]);
     }
 
     /**
      * 刪除緩存數據
      *
-     * @param key 查詢key
+     * @param hashKey 查詢key
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> delete(String key) {
-        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, key);
+    public Mono<Void> delete(String hashKey) {
+        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, hashKey);
     }
 
     /**
      * 刪除緩存數據，此為批量刪除
      *
-     * @param key key集合
+     * @param hashKeys key集合
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> deleteAll(Collection<String> key) {
-        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, key.stream().toList());
+    public Mono<Void> deleteAll(Collection<String> hashKeys) {
+        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, hashKeys.stream().toList());
     }
 
     /**

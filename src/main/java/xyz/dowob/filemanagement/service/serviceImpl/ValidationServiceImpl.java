@@ -302,7 +302,7 @@ public class ValidationServiceImpl implements ValidationService {
      */
     private Mono<Void> alphanumericInspection(String username) {
         return Mono.defer(() -> {
-            if (Pattern.matches("^[a-zA-Z0-9]*$", username)) {
+            if (Pattern.matches("^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z0-9]*$", username)) {
                 return Mono.empty();
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));

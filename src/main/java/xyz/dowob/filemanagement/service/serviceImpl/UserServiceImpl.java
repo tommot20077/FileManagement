@@ -17,6 +17,7 @@ import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvid
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.customenum.UserInfoType;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -31,6 +32,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -298,26 +300,40 @@ public class UserServiceImpl implements UserService {
      * @return 返回所有實體
      */
     @Override
-    public Flux<User> getAllByParams(Object... args) {
+    public Flux<User> getAllByParams(String type, Object... args) {
         if (args.length == 0) {
             return Flux.empty();
         }
 
-        List<String> usernameList = new LinkedList<>();
+        List<String> userInfoList = new LinkedList<>();
+        boolean isId = Objects.equals(type, UserInfoType.ID.name());
 
         Stream.of(args).forEach(arg -> {
-            usernameList.add(arg.toString());
+            userInfoList.add(arg.toString());
         });
 
-        Flux<User> cacheUserFlux = cacheProvider.getAll(usernameList, User.class).doOnNext(user -> {
-            usernameList.remove(user.getUsername());
+        Flux<User> cacheUserFlux = cacheProvider.getAll(userInfoList, User.class).doOnNext(user -> {
+            Object userType = isId ? user.getId().toString() : user.getUsername();
+            userInfoList.remove(userType);
         });
 
-        if (usernameList.isEmpty()) {
+        if (userInfoList.isEmpty()) {
             return cacheUserFlux;
         }
 
-        Flux<User> userRepositoryFlux = userRepository.findAllByUsernameIn(usernameList).collectList().doOnNext(userList -> {
+
+        Flux<User> userRepositoryChooseFlux;
+        if (isId) {
+            userRepositoryChooseFlux = userRepository.findAllByIdIn(userInfoList
+                                                                            .stream()
+                                                                            .filter(id -> id.matches("\\d+"))
+                                                                            .map(Long::parseLong)
+                                                                            .collect(Collectors.toList()));
+        } else {
+            userRepositoryChooseFlux = userRepository.findAllByUsernameIn(userInfoList);
+        }
+
+        Flux<User> userRepositoryFlux = userRepositoryChooseFlux.collectList().doOnNext(userList -> {
             if (userList.isEmpty()) {
                 return;
             }

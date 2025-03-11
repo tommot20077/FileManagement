@@ -40,6 +40,15 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
     Flux<User> findAllByUsernameIn(Collection<String> usernames);
 
     /**
+     * 根據用戶ID查詢用戶，此為批量查詢
+     *
+     * @param userIds 用戶ID集合
+     *
+     * @return Flux<User>
+     */
+    Flux<User> findAllByIdIn(Collection<Long> userIds);
+
+    /**
      * 根據郵箱查詢用戶
      *
      * @param email 信箱

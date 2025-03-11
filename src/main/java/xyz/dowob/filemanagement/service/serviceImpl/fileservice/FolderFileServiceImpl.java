@@ -16,6 +16,7 @@ import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareType;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.User;
@@ -134,6 +135,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     userFileMetadata.setFilename(fileEditDTO.getFilename());
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
+
+                    FileShareType shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
+                    userFileMetadata.setShareType(shareType);
 
                     Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
                     userFileMetadata.setIsStar(isStar);

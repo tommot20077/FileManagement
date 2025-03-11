@@ -7,6 +7,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
+import xyz.dowob.filemanagement.customenum.UserInfoType;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
@@ -74,15 +75,17 @@ public class ApiUserController extends BaseUserController {
     /**
      * 根據輸入的用戶名稱獲取指定用戶信息的API請求
      *
-     * @param exchange   請求對象
-     * @param searchList 查詢列表
+     * @param exchange  請求對象
+     * @param userInfos 查詢列表
+     * @param type      查詢類型
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
     @GetMapping("/info/search")
-    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, @RequestBody Set<String> searchList) {
-        return super.searchUserInfo(exchange, searchList);
+    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange,
+                                                  @RequestParam Set<String> userInfos,
+                                                  @RequestParam(required = false, defaultValue = "name") String type) {
+        String formatType = UserInfoType.getUserInfoType(type).name();
+        return super.searchUserInfo(exchange, userInfos, formatType);
     }
-
-
 }

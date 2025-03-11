@@ -103,12 +103,13 @@ public class TokenServiceImpl implements TokenService {
     /**
      * 獲取所有實體，根據參數進行過濾
      *
+     * @param type 類型
      * @param args 參數
      *
      * @return 返回所有實體
      */
     @Override
-    public Flux<Token> getAllByParams(Object... args) {
+    public Flux<Token> getAllByParams(String type, Object... args) {
         return Flux.empty();
     }
 

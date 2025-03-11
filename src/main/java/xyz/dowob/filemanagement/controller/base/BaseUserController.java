@@ -7,6 +7,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.UserInfoType;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -17,6 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * 用戶控制器的基礎類
@@ -87,7 +89,7 @@ public abstract class BaseUserController implements ResponseUnity {
      */
     // todo 改成管理員使用
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
-        return handleError(userService.getAllByParams().collectList().flatMap(userList -> {
+        return handleError(userService.getAll().collectList().flatMap(userList -> {
             ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", userList);
             return createResponseEntity(responseEntity);
         }), exchange);
@@ -112,16 +114,19 @@ public abstract class BaseUserController implements ResponseUnity {
      * 查詢用戶信息的請求
      * 該方法用於查詢指定用戶的詳細信息。
      *
-     * @param exchange 請求對象
-     * @param username 用戶名
+     * @param exchange  請求對象
+     * @param userInfos 用戶名
+     * @param type      查詢類型
      *
      * @return Mono<ResponseEntity < ?>> 返回指定用戶的詳細信息
      */
-    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, Set<String> username) {
+    public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, Set<String> userInfos, String type) {
+        Function<? super User, ? extends String> key = type.equals(UserInfoType.NAME.name()) ? User::getUsername : user -> user.getId().toString();
+        Function<? super User, ? extends String> value = type.equals(UserInfoType.NAME.name()) ? user -> user.getId().toString() : User::getUsername;
         Mono<ResponseEntity<?>> entityMono = validationService
-                .validateUserSearchList(username)
-                .then(userService.getAllByParams(username.toArray()).collectMap(User::getUsername, User::getId).flatMap(userMap -> {
-                    Set<String> inValidUser = new HashSet<>(username);
+                .validateUserSearchList(userInfos)
+                .then(userService.getAllByParams(type, userInfos.toArray()).collectMap(key, value).flatMap(userMap -> {
+                    Set<String> inValidUser = new HashSet<>(userInfos);
                     inValidUser.removeAll(userMap.keySet());
 
                     Map<String, Object> result = new HashMap<>();

@@ -24,63 +24,63 @@ public interface CacheProvider {
     /**
      * 根據key獲取緩存數據
      *
-     * @param key   key
-     * @param clazz 類型
-     * @param <T>   泛型
+     * @param hashKey hashKey
+     * @param clazz   類型
+     * @param <T>     泛型
      *
      * @return Mono<T>
      */
-    <T> Mono<T> get(String key, Class<T> clazz);
+    <T> Mono<T> get(String hashKey, Class<T> clazz);
 
     /**
      * 根據key獲取緩存數據，此為批量查詢
      *
-     * @param key   key集合
-     * @param clazz 類型
-     * @param <T>   泛型
+     * @param hashKeys key集合
+     * @param clazz    類型
+     * @param <T>      泛型
      *
      * @return Flux<T>
      */
-    <T> Flux<T> getAll(Collection<String> key, Class<T> clazz);
+    <T> Flux<T> getAll(Collection<String> hashKeys, Class<T> clazz);
 
     /**
      * 設定緩存數據
      *
-     * @param key    查詢key
-     * @param value  存儲value
-     * @param expire 過期時間
+     * @param hashKey 查詢key
+     * @param value   存儲value
+     * @param expire  過期時間
      *
      * @return Mono<Void>
      */
-    Mono<Void> set(String key, Object value, Duration... expire);
+    Mono<Void> set(String hashKey, Object value, Duration... expire);
 
     /**
      * 設定緩存數據，此為批量設定
      *
-     * @param value  key-value 集合
-     * @param expire 過期時間
+     * @param keyValues key-keyValues 集合
+     * @param expire    過期時間
      *
      * @return Mono<Void>
      */
-    Mono<Void> setAll(Map<String, Object> value, Duration... expire);
+    Mono<Void> setAll(Map<String, Object> keyValues, Duration... expire);
 
     /**
      * 刪除緩存數據
      *
-     * @param key 查詢key
+     * @param hashKey 查詢key
      *
      * @return Mono<Void>
      */
-    Mono<Void> delete(String key);
+    Mono<Void> delete(String hashKey);
 
     /**
      * 刪除緩存數據，此為批量刪除
      *
-     * @param key key集合
+     * @param hashKeys key集合
      *
      * @return Mono<Void>
      */
-    Mono<Void> deleteAll(Collection<String> key);
+    Mono<Void> deleteAll(Collection<String> hashKeys);
 
     /**
      * 獲取緩存數據的默認過期時間

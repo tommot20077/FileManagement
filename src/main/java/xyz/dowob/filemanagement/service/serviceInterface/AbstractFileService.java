@@ -565,6 +565,9 @@ public abstract class AbstractFileService implements FileService {
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
+                    FileShareType shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
+                    userFileMetadata.setShareType(shareType);
+
                     Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
                     userFileMetadata.setIsStar(isStar);
                     return userFileMetaRepository.save(userFileMetadata);
@@ -1214,7 +1217,7 @@ public abstract class AbstractFileService implements FileService {
             return Mono.just(userFileMetadata);
         }
 
-        return userFIleShareRecordRepository.findAllByUserIdIn(editUsers.keySet()).flatMap(record -> {
+        return userFIleShareRecordRepository.findAllByUserIdInAndFileId(editUsers.keySet(), userFileMetadata.getId()).flatMap(record -> {
             ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
             switch (editType) {
                 case REMOVE -> removeRecords.add(record);
@@ -1227,6 +1230,7 @@ public abstract class AbstractFileService implements FileService {
                     UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
                     editRecords.add(record);
                 });
+                //todo 確認不存在用戶
             }
             return Mono.when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
                     .thenReturn(userFileMetadata);

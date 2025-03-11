@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.customenum;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -30,5 +31,25 @@ public enum FileShareType {
      */
     NONE("不分享");
 
-    private final String value;
+    /**
+     * 描述
+     */
+    private final String describe;
+
+    /**
+     * 根據字符串格式化文件分享類型，此為不區分大小寫的格式化
+     *
+     * @param type 文件分享類型字符串
+     *
+     * @return 文件分享類型
+     */
+    @JsonCreator
+    public static FileShareType format(String type) {
+        for (FileShareType fileType : FileShareType.values()) {
+            if (fileType.name().equalsIgnoreCase(type)) {
+                return fileType;
+            }
+        }
+        return null;
+    }
 }

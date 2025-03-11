@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareType;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -70,6 +71,11 @@ public class UserFileListDTO {
     private FileEnum fileType;
 
     /**
+     * 文件共享類型
+     */
+    private FileShareType shareType;
+
+    /**
      * 文件GridFsId
      */
     private String gridFsId;
@@ -107,6 +113,7 @@ public class UserFileListDTO {
         this.md5 = serverFileMetadata.getMd5();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
+        this.shareType = userFileMetadata.getShareType();
 
         if (shareUsers != null) {
             this.shareUsers.addAll(shareUsers);
@@ -129,6 +136,7 @@ public class UserFileListDTO {
         this.fileType = userFileMetadata.getFileType();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
+        this.shareType = userFileMetadata.getShareType();
 
         if (shareUsers != null) {
             this.shareUsers.addAll(shareUsers);
@@ -150,6 +158,7 @@ public class UserFileListDTO {
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
+        this.shareType = userFileMetadata.getShareType();
         if (shareUsers != null) {
             this.shareUsers.addAll(shareUsers);
         }

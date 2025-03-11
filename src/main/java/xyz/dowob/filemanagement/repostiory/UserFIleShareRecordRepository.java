@@ -36,7 +36,7 @@ public interface UserFIleShareRecordRepository extends ReactiveCrudRepository<Us
      *
      * @return 用戶檔案分享記錄
      */
-    Flux<UserFileShareRecord> findAllByUserIdIn(Collection<Long> userIds);
+    Flux<UserFileShareRecord> findAllByUserIdInAndFileId(Collection<Long> userIds, Long fileId);
 
     /**
      * 根據檔案ID查詢用戶檔案分享記錄

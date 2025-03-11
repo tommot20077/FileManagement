@@ -23,7 +23,7 @@ import reactor.core.publisher.Mono;
  * @create 2024-09-14 22:57
  * @Version 1.0
  **/
-public interface CrudService <T, ID> {
+public interface CrudService<T, ID> {
     /**
      * 創建一個新的實體
      *
@@ -48,9 +48,10 @@ public interface CrudService <T, ID> {
     /**
      * 獲取所有實體
      *
+     * @param type 類型
      * @param args 可變參數，用於條件查詢
      */
-    Flux<T> getAllByParams(Object... args);
+    Flux<T> getAllByParams(String type, Object... args);
 
     /**
      * 更新一個實體
