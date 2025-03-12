@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
-import xyz.dowob.filemanagement.customenum.UserInfoType;
+import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
@@ -85,7 +85,7 @@ public class ApiUserController extends BaseUserController {
     public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange,
                                                   @RequestParam Set<String> userInfos,
                                                   @RequestParam(required = false, defaultValue = "name") String type) {
-        String formatType = UserInfoType.getUserInfoType(type).name();
+        String formatType = UserInfoTypeEnum.getUserInfoType(type).name();
         return super.searchUserInfo(exchange, userInfos, formatType);
     }
 }

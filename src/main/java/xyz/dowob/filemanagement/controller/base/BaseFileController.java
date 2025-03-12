@@ -6,12 +6,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
@@ -80,6 +80,11 @@ public abstract class BaseFileController implements ResponseUnity {
     protected final ObjectMapper objectMapper;
 
     /**
+     * 文件權限規則管理器，用於管理文件的權限規則。
+     */
+    protected final FilePermissionRuleManager filePermissionRuleManager;
+
+    /**
      * 自定義文件類型，表示支持的文件類型枚舉，包含圖片、視頻、音樂、文檔等。
      */
     protected final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
@@ -102,9 +107,9 @@ public abstract class BaseFileController implements ResponseUnity {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
 
-            List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(FilePermissionRule.ALLOW_SHARED));
+            List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowShared()));
             if (!Objects.equals(folderId, ReservedSearchIdEnum.RECYCLE_FILE_ID.getId())) {
-                rules.add(FilePermissionRule.BLOCK_DELETED);
+                rules.add(filePermissionRuleManager.getBlockDeleted());
             }
 
             return permissionService.validateUserPermission(user, folderId, rules).flatMap(folder -> {
@@ -192,7 +197,9 @@ public abstract class BaseFileController implements ResponseUnity {
      */
     protected Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, String id, FileEnum type) {
         FileEnum[] fileType = type == null ? CUSTOM_FILE_TYPE : new FileEnum[]{type};
-        List<Permission<UserFileMetadata>> rules = List.of(FilePermissionRule.ALLOW_OWNER, FilePermissionRule.BLOCK_NOT_SEARCH_OPERATION);
+        List<Permission<UserFileMetadata>> rules = List.of(filePermissionRuleManager.getAllowOwner(),
+                                                           filePermissionRuleManager.getBlockNotSearchOperation()
+        );
         return handleError(Mono.defer(() -> userService
                 .getUser(exchange)
                 .flatMap(user -> permissionService

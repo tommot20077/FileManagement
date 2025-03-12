@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FileShareType;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -73,7 +73,7 @@ public class UserFileListDTO {
     /**
      * 文件共享類型
      */
-    private FileShareType shareType;
+    private FileShareTypeEnum shareType;
 
     /**
      * 文件GridFsId

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
@@ -50,7 +51,7 @@ public class WebFolderController extends BaseFolderController {
      * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
      * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
      */
-    public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper,
+    public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                @Nullable FolderListTreeManager folderListTreeManager) {
         super(userService,
               permissionService,
@@ -59,7 +60,7 @@ public class WebFolderController extends BaseFolderController {
               validationService,
               folderService,
               userLimiterStrategy,
-              objectMapper,
+              objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }

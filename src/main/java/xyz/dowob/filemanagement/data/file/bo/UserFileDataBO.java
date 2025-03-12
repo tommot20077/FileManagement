@@ -8,7 +8,7 @@ import lombok.Setter;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FileShareType;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.dto.EditorContentDTO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -65,7 +65,7 @@ public class UserFileDataBO {
     /**
      * 共享類型
      */
-    private FileShareType shareType;
+    private FileShareTypeEnum shareType;
     /**
      * 共享用戶
      */

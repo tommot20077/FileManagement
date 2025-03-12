@@ -7,7 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FileShareType;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -73,7 +73,7 @@ public class UserFileMetadata {
      * 分享類型，默認為不分享
      */
     @Column("share_type")
-    private FileShareType shareType = FileShareType.NONE;
+    private FileShareTypeEnum shareType = FileShareTypeEnum.NONE;
 
     /**
      * 上傳時間

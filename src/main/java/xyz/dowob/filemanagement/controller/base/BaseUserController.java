@@ -7,7 +7,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
-import xyz.dowob.filemanagement.customenum.UserInfoType;
+import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -121,8 +121,12 @@ public abstract class BaseUserController implements ResponseUnity {
      * @return Mono<ResponseEntity < ?>> 返回指定用戶的詳細信息
      */
     public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange, Set<String> userInfos, String type) {
-        Function<? super User, ? extends String> key = type.equals(UserInfoType.NAME.name()) ? User::getUsername : user -> user.getId().toString();
-        Function<? super User, ? extends String> value = type.equals(UserInfoType.NAME.name()) ? user -> user.getId().toString() : User::getUsername;
+        Function<? super User, ? extends String> key = type.equals(UserInfoTypeEnum.NAME.name()) ? User::getUsername : user -> user
+                .getId()
+                .toString();
+        Function<? super User, ? extends String> value = type.equals(UserInfoTypeEnum.NAME.name()) ? user -> user
+                .getId()
+                .toString() : User::getUsername;
         Mono<ResponseEntity<?>> entityMono = validationService
                 .validateUserSearchList(userInfos)
                 .then(userService.getAllByParams(type, userInfos.toArray()).collectMap(key, value).flatMap(userMap -> {

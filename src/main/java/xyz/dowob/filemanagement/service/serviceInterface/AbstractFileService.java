@@ -565,7 +565,7 @@ public abstract class AbstractFileService implements FileService {
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
-                    FileShareType shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
+                    FileShareTypeEnum shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
                     userFileMetadata.setShareType(shareType);
 
                     Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());

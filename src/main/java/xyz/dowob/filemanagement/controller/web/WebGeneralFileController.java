@@ -11,6 +11,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -42,8 +43,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/web/v1/files")
 public class WebGeneralFileController extends BaseGeneralFileController {
-    public WebGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper) {
-        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, userLimiterStrategy, objectMapper);
+    public WebGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
+        super(userService,
+              fileServiceStrategy,
+              fileProperties,
+              validationService,
+              permissionService,
+              userLimiterStrategy,
+              objectMapper,
+              filePermissionRuleManager
+        );
     }
 
     /**

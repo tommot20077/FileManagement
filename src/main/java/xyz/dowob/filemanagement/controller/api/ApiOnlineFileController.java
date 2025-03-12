@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -42,8 +43,16 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
      * @param userLimiterStrategy 用戶限制策略
      * @param objectMapper        用於處理對象映射的工具
      */
-    public ApiOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper) {
-        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, userLimiterStrategy, objectMapper);
+    public ApiOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
+        super(userService,
+              fileServiceStrategy,
+              fileProperties,
+              validationService,
+              permissionService,
+              userLimiterStrategy,
+              objectMapper,
+              filePermissionRuleManager
+        );
     }
 
     /**

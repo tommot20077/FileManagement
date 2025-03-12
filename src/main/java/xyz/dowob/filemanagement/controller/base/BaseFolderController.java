@@ -5,12 +5,12 @@ import jakarta.annotation.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.functionInterface.Permission;
@@ -63,9 +63,17 @@ public abstract class BaseFolderController extends BaseFileController {
      * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
      * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
      */
-    public BaseFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper,
+    public BaseFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                 @Nullable FolderListTreeManager folderListTreeManager) {
-        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, userLimiterStrategy, objectMapper);
+        super(userService,
+              fileServiceStrategy,
+              fileProperties,
+              validationService,
+              permissionService,
+              userLimiterStrategy,
+              objectMapper,
+              filePermissionRuleManager
+        );
         this.folderListTreeManager = folderListTreeManager;
         this.folderService = folderService;
     }
@@ -79,8 +87,8 @@ public abstract class BaseFolderController extends BaseFileController {
      * @return 返回刪除結果，成功返回 OK，失敗返回 BAD_REQUEST。
      */
     public Mono<ResponseEntity<?>> deleteFolder(String id, ServerWebExchange exchange) {
-        List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(FilePermissionRule.ALLOW_OWNER,
-                                                                           FilePermissionRule.BLOCK_NOT_SEARCH_OPERATION
+        List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowOwner(),
+                                                                           filePermissionRuleManager.getBlockNotSearchOperation()
         ));
         Mono<ResponseEntity<?>> result = userService
                 .getUser(exchange)
@@ -161,7 +169,7 @@ public abstract class BaseFolderController extends BaseFileController {
         return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
             HashMap<String, Object> result = new HashMap<>();
             return permissionService
-                    .validateUserPermission(user, fileId, FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
+                    .validateUserPermission(user, fileId, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
                     .flatMap(file -> validationService
                             .validateFileType(file, FileEnum.FOLDER)
                             .then(folderService.getUserFilePaths(file, user).flatMap(list -> {

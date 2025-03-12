@@ -29,10 +29,17 @@ public class FileProperties {
      */
     private Upload upload = new Upload();
 
+
+    /**
+     * 建立文件下載配置
+     */
+    private Download download = new Download();
+
     /**
      * 建立全局配置
      */
     private global global = new global();
+
 
     /**
      * 文件上傳配置
@@ -63,6 +70,17 @@ public class FileProperties {
          * 合併處理任務限制，默認為 3
          */
         private Integer combineProcessCountLimit = 3;
+    }
+
+    /**
+     * 文件下載配置
+     */
+    @Data
+    public static class Download {
+        /**
+         * 下載緩存保留時間，默認為 3600，單位為秒
+         */
+        private Long downloadCacheKeepTime = 3600L;
     }
 
     /**

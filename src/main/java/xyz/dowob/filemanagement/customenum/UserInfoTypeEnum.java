@@ -14,7 +14,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
  * @Version 1.0
  **/
 
-public enum UserInfoType {
+public enum UserInfoTypeEnum {
     /**
      * 用戶名稱模式
      */
@@ -33,8 +33,8 @@ public enum UserInfoType {
      * @return 查詢類型枚舉對象
      */
     @JsonCreator
-    public static UserInfoType getUserInfoType(String value) {
-        for (UserInfoType type : UserInfoType.values()) {
+    public static UserInfoTypeEnum getUserInfoType(String value) {
+        for (UserInfoTypeEnum type : UserInfoTypeEnum.values()) {
             if (type.name().equalsIgnoreCase(value)) {
                 return type;
             }

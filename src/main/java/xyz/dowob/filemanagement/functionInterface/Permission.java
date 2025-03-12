@@ -1,8 +1,7 @@
 package xyz.dowob.filemanagement.functionInterface;
 
+import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.User;
-
-import java.util.Optional;
 
 /**
  * 權限規則接口，用戶可以通過實現 PermissionRule 介面來自定義權限規則
@@ -22,7 +21,7 @@ public interface Permission<T> {
      * @param user 用戶
      * @param t    驗證對象
      *
-     * @return 是否有權限
+     * @return 是否驗證時有不通過的規則
      */
-    Optional<Throwable> check(User user, T t);
+    Mono<Throwable> check(User user, T t);
 }

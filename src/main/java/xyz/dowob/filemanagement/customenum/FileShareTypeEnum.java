@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
  **/
 @Getter
 @RequiredArgsConstructor
-public enum FileShareType {
+public enum FileShareTypeEnum {
     /**
      * 公開分享
      */
@@ -44,8 +44,8 @@ public enum FileShareType {
      * @return 文件分享類型
      */
     @JsonCreator
-    public static FileShareType format(String type) {
-        for (FileShareType fileType : FileShareType.values()) {
+    public static FileShareTypeEnum format(String type) {
+        for (FileShareTypeEnum fileType : FileShareTypeEnum.values()) {
             if (fileType.name().equalsIgnoreCase(type)) {
                 return fileType;
             }

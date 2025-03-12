@@ -5,8 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -16,7 +16,6 @@ import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 
 import java.util.Collection;
-import java.util.Optional;
 
 /**
  * 檔案權限服務實現類，分離檔案權限驗證邏輯
@@ -42,6 +41,11 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
      * 用戶檔案元數據庫操作類
      */
     private final UserFileMetaRepository userFileMetaRepository;
+
+    /**
+     * 權限規則管理器
+     */
+    private final FilePermissionRuleManager filePermissionRuleManager;
 
     /**
      * 驗證用戶是否有權限，通過設置不同的權限規則來實現不同的權限驗證
@@ -90,7 +94,7 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
 
 
     /**
-     * 驗證用戶是否有權限，當沒有指定權限規則時，使用默認的權限規則
+     * 驗證用戶是否有權限，當沒有指定權限規則時，使用默認的權限規則(只允許擁有者訪問)
      *
      * @param user  用戶
      * @param file  文件
@@ -99,26 +103,26 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
      * @return UserFileMetadata 文件元數據
      */
     private Mono<UserFileMetadata> checkPermissions(User user, UserFileMetadata file, @Nullable Collection<Permission<UserFileMetadata>> rules) {
-        Collection<Permission<UserFileMetadata>> defaultRules;
+        Collection<Permission<UserFileMetadata>> validateRules;
         if (rules == null || rules.isEmpty()) {
-            defaultRules = FilePermissionRule.DefaultRule.ONLY_OWNER.getRules();
+            validateRules = FilePermissionRuleManager.DefaultRule.ONLY_OWNER.getRules(filePermissionRuleManager);
         } else {
-            defaultRules = rules;
+            validateRules = rules;
         }
 
-        for (Permission<UserFileMetadata> rule : defaultRules) {
-            Optional<Throwable> check = rule.check(user, file);
-            if (check.isPresent()) {
-                return Mono.error(check.get());
+        Flux<Permission<UserFileMetadata>> permissionFlux = Flux.fromIterable(validateRules);
+        return permissionFlux.flatMap(rule -> rule.check(user, file)).collectList().flatMap(errors -> {
+            if (errors.isEmpty()) {
+                return Mono.just(file);
             }
-        }
-        return Mono.just(file);
+            return Mono.error(errors.getFirst());
+        });
     }
 
     /**
      * 保留值搜索方法，在搜索用戶檔案元數據時，如果找不到文件，則檢查輸入的文件ID是否是保留值
      * 當文件ID是保留值時，則返回一個虛擬的文件元數據，否則拋出 ValidationException 異常
-     * 這虛擬的文件元數據用於後續驗證時進行檢查，在一般規則下不允許對保留值進行操作 {@link FilePermissionRule#BLOCK_NOT_SEARCH_OPERATION}
+     * 這虛擬的文件元數據用於後續驗證時進行檢查，在一般規則下不允許對保留值進行操作 {@link FilePermissionRuleManager.DefaultRule}
      * 則拋出 ValidationException 異常
      *
      * @param user   用戶

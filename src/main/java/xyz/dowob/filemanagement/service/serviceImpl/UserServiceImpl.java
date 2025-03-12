@@ -17,7 +17,7 @@ import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvid
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
-import xyz.dowob.filemanagement.customenum.UserInfoType;
+import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -306,7 +306,7 @@ public class UserServiceImpl implements UserService {
         }
 
         List<String> userInfoList = new LinkedList<>();
-        boolean isId = Objects.equals(type, UserInfoType.ID.name());
+        boolean isId = Objects.equals(type, UserInfoTypeEnum.ID.name());
 
         Stream.of(args).forEach(arg -> {
             userInfoList.add(arg.toString());

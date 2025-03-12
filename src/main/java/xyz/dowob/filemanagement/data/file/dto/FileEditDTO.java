@@ -4,7 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
-import xyz.dowob.filemanagement.customenum.FileShareType;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
@@ -47,7 +47,7 @@ public class FileEditDTO {
     /**
      * 文件分享類型
      */
-    private FileShareType shareType;
+    private FileShareTypeEnum shareType;
 
     /**
      * 是否為星標文件

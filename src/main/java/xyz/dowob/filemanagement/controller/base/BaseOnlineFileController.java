@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FilePermissionRule;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -46,8 +46,16 @@ public class BaseOnlineFileController extends BaseFileController {
      * @param userLimiterStrategy 用戶限制策略
      * @param objectMapper        用於處理對象映射的工具
      */
-    public BaseOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper) {
-        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, userLimiterStrategy, objectMapper);
+    public BaseOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
+        super(userService,
+              fileServiceStrategy,
+              fileProperties,
+              validationService,
+              permissionService,
+              userLimiterStrategy,
+              objectMapper,
+              filePermissionRuleManager
+        );
     }
 
     /**
@@ -89,7 +97,10 @@ public class BaseOnlineFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> downloadFile(String id, ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             return permissionService
-                    .validateUserPermission(user, Long.parseLong(id), FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
+                    .validateUserPermission(user,
+                                            Long.parseLong(id),
+                                            FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager)
+                    )
                     .flatMap(file -> validationService
                             .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
                             .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).downloadFile(file, user).flatMap(userFileDataBO -> {
@@ -110,8 +121,8 @@ public class BaseOnlineFileController extends BaseFileController {
      */
     public Mono<ResponseEntity<?>> deleteFile(String id, ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(FilePermissionRule.ALLOW_OWNER,
-                                                                               FilePermissionRule.BLOCK_NOT_SEARCH_OPERATION
+            List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowOwner(),
+                                                                               filePermissionRuleManager.getBlockNotSearchOperation()
             ));
             return permissionService
                     .validateUserPermission(user, Long.parseLong(id), rules)
@@ -138,10 +149,10 @@ public class BaseOnlineFileController extends BaseFileController {
             fileIds.add(Long.parseLong(fileEditDTO.getFileId()));
             if (fileEditDTO.getParentFolderId() != null && fileEditDTO.getEditType() == EditTypeEnum.EDIT_METADATA) {
                 fileIds.add(fileEditDTO.getParentFolderId());
-                rules.add(FilePermissionRule.ALLOW_OWNER);
+                rules.add(filePermissionRuleManager.getAllowOwner());
             }
             if (fileEditDTO.getEditType() != EditTypeEnum.EDIT_METADATA) {
-                rules.add(FilePermissionRule.ALLOW_SHARED);
+                rules.add(filePermissionRuleManager.getAllowShared());
             }
 
             return permissionService.validateUserPermission(user, fileIds, rules).collectList().flatMap(files -> {
@@ -172,14 +183,18 @@ public class BaseOnlineFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回異步處理的結果，包含文件的歷史版本記錄
      */
     public Mono<ResponseEntity<?>> getHistory(ServerWebExchange exchange, String id, Integer page, Integer pageSize) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
+        Mono<ResponseEntity<?>> responseEntityMono = userService.getUser(exchange).flatMap(user -> {
             return permissionService
-                    .validateUserPermission(user, Long.parseLong(id), FilePermissionRule.DefaultRule.WITH_SHARED.getRules())
+                    .validateUserPermission(user,
+                                            Long.parseLong(id),
+                                            FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager)
+                    )
                     .flatMap(file -> validationService
                             .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
                             .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).getFileVersionList(user, file, page, pageSize))
                             .flatMap(history -> createResponseEntity(createResponse(exchange, "獲取歷程記錄成功", history))));
-        }), exchange);
+        });
+        return handleError(responseEntityMono, exchange);
     }
 
     /**
