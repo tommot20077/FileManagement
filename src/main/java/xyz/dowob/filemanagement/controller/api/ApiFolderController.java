@@ -59,8 +59,7 @@ public class ApiFolderController extends BaseFolderController {
               fileProperties,
               validationService,
               folderService,
-              userLimiterStrategy,
-              objectMapper, filePermissionRuleManager,
+              userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }
@@ -114,6 +113,20 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> getRecentlyFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
+
+    /**
+     * 獲取用戶分享的檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 分享檔案列表
+     */
+    @GetMapping("/shared")
+    public Mono<ResponseEntity<?>> getSharedFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.SHARE_FILE_ID.getId(), 1, null, getFileEnums(type));
+    }
+
 
     /**
      * 創建資料夾

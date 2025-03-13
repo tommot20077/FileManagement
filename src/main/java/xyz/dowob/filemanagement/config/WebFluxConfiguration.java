@@ -51,11 +51,14 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
     private final ObjectMapper objectMapper;
 
     /**
+     * CSRF Token 儲存庫策略
+     */
+    private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
+
+    /**
      * 不需要驗證CSRF的方法
      */
     private final List<HttpMethod> PASS_METHODS = List.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.TRACE);
-
-    private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
     /**
      * 帶參數的構造方法
@@ -91,6 +94,8 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
 
     /**
      * 配置 CSRF Token 驗證過濾器，用於驗證 CSRF Token 的合法性
+     * 當請求的路徑不是以 /web 開頭或是安全方法時，不進行驗證 CSRF Token 安全方法請參考 {@link #isSafeMethod(ServerWebExchange)}
+     * 當請求的路徑為 /api/v1/guest/csrf/token 時，會檢查 Referer 是否合法，因為 CSRF TOKEN 需要進行保護限制
      * 當驗證失敗時，返回錯誤信息，並設置 HTTP 狀態碼為 403
      * 當驗證成功，會刪除Redis中的Token
      *
@@ -99,7 +104,16 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
     @Bean
     public WebFilter csrfValidationFilter() {
         return (exchange, chain) -> {
-            if (!exchange.getRequest().getPath().toString().startsWith("/web") || isPassMethod(exchange)) {
+            String path = exchange.getRequest().getPath().toString();
+            if (!path.startsWith("/web") || isSafeMethod(exchange)) {
+                if (path.equals("/api/v1/guest/csrf/token")) {
+                    List<String> refererHeaders = exchange.getRequest().getHeaders().get("Referer");
+                    if (refererHeaders == null || refererHeaders.isEmpty() || refererHeaders
+                            .stream()
+                            .noneMatch(referer -> referer.matches(securityProperties.getCsrf().getAllowRefererPatten()))) {
+                        return writeJsonResponse(exchange, ValidationException.ErrorCode.CSRF_TOKEN_INVALID_REFERER);
+                    }
+                }
                 return chain.filter(exchange);
             }
 
@@ -110,8 +124,9 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
                         csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(token).subscribeOn(Schedulers.boundedElastic()).subscribe();
                     }))
                     .onErrorResume(ValidationException.class, e -> writeJsonResponse(exchange, e.getErrorCode()));
-
         };
+
+
     }
 
     /**
@@ -141,7 +156,15 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
         }
     }
 
-    public boolean isPassMethod(ServerWebExchange exchange) {
+    /**
+     * 判斷是否為安全方法，安全方法不進行 CSRF Token 驗證
+     * 安全方法包括 GET、HEAD、OPTIONS、TRACE 方法，定義在 {@link #PASS_METHODS}
+     *
+     * @param exchange 伺服器 Web 交換對象
+     *
+     * @return 是否為安全方法
+     */
+    public boolean isSafeMethod(ServerWebExchange exchange) {
         return PASS_METHODS.contains(exchange.getRequest().getMethod());
     }
 

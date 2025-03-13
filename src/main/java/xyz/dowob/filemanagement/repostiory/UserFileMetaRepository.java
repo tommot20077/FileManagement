@@ -4,17 +4,19 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.relational.core.query.Criteria;
-import org.springframework.data.relational.domain.SqlSort;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.entity.UserFileShareRecord;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,8 +63,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     default Flux<UserFileMetadata> findAllByParentFolderIdIn(List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
         return entityOperations
                 .select(UserFileMetadata.class)
-                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("parent_folder_id").in(parentFolderId))
-                                  .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("parent_folder_id").in(parentFolderId)))
                 .all();
     }
 
@@ -76,9 +77,11 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     default Flux<UserFileMetadata> findAllByParentFolderIdInAndIsDeleted(List<Long> parentFolderId, Boolean isDeleted, R2dbcEntityOperations entityOperations) {
         return entityOperations
                 .select(UserFileMetadata.class)
-                .matching(org.springframework.data.relational.core.query.Query
-                                  .query(Criteria.where("parent_folder_id").in(parentFolderId).and("is_deleted").is(isDeleted))
-                                  .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END")))
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria
+                                                                                             .where("parent_folder_id")
+                                                                                             .in(parentFolderId)
+                                                                                             .and("is_deleted")
+                                                                                             .is(isDeleted)))
                 .all();
     }
 
@@ -89,7 +92,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回根文件夾下的所有檔案元數據
      */
-    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL AND is_deleted = 0 ORDER BY CASE WHEN parent_folder_id IS NULL THEN 0 ELSE 1 END, filename")
+    @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL AND is_deleted = 0")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
 
     /**
@@ -107,7 +110,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Flux<UserFileMetadata> 返回所有檔案元數據
      */
-    default Flux<UserFileMetadata> findAllByUserIdOrderByLastAccessTimeDesc(Long userId, List<FileEnum> type, R2dbcEntityOperations entityOperations) {
+    default Flux<UserFileMetadata> findAllByUserIdOrderByLastAccessTimeDesc(Long userId, List<FileEnum> type, Integer limit, R2dbcEntityOperations entityOperations) {
 
         Criteria criteria = Criteria.where("user_id").is(userId).and("file_type").not("FOLDER").and("is_deleted").is(false);
 
@@ -118,8 +121,10 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
 
         org.springframework.data.relational.core.query.Query query = org.springframework.data.relational.core.query.Query
                 .query(criteria)
-                .limit(20)
                 .sort(Sort.by(Sort.Direction.DESC, "last_access_time"));
+        if (limit != null && limit > 0) {
+            query = query.limit(limit);
+        }
 
         return entityOperations.select(query, UserFileMetadata.class);
     }
@@ -164,9 +169,37 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                     }
                     return r2dbcEntityOperations
                             .select(UserFileMetadata.class)
-                            .matching(org.springframework.data.relational.core.query.Query
-                                              .query(Criteria.where("id").in(fileIds))
-                                              .sort(SqlSort.unsafe("CASE WHEN file_type = 'folder' THEN 0 ELSE 1 END, filename")))
+                            .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("id").in(fileIds)))
+                            .all();
+                });
+    }
+
+    /**
+     * 根據用戶ID查詢所有共享給該用戶的檔案元數據
+     *
+     * @param userId                用戶ID
+     * @param r2dbcEntityOperations R2dbc實體操作
+     *
+     * @return Flux<UserFileMetadata>
+     */
+    default Flux<UserFileMetadata> findAllByShareWithUserId(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+        return r2dbcEntityOperations
+                .select(UserFileShareRecord.class)
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("user_id").is(userId)))
+                .all()
+                .map(UserFileShareRecord::getFileId)
+                .collectList()
+                .flatMapMany(fileIds -> {
+                    if (fileIds.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return r2dbcEntityOperations
+                            .select(UserFileMetadata.class)
+                            .matching(org.springframework.data.relational.core.query.Query.query(Criteria
+                                                                                                         .where("id")
+                                                                                                         .in(fileIds)
+                                                                                                         .and("is_deleted")
+                                                                                                         .is(false)))
                             .all();
                 });
     }
@@ -229,5 +262,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         }
 
         return bindSpec.map((row, metadata) -> r2dbcEntityOperations.getConverter().read(UserFileMetadata.class, row, metadata)).all();
+    }
+
+
+    default Mono<FileShareTypeEnum> getShareTypeByUserIdAndFileId(Long fileId, Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+        return r2dbcEntityOperations
+                .select(UserFileMetadata.class)
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("id").is(fileId)))
+                .one()
+                .map(UserFileMetadata::getShareType);
     }
 }

@@ -440,9 +440,17 @@ public abstract class AbstractFileService implements FileService {
 
             case STAR_FILE_ID -> userFileMetaRepository.findAllByUserIdAndIsStarAndIsDeleted(user.getId(), true, false);
 
-            case RECENT_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByLastAccessTimeDesc(user.getId(), type, entityOperations);
+            case RECENT_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByLastAccessTimeDesc(user.getId(),
+                                                                                                   type,
+                                                                                                   fileProperties
+                                                                                                           .getGlobal()
+                                                                                                           .getShowRecentFileCount(),
+                                                                                                   entityOperations
+            );
 
             case RECYCLE_FILE_ID -> userFileMetaRepository.findAllByUserIdOrderByIsFolder(user.getId(), entityOperations);
+
+            case SHARE_FILE_ID -> userFileMetaRepository.findAllByShareWithUserId(user.getId(), entityOperations);
 
             case null ->
                     userFileMetaRepository.findAllByParentFolderIdInAndIsDeleted(Collections.singletonList(fatherFolderId), false, entityOperations);
@@ -557,7 +565,7 @@ public abstract class AbstractFileService implements FileService {
      */
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         UserFileMetadata userFileMetadata = fileEditDTO.getUserFileMetadata();
-        Mono<UserFileMetadata> processShareUserMono = processShareUser(userFileMetadata, fileEditDTO);
+        Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
         Mono<UserFileMetadata> processFileMono = redisProvider
                 .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
                 .then(Mono.defer(() -> {
@@ -1201,40 +1209,49 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 處理檔案元數據的共享用戶的變更方法
      *
-     * @param userFileMetadata 用戶檔案元數據
-     * @param fileEditDTO      檔案編輯DTO
+     * @param userFileMetadatas 用戶檔案元數據
+     * @param fileEditDTO       檔案編輯DTO
      *
-     * @return Mono<UserFileMetadata> 處理後的用戶檔案元數據
+     * @return Flux<UserFileMetadata> 處理後的用戶檔案元數據
      */
-    protected Mono<UserFileMetadata> processShareUser(UserFileMetadata userFileMetadata, FileEditDTO fileEditDTO) {
+    protected Flux<UserFileMetadata> processShareUser(Collection<UserFileMetadata> userFileMetadatas, FileEditDTO fileEditDTO) {
         List<UserFileShareRecord> removeRecords = new ArrayList<>();
         List<UserFileShareRecord> editRecords = new ArrayList<>();
-
-        Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO.getShareUsers()
-                .stream()
-                .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
-        if (editUsers.isEmpty()) {
-            return Mono.just(userFileMetadata);
-        }
-
-        return userFIleShareRecordRepository.findAllByUserIdInAndFileId(editUsers.keySet(), userFileMetadata.getId()).flatMap(record -> {
-            ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
-            switch (editType) {
-                case REMOVE -> removeRecords.add(record);
-                case UPDATE -> editRecords.add(record);
+        return Flux.fromIterable(userFileMetadatas).flatMap(userFileMetadata -> {
+            Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO
+                    .getShareUsers()
+                    .stream()
+                    .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
+            if (editUsers.isEmpty()) {
+                return Mono.just(userFileMetadata);
             }
-            return Mono.just(userFileMetadata);
-        }).then(Mono.defer(() -> {
-            if (!editUsers.isEmpty()) {
-                editUsers.forEach((userId, editType) -> {
-                    UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
-                    editRecords.add(record);
-                });
-                //todo 確認不存在用戶
+
+            return userFIleShareRecordRepository.findAllByUserIdInAndFileId(editUsers.keySet(), userFileMetadata.getId()).flatMap(record -> {
+                ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
+                switch (editType) {
+                    case REMOVE -> removeRecords.add(record);
+                    case UPDATE -> editRecords.add(record);
+                }
+                return Mono.just(userFileMetadata);
+            }).then(Mono.defer(() -> {
+                if (!editUsers.isEmpty()) {
+                    editUsers.forEach((userId, editType) -> {
+                        UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
+                        editRecords.add(record);
+                    });
+                }
+                return Mono.just(userFileMetadata);
+            }));
+        }).collectList().flatMapMany(metadataList -> {
+            if (removeRecords.isEmpty() && editRecords.isEmpty()) {
+                return Flux.fromIterable(metadataList);
             }
-            return Mono.when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
-                    .thenReturn(userFileMetadata);
-        }));
+            return Mono
+                    .when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
+                    .thenMany(Flux.fromIterable(metadataList));
+        });
+
+
     }
 
     /**

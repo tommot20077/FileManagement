@@ -50,6 +50,11 @@ public class FileEditDTO {
     private FileShareTypeEnum shareType;
 
     /**
+     * 是否為需要遞歸向下設置權限
+     */
+    private Boolean recursiveSetting = false;
+
+    /**
      * 是否為星標文件
      */
     private Boolean isStar;

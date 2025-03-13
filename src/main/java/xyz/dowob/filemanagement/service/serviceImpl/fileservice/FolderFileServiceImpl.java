@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -61,7 +62,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               fileProperties,
               circuitBreakerConfig,
               rateLimiterConfig,
-              folderListTreeProvider, fileTrashRecordRepository, entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper
+              folderListTreeProvider,
+              fileTrashRecordRepository,
+              entityOperations,
+              transactionalOperator,
+              userFIleShareRecordRepository,
+              objectMapper
         );
     }
     //todo 後期加入下載資料夾的功能
@@ -146,11 +152,30 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO.getParentFolderId());
                     }
 
-                    Mono<UserFileMetadata> processShareUserMono = processShareUser(userFileMetadata, fileEditDTO);
+                    if (fileEditDTO.getRecursiveSetting()) {
+                        Mono<Void> handleChildFolder = findAllChildFolder(Collections.singletonList(userFileMetadata.getId()),
+                                                                          new ArrayList<>()
+                        ).flatMap(childFolderList -> {
+                            Mono<Void> processShareUserMono = processShareUser(childFolderList, fileEditDTO).then();
+                            Mono<Void> settingChildFolder = Mono.defer(() -> {
+                                childFolderList.forEach(childFolder -> {
+                                    childFolder.setShareType(shareType);
+                                });
+                                return userFileMetaRepository.saveAll(childFolderList).then();
+                            });
 
-                    return Mono
-                            .zip(processShareUserMono, userFileMetaRepository.save(userFileMetadata))
-                            .flatMap(tuple2 -> cleanUserListCache(user.getId(), tuple2.getT2().getParentFolderId()));
+                            Long[] parentFolderIds = childFolderList.stream().map(UserFileMetadata::getId).toArray(Long[]::new);
+                            Mono<Void> cleanUserListCache = cleanUserListCache(user.getId(), parentFolderIds);
+
+                            return Mono.when(processShareUserMono, settingChildFolder).then(cleanUserListCache);
+                        });
+                        transactionalOperator.transactional(handleChildFolder).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    }
+
+
+                    Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
+                    Mono<Void> cleanUserListCache = cleanUserListCache(user.getId(), fileEditDTO.getParentFolderId());
+                    return Mono.when(processShareUserMono, userFileMetaRepository.save(userFileMetadata), cleanUserListCache);
                 });
     }
 
@@ -175,8 +200,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         List<Long> serverFileIds = childFolderList.stream().map(UserFileMetadata::getServerFileId).filter(Objects::nonNull).toList();
                         return handleUserStorage(user, serverFileIds);
                     })
-                    .then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()))
-                    .then(updateOwner(userFileList, user.getId()))
+                    .then(Mono.when(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()), updateOwner(userFileList, user.getId())))
                     .then(userFileMetaRepository.delete(userFileMetadata));
         });
     }
@@ -300,10 +324,10 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 遞歸刪除文件夾的共通實現
+     * 找尋指定文件夾的所有子文件夾
      *
      * @param parentFolderIdList 父文件夾ID列表
-     * @param childFolderList    服務器文件列表
+     * @param childFolderList    子文件夾列表
      *
      * @return Mono<Void>
      */

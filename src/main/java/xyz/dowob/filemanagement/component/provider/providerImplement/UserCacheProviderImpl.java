@@ -1,11 +1,11 @@
 package xyz.dowob.filemanagement.component.provider.providerImplement;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
+import xyz.dowob.filemanagement.config.properties.UserProperties;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -15,7 +15,7 @@ import java.util.Map;
  * 用戶緩存提供者實現類，用於提供用戶緩存的操作
  * 實現了CacheProvider接口，提供了緩存操作的具體實現
  * 並使用RedisProvider提供的操作方法實現具體的緩存操作
- * 用戶緩存的key前綴為"user_info"，用戶緩存的默認過期時間為1小時
+ * 用戶緩存的key前綴以及緩存的默認過期時間來自於UserProperties的Cache配置 {@link UserProperties}
  * 用戶緩存的key-value為用戶ID-用戶信息
  *
  * @author yuan
@@ -25,7 +25,6 @@ import java.util.Map;
  * @Version 1.0
  **/
 @Component
-@RequiredArgsConstructor
 public class UserCacheProviderImpl implements CacheProvider {
     /**
      * Redis操作提供者
@@ -35,18 +34,30 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 緩存前綴
      */
-    private final String USER_INFO_CACHE_PREFIX = "user_info";
+    private final String USER_INFO_CACHE_PREFIX;
 
     /**
-     * 默認過期時間
+     * 默認過期時間，單位為分鐘
      */
-    private final Duration DEFAULT_EXPIRE = Duration.ofHours(1);
+    private final int DEFAULT_EXPIRE;
+
+    /**
+     * 用戶緩存提供者實現類的構造方法
+     *
+     * @param redisProvider  Redis操作提供者
+     * @param userProperties 用戶配置
+     */
+    public UserCacheProviderImpl(RedisProvider redisProvider, UserProperties userProperties) {
+        this.redisProvider = redisProvider;
+        USER_INFO_CACHE_PREFIX = userProperties.cache.userInfoCachePrefix;
+        DEFAULT_EXPIRE = userProperties.cache.defaultExpire;
+    }
 
     /**
      * 根據key獲取緩存數據
      *
-     * @param hashKey   key
-     * @param clazz 類型
+     * @param hashKey key
+     * @param clazz   類型
      *
      * @return Mono<T>
      */
@@ -58,8 +69,8 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 根據key獲取緩存數據，此為批量查詢
      *
-     * @param hashKeys   key集合
-     * @param clazz 類型
+     * @param hashKeys key集合
+     * @param clazz    類型
      *
      * @return Flux<T>
      */
@@ -74,16 +85,16 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 設定緩存數據
      *
-     * @param hashKey    查詢key
-     * @param value  存儲value
-     * @param expire 過期時間
+     * @param hashKey 查詢key
+     * @param value   存儲value
+     * @param expire  過期時間
      *
      * @return Mono<Void>
      */
     @Override
     public Mono<Void> set(String hashKey, Object value, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, DEFAULT_EXPIRE);
+            return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, Duration.ofMinutes(DEFAULT_EXPIRE));
         }
         return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, expire[0]);
     }
@@ -91,15 +102,15 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 設定緩存數據，此為批量設定
      *
-     * @param keyValues  key-value 集合
-     * @param expire 過期時間
+     * @param keyValues key-value 集合
+     * @param expire    過期時間
      *
      * @return Mono<Void>
      */
     @Override
     public Mono<Void> setAll(Map<String, Object> keyValues, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, DEFAULT_EXPIRE);
+            return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, Duration.ofMinutes(DEFAULT_EXPIRE));
         }
         return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, expire[0]);
     }
@@ -135,6 +146,6 @@ public class UserCacheProviderImpl implements CacheProvider {
      */
     @Override
     public Duration getDefaultExpire() {
-        return DEFAULT_EXPIRE;
+        return Duration.ofMinutes(DEFAULT_EXPIRE);
     }
 }

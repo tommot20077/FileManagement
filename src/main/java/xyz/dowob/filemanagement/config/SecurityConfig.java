@@ -91,7 +91,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .headers(headerSpec -> headerSpec
-                        .hsts(hsts -> hsts.includeSubdomains(true).maxAge(Duration.ofDays(365)))
+                        .hsts(hsts -> hsts
+                                .includeSubdomains(securityProperties.getHsts().isIncludeSubDomains())
+                                .maxAge(Duration.ofMinutes(securityProperties.getHsts().getMaxAge())))
                         .contentSecurityPolicy(contentSecurityPolicySpec -> {
                             contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                         }))

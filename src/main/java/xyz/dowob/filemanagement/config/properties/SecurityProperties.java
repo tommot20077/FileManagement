@@ -49,6 +49,11 @@ public class SecurityProperties {
      */
     private Csrf csrf = new Csrf();
 
+    /**
+     * HSTS 配置
+     */
+    private Hsts hsts = new Hsts();
+
 
     /**
      * 驗證 JWT 密鑰是否配置
@@ -170,6 +175,31 @@ public class SecurityProperties {
          * CSRF 憑證的存儲方式，默認為 LOCAL
          */
         private CsrfTokenRepositoryEnum csrfTokenRepository = CsrfTokenRepositoryEnum.LOCAL;
+
+        /**
+         * 允許的 Referer，默認為 *，即允許所有 Referer
+         * 此配置值為管理CSRF TOKEN的獲取安全性，指定的 Referer 可以獲取 CSRF TOKEN
+         * 預設允許來自HTTP和HTTPS的所有Referer
+         */
+        private String allowRefererPatten = "^https?://.*$";
+    }
+
+    @Data
+    public static class Hsts {
+        /**
+         * HSTS 的最大時間，默認為 1 年， 單位為分鐘
+         */
+        private long maxAge = 60 * 24 * 365;
+
+        /**
+         * 是否啟用 includeSubDomains，默認為 true
+         */
+        private boolean includeSubDomains = true;
+
+        /**
+         * 是否啟用 preload，默認為 true
+         */
+        private boolean preload = true;
     }
 
 

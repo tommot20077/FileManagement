@@ -70,10 +70,10 @@ public class UserFileMetadata {
     private FileEnum fileType = FileEnum.OTHER;
 
     /**
-     * 分享類型，默認為不分享
+     * 分享類型，默認為預設分享
      */
     @Column("share_type")
-    private FileShareTypeEnum shareType = FileShareTypeEnum.NONE;
+    private FileShareTypeEnum shareType = FileShareTypeEnum.DEFAULT;
 
     /**
      * 上傳時間

@@ -310,6 +310,13 @@ public class ValidationException extends Exception {
          * 錯誤信息: 關鍵字過短
          */
         KEYWORD_TOO_SHORT(1145, "關鍵字過短，不能少於 2 字元"),
+
+        /**
+         * 錯誤碼: 1146
+         * HTTP狀態碼: 403
+         * 錯誤信息: CSRF 憑證無效，請求來源不合法
+         */
+        CSRF_TOKEN_INVALID_REFERER(1146, HttpStatus.FORBIDDEN, "禁止請求CSRF 憑證，請求來源不被允許"),
         ;
 
 

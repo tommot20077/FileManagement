@@ -127,7 +127,7 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
                                               //@RequestPart(value = "transferTaskId", required = false) String transferTaskId,
                                               //@RequestPart(value = "file", required = false) Mono<Part> filePart,
                                               @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
-        TransmissionEnum transmissionType = fileProperties.getTransmissionType();
+        TransmissionEnum transmissionType = fileProperties.getUpload().getTransmissionType();
         return handleChunkUpload(uploadChunkDTO, exchange);
         //todo 未來支持其他傳輸類型
     }

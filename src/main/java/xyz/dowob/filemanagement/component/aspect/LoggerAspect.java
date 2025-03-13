@@ -147,24 +147,24 @@ public class LoggerAspect {
      * @param error      錯誤
      */
     private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, Object result, Throwable error) {
-        String[] userNameAndUserId = getUserNameAndUserId(exchange);
+        String[] usernameAndUserId = getUserNameAndUserId(exchange);
 
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
 
         if (error != null) {
             if (error instanceof ValidationException) {
-                log.warn("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
-                         userNameAndUserId[0],
-                         userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
+                          usernameAndUserId[0],
+                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
                          className,
                          methodName,
                          error.getMessage()
                 );
             } else {
                 log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
-                          userNameAndUserId[0],
-                          userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                          usernameAndUserId[0],
+                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
                           className,
                           methodName,
                           error.getMessage()
@@ -172,8 +172,8 @@ public class LoggerAspect {
             }
         } else {
             log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
-                      userNameAndUserId[0],
-                      userNameAndUserId[1] != null ? "(ID:" + userNameAndUserId[1] + ") " : "",
+                      usernameAndUserId[0],
+                      usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
                       className,
                       methodName,
                       result

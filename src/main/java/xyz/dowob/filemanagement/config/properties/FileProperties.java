@@ -19,16 +19,11 @@ import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 @ConfigurationProperties(prefix = "file")
 @Data
 public class FileProperties {
-    /**
-     * 文件傳輸類型，默認為 MULTIPART，即使用 Multipart 進行文件傳輸
-     */
-    private TransmissionEnum transmissionType = TransmissionEnum.CHUNK;
 
     /**
      * 建立文件上傳配置
      */
     private Upload upload = new Upload();
-
 
     /**
      * 建立文件下載配置
@@ -40,16 +35,15 @@ public class FileProperties {
      */
     private global global = new global();
 
-
     /**
      * 文件上傳配置
      */
     @Data
     public static class Upload {
         /**
-         * 文件上傳臨時目錄，默認為 ./temp/uploads/
+         * 文件傳輸類型，默認為 CHUNK 進行文件傳輸
          */
-        private String tempDirectory = "./temp/uploads/";
+        private TransmissionEnum transmissionType = TransmissionEnum.CHUNK;
 
         /**
          * Websocket最大允許分塊大小，單位為 MB，默認為 20MB
@@ -103,7 +97,11 @@ public class FileProperties {
          */
         private Integer retentionTime = 30;
 
-        //private Integer maxFolderDepth = 10;
+        /**
+         * 顯示最近文件數量，默認為 20，當設置值小於等於0時，則不限制顯示數量
+         */
+        private Integer showRecentFileCount = 20;
 
+        //private Integer maxFolderDepth = 10;
     }
 }

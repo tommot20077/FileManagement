@@ -102,6 +102,18 @@ public interface ResponseUnity {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
     }
 
+    /**
+     * 用於創建返回ApiResponseDTO的方法，此為重載方法
+     * 適用WebSocket請求
+     *
+     * @param session WebSocketSession
+     * @param status  狀態碼
+     * @param message 返回消息
+     * @param data    返回數據
+     * @param <T>     泛型
+     *
+     * @return ApiResponseDTO 返回對應的ApiResponseDTO
+     */
     default <T> ApiResponseDTO<T> createResponse(WebSocketSession session, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, session.getHandshakeInfo().getUri().getPath(), message, data);
     }

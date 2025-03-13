@@ -17,17 +17,22 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum FileShareTypeEnum {
     /**
-     * 公開分享
+     * 公開分享: 所有人都可以訪問，無須設定允許的用戶
      */
     PUBLIC("公開分享"),
 
     /**
-     * 私有分享
+     * 默認分享: 不公開所有人但可以設定允許的用戶使用，此外會跟隨文件的父文件夾的分享設定，當用戶有權限訪問父文件夾時，也可以訪問此文件
+     */
+    DEFAULT("預設分享"),
+
+    /**
+     * 私有分享: 只有設定的用戶可以訪問，即使具有父文件夾的訪問權限也無法訪問
      */
     PRIVATE("私有分享"),
 
     /**
-     * 不分享
+     * 不分享: 不分享文件，即使設定用戶也無法訪問
      */
     NONE("不分享");
 

@@ -38,7 +38,12 @@ public enum ReservedSearchIdEnum {
     /**
      * 獲取用戶回收站文件列表
      */
-    RECYCLE_FILE_ID(-4L);
+    RECYCLE_FILE_ID(-4L),
+
+    /**
+     * 獲取用戶分享文件列表
+     */
+    SHARE_FILE_ID(-5L);
 
     /**
      * 預留的搜索 ID
