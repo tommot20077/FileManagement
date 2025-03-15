@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.controller.base;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -120,10 +121,10 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(String action, Long id, ServerWebExchange exchange) {
         DownloadActionEnum actionEnum = DownloadActionEnum.getType(action);
 
-        return userService
-                .getUser(exchange)
-                .flatMap(user -> processFileDownload(actionEnum, id, user))
-                .onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
+        return userService.getUser(exchange).flatMap(user -> {
+            String rangeHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.RANGE);
+            return processFileDownload(actionEnum, id, user, rangeHeader);
+        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
     }
 
     /**
@@ -278,11 +279,14 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
      */
-    private Mono<ResponseEntity<Flux<DataBuffer>>> processFileDownload(DownloadActionEnum action, Long id, User user) {
+    private Mono<ResponseEntity<Flux<DataBuffer>>> processFileDownload(DownloadActionEnum action, Long id, User user, String rangeHeader) {
         return permissionService
                 .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
-                .flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE).then(downloadAndPrepareResponse(file, user, action)));
+                .flatMap(file -> validationService
+                        .validateFileType(file, CUSTOM_FILE_TYPE)
+                        .then(downloadAndPrepareResponse(file, user, action, rangeHeader)));
     }
+
 
     /**
      * 下載文件並準備返回結果
@@ -293,12 +297,14 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
      */
-    private Mono<ResponseEntity<Flux<DataBuffer>>> downloadAndPrepareResponse(UserFileMetadata file, User user, DownloadActionEnum action) {
-        return fileServiceStrategy.getFileService().downloadFile(file, user).map(userFileDataBO -> {
-            HttpHeaders headers = prepareHttpHeaders(action, userFileDataBO);
-            return ResponseEntity.ok().headers(headers).body(userFileDataBO.getDataStream());
+    private Mono<ResponseEntity<Flux<DataBuffer>>> downloadAndPrepareResponse(UserFileMetadata file, User user, DownloadActionEnum action, String rangeHeader) {
+        return fileServiceStrategy.getFileService().downloadFile(file, user, rangeHeader).map(userFileDataBO -> {
+            HttpHeaders headers = prepareHttpHeaders(action, userFileDataBO, rangeHeader);
+            HttpStatus status = rangeHeader != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK;
+            return ResponseEntity.status(status).headers(headers).body(userFileDataBO.getDataStream());
         });
     }
+
 
     /**
      * 準備 Http 標頭
@@ -308,8 +314,8 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return HttpHeaders 返回 Http 標頭
      */
-    private HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO) {
-        HttpHeaders headers = new HttpHeaders();
+    private HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO, String rangeHeader) {
+        HttpHeaders headers = getHttpHeaders(userFileDataBO, rangeHeader);
 
         if (action.equals(DownloadActionEnum.DOWNLOAD)) {
             String encodedFilename = URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8);
@@ -317,15 +323,39 @@ public abstract class BaseGeneralFileController extends BaseFileController {
             headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
         } else {
             headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
-            String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheKeepTime());
-            headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
         }
-
-        headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
-        headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(userFileDataBO.getFileSize()));
-
+        String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheKeepTime());
+        headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
         return headers;
     }
+
+    /**
+     * 獲取 Http 標頭
+     *
+     * @param userFileDataBO 文件數據對象
+     * @param rangeHeader    範圍標頭
+     *
+     * @return HttpHeaders 返回 Http 標頭
+     */
+    private static @NotNull HttpHeaders getHttpHeaders(UserFileDataBO userFileDataBO, String rangeHeader) {
+        HttpHeaders headers = new HttpHeaders();
+        long fileSize = userFileDataBO.getFileSize();
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String[] ranges = rangeHeader.replace("bytes=", "").split("-");
+            long start = Long.parseLong(ranges[0]);
+            long end = ranges.length > 1 && !ranges[1].isEmpty() ? Long.parseLong(ranges[1]) : fileSize - 1;
+
+            headers.set(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileSize);
+            headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(end - start + 1));
+            headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+        } else {
+            headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileSize));
+            headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+        }
+        return headers;
+    }
+
 
     /**
      * 處理驗證異常，因為回傳格式不同，所以不可使用 {@link #handleError(Mono, ServerWebExchange)} 方法

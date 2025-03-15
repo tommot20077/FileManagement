@@ -35,3 +35,4 @@ build/
 /src/main/resources/application-prod.yml
 /docker-compose.yml
 /Dockerfile
+/logs/

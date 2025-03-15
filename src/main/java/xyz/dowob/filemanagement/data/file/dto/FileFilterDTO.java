@@ -58,6 +58,16 @@ public class FileFilterDTO {
     private LocalDateTime endTime;
 
     /**
+     * 是否包含已刪除的文件
+     */
+    private Boolean includeDeleted;
+
+    /**
+     * 是否包含已共享的文件
+     */
+    private Boolean includeShared;
+
+    /**
      * 判斷過濾條件是否為空
      *
      * @return 返回過濾條件是否為空
@@ -77,7 +87,7 @@ public class FileFilterDTO {
      * @param startTime 開始時間
      * @param endTime   結束時間
      */
-    public FileFilterDTO(String keyword, Long folderId, List<FileEnum> types, Integer page, Integer pageSize, LocalDateTime startTime, LocalDateTime endTime) {
+    public FileFilterDTO(String keyword, Long folderId, List<FileEnum> types, Integer page, Integer pageSize, LocalDateTime startTime, LocalDateTime endTime, Boolean includeDeleted, Boolean includeShared) {
         this.keyword = keyword;
         this.folderId = folderId;
         this.startTime = startTime;
@@ -85,5 +95,7 @@ public class FileFilterDTO {
         this.types = Objects.requireNonNullElseGet(types, ArrayList::new);
         this.page = Objects.requireNonNullElse(page, 1);
         this.pageSize = Objects.requireNonNullElse(pageSize, 100);
+        this.includeDeleted = Objects.requireNonNullElse(includeDeleted, false);
+        this.includeShared = Objects.requireNonNullElse(includeShared, false);
     }
 }

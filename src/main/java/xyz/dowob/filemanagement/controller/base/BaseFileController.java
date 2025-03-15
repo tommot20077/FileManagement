@@ -25,7 +25,6 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static xyz.dowob.filemanagement.customenum.FileEnum.*;
@@ -135,20 +134,13 @@ public abstract class BaseFileController implements ResponseUnity {
      * 這個方法支持對文件進行多條件過濾，包括名稱、類型、創建時間等。
      *
      * @param exchange  請求對象，包含用戶的上下文。
-     * @param keyword   關鍵字，用於模糊匹配文件名稱。
-     * @param folderId  資料夾 ID，指定要搜索的資料夾。
-     * @param page      分頁頁碼。
-     * @param size      每頁顯示的文件數量。
-     * @param types     文件類型，用於過濾特定類型的文件。
-     * @param startTime 文件創建時間的起始時間，用於範圍過濾。
-     * @param endTime   文件創建時間的結束時間，用於範圍過濾。
+     * @param fileFilterDTO 文件過濾條件的數據對象。
      *
      * @return 返回符合條件的文件列表。
      */
-    protected Mono<ResponseEntity<?>> searchFile(ServerWebExchange exchange, String keyword, Long folderId, Integer page, Integer size, List<FileEnum> types, LocalDateTime startTime, LocalDateTime endTime) {
+    protected Mono<ResponseEntity<?>> searchFile(ServerWebExchange exchange, FileFilterDTO fileFilterDTO) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
-            FileFilterDTO fileFilterDTO = new FileFilterDTO(keyword, folderId, types, page, size, startTime, endTime);
             return validationService.validateFileFilterDTO(fileFilterDTO).then(fileService.searchUserFile(user, fileFilterDTO).flatMap(files -> {
                 HashMap<String, Object> result = new HashMap<>();
                 result.put("userId", user.getId());

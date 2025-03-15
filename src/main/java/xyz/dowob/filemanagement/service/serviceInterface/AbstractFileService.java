@@ -13,6 +13,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.data.mongodb.gridfs.ReactiveGridFsResource;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
@@ -21,6 +22,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
+import xyz.dowob.filemanagement.LimitedInputStream;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -295,8 +297,6 @@ public abstract class AbstractFileService implements FileService {
      * @param list 檔案列表
      *
      * @return Mono<PagedResponseDTO < UserFileListDTO>> 檔案總數和分頁後的檔案列表
-     *
-     * @
      */
     private Mono<PagedResponseDTO<UserFileListDTO>> filterAndPageResponse(List<UserFileListDTO> list, FileFilterDTO fileFilterDTO) {
         return filterPageElements(Flux.fromIterable(list), fileFilterDTO).flatMap(tuple -> {
@@ -465,8 +465,9 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<UserFileDataBO>
      */
-    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user) {
-        return Mono.defer(() -> {
+    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... rangeHeader) {
+        return Mono
+                .defer(() -> {
                     userFileMetadata.setLastAccessTime(LocalDateTime.now());
                     userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
                     return serverFileMetaRepository
@@ -476,21 +477,22 @@ public abstract class AbstractFileService implements FileService {
                                                                            userFileMetadata.getId()
                             )))
                             .map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata));
-                   })
-                .flatMap(fileData -> gridFsProvider
-                        .findFileById(new ObjectId(fileData.getGridFsId()))
-                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND, fileData.getServerFileId())))
+                })
+                .flatMap(userFileDataBO -> gridFsProvider
+                        .findFileById(new ObjectId(userFileDataBO.getGridFsId()))
+                        .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
+                                                                       userFileDataBO.getServerFileId()
+                        )))
                         .flatMap(gridFsFile -> gridFsProvider.getResource(gridFsFile).map(resource -> {
-                            Flux<DataBuffer> dataStream = resource.getDownloadStream().map(dataBuffer -> {
-                                byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                dataBuffer.read(bytes);
-                                DataBufferUtils.release(dataBuffer);
-                                return DefaultDataBufferFactory.sharedInstance.wrap(bytes);
-                            });
-                            fileData.setDataStream(dataStream);
-                            return fileData;
+                            long[] range = getRangeFromHeader(rangeHeader[0], userFileDataBO.getFileSize());
+                            long start = range[0];
+                            long end = range[1];
+
+                            userFileDataBO.setDataStream(streamFileFromGridFS(resource, start, end));
+                            return userFileDataBO;
                         })));
     }
+
 
     /**
      * 過濾所需的檔案元素並分頁
@@ -1250,8 +1252,50 @@ public abstract class AbstractFileService implements FileService {
                     .when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
                     .thenMany(Flux.fromIterable(metadataList));
         });
+    }
 
+    /**
+     * 獲取標頭中的範圍，若無則返回文件大小的範圍
+     *
+     * @param rangeHeader 範圍標頭
+     * @param fileSize    文件大小
+     *
+     * @return 返回範圍數組
+     */
+    private long[] getRangeFromHeader(String rangeHeader, long fileSize) {
+        long start = 0;
+        long end = fileSize - 1;
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String[] ranges = rangeHeader.replace("bytes=", "").split("-");
+            start = Long.parseLong(ranges[0]);
+            if (ranges.length > 1 && !ranges[1].isEmpty()) {
+                end = Long.parseLong(ranges[1]);
+            }
+        }
+        return new long[]{start, end};
+    }
 
+    /**
+     * 從GridFS流式讀取文件，並返回數據流
+     *
+     * @param resource GridFS資源
+     * @param start    開始位置
+     * @param end      結束位置
+     *
+     * @return 返回數據流
+     */
+    protected Flux<DataBuffer> streamFileFromGridFS(ReactiveGridFsResource resource, long start, long end) {
+        return resource
+                .getInputStream()
+                .flatMapMany(inputStream -> DataBufferUtils
+                        .readInputStream(() -> new LimitedInputStream(inputStream, start, end), DefaultDataBufferFactory.sharedInstance, 8192)
+                        .publishOn(Schedulers.boundedElastic())
+                        .doFinally(signal -> {
+                            try {
+                                inputStream.close();
+                            } catch (Exception ignored) {
+                            }
+                        }));
     }
 
     /**

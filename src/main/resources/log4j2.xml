@@ -3,15 +3,15 @@
     <Properties>
         <Property name="log4j2.messageFactory">org.apache.logging.log4j.message.ReusableMessageFactory</Property>
     </Properties>
-    <!-- 定義 Appenders -->
+
     <Appenders>
-        <!-- 同步控制台輸出 -->
+        <!-- 控制台輸出 -->
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-30.30c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
 
         </Console>
 
-        <!-- 文件輸出 -->
+        <!-- 一般日誌文件（不包含 ERROR 級別） -->
         <RollingFile name="FileLogger" fileName="logs/app.log"
                      filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout>
@@ -21,7 +21,26 @@
                 <TimeBasedTriggeringPolicy/>
                 <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="20"/>
+            <DefaultRolloverStrategy max="50"/>
+            <Filters>
+                <!-- 過濾掉 ERROR 級別，避免與 ErrorLogger 重複 -->
+                <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="NEUTRAL"/>
+            </Filters>
+        </RollingFile>
+
+        <!-- 錯誤日誌文件（只包含 ERROR 及以上級別） -->
+        <RollingFile name="ErrorLogger" fileName="logs/error.log"
+                     filePattern="logs/error-%d{yyyy-MM-dd}.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+            </Policies>
+            <Filters>
+                <!-- 只記錄 ERROR 及以上級別 -->
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
         </RollingFile>
 
         <!-- 異步 Appender -->
@@ -31,20 +50,27 @@
         <Async name="AsyncFileLogger">
             <AppenderRef ref="FileLogger"/>
         </Async>
+        <Async name="AsyncErrorLogger">
+            <AppenderRef ref="ErrorLogger"/>
+        </Async>
     </Appenders>
 
-    <!-- 定義 Loggers -->
     <Loggers>
-        <!-- 使用異步 Appenders 的 Root Logger -->
+        <!-- Root Logger（INFO 級別，發送到 Console 和 FileLogger，不記錄 ERROR） -->
         <Root level="info">
             <AppenderRef ref="AsyncConsole"/>
-            <!--<AppenderRef ref="AsyncFileLogger"/>-->
+            <AppenderRef ref="AsyncFileLogger"/>
         </Root>
 
-        <!-- 定義具體的 Logger，根據需要設置級別和 Appender -->
+        <!-- xyz.dowob.filemanagement（DEBUG 級別，發送到 Console 和 FileLogger，不記錄 ERROR） -->
         <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
             <AppenderRef ref="AsyncConsole"/>
-            <!--<AppenderRef ref="AsyncFileLogger"/>-->
+            <AppenderRef ref="AsyncFileLogger"/>
+        </Logger>
+
+        <!-- 獨立的 ERROR Logger（只寫入 error.log） -->
+        <Logger name="ErrorLogger" level="error" additivity="false">
+            <AppenderRef ref="AsyncErrorLogger"/>
         </Logger>
     </Loggers>
 </Configuration>

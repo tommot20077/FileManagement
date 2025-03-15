@@ -121,29 +121,35 @@ public class FilePermissionRuleManager {
                 });
             }
 
-            Mono<Boolean> existParentRecordMono;
-            Mono<Optional<FileShareTypeEnum>> parentShareTypeOptionalMono;
-
-            if (file.getParentFolderId() != null) {
-                existParentRecordMono = shareRecordRepository.existsByUserIdAndFileId(user.getId(), file.getParentFolderId());
-                parentShareTypeOptionalMono = userFileMetaRepository
-                        .getShareTypeByUserIdAndFileId(file.getParentFolderId(), user.getId(), r2dbcEntityOperations)
-                        .map(Optional::of)
-                        .switchIfEmpty(Mono.just(Optional.empty()));
-            } else {
-                existParentRecordMono = Mono.just(false);
-                parentShareTypeOptionalMono = Mono.just(Optional.empty());
-            }
-
-            return Mono.zip(existParentRecordMono, parentShareTypeOptionalMono).flatMap(tuple -> {
-                Boolean parentExistRecord = tuple.getT1();
-                Optional<FileShareTypeEnum> parentShareTypeOptional = tuple.getT2();
-                if (parentShareTypeOptional.isPresent()) {
-                    if (parentShareTypeOptional.get() == FileShareTypeEnum.PUBLIC || parentExistRecord && parentShareTypeOptional.get() != FileShareTypeEnum.NONE) {
-                        return Mono.empty();
-                    }
+            return shareRecordRepository.existsByUserIdAndFileId(user.getId(), file.getId()).flatMap(hasRecord -> {
+                if (hasRecord) {
+                    return Mono.empty();
                 }
-                return Mono.just(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED, file.getId()));
+
+                Mono<Boolean> existParentRecordMono;
+                Mono<Optional<FileShareTypeEnum>> parentShareTypeOptionalMono;
+
+                if (file.getParentFolderId() != null) {
+                    existParentRecordMono = shareRecordRepository.existsByUserIdAndFileId(user.getId(), file.getParentFolderId());
+                    parentShareTypeOptionalMono = userFileMetaRepository
+                            .getShareTypeByFileId(file.getParentFolderId(), r2dbcEntityOperations)
+                            .map(Optional::of)
+                            .switchIfEmpty(Mono.just(Optional.empty()));
+                } else {
+                    existParentRecordMono = Mono.just(false);
+                    parentShareTypeOptionalMono = Mono.just(Optional.empty());
+                }
+
+                return Mono.zip(existParentRecordMono, parentShareTypeOptionalMono).flatMap(tuple -> {
+                    Boolean parentExistRecord = tuple.getT1();
+                    Optional<FileShareTypeEnum> parentShareTypeOptional = tuple.getT2();
+                    if (parentShareTypeOptional.isPresent()) {
+                        if (parentShareTypeOptional.get() == FileShareTypeEnum.PUBLIC || parentExistRecord && parentShareTypeOptional.get() != FileShareTypeEnum.NONE) {
+                            return Mono.empty();
+                        }
+                    }
+                    return Mono.just(new ValidationException(ValidationException.ErrorCode.FILE_PERMISSION_DENIED, file.getId()));
+                });
             });
         };
 

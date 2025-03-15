@@ -1,7 +1,8 @@
 package xyz.dowob.filemanagement.component.aspect;
 
 import lombok.NoArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -33,10 +34,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  **/
 @Aspect
 @Component
-@Log4j2
 @NoArgsConstructor
 @SuppressWarnings("all")
 public class LoggerAspect {
+    /**
+     * 日誌的記錄器
+     */
+    private static final Logger log = LogManager.getLogger(LoggerAspect.class);
 
     /**
      * 定義 ServiceInterface 層切入點

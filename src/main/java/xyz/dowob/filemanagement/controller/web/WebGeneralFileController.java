@@ -18,6 +18,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGeneralFileController;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
+import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -86,6 +87,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
             @PathVariable Long id, ServerWebExchange exchange) {
         return super.downloadFile(action, id, exchange);
     }
+
 
     /**
      * 刪除文件的 Web 請求，根據文件 ID 刪除文件
@@ -206,14 +208,16 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     /**
      * 搜索文件的 Web 請求
      *
-     * @param exchange  請求對象
-     * @param keyword   關鍵字
-     * @param folderId  文件夾 ID
-     * @param page      頁碼
-     * @param size      每頁大小
-     * @param types     文件類型
-     * @param startDate 開始時間
-     * @param endDate   結束時間
+     * @param exchange  請求對象，包含用戶的上下文。
+     * @param keyword   關鍵字，用於模糊匹配文件名稱。
+     * @param folderId  資料夾 ID，指定要搜索的資料夾。
+     * @param page      分頁頁碼。
+     * @param size      每頁顯示的文件數量。
+     * @param types     文件類型，用於過濾特定類型的文件。
+     * @param startDate 文件創建時間的起始時間，用於範圍過濾。
+     * @param endDate   文件創建時間的結束時間，用於範圍過濾。
+     * @param deleted   是否包含已刪除的文件
+     * @param shared    是否包含已共享的文件
      *
      * @return Mono<ResponseEntity < ?>> 返回搜索文件的結果
      */
@@ -224,10 +228,13 @@ public class WebGeneralFileController extends BaseGeneralFileController {
                                         @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
                                         @RequestParam(value = "size", required = false) Integer size,
                                         @RequestParam(value = "type", required = false) List<String> types,
+                                        @RequestParam(value = "deleted", required = false) Boolean deleted,
+                                        @RequestParam(value = "shared", required = false) Boolean shared,
                                         @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
                                         LocalDateTime startDate,
                                         @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
                                         LocalDateTime endDate) {
-        return super.searchFile(exchange, keyword, folderId, page, size, getFileEnums(types), startDate, endDate);
+        FileFilterDTO fileFilterDTO = new FileFilterDTO(keyword, folderId, getFileEnums(types), page, size, startDate, endDate, deleted, shared);
+        return super.searchFile(exchange, fileFilterDTO);
     }
 }

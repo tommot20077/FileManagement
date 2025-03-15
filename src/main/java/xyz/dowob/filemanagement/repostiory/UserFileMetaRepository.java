@@ -220,9 +220,11 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         LocalDateTime startTime = fileFilterDTO.getStartTime();
         LocalDateTime endTime = fileFilterDTO.getEndTime();
         List<FileEnum> types = fileFilterDTO.getTypes();
+        Boolean includeDeleted = fileFilterDTO.getIncludeDeleted();
+        Boolean includeShared = fileFilterDTO.getIncludeShared();
 
         if (keyword != null && !keyword.isBlank()) {
-            sql.append(" AND MATCH(filename) AGAINST(:keyword IN NATURAL LANGUAGE MODE) AND is_deleted = 0");
+            sql.append(" AND MATCH(filename) AGAINST(:keyword IN BOOLEAN MODE)");
         }
         if (folderId != null) {
             if (folderId == 0) {
@@ -243,6 +245,11 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
             sql.append(" AND last_access_time <= :endTime");
         }
 
+        if (!includeDeleted) {
+            sql.append(" AND is_deleted = 0");
+        }
+
+        System.out.println(sql.toString());
         DatabaseClient.GenericExecuteSpec bindSpec = r2dbcEntityOperations.getDatabaseClient().sql(sql.toString()).bind("userId", userId);
 
         if (keyword != null && !keyword.isEmpty()) {
@@ -261,11 +268,16 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
             bindSpec = bindSpec.bind("endTime", endTime);
         }
 
-        return bindSpec.map((row, metadata) -> r2dbcEntityOperations.getConverter().read(UserFileMetadata.class, row, metadata)).all();
+
+        Flux<UserFileMetadata> result1 = bindSpec
+                .map((row, metadata) -> r2dbcEntityOperations.getConverter().read(UserFileMetadata.class, row, metadata))
+                .all();
+        Flux<UserFileMetadata> result2 = includeShared ? findAllByShareWithUserId(userId, r2dbcEntityOperations) : Flux.empty();
+        return result1.mergeWith(result2);
     }
 
 
-    default Mono<FileShareTypeEnum> getShareTypeByUserIdAndFileId(Long fileId, Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+    default Mono<FileShareTypeEnum> getShareTypeByFileId(Long fileId, R2dbcEntityOperations r2dbcEntityOperations) {
         return r2dbcEntityOperations
                 .select(UserFileMetadata.class)
                 .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("id").is(fileId)))

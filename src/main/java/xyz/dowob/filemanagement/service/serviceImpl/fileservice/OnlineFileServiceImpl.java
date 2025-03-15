@@ -100,7 +100,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * @return 文件數據業務對象
      */
     @Override
-    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user) {
+    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... range) {
         return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
             try {
                 EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
