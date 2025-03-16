@@ -1,0 +1,311 @@
+package xyz.dowob.filemanagement.component.manager;
+
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import xyz.dowob.filemanagement.annotation.CacheProviderType;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
+import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
+import xyz.dowob.filemanagement.functionInterface.CacheRule;
+
+import java.time.Duration;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+/**
+ * 緩存管理器，用於管理緩存提供者 {@link CacheProvider}
+ * 這類是對於緩存提供者的管理，並封裝了對於緩存操作的方法，
+ * 整個緩存管理器主要處理2件事情：
+ * 1. CacheProvider的策略選取，會依照CacheProviderEnum選取對應的CacheProvider
+ * 2. 對於緩存操作的封裝，提供了緩存的增刪改查操作
+ * 對於緩存操作的具體實現在CacheProvider中，CacheManager只是對其進行了封裝
+ * 但如果有特殊需求也可以使用策略模式獲取到CacheProvider進行操作
+ *
+ * @author yuan
+ * @program FileManagement
+ * @ClassName CacheManager
+ * @create 2025/3/15
+ * @Version 1.0
+ **/
+@Component
+@SuppressWarnings("unused")
+public class CacheManager {
+    /**
+     * 緩存提供者的Map，用於存儲不同類型的緩存提供者
+     */
+    private final EnumMap<CacheProviderEnum, CacheProvider> cacheProviderMap;
+
+    /**
+     * 緩存管理器的構造方法，用於初始化緩存提供者列表
+     * 會將緩存提供者列表轉換為EnumMap，方便根據CacheProviderEnum獲取對應的CacheProvider
+     *
+     * @param cacheProviderList 緩存提供者列表
+     */
+    public CacheManager(List<CacheProvider> cacheProviderList) {
+        cacheProviderMap = new EnumMap<>(CacheProviderEnum.class);
+        for (CacheProvider provider : cacheProviderList) {
+            CacheProviderType cacheProviderType = AnnotatedElementUtils.findMergedAnnotation(provider.getClass(), CacheProviderType.class);
+            if (cacheProviderType != null) {
+                cacheProviderMap.put(cacheProviderType.value(), provider);
+            }
+        }
+    }
+
+    /**
+     * 設置緩存提供者，當需要自定義緩存提供者時可以使用此方法
+     *
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param cacheProvider     緩存提供者
+     */
+    public void setCacheProvider(CacheProviderEnum cacheProviderEnum, CacheProvider cacheProvider) {
+        cacheProviderMap.put(cacheProviderEnum, cacheProvider);
+    }
+
+    /**
+     * 獲取緩存提供者，根據CacheProviderEnum獲取對應的CacheProvider
+     *
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return CacheProvider 緩存提供者
+     */
+    public CacheProvider getCacheProvider(CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum);
+    }
+
+    /**
+     * 獲取緩存，根據key獲取緩存數據
+     *
+     * @param key               key
+     * @param clazz             類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<T>
+     */
+    public <T> Mono<T> getCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum).get(key, clazz);
+    }
+
+    /**
+     * 獲取緩存，根據key獲取緩存數據，此為批量查詢
+     *
+     * @param keys              key集合
+     * @param clazz             類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Flux<T>
+     */
+    public <T> Flux<T> getCacheWithBatch(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum).getAll(keys, clazz);
+    }
+
+    /**
+     * 設置緩存，根據key設置緩存數據
+     *
+     * @param key               key
+     * @param value             存儲value
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCache(String key, Object value, CacheProviderEnum cacheProviderEnum) {
+        return setCache(key, value, cacheProviderEnum, null);
+    }
+
+    /**
+     * 設置緩存，根據key設置緩存數據，並設置過期時間
+     *
+     * @param key               key
+     * @param value             存儲value
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param expire            過期時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCache(String key, Object value, CacheProviderEnum cacheProviderEnum, Duration expire) {
+        return cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+    }
+
+    /**
+     * 設置緩存，根據key-value設置緩存數據，此為批量設置
+     *
+     * @param keyValues         key-value集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCacheWithBatch(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum) {
+        return setCacheWithBatch(keyValues, cacheProviderEnum, null);
+    }
+
+    /**
+     * 設置緩存，根據key-value設置緩存數據，此為批量設置，並設置過期時間
+     *
+     * @param keyValues         key-value集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param expire            過期時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCacheWithBatch(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
+        return cacheProviderMap.get(cacheProviderEnum).setAll(keyValues, expire);
+    }
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum).delete(key);
+    }
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，此為批量刪除
+     *
+     * @param keys              key集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCacheWithBatch(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum).deleteAll(keys);
+    }
+
+    /**
+     * 刪除緩存，刪除所有緩存數據
+     *
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteAllCache(CacheProviderEnum cacheProviderEnum) {
+        return cacheProviderMap.get(cacheProviderEnum).deleteAll(null);
+    }
+
+    /**
+     * 獲取Mono的緩存，如果緩存不存在則執行source並將結果存入緩存
+     *
+     * @param key               查詢緩存的key，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param <T>               回傳的類型
+     *
+     * @return Mono<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Mono<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Mono<? extends T> source, List<CacheRule<T>> cacheRules) {
+        return runAndSetCache(key, clazz, cacheProviderEnum, source, cacheRules, null);
+    }
+
+
+    /**
+     * 獲取Mono的緩存，如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
+     *
+     * @param key               查詢緩存的key，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param expire            過期時間
+     * @param <T>               回傳的類型
+     *
+     * @return Mono<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Mono<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Mono<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
+        return cacheProviderMap.get(cacheProviderEnum).get(key, clazz).switchIfEmpty(source.doOnNext(value -> {
+            if (cacheProviderMap.get(cacheProviderEnum) != null) {
+                applyCacheRule(cacheRules, value, expire);
+            }
+        }));
+    }
+
+    /**
+     * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存
+     *
+     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param <T>               回傳的類型
+     *
+     * @return Flux<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules) {
+        return runAndSetCache(keys, clazz, cacheProviderEnum, source, cacheRules, null);
+    }
+
+    /**
+     * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
+     *
+     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param expire            過期時間
+     * @param <T>               回傳的類型
+     *
+     * @return Flux<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
+        return cacheProviderMap.get(cacheProviderEnum).getAll(keys, clazz).switchIfEmpty(source.doOnNext(value -> {
+            if (cacheProviderMap.get(cacheProviderEnum) != null) {
+                applyCacheRule(cacheRules, value, expire);
+            }
+        }));
+    }
+
+    /**
+     * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定回傳值的某項屬性作為key
+     *
+     * @param keyExtractor      key提取器
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param <T>               回傳的類型
+     *
+     * @return CacheRule<T> 緩存規則
+     */
+    @SkipRecord
+    public <T> CacheRule<T> generateCacheRule(Function<T, ?> keyExtractor, CacheProviderEnum cacheProviderEnum) {
+        return (value, expire) -> {
+            String key = keyExtractor.apply(value).toString();
+            return cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+        };
+    }
+
+    /**
+     * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定key
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param <T>               回傳的類型
+     *
+     * @return CacheRule<T> 緩存規則
+     */
+    @SkipRecord
+    public <T> CacheRule<T> generateCacheRule(String key, CacheProviderEnum cacheProviderEnum) {
+        return (value, expire) -> cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+    }
+
+    /**
+     * 應用緩存規則，將緩存規則應用到需要緩存的值上
+     *
+     * @param cacheRules 緩存規則
+     * @param value      需要緩存的值
+     * @param expire     過期時間
+     * @param <T>        回傳的類型
+     */
+    private <T> void applyCacheRule(List<CacheRule<T>> cacheRules, T value, Duration expire) {
+        Mono.when(cacheRules.stream().map(rule -> rule.apply(value, expire)).toList()).subscribeOn(Schedulers.boundedElastic()).subscribe();
+    }
+}

@@ -1,31 +1,32 @@
-package xyz.dowob.filemanagement.component.provider.providerImplement;
+package xyz.dowob.filemanagement.component.provider.provider;
 
-import org.springframework.stereotype.Component;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
-import xyz.dowob.filemanagement.config.properties.UserProperties;
 
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 
 /**
- * 用戶緩存提供者實現類，用於提供用戶緩存的操作
- * 實現了CacheProvider接口，提供了緩存操作的具體實現
- * 並使用RedisProvider提供的操作方法實現具體的緩存操作
- * 用戶緩存的key前綴以及緩存的默認過期時間來自於UserProperties的Cache配置 {@link UserProperties}
- * 用戶緩存的key-value為用戶ID-用戶信息
+ * Redis緩存提供者抽象類，用於提供緩存操作的具體實現
+ * 這類主要對於使用Redis作為緩存的操作進行了封裝，提供對於緩存操作的初步實現
+ * 減少了具體緩存操作的重複代碼
+ * 此類實現了CacheProvider接口，提供了緩存操作的具體實現，並使用RedisProvider提供的操作方法實現具體的緩存操作
  *
  * @author yuan
  * @program FileManagement
- * @ClassName UserCacheProviderImpl
- * @create 2025/3/10
+ * @ClassName AbstractCacheProvider
+ * @create 2025/3/15
  * @Version 1.0
  **/
-@Component
-public class UserCacheProviderImpl implements CacheProvider {
+
+@Setter
+@Getter
+public abstract class AbstractRedisCacheProvider implements CacheProvider {
     /**
      * Redis操作提供者
      */
@@ -34,23 +35,20 @@ public class UserCacheProviderImpl implements CacheProvider {
     /**
      * 緩存前綴
      */
-    private final String USER_INFO_CACHE_PREFIX;
+    private String CACHE_PREFIX;
 
     /**
      * 默認過期時間，單位為分鐘
      */
-    private final int DEFAULT_EXPIRE;
+    private int DEFAULT_EXPIRE_TIME;
 
     /**
      * 用戶緩存提供者實現類的構造方法
      *
-     * @param redisProvider  Redis操作提供者
-     * @param userProperties 用戶配置
+     * @param redisProvider Redis操作提供者
      */
-    public UserCacheProviderImpl(RedisProvider redisProvider, UserProperties userProperties) {
+    public AbstractRedisCacheProvider(@NotNull RedisProvider redisProvider) {
         this.redisProvider = redisProvider;
-        USER_INFO_CACHE_PREFIX = userProperties.cache.userInfoCachePrefix;
-        DEFAULT_EXPIRE = userProperties.cache.defaultExpire;
     }
 
     /**
@@ -61,9 +59,8 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Mono<T>
      */
-    @Override
     public <T> Mono<T> get(String hashKey, Class<T> clazz) {
-        return redisProvider.getHashMap(USER_INFO_CACHE_PREFIX, hashKey, clazz);
+        return redisProvider.getHashMap(CACHE_PREFIX, hashKey, clazz);
     }
 
     /**
@@ -74,12 +71,11 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Flux<T>
      */
-    @Override
     public <T> Flux<T> getAll(Collection<String> hashKeys, Class<T> clazz) {
         if (hashKeys == null || hashKeys.isEmpty()) {
-            return redisProvider.getHashMapAll(USER_INFO_CACHE_PREFIX, clazz);
+            return redisProvider.getHashMapAll(CACHE_PREFIX, clazz);
         }
-        return redisProvider.getHashMapList(USER_INFO_CACHE_PREFIX, hashKeys.stream().toList(), clazz);
+        return redisProvider.getHashMapList(CACHE_PREFIX, hashKeys.stream().toList(), clazz);
     }
 
     /**
@@ -91,12 +87,11 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Mono<Void>
      */
-    @Override
     public Mono<Void> set(String hashKey, Object value, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, Duration.ofMinutes(DEFAULT_EXPIRE));
+            return redisProvider.setHashMap(CACHE_PREFIX, hashKey, value, Duration.ofMinutes(DEFAULT_EXPIRE_TIME));
         }
-        return redisProvider.setHashMap(USER_INFO_CACHE_PREFIX, hashKey, value, expire[0]);
+        return redisProvider.setHashMap(CACHE_PREFIX, hashKey, value, expire[0]);
     }
 
     /**
@@ -107,12 +102,11 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Mono<Void>
      */
-    @Override
     public Mono<Void> setAll(Map<String, Object> keyValues, Duration... expire) {
         if (expire == null || expire.length == 0) {
-            return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, Duration.ofMinutes(DEFAULT_EXPIRE));
+            return redisProvider.setHashMapAll(CACHE_PREFIX, keyValues, Duration.ofMinutes(DEFAULT_EXPIRE_TIME));
         }
-        return redisProvider.setHashMapAll(USER_INFO_CACHE_PREFIX, keyValues, expire[0]);
+        return redisProvider.setHashMapAll(CACHE_PREFIX, keyValues, expire[0]);
     }
 
     /**
@@ -122,9 +116,8 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Mono<Void>
      */
-    @Override
     public Mono<Void> delete(String hashKey) {
-        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, hashKey);
+        return redisProvider.deleteHash(CACHE_PREFIX, hashKey);
     }
 
     /**
@@ -134,9 +127,11 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Mono<Void>
      */
-    @Override
     public Mono<Void> deleteAll(Collection<String> hashKeys) {
-        return redisProvider.deleteHash(USER_INFO_CACHE_PREFIX, hashKeys.stream().toList());
+        if (hashKeys == null || hashKeys.isEmpty()) {
+            return redisProvider.deleteHash(CACHE_PREFIX);
+        }
+        return redisProvider.deleteHash(CACHE_PREFIX, hashKeys.stream().toList());
     }
 
     /**
@@ -144,8 +139,7 @@ public class UserCacheProviderImpl implements CacheProvider {
      *
      * @return Duration
      */
-    @Override
     public Duration getDefaultExpire() {
-        return Duration.ofMinutes(DEFAULT_EXPIRE);
+        return Duration.ofMinutes(DEFAULT_EXPIRE_TIME);
     }
 }

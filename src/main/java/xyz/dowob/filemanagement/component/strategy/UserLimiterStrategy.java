@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.component.strategy;
 
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.annotation.UserLimiterType;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
@@ -48,6 +49,7 @@ public class UserLimiterStrategy {
      *
      * @return 用戶限流器
      */
+    @SkipRecord
     public UserLimiter getUserLimiter(UserLimiterEnum userLimiterEnum) {
         return userLimiterEnumMap.get(userLimiterEnum);
     }

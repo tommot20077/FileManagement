@@ -14,6 +14,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.controller.exception.ExceptionController;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
@@ -123,12 +124,19 @@ public class LoggerAspect {
      * @return String 處理後的日誌顯示的返回值
      */
     private String processMethodSignature(Method method, Object result) {
+        Class<?> declaringClass = method.getDeclaringClass();
+
+        boolean isSkip = method.isAnnotationPresent(SkipRecord.class) || declaringClass.isAnnotationPresent(SkipRecord.class);
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
-        boolean isOverLength = method.isAnnotationPresent(HideOverLength.class);
+        boolean isOverLength = method.isAnnotationPresent(HideOverLength.class) || declaringClass.isAnnotationPresent(HideOverLength.class);
+        if (isSkip) {
+            return null;
+        }
 
         if (isSensitive) {
             return "[隱藏敏感訊息]";
         }
+
         if (result == null) {
             return "無返回值";
         }
@@ -160,10 +168,7 @@ public class LoggerAspect {
             if (error instanceof ValidationException) {
                 log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
                           usernameAndUserId[0],
-                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
-                         className,
-                         methodName,
-                         error.getMessage()
+                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "", className, methodName, error.getMessage()
                 );
             } else {
                 log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
@@ -175,6 +180,10 @@ public class LoggerAspect {
                 );
             }
         } else {
+            if (result == null) {
+                return;
+            }
+
             log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
                       usernameAndUserId[0],
                       usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",

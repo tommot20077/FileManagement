@@ -25,9 +25,14 @@ public class UserProperties {
     @Data
     public static class Cache {
         /**
+         * 是否啟用用戶緩存，默認為啟用
+         */
+        public Boolean enableUserCache = true;
+
+        /**
          * 緩存前綴
          */
-        public String userInfoCachePrefix = "user_info";
+        public String userInfoCachePrefix = "user_info_cache";
 
         /**
          * 緩存過期時間，默認為1小時，單位為分鐘

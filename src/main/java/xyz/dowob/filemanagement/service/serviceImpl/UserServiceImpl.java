@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceImpl;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
@@ -9,12 +10,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
-import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
+import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
@@ -24,6 +25,7 @@ import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.functionInterface.CacheRule;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
@@ -86,9 +88,28 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
 
     /**
-     * Cache提供者
+     * Cache處理器
      */
-    private final CacheProvider cacheProvider;
+    private final CacheManager cacheManager;
+
+    /**
+     * 用戶ID緩存規則
+     */
+    private CacheRule<User> USER_ID_CACHE_RULE;
+
+    /**
+     * 用戶名緩存規則
+     */
+    private CacheRule<User> USERNAME_CACHE_RULE;
+
+    /**
+     * 初始化緩存規則
+     */
+    @PostConstruct
+    public void init() {
+        USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
+        USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
+    }
 
     /**
      * 此方法之後為UserService接口中的方法實現
@@ -233,31 +254,24 @@ public class UserServiceImpl implements UserService {
                 return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
                     if (authentication != null && authentication.isAuthenticated()) {
                         userId[0] = Long.valueOf(authentication.getPrincipal().toString());
-                        return getUserFromCacheOrDB(userId);
+                        return cacheManager.runAndSetCache(userId[0].toString(),
+                                                           User.class,
+                                                           CacheProviderEnum.USER_CACHE,
+                                                           userRepository.findById((Long) userId[0]),
+                                                           List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
+                        );
                     }
                     return Mono.empty();
                 });
             }
-            return getUserFromCacheOrDB(userId);
+            return cacheManager.runAndSetCache(userId[0].toString(),
+                                               User.class,
+                                               CacheProviderEnum.USER_CACHE,
+                                               userRepository.findById((Long) userId[0]),
+                                               List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
+            );
         }).switchIfEmpty(Mono.empty());
     }
-
-    /**
-     * 根據用戶ID從緩存或數據庫中獲取用戶對象
-     *
-     * @param userId 用戶ID
-     *
-     * @return 用戶實體
-     */
-    private Mono<User> getUserFromCacheOrDB(Object[] userId) {
-        return cacheProvider.get(userId[0].toString(), User.class).doOnNext(user -> {
-        }).switchIfEmpty(Mono.defer(() -> userRepository.findById((Long) userId[0]).doOnNext(user -> {
-            Mono<Void> usernameCache = cacheProvider.set(user.getUsername(), user);
-            Mono<Void> idCache = cacheProvider.set(user.getId().toString(), user);
-            Mono.when(usernameCache, idCache).subscribeOn(Schedulers.boundedElastic()).subscribe();
-        })));
-    }
-
 
     /**
      * 此方法之後為CrudService接口中的方法實現
@@ -312,7 +326,7 @@ public class UserServiceImpl implements UserService {
             userInfoList.add(arg.toString());
         });
 
-        Flux<User> cacheUserFlux = cacheProvider.getAll(userInfoList, User.class).doOnNext(user -> {
+        Flux<User> cacheUserFlux = cacheManager.getCacheProvider(CacheProviderEnum.USER_CACHE).getAll(userInfoList, User.class).doOnNext(user -> {
             Object userType = isId ? user.getId().toString() : user.getUsername();
             userInfoList.remove(userType);
         });
@@ -333,15 +347,13 @@ public class UserServiceImpl implements UserService {
             userRepositoryChooseFlux = userRepository.findAllByUsernameIn(userInfoList);
         }
 
-        Flux<User> userRepositoryFlux = userRepositoryChooseFlux.collectList().doOnNext(userList -> {
-            if (userList.isEmpty()) {
-                return;
-            }
-            Mono<Void> usernameCache = cacheProvider.setAll(userList.stream().collect(Collectors.toMap(User::getUsername, user -> user)));
-            Mono<Void> idCache = cacheProvider.setAll(userList.stream().collect(Collectors.toMap(user -> user.getId().toString(), user -> user)));
-            Mono.when(usernameCache, idCache).subscribeOn(Schedulers.boundedElastic()).subscribe();
 
-        }).flatMapMany(Flux::fromIterable);
+        Flux<User> userRepositoryFlux = cacheManager.runAndSetCache(userInfoList,
+                                                                    User.class,
+                                                                    CacheProviderEnum.USER_CACHE,
+                                                                    userRepositoryChooseFlux,
+                                                                    List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
+        );
         return cacheUserFlux.concatWith(userRepositoryFlux);
     }
 

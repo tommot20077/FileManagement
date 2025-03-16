@@ -28,6 +28,7 @@ import java.util.Objects;
  **/
 @Component
 @SuppressWarnings("unused")
+@HideOverLength
 public class RedisProvider {
     /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的
@@ -156,7 +157,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setHashMap(String hashKey, String innerKey, Object value, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return setHashMap(hashKey, innerKey, value);
         }
         return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(setExpire(hashKey, expireTime));
@@ -185,7 +186,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setHashMapAll(String hashKey, Map<String, Object> value, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return setHashMapAll(hashKey, value);
         }
         return redisTemplate.opsForHash().putAll(hashKey, value).then(setExpire(hashKey, expireTime));
@@ -367,7 +368,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setSet(String key, Object value, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return setSet(key, value);
         }
         return redisTemplate.opsForSet().add(key, value).then(setExpire(key, expireTime));
@@ -440,7 +441,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setList(String key, Object value, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return setList(key, value);
         }
         return redisTemplate.opsForList().rightPush(key, value).then(setExpire(key, expireTime));
@@ -515,7 +516,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> insertList(String key, Object value, Boolean isLeft, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return insertList(key, value, isLeft);
         }
         return insertList(key, value, isLeft).then(setExpire(key, expireTime));
@@ -574,7 +575,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> setZset(String key, Object value, double score, Duration expireTime) {
-        if (expireTime.isNegative()) {
+        if (expireTime == null || expireTime.isNegative()) {
             return setZset(key, value, score);
         }
         return setZset(key, value, score).then(setExpire(key, expireTime));

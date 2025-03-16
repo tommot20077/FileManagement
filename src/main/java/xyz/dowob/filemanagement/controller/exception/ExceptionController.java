@@ -194,7 +194,7 @@ public class ExceptionController implements ResponseUnity {
      */
     @ExceptionHandler(ServerWebInputException.class)
     public Mono<ResponseEntity<?>> handleInvalidJsonException(ServerWebInputException ex, ServerWebExchange exchange) {
-        log.debug("用戶輸入的JSON 格式錯誤，錯誤: " + ex.getMessage());
+        log.debug("用戶輸入的JSON 格式錯誤，錯誤: {}", ex.getMessage());
 
         ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
                 .<Void>builder()
@@ -202,6 +202,29 @@ public class ExceptionController implements ResponseUnity {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .path(exchange.getRequest().getURI().getPath())
                 .message("JSON 格式錯誤")
+                .data(null)
+                .build();
+
+        return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
+    }
+
+    /**
+     * 處理不支持的操作
+     *
+     * @param ex       UnsupportedOperationException 不支持的操作
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    @ExceptionHandler(UnsupportedOperationException.class)
+    public Mono<ResponseEntity<?>> handleUnsupportedOperationException(UnsupportedOperationException ex, ServerWebExchange exchange) {
+        log.debug("不支持的操作: {}", ex.getMessage());
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("不支持的操作")
                 .data(null)
                 .build();
 

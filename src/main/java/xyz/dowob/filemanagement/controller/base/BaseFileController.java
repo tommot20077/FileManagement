@@ -133,7 +133,7 @@ public abstract class BaseFileController implements ResponseUnity {
      * 搜索文件，根據指定的關鍵字、資料夾 ID、文件類型以及時間範圍等條件進行文件搜索。
      * 這個方法支持對文件進行多條件過濾，包括名稱、類型、創建時間等。
      *
-     * @param exchange  請求對象，包含用戶的上下文。
+     * @param exchange      請求對象，包含用戶的上下文。
      * @param fileFilterDTO 文件過濾條件的數據對象。
      *
      * @return 返回符合條件的文件列表。

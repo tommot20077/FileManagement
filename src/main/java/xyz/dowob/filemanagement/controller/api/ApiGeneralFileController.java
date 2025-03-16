@@ -221,7 +221,7 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
      * @return Mono<ResponseEntity < ?>> 返回搜索文件的結果
      */
     @GetMapping("/search")
-    public Mono<ResponseEntity<?>> test(ServerWebExchange exchange,
+    public Mono<ResponseEntity<?>> search(ServerWebExchange exchange,
                                         @RequestParam(value = "keyword", required = false) String keyword,
                                         @RequestParam(value = "folder", required = false) Long folderId,
                                         @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,

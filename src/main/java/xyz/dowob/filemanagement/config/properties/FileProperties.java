@@ -74,7 +74,17 @@ public class FileProperties {
         /**
          * 下載緩存保留時間，默認為 3600，單位為秒
          */
-        private Long downloadCacheKeepTime = 3600L;
+        private Long downloadCacheHeaderExpireTime = 3600L;
+
+        /**
+         * 下載流緩存前綴
+         */
+        private String downloadCachePrefix = "download_stream_cache";
+
+        /**
+         * 下載流緩存過期時間，默認為 60，單位為分鐘
+         */
+        private Integer downloadCacheExpireTime = 60;
     }
 
     /**
@@ -86,6 +96,11 @@ public class FileProperties {
          * 是否啟用用戶文件列表樹，默認為 true
          */
         private Boolean enableUserFolderListTree = true;
+
+        /**
+         * 是否啟用文件流緩存，默認為 true
+         */
+        private Boolean enableFileStreamCache = true;
 
         /**
          * 文件列表每頁顯示數量，默認為 100

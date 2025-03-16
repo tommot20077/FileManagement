@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -50,25 +51,21 @@ public class FilePermissionRuleManager {
     /**
      * 允許擁有者訪問的權限規則
      */
-    @Getter
     private Permission<UserFileMetadata> allowOwner;
 
     /**
      * 允許共享者訪問的權限規則
      */
-    @Getter
     private Permission<UserFileMetadata> allowShared;
 
     /**
      * 阻止保留搜索ID的權限規則
      */
-    @Getter
     private Permission<UserFileMetadata> blockNotSearchOperation;
 
     /**
      * 阻止已刪除的文件的權限規則
      */
-    @Getter
     private Permission<UserFileMetadata> blockDeleted;
 
     /**
@@ -167,6 +164,47 @@ public class FilePermissionRuleManager {
             return Mono.empty();
         };
     }
+
+    /**
+     * 獲取默認的允許擁有者訪問的權限規則
+     *
+     * @return 權限規則列表
+     */
+    @SkipRecord
+    public Permission<UserFileMetadata> getAllowOwner() {
+        return allowOwner;
+    }
+
+    /**
+     * 獲取默認的允許共享者訪問的權限規則
+     *
+     * @return 權限規則列表
+     */
+    @SkipRecord
+    public Permission<UserFileMetadata> getAllowShared() {
+        return allowShared;
+    }
+
+    /**
+     * 獲取默認的阻止保留搜索ID的權限規則
+     *
+     * @return 權限規則列表
+     */
+    @SkipRecord
+    public Permission<UserFileMetadata> getBlockNotSearchOperation() {
+        return blockNotSearchOperation;
+    }
+
+    /**
+     * 獲取默認的阻止已刪除的文件的權限規則
+     *
+     * @return 權限規則列表
+     */
+    @SkipRecord
+    public Permission<UserFileMetadata> getBlockDeleted() {
+        return blockDeleted;
+    }
+
 
     /**
      * 預設的權限規則

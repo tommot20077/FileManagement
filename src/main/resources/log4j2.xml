@@ -8,7 +8,6 @@
         <!-- 控制台輸出 -->
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-30.30c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
-
         </Console>
 
         <!-- 一般日誌文件（不包含 ERROR 級別） -->
@@ -23,7 +22,6 @@
             </Policies>
             <DefaultRolloverStrategy max="50"/>
             <Filters>
-                <!-- 過濾掉 ERROR 級別，避免與 ErrorLogger 重複 -->
                 <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="NEUTRAL"/>
             </Filters>
         </RollingFile>
@@ -38,9 +36,21 @@
                 <TimeBasedTriggeringPolicy/>
             </Policies>
             <Filters>
-                <!-- 只記錄 ERROR 及以上級別 -->
                 <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
             </Filters>
+        </RollingFile>
+
+        <!-- 新增 `runtime.log` -->
+        <RollingFile name="RuntimeLogger" fileName="logs/runtime.log"
+                     filePattern="logs/runtime-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
+            </PatternLayout>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="50"/>
         </RollingFile>
 
         <!-- 異步 Appender -->
@@ -53,6 +63,9 @@
         <Async name="AsyncErrorLogger">
             <AppenderRef ref="ErrorLogger"/>
         </Async>
+        <Async name="AsyncRuntimeLogger">
+            <AppenderRef ref="RuntimeLogger"/>
+        </Async>
     </Appenders>
 
     <Loggers>
@@ -60,17 +73,13 @@
         <Root level="info">
             <AppenderRef ref="AsyncConsole"/>
             <AppenderRef ref="AsyncFileLogger"/>
+            <AppenderRef ref="AsyncErrorLogger"/>
         </Root>
 
-        <!-- xyz.dowob.filemanagement（DEBUG 級別，發送到 Console 和 FileLogger，不記錄 ERROR） -->
+        <!-- xyz.dowob.filemanagement（DEBUG 級別，發送到 Console 和 RuntimeLogger） -->
         <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
             <AppenderRef ref="AsyncConsole"/>
-            <AppenderRef ref="AsyncFileLogger"/>
-        </Logger>
-
-        <!-- 獨立的 ERROR Logger（只寫入 error.log） -->
-        <Logger name="ErrorLogger" level="error" additivity="false">
-            <AppenderRef ref="AsyncErrorLogger"/>
+            <AppenderRef ref="AsyncRuntimeLogger"/>
         </Logger>
     </Loggers>
 </Configuration>

@@ -22,8 +22,8 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
-import xyz.dowob.filemanagement.LimitedInputStream;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
@@ -35,6 +35,7 @@ import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.*;
+import xyz.dowob.filemanagement.data.file.po.DataBufferPO;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
 import xyz.dowob.filemanagement.entity.*;
 import xyz.dowob.filemanagement.exception.LimitationException;
@@ -137,6 +138,11 @@ public abstract class AbstractFileService implements FileService {
      * 映射轉換器
      */
     protected final ObjectMapper objectMapper;
+
+    /**
+     * 緩存管理器
+     */
+    protected final CacheManager cacheManager;
 
     /**
      * 檔案類型檢驗器
@@ -466,31 +472,41 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<UserFileDataBO>
      */
     public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... rangeHeader) {
-        return Mono
-                .defer(() -> {
-                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
-                    userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                    return serverFileMetaRepository
-                            .findById(userFileMetadata.getServerFileId().toString())
-                            .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
-                                                                           userFileMetadata.getServerFileId(),
-                                                                           userFileMetadata.getId()
-                            )))
-                            .map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata));
-                })
-                .flatMap(userFileDataBO -> gridFsProvider
+        return Mono.defer(() -> {
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+            userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
+            return serverFileMetaRepository
+                    .findById(userFileMetadata.getServerFileId().toString())
+                    .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.USER_HAVE_NOT_EXIST_SERVER_FILE,
+                                                                   userFileMetadata.getServerFileId(),
+                                                                   userFileMetadata.getId()
+                    )));
+        }).map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata)).flatMap(userFileDataBO -> {
+            Mono<DataBufferPO> getTestBOMono = Mono.defer(() -> {
+                DataBufferPO dataBufferPO = new DataBufferPO();
+                Flux<DataBuffer> dataBufferFlux = gridFsProvider
                         .findFileById(new ObjectId(userFileDataBO.getGridFsId()))
                         .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
                                                                        userFileDataBO.getServerFileId()
-                        )))
-                        .flatMap(gridFsFile -> gridFsProvider.getResource(gridFsFile).map(resource -> {
-                            long[] range = getRangeFromHeader(rangeHeader[0], userFileDataBO.getFileSize());
-                            long start = range[0];
-                            long end = range[1];
-
-                            userFileDataBO.setDataStream(streamFileFromGridFS(resource, start, end));
-                            return userFileDataBO;
-                        })));
+                        ))).flatMap(gridFsProvider::getResource).flatMapMany(ReactiveGridFsResource::getDownloadStream);
+                dataBufferPO.setDataBufferFlux(dataBufferFlux);
+                return Mono.just(dataBufferPO);
+            }).cache();
+            return cacheManager
+                    .runAndSetCache(userFileDataBO.getGridFsId(),
+                                    DataBufferPO.class,
+                                    CacheProviderEnum.FILE_STREAM_CACHE,
+                                    getTestBOMono,
+                                    Collections.singletonList(cacheManager.generateCacheRule(userFileDataBO.getGridFsId(),
+                                                                                             CacheProviderEnum.FILE_STREAM_CACHE
+                                    ))
+                    )
+                    .map(dataBufferPO -> {
+                        long[] range = getRangeFromHeader(rangeHeader[0], userFileDataBO.getFileSize());
+                        userFileDataBO.setDataStream(streamFileFromGridFS(dataBufferPO, range[0], range[1]));
+                        return userFileDataBO;
+                    });
+        });
     }
 
 
@@ -1264,39 +1280,37 @@ public abstract class AbstractFileService implements FileService {
      */
     private long[] getRangeFromHeader(String rangeHeader, long fileSize) {
         long start = 0;
-        long end = fileSize - 1;
+        long end = -1;
         if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
             String[] ranges = rangeHeader.replace("bytes=", "").split("-");
             start = Long.parseLong(ranges[0]);
-            if (ranges.length > 1 && !ranges[1].isEmpty()) {
-                end = Long.parseLong(ranges[1]);
+            if (ranges.length > 1 && !ranges[1].isEmpty() && ranges[1].matches("\\d+")) {
+                long endRange = Long.parseLong(ranges[1]);
+                end = endRange < fileSize ? endRange : -1;
             }
         }
         return new long[]{start, end};
     }
 
     /**
-     * 從GridFS流式讀取文件，並返回數據流
+     * 將檔案輸入流轉換為數據流
      *
-     * @param resource GridFS資源
-     * @param start    開始位置
-     * @param end      結束位置
+     * @param dataBufferPO 文件輸入流
+     * @param start        開始位置
+     * @param end          結束位置
      *
      * @return 返回數據流
      */
-    protected Flux<DataBuffer> streamFileFromGridFS(ReactiveGridFsResource resource, long start, long end) {
-        return resource
-                .getInputStream()
-                .flatMapMany(inputStream -> DataBufferUtils
-                        .readInputStream(() -> new LimitedInputStream(inputStream, start, end), DefaultDataBufferFactory.sharedInstance, 8192)
-                        .publishOn(Schedulers.boundedElastic())
-                        .doFinally(signal -> {
-                            try {
-                                inputStream.close();
-                            } catch (Exception ignored) {
-                            }
-                        }));
+    protected Flux<DataBuffer> streamFileFromGridFS(DataBufferPO dataBufferPO, long start, long end) {
+        return Flux.defer(() -> {
+            Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferPO.getDataBufferFlux(), start);
+            if (end == -1L || end == Long.MAX_VALUE) {
+                return skippedFlux;
+            }
+            return DataBufferUtils.takeUntilByteCount(skippedFlux, end - start + 1);
+        });
     }
+
 
     /**
      * 創建一個新的用戶文件元數據實體

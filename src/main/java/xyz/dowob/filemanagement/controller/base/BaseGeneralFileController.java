@@ -3,7 +3,6 @@ package xyz.dowob.filemanagement.controller.base;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
@@ -324,7 +323,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         } else {
             headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
         }
-        String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheKeepTime());
+        String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime());
         headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
         return headers;
     }
@@ -337,7 +336,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return HttpHeaders 返回 Http 標頭
      */
-    private static @NotNull HttpHeaders getHttpHeaders(UserFileDataBO userFileDataBO, String rangeHeader) {
+    private HttpHeaders getHttpHeaders(UserFileDataBO userFileDataBO, String rangeHeader) {
         HttpHeaders headers = new HttpHeaders();
         long fileSize = userFileDataBO.getFileSize();
 

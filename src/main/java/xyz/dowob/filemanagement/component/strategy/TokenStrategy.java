@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.component.strategy;
 
 import org.springframework.stereotype.Component;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.provider.providerImplement.PasswordResetTokenProviderImpl;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
@@ -49,6 +50,7 @@ public class TokenStrategy {
      *
      * @return TokenProvider
      */
+    @SkipRecord
     public TokenProvider getTokenProvider(TokenEnum tokenEnum) {
         TokenProvider tokenProvider = tokenStrategies.get(tokenEnum);
         if (tokenProvider == null) {
