@@ -12,10 +12,7 @@ import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
 import xyz.dowob.filemanagement.functionInterface.CacheRule;
 
 import java.time.Duration;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -31,7 +28,7 @@ import java.util.function.Function;
  * @program FileManagement
  * @ClassName CacheManager
  * @create 2025/3/15
- * @Version 1.0
+ * @Version 1.1
  **/
 @Component
 @SuppressWarnings("unused")
@@ -80,6 +77,7 @@ public class CacheManager {
 
     /**
      * 獲取緩存，根據key獲取緩存數據
+     * 回傳值為Mono，用於單個查詢
      *
      * @param key               key
      * @param clazz             類型
@@ -87,12 +85,31 @@ public class CacheManager {
      *
      * @return Mono<T>
      */
-    public <T> Mono<T> getCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
-        return cacheProviderMap.get(cacheProviderEnum).get(key, clazz);
+    public <T> Mono<T> getCacheMono(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> provider.get(key, clazz)).orElseGet(Mono::empty);
+    }
+
+
+    /**
+     * 獲取緩存，根據key獲取緩存數據
+     * 回傳值為Flux，用於查詢集合類緩存
+     *
+     * @param key               key
+     * @param clazz             類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Flux<T>
+     */
+    public <T> Flux<T> getCacheFlux(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.getAsList(key, clazz).flatMapMany(Flux::fromIterable))
+                .orElseGet(Flux::empty);
     }
 
     /**
      * 獲取緩存，根據key獲取緩存數據，此為批量查詢
+     * 回傳值為Map，key為查詢的key，value為查詢的結果
      *
      * @param keys              key集合
      * @param clazz             類型
@@ -100,8 +117,42 @@ public class CacheManager {
      *
      * @return Flux<T>
      */
-    public <T> Flux<T> getCacheWithBatch(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
-        return cacheProviderMap.get(cacheProviderEnum).getAll(keys, clazz);
+    public <T> Mono<Map<String, T>> getCaches(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> provider.getAllAsMap(keys, clazz)).orElseGet(Mono::empty);
+    }
+
+    /**
+     * 獲取緩存，根據key獲取緩存數據，此為批量查詢
+     * 回傳值為Map，key為查詢的key，value為查詢的結果
+     * 這是查詢列表的方法，返回的是Map，內部是列表
+     *
+     * @param keys              key集合
+     * @param clazz             類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Flux<T>
+     */
+    public <T> Mono<Map<String, List<T>>> getListCaches(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.getAllAsMapList(keys, clazz))
+                .orElseGet(Mono::empty);
+    }
+
+    /**
+     * 獲取緩存，根據key獲取緩存數據，此為批量查詢
+     * 將所有查詢結果合併為一個Flux
+     *
+     * @param keys              key集合
+     * @param clazz             類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Flux<T>
+     */
+    public <T> Flux<T> getCachesAsConcat(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum) {
+        return getCaches(keys, clazz, cacheProviderEnum)
+                .switchIfEmpty(Mono.just(new HashMap<>()))
+                .flatMapMany(map -> Flux.fromIterable(map.values()));
     }
 
     /**
@@ -128,8 +179,12 @@ public class CacheManager {
      * @return Mono<Void>
      */
     public Mono<Void> setCache(String key, Object value, CacheProviderEnum cacheProviderEnum, Duration expire) {
-        return cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.set(key, value, expire).subscribeOn(Schedulers.boundedElastic()))
+                .orElseGet(Mono::empty);
     }
+
 
     /**
      * 設置緩存，根據key-value設置緩存數據，此為批量設置
@@ -139,8 +194,9 @@ public class CacheManager {
      *
      * @return Mono<Void>
      */
-    public Mono<Void> setCacheWithBatch(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum) {
-        return setCacheWithBatch(keyValues, cacheProviderEnum, null);
+    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum) {
+        return setCaches(keyValues, cacheProviderEnum, null);
+
     }
 
     /**
@@ -152,12 +208,32 @@ public class CacheManager {
      *
      * @return Mono<Void>
      */
-    public Mono<Void> setCacheWithBatch(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
-        return cacheProviderMap.get(cacheProviderEnum).setAll(keyValues, expire);
+    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
+            provider.setAll(keyValues, chooseTime).subscribeOn(Schedulers.boundedElastic()).subscribe();
+            return Mono.empty();
+        }).orElseGet(Mono::empty).then();
     }
 
     /**
-     * 刪除緩存，根據key刪除緩存數據
+     * 刪除緩存，根據key刪除緩存數據，可以設置是否異步
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param isAsync           是否異步
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Mono<Void> action = provider.delete(key);
+            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
+        }).orElseGet(Mono::empty);
+    }
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，此為同步刪除
      *
      * @param key               key
      * @param cacheProviderEnum 緩存提供者的類型
@@ -165,34 +241,41 @@ public class CacheManager {
      * @return Mono<Void>
      */
     public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum) {
-        return cacheProviderMap.get(cacheProviderEnum).delete(key);
+        return deleteCache(key, cacheProviderEnum, false);
     }
 
     /**
-     * 刪除緩存，根據key刪除緩存數據，此為批量刪除
+     * 刪除緩存，根據key刪除緩存數據，此為批量刪除，並且可以設置是否異步
+     *
+     * @param keys              key集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param isAsync           是否異步
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Mono<Void> action = provider.deleteAll(keys);
+            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
+        }).orElseGet(Mono::empty);
+    }
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，此為批量刪除，此為同步刪除
      *
      * @param keys              key集合
      * @param cacheProviderEnum 緩存提供者的類型
      *
      * @return Mono<Void>
      */
-    public Mono<Void> deleteCacheWithBatch(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
-        return cacheProviderMap.get(cacheProviderEnum).deleteAll(keys);
+    public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        return deleteCaches(keys, cacheProviderEnum, false);
     }
 
-    /**
-     * 刪除緩存，刪除所有緩存數據
-     *
-     * @param cacheProviderEnum 緩存提供者的類型
-     *
-     * @return Mono<Void>
-     */
-    public Mono<Void> deleteAllCache(CacheProviderEnum cacheProviderEnum) {
-        return cacheProviderMap.get(cacheProviderEnum).deleteAll(null);
-    }
 
     /**
      * 獲取Mono的緩存，如果緩存不存在則執行source並將結果存入緩存
+     * 此為使用CacheProvider內部的默認過期時間
      *
      * @param key               查詢緩存的key，若緩存不存在此值將作為緩存的key
      * @param clazz             回傳的類型
@@ -222,17 +305,18 @@ public class CacheManager {
      * @return Mono<T> 回傳緩存的值或source的回傳值
      */
     public <T> Mono<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Mono<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
-        return cacheProviderMap.get(cacheProviderEnum).get(key, clazz).switchIfEmpty(source.doOnNext(value -> {
-            if (cacheProviderMap.get(cacheProviderEnum) != null) {
-                applyCacheRule(cacheRules, value, expire);
-            }
-        }));
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
+            return provider.get(key, clazz).switchIfEmpty(source.doOnNext(value -> {
+                applyCacheRule(cacheRules, value, chooseTime);
+            }));
+        }).orElseGet(() -> source.cast(clazz));
     }
 
     /**
      * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存
      *
-     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param key               查詢緩存的ke，若緩存不存在此值將作為緩存的key
      * @param clazz             回傳的類型
      * @param cacheProviderEnum 緩存提供者的類型
      * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
@@ -241,14 +325,14 @@ public class CacheManager {
      *
      * @return Flux<T> 回傳緩存的值或source的回傳值
      */
-    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules) {
-        return runAndSetCache(keys, clazz, cacheProviderEnum, source, cacheRules, null);
+    public <T> Flux<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules) {
+        return runAndSetCache(key, clazz, cacheProviderEnum, source, cacheRules, null);
     }
 
     /**
      * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
      *
-     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param key               查詢緩存的key集合，若緩存不存在此值將作為緩存的key
      * @param clazz             回傳的類型
      * @param cacheProviderEnum 緩存提供者的類型
      * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
@@ -258,13 +342,88 @@ public class CacheManager {
      *
      * @return Flux<T> 回傳緩存的值或source的回傳值
      */
-    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
-        return cacheProviderMap.get(cacheProviderEnum).getAll(keys, clazz).switchIfEmpty(source.doOnNext(value -> {
-            if (cacheProviderMap.get(cacheProviderEnum) != null) {
-                applyCacheRule(cacheRules, value, expire);
-            }
-        }));
+    public <T> Flux<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
+            return provider.getAsList(key, clazz).flatMapMany(Flux::fromIterable).switchIfEmpty(source.doOnNext(value -> {
+                applyCacheRule(cacheRules, value, chooseTime);
+            }));
+        }).orElseGet(() -> source.cast(clazz));
     }
+
+    /**
+     * 獲取Flux的緩存，此方法為批量查詢並返回一個結果流
+     * 如果緩存不存在則執行source並將結果存入緩存
+     * 此為使用CacheProvider內部的默認過期時間
+     *
+     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param <T>               回傳的類型
+     *
+     * @return Mono<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules) {
+        return runAndSetCache(keys, clazz, cacheProviderEnum, source, cacheRules, null);
+    }
+
+    /**
+     * 獲取Flux的緩存，此方法為批量查詢並返回一個結果流
+     * 如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
+     *
+     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param expire            過期時間
+     * @param <T>               回傳的類型
+     *
+     * @return Mono<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
+            return provider.getAllAsMap(keys, clazz).flatMapMany(map -> {
+                if (map.isEmpty()) {
+                    return source.doOnNext(value -> {
+                        applyCacheRule(cacheRules, value, chooseTime);
+                    });
+                }
+                return Flux.fromIterable(map.values());
+            });
+        }).orElseGet(() -> source.cast(clazz));
+    }
+
+    /**
+     * 獲取Mono的Map緩存，如果緩存不存在則執行source並將結果存入緩存
+     * 此為使用CacheProvider內部的默認過期時間
+     * 適用於批量查詢，會將結果依照key存入Map
+     *
+     * @param keys              查詢緩存的key集合，若緩存不存在此值將作為緩存的key
+     * @param clazz             回傳的類型
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param source            當沒有緩存時執行的方法，方法的回傳值將作為緩存的值
+     * @param cacheRules        緩存規則
+     * @param <T>               回傳的類型
+     *
+     * @return Mono<T> 回傳緩存的值或source的回傳值
+     */
+    public <T> Mono<Map<String, T>> runAndSetCaches(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Function<Collection<String>, Mono<Map<String, T>>> source, List<CacheRule<T>> cacheRules, Duration expire) {
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.getAllAsMap(keys, clazz).switchIfEmpty(source.apply(keys).doOnNext(resultMap -> {
+                    if (!resultMap.isEmpty()) {
+                        resultMap.forEach((key, value) -> {
+                            applyCacheRule(cacheRules, value, Objects.requireNonNullElse(expire, provider.getDefaultExpire()));
+                        });
+                    }
+                })))
+                .orElseGet(() -> source.apply(keys));
+    }
+
 
     /**
      * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定回傳值的某項屬性作為key
@@ -279,9 +438,13 @@ public class CacheManager {
     public <T> CacheRule<T> generateCacheRule(Function<T, ?> keyExtractor, CacheProviderEnum cacheProviderEnum) {
         return (value, expire) -> {
             String key = keyExtractor.apply(value).toString();
-            return cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+            return Optional
+                    .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                    .map(provider -> provider.set(key, value, expire))
+                    .orElseGet(Mono::empty);
         };
     }
+
 
     /**
      * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定key
@@ -294,7 +457,10 @@ public class CacheManager {
      */
     @SkipRecord
     public <T> CacheRule<T> generateCacheRule(String key, CacheProviderEnum cacheProviderEnum) {
-        return (value, expire) -> cacheProviderMap.get(cacheProviderEnum).set(key, value, expire);
+        return (value, expire) -> Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.set(key, value, expire))
+                .orElseGet(Mono::empty);
     }
 
     /**

@@ -21,5 +21,9 @@ public enum CacheProviderEnum {
     /**
      * 檔案流緩存
      */
-    FILE_STREAM_CACHE
+    FILE_STREAM_CACHE,
+    /**
+     * 檔案列表緩存
+     */
+    USER_FILE_LIST_CACHE,
 }

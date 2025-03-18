@@ -9,22 +9,23 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.CacheProviderType;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.component.provider.provider.AbstractRedisCacheProvider;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
-import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
+import xyz.dowob.filemanagement.config.properties.CacheProperties;
 import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
-import xyz.dowob.filemanagement.data.file.po.DataBufferPO;
+import xyz.dowob.filemanagement.data.file.po.FluxDataPO;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Duration;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 文件流緩存提供者實現類，用於提供文件流緩存的操作
  * 對於每一次請求都需要從GridFS中獲取文件流，這樣會對服務器造成壓力，因此提供對於檔案的數據流進行緩存
  * 透過繼承AbstractRedisCacheProvider，實現了CacheProvider接口，提供了緩存操作的具體實現
- * 此類透過檔案設定enable-file-stream-cache來判斷是否啟用文件流緩存，當開啟時此類才會生效，默認開啟 {@link FileProperties}
+ * 此類透過緩存設定enable-file-stream-cache來判斷是否啟用文件流緩存，當開啟時此類才會生效，默認開啟 {@link CacheProperties}
  * 文件流緩存的key前綴以及緩存的默認過期時間來自於檔案設定
  *
  * @author yuan
@@ -34,80 +35,113 @@ import java.util.Map;
  * @Version 1.0
  **/
 @Component
+@HideOverLength
 @CacheProviderType(CacheProviderEnum.FILE_STREAM_CACHE)
-@ConditionalOnProperty(prefix = "file", name = "global.enable-file-stream-cache", havingValue = "true", matchIfMissing = true)
-public class StreamCacheProviderImpl extends AbstractRedisCacheProvider {
+@ConditionalOnProperty(prefix = "cache", name = "enable-file-download-stream-cache", havingValue = "true", matchIfMissing = true)
+public class StreamCacheProviderImpl implements CacheProvider {
+    /**
+     * Redis操作提供者
+     */
+    private final RedisProvider redisProvider;
+
+    /**
+     * 默認過期時間
+     */
+    private final Duration DEFAULT_EXPIRE_TIME;
+
+    /**
+     * 緩存前綴
+     */
+    private final String CACHE_PREFIX;
+
+
     /**
      * 文件流緩存提供者實現類的構造方法
      *
      * @param redisProvider Redis操作提供者
      */
-    public StreamCacheProviderImpl(RedisProvider redisProvider, FileProperties fileProperties) {
-        super(redisProvider);
-        super.setCACHE_PREFIX(fileProperties.getDownload().getDownloadCachePrefix());
-        super.setDEFAULT_EXPIRE_TIME(fileProperties.getDownload().getDownloadCacheExpireTime());
+    public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
+        this.redisProvider = redisProvider;
+        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
+        this.CACHE_PREFIX = cacheProperties.getDownloadCachePrefix();
     }
 
+
     /**
-     * 根據key獲取緩存數據
+     * 查詢緩存值
      *
-     * @param hashKey key
-     * @param clazz   類型
+     * @param key   查詢key
+     * @param clazz 值的類型
+     * @param <T>   泛型類型
      *
      * @return Mono<T>
      */
-    @HideOverLength
-    @Override
-    public <T> Mono<T> get(String hashKey, Class<T> clazz) {
-        return super.getRedisProvider().getHashMap(super.getCACHE_PREFIX(), hashKey, String.class).mapNotNull(base64 -> {
-            if (clazz.isAssignableFrom(DataBufferPO.class)) {
-                DataBufferPO dataBufferPO = new DataBufferPO();
-                dataBufferPO.setDataBufferFlux(formatBase64ToStream(base64));
-                return dataBufferPO;
-            }
-            return null;
+    public <T> Mono<T> get(String key, Class<T> clazz) {
+        return redisProvider.getHashMap(CACHE_PREFIX, key, String.class).map(base64 -> {
+            Flux<DataBuffer> dataBufferFlux = formatBase64ToStream(base64);
+            return new FluxDataPO<>(dataBufferFlux);
         }).cast(clazz);
     }
 
 
     /**
-     * 根據key獲取緩存數據，此為批量查詢
+     * 查詢緩存集合 (返回一個 List)
      *
-     * @param hashKeys key集合
-     * @param clazz    類型
+     * @param key   緩存鍵集合
+     * @param clazz 值的類型
+     * @param <T>   泛型類型
      *
-     * @return Flux<T>
+     * @return Mono<List < T>>
      */
-    @HideOverLength
     @Override
-    public <T> Flux<T> getAll(Collection<String> hashKeys, Class<T> clazz) {
-        return Flux.error(new UnsupportedOperationException("檔案流緩存不支持批量查詢"));
+    public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
+        return redisProvider.getHashMap(CACHE_PREFIX, key, String.class).flatMap(base64 -> formatBase64ToStream(base64).cast(clazz).collectList());
+    }
+
+    /**
+     * 批量查詢緩存列表 (返回一個 Map，內部為列表)
+     *
+     * @param keys  緩存鍵集合
+     * @param clazz 值的類型
+     * @param <T>   泛型類型
+     *
+     * @return Mono<Map < String, List < T>>>
+     */
+    @Override
+    public <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
+        HashMap<String, List<T>> map = new HashMap<>();
+        return Flux.fromIterable(keys).flatMap(key -> getAsList(key, clazz).doOnNext(list -> map.put(key, list))).then(Mono.just(map));
     }
 
 
     /**
-     * 設定緩存數據
+     * 設定單個緩存值
      *
-     * @param hashKey 查詢key
-     * @param value   存儲value
-     * @param expire  過期時間
+     * @param key    查詢key
+     * @param value  存儲value
+     * @param expire 過期時間
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> set(String hashKey, Object value, Duration... expire) {
-        boolean hasExpire = expire != null && expire.length > 0;
-        if (value instanceof DataBufferPO dataBufferPO) {
-            return formatStreamToBase64(dataBufferPO.getDataBufferFlux()).flatMap(base64 -> {
-                if (hasExpire) {
-                    return super.getRedisProvider().setHashMap(super.getCACHE_PREFIX(), hashKey, base64, expire[0]);
+    public Mono<Void> set(String key, Object value, Duration expire) {
+        Duration chooseTime = Objects.requireNonNullElse(expire, DEFAULT_EXPIRE_TIME);
+
+        Flux<DataBuffer> dataBufferFlux;
+        if (value instanceof FluxDataPO<?> dataPO) {
+            FluxDataPO<DataBuffer> dataBufferPO = new FluxDataPO<>();
+            dataBufferFlux = dataBufferPO.formatAndSet(dataPO.getTFlux(), DataBuffer.class);
+        } else if (value instanceof Collection<?> c) {
+            dataBufferFlux = Flux.fromIterable(c).cast(DataBuffer.class);
+        } else {
+            dataBufferFlux = ((Flux<?>) value).flatMap(o -> {
+                if (o instanceof DataBuffer) {
+                    return Flux.just((DataBuffer) o);
                 }
-                return super
-                        .getRedisProvider()
-                        .setHashMap(super.getCACHE_PREFIX(), hashKey, base64, Duration.ofMinutes(super.getDEFAULT_EXPIRE_TIME()));
-            }).then();
+                return Flux.error(new UnsupportedOperationException("不支持的操作類型: " + o.getClass().getName()));
+            });
         }
-        return Mono.empty();
+        return formatStreamToBase64(dataBufferFlux).flatMap(base64 -> redisProvider.setHashMap(CACHE_PREFIX, key, base64, chooseTime)).then();
     }
 
 
@@ -120,8 +154,19 @@ public class StreamCacheProviderImpl extends AbstractRedisCacheProvider {
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> setAll(Map<String, Object> keyValues, Duration... expire) {
-        return Mono.error(new UnsupportedOperationException("檔案流緩存不支持批量設定"));
+    public Mono<Void> setAll(Map<String, Object> keyValues, Duration expire) {
+        return keyValues.entrySet().stream().map(entry -> set(entry.getKey(), entry.getValue(), expire)).reduce(Mono::then).orElse(Mono.empty());
+    }
+
+    /**
+     * 獲取默認過期時間
+     *
+     * @return 默認過期時間
+     */
+    @Override
+    @SkipRecord
+    public Duration getDefaultExpire() {
+        return DEFAULT_EXPIRE_TIME;
     }
 
 
@@ -132,7 +177,6 @@ public class StreamCacheProviderImpl extends AbstractRedisCacheProvider {
      *
      * @return Mono<String>
      */
-    @HideOverLength
     private Mono<String> formatStreamToBase64(Flux<DataBuffer> dataBufferFlux) {
         return dataBufferFlux.map(dataBuffer -> {
             byte[] bytes = new byte[dataBuffer.readableByteCount()];
@@ -140,13 +184,15 @@ public class StreamCacheProviderImpl extends AbstractRedisCacheProvider {
             DataBufferUtils.release(dataBuffer);
             return bytes;
         }).collectList().map(byteList -> {
-            byte[] allBytes = byteList.stream().reduce(new byte[0], (a, b) -> {
-                byte[] result = new byte[a.length + b.length];
-                System.arraycopy(a, 0, result, 0, a.length);
-                System.arraycopy(b, 0, result, a.length, b.length);
-                return result;
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream(byteList.size());
+            byteList.forEach(bytes -> {
+                try {
+                    outputStream.write(bytes);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             });
-            return Base64.getEncoder().encodeToString(allBytes);
+            return Base64.getEncoder().encodeToString(outputStream.toByteArray());
         });
     }
 
@@ -157,7 +203,6 @@ public class StreamCacheProviderImpl extends AbstractRedisCacheProvider {
      *
      * @return Flux<DataBuffer>
      */
-    @HideOverLength
     private Flux<DataBuffer> formatBase64ToStream(String base64) {
         byte[] bytes = Base64.getDecoder().decode(base64);
         return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes));

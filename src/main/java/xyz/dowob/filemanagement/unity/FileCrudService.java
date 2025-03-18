@@ -91,5 +91,5 @@ public interface FileCrudService {
      *
      * @param entity 服務器文件元數據實體對象
      */
-    Mono<ServerFileMetadata> deleteServerFileMetadata(ServerFileMetadata entity);
+    Mono<Void> deleteServerFileMetadata(ServerFileMetadata entity);
 }

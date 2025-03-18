@@ -5,6 +5,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.PostConstruct;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.Tika;
@@ -23,6 +24,7 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
@@ -35,19 +37,19 @@ import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
 import xyz.dowob.filemanagement.data.file.dto.*;
-import xyz.dowob.filemanagement.data.file.po.DataBufferPO;
+import xyz.dowob.filemanagement.data.file.po.FluxDataPO;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
 import xyz.dowob.filemanagement.entity.*;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.functionInterface.CacheRule;
 import xyz.dowob.filemanagement.repostiory.*;
 
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -155,16 +157,6 @@ public abstract class AbstractFileService implements FileService {
     protected Long CHUNK_SIZE;
 
     /**
-     * 默認緩存時間
-     */
-    private static final Duration DEFAULT_CACHE_DURATION = Duration.ofHours(1);
-
-    /**
-     * 緩存鍵的格式
-     */
-    private static final String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
-
-    /**
      * 初始化方法，獲取文件配置中的分塊大小
      */
     @PostConstruct
@@ -181,30 +173,32 @@ public abstract class AbstractFileService implements FileService {
      */
     @HideOverLength
     public Mono<PagedResponseDTO<UserFileListDTO>> getUserFileList(User user, FileFilterDTO fileFilterDTO) {
+        String key = getUserFileListBaseKey(user.getId(), fileFilterDTO.getFolderId());
         int pageSize = Objects.requireNonNullElse(fileFilterDTO.getPageSize(), fileProperties.getGlobal().getPageSize());
         int currentPage = Math.max(1, Objects.requireNonNullElse(fileFilterDTO.getPage(), 1));
         fileFilterDTO.setPage(currentPage);
         fileFilterDTO.setPageSize(pageSize);
 
-        String key = getUserFileListBaseKey(user.getId(), fileFilterDTO.getFolderId());
 
-        return getFileListFormCache(key).collectList().flatMap(cachedList -> {
-            if (!cachedList.isEmpty()) {
-                return filterAndPageResponse(cachedList, fileFilterDTO);
-            }
-            return formatUserFileMetaToListDto(getUserFileMetadataFlux(user, fileFilterDTO.getFolderId(), fileFilterDTO.getTypes()))
-                    .collectList()
-                    .flatMap(dbList -> {
-                        if (!dbList.isEmpty()) {
-                            Mono<Void> cacheMono = cacheUserFileList(user, fileFilterDTO.getFolderId(), Flux.fromIterable(dbList));
-                            return cacheMono.then(filterAndPageResponse(dbList, fileFilterDTO));
-                        }
-                        return filterAndPageResponse(dbList, fileFilterDTO);
-                    });
-        });
+        Flux<UserFileMetadata> getUserFileMetadataFlux = getUserFileMetadataFlux(user, fileFilterDTO.getFolderId(), fileFilterDTO.getTypes());
+        Flux<UserFileListDTO> getUserFileListDTOFlux = formatUserFileMetaToListDto(getUserFileMetadataFlux);
+
+        if (fileFilterDTO.getFolderId() == null || fileFilterDTO.getFolderId() < 0) {
+            return getUserFileListDTOFlux.collectList().flatMap(list -> filterAndPageResponse(list, fileFilterDTO));
+        }
+
+        CacheRule<UserFileListDTO> cacheRule = cacheManager.generateCacheRule(key, CacheProviderEnum.USER_FILE_LIST_CACHE);
+        Flux<UserFileListDTO> listDTOFlux = cacheManager.runAndSetCache(key,
+                                                                        UserFileListDTO.class,
+                                                                        CacheProviderEnum.USER_FILE_LIST_CACHE,
+                                                                        getUserFileListDTOFlux,
+                                                                        Collections.singletonList(cacheRule)
+        );
+        return listDTOFlux.collectList().flatMap(list -> filterAndPageResponse(list, fileFilterDTO));
     }
 
     protected String getUserFileListBaseKey(Long userId, Long searchId) {
+        String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
         return String.format(PAGE_KEY_FORMAT, userId, Objects.requireNonNullElse(searchId, 0L));
     }
 
@@ -287,14 +281,16 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 從緩存中獲取用戶文件列表
+     * 清除用戶文件列表緩存的共通實現
      *
-     * @param key 緩存Key
+     * @param userId    用戶ID
+     * @param folderIds 文件夾ID列表
      *
-     * @return Flux<UserFileListDTO> 檔案列表流
+     * @return Mono<Void>
      */
-    private Flux<UserFileListDTO> getFileListFormCache(String key) {
-        return redisProvider.getList(key, UserFileListDTO.class);
+    protected Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
+        List<String> keys = Arrays.stream(folderIds).distinct().map(folderId -> getUserFileListBaseKey(userId, folderId)).toList();
+        return cacheManager.deleteCaches(keys, CacheProviderEnum.USER_FILE_LIST_CACHE, true);
     }
 
     /**
@@ -411,24 +407,6 @@ public abstract class AbstractFileService implements FileService {
         }));
     }
 
-    /**
-     * 緩存用戶文件列表，而若父文件夾ID為空或是小於0則不進行緩存
-     *
-     * @param user                用戶信息
-     * @param fatherFolderId      父文件夾ID
-     * @param userFileListDTOFlux 檔案列表流
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> cacheUserFileList(User user, Long fatherFolderId, Flux<UserFileListDTO> userFileListDTOFlux) {
-        if (fatherFolderId == null || fatherFolderId < 0) {
-            return Mono.empty();
-        }
-        String key = getUserFileListBaseKey(user.getId(), fatherFolderId);
-        return userFileListDTOFlux.flatMap(userFileListDTO -> redisProvider.insertList(key, userFileListDTO, false, DEFAULT_CACHE_DURATION))
-                .then()
-                .subscribeOn(Schedulers.boundedElastic());
-    }
 
     /**
      * 獲取用戶文件元數據流
@@ -482,28 +460,30 @@ public abstract class AbstractFileService implements FileService {
                                                                    userFileMetadata.getId()
                     )));
         }).map(serverFileMetadata -> new UserFileDataBO(serverFileMetadata, userFileMetadata)).flatMap(userFileDataBO -> {
-            Mono<DataBufferPO> getTestBOMono = Mono.defer(() -> {
-                DataBufferPO dataBufferPO = new DataBufferPO();
+            Mono<FluxDataPO<DataBuffer>> fluxDataPOMono = Mono.defer(() -> {
+                FluxDataPO<DataBuffer> dataBufferPO = new FluxDataPO<>();
                 Flux<DataBuffer> dataBufferFlux = gridFsProvider
                         .findFileById(new ObjectId(userFileDataBO.getGridFsId()))
                         .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.GRIDFS_FILE_NOT_FOUND,
                                                                        userFileDataBO.getServerFileId()
                         ))).flatMap(gridFsProvider::getResource).flatMapMany(ReactiveGridFsResource::getDownloadStream);
-                dataBufferPO.setDataBufferFlux(dataBufferFlux);
+                dataBufferPO.setTFlux(dataBufferFlux);
                 return Mono.just(dataBufferPO);
-            }).cache();
+            });
             return cacheManager
-                    .runAndSetCache(userFileDataBO.getGridFsId(),
-                                    DataBufferPO.class,
-                                    CacheProviderEnum.FILE_STREAM_CACHE,
-                                    getTestBOMono,
+                    .runAndSetCache(userFileDataBO.getGridFsId(), FluxDataPO.class,
+                                    CacheProviderEnum.FILE_STREAM_CACHE, fluxDataPOMono,
                                     Collections.singletonList(cacheManager.generateCacheRule(userFileDataBO.getGridFsId(),
                                                                                              CacheProviderEnum.FILE_STREAM_CACHE
                                     ))
                     )
                     .map(dataBufferPO -> {
                         long[] range = getRangeFromHeader(rangeHeader[0], userFileDataBO.getFileSize());
-                        userFileDataBO.setDataStream(streamFileFromGridFS(dataBufferPO, range[0], range[1]));
+                        FluxDataPO<DataBuffer> dataBuffer = new FluxDataPO<>();
+                        userFileDataBO.setDataStream(streamFileFromGridFS(dataBuffer.formatAndSet(dataBufferPO.getTFlux(), DataBuffer.class),
+                                                                          range[0],
+                                                                          range[1]
+                        ));
                         return userFileDataBO;
                     });
         });
@@ -584,8 +564,8 @@ public abstract class AbstractFileService implements FileService {
     public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
         UserFileMetadata userFileMetadata = fileEditDTO.getUserFileMetadata();
         Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
-        Mono<UserFileMetadata> processFileMono = redisProvider
-                .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
+        Mono<UserFileMetadata> processFileMono = cacheManager
+                .deleteCache(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()), CacheProviderEnum.USER_FILE_LIST_CACHE)
                 .then(Mono.defer(() -> {
                     userFileMetadata.setFilename(fileEditDTO.getFilename());
                     userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
@@ -931,22 +911,6 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
-
-    /**
-     * 清除用戶文件列表緩存的共通實現
-     *
-     * @param userId    用戶ID
-     * @param folderIds 文件夾ID列表
-     *
-     * @return Mono<Void>
-     */
-    protected Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
-        CompletableFuture.runAsync(() -> Arrays
-                .stream(folderIds)
-                .distinct()
-                .forEach(folderId -> redisProvider.deleteList(getUserFileListBaseKey(userId, folderId)).subscribe()));
-        return Mono.empty();
-    }
 
     /**
      * 初始化上傳任務，若需要則返回Mono<String> taskId
@@ -1295,15 +1259,15 @@ public abstract class AbstractFileService implements FileService {
     /**
      * 將檔案輸入流轉換為數據流
      *
-     * @param dataBufferPO 文件輸入流
-     * @param start        開始位置
-     * @param end          結束位置
+     * @param dataBufferFlux 文件輸入流
+     * @param start          開始位置
+     * @param end            結束位置
      *
      * @return 返回數據流
      */
-    protected Flux<DataBuffer> streamFileFromGridFS(DataBufferPO dataBufferPO, long start, long end) {
+    protected Flux<DataBuffer> streamFileFromGridFS(Flux<DataBuffer> dataBufferFlux, long start, long end) {
         return Flux.defer(() -> {
-            Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferPO.getDataBufferFlux(), start);
+            Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferFlux, start);
             if (end == -1L || end == Long.MAX_VALUE) {
                 return skippedFlux;
             }
@@ -1329,9 +1293,6 @@ public abstract class AbstractFileService implements FileService {
      * @return 用戶文件元數據實體對象
      */
     public Mono<UserFileMetadata> getUserFileMetadataById(Long id) {
-        if (id == null) {
-            return Mono.empty();
-        }
         return userFileMetaRepository.findById(id.toString());
     }
 
@@ -1339,7 +1300,7 @@ public abstract class AbstractFileService implements FileService {
      * 獲取所有用戶文件元數據實體
      */
     public Flux<UserFileMetadata> getAllUserFileMetadata() {
-        return Flux.empty();
+        return userFileMetaRepository.findAll();
     }
 
     /**
@@ -1347,8 +1308,8 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 用戶文件元數據實體對象
      */
-    public Mono<Void> updateUserFileMetadata(UserFileMetadata entity) {
-        return Mono.empty();
+    public Mono<Void> updateUserFileMetadata(@NotNull UserFileMetadata entity) {
+        return userFileMetaRepository.save(entity).then();
     }
 
     /**
@@ -1357,7 +1318,7 @@ public abstract class AbstractFileService implements FileService {
      * @param entity 用戶文件元數據實體對象
      */
     public Mono<Void> deleteUserFileMetadata(UserFileMetadata entity) {
-        return Mono.empty();
+        return userFileMetaRepository.deleteById(entity.getId().toString());
     }
 
     /**
@@ -1366,7 +1327,7 @@ public abstract class AbstractFileService implements FileService {
      * @return 返回一個新的服務器文件元數據實體對象
      */
     public Mono<ServerFileMetadata> createServerFileMetadata() {
-        return Mono.empty();
+        return Mono.just(new ServerFileMetadata());
     }
 
     /**
@@ -1377,14 +1338,15 @@ public abstract class AbstractFileService implements FileService {
      * @return 服務器文件元數據實體對象
      */
     public Mono<ServerFileMetadata> getByServerFileMetadataId(Long id) {
-        return Mono.empty();
+        return serverFileMetaRepository.findById(id.toString());
     }
 
     /**
      * 獲取所有服務器文件元數據實體
      */
+    @RequirePermission(PermissionEnum.MANAGE)
     public Flux<ServerFileMetadata> getAllServerFileMetadata() {
-        return Flux.empty();
+        return serverFileMetaRepository.findAll();
     }
 
     /**
@@ -1392,8 +1354,9 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 服務器文件元數據實體對象
      */
-    public Mono<ServerFileMetadata> updateServerFileMetadata(ServerFileMetadata entity) {
-        return Mono.empty();
+    @RequirePermission(PermissionEnum.MANAGE)
+    public Mono<ServerFileMetadata> updateServerFileMetadata(@NotNull ServerFileMetadata entity) {
+        return serverFileMetaRepository.save(entity);
     }
 
     /**
@@ -1401,8 +1364,9 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param entity 服務器文件元數據實體對象
      */
-    public Mono<ServerFileMetadata> deleteServerFileMetadata(ServerFileMetadata entity) {
-        return Mono.empty();
+    @RequirePermission(PermissionEnum.MANAGE)
+    public Mono<Void> deleteServerFileMetadata(ServerFileMetadata entity) {
+        return serverFileMetaRepository.deleteById(entity.getId().toString());
     }
 
 }

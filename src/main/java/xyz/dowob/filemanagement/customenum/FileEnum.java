@@ -161,14 +161,16 @@ public enum FileEnum {
     /**
      * 根據文件名獲取文件類型，如果找不到對應的文件類型，則返回其他類型
      *
+     * @param fileEnum 文件類型
      * @param filename 文件名
      *
      * @return 返回文件類型
      */
-    public static String getMediaType(FileEnum fileEnum, String filename) {
-        String extension = FilenameUtils.getExtension(filename).toLowerCase();
+    public static String getMediaType(FileEnum fileEnum, String... filename) {
+
         Map<String, String> extensionMap = FILE_ENUM_MAP.get(fileEnum);
-        if (extensionMap != null) {
+        if (extensionMap != null && filename.length > 0) {
+            String extension = FilenameUtils.getExtension(filename[0]).toLowerCase();
             return extensionMap.getOrDefault(extension, getDefaultMediaType(fileEnum));
         }
         return getDefaultMediaType(fileEnum);

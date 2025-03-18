@@ -228,6 +228,7 @@ public class RedisProvider {
         return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
     }
 
+
     /**
      * 根據 Hash 的鍵和內部的鍵獲取數據，此適用於列表形式
      *
@@ -467,7 +468,7 @@ public class RedisProvider {
      * @return 返回 Flux<Object> 對象
      */
     public Flux<Object> getList(String key) {
-        return redisTemplate.opsForList().range(key, 0, -1);
+        return getList(key, 0, -1);
     }
 
     /**

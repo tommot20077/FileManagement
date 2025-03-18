@@ -89,6 +89,19 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
     }
 
     /**
+     * 獲取文件的信息的 API 請求，根據文件 ID 獲取文件的信息
+     *
+     * @param id       文件 ID
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回文件的信息
+     */
+    @GetMapping("/{id}/info")
+    public Mono<ResponseEntity<?>> getFileInfo(@PathVariable Long id, ServerWebExchange exchange) {
+        return super.getFileType(id, exchange);
+    }
+
+    /**
      * 刪除文件的 API 請求，根據文件 ID 刪除文件
      *
      * @param id       文件 ID

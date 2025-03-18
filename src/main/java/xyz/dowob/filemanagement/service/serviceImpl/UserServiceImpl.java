@@ -325,8 +325,7 @@ public class UserServiceImpl implements UserService {
         Stream.of(args).forEach(arg -> {
             userInfoList.add(arg.toString());
         });
-
-        Flux<User> cacheUserFlux = cacheManager.getCacheProvider(CacheProviderEnum.USER_CACHE).getAll(userInfoList, User.class).doOnNext(user -> {
+        Flux<User> cacheUserFlux = cacheManager.getCachesAsConcat(userInfoList, User.class, CacheProviderEnum.USER_CACHE).doOnNext(user -> {
             Object userType = isId ? user.getId().toString() : user.getUsername();
             userInfoList.remove(userType);
         });

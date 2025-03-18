@@ -317,6 +317,13 @@ public class ValidationException extends Exception {
          * 錯誤信息: CSRF 憑證無效，請求來源不合法
          */
         CSRF_TOKEN_INVALID_REFERER(1146, HttpStatus.FORBIDDEN, "禁止請求CSRF 憑證，請求來源不被允許"),
+
+        /**
+         * 錯誤碼: 1147
+         * HTTP狀態碼: 400
+         * 錯誤信息: 不支持的操作
+         */
+        UNSUPPORTED_OPERATION(1147, "不支持的操作"),
         ;
 
 

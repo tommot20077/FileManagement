@@ -127,6 +127,36 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
+     * 獲取文件的信息，根據文件 ID 獲取文件的信息
+     *
+     * @param id       文件 ID
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回文件信息
+     */
+    public Mono<ResponseEntity<?>> getFileType(Long id, ServerWebExchange exchange) {
+        Mono<ResponseEntity<?>> result = userService
+                .getUser(exchange)
+                .flatMap(user -> permissionService
+                        .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
+                        .flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE))
+                        .flatMap(file -> fileServiceStrategy
+                                .getFileService()
+                                .getByServerFileMetadataId(file.getServerFileId())
+                                .flatMap(serverFileMetadata -> {
+                                    String fileType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
+                                    long fileSize = serverFileMetadata.getFileSize();
+                                    ApiResponseDTO<?> apiResponse = createResponse(exchange,
+                                                                                   "獲取文件類型成功",
+                                                                                   Map.of("X-File-Content-Type", fileType, "X-File-Size", fileSize)
+                                    );
+                                    return createResponseEntity(apiResponse);
+                                })));
+
+        return handleError(result, exchange);
+    }
+
+    /**
      * 刪除文件的請求，根據文件 ID 刪除文件
      *
      * @param id       文件 ID

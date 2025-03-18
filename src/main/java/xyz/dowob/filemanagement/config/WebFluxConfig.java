@@ -28,13 +28,13 @@ import java.util.List;
  *
  * @author yuan
  * @program FileManagement
- * @ClassName WebFluxConfiguration
+ * @ClassName WebFluxConfig
  * @description
  * @create 2024-12-08 23:07
  * @Version 1.0
  **/
 @Configuration
-public class WebFluxConfiguration implements WebFluxConfigurer {
+public class WebFluxConfig implements WebFluxConfigurer {
     /**
      * 文件配置文件
      */
@@ -65,7 +65,7 @@ public class WebFluxConfiguration implements WebFluxConfigurer {
      *
      * @param fileProperties 文件配置文件
      */
-    public WebFluxConfiguration(FileProperties fileProperties, SecurityProperties securityProperties, ObjectMapper objectMapper, CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy) {
+    public WebFluxConfig(FileProperties fileProperties, SecurityProperties securityProperties, ObjectMapper objectMapper, CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy) {
         this.fileProperties = fileProperties;
         this.securityProperties = securityProperties;
         this.objectMapper = objectMapper;
