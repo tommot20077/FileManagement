@@ -100,7 +100,7 @@ public class ValidationServiceImpl implements ValidationService {
             case EDIT_CONTENT -> validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容");
             case BUILD_HISTORY_RECORD ->
                     validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(), 1000, "備註"));
-            case REVERT_HISTORY_RECORD -> Mono.empty();
+            case REVERT_HISTORY_RECORD, DELETE_HISTORY_RECORD -> Mono.empty();
         }));
     }
 

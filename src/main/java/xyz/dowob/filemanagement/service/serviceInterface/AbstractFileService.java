@@ -35,7 +35,7 @@ import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
-import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
+import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDAO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.data.file.po.FluxDataPO;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
@@ -836,8 +836,8 @@ public abstract class AbstractFileService implements FileService {
                     .flatMap(serverFileMetaCountDaoList -> {
                         Set<Long> serverFileIdList = serverFileMetaCountDaoList
                                 .stream()
-                                .filter(serverFileMetaCountDao -> serverFileMetaCountDao.count() == 1)
-                                .map(ServerFileMetaCountDao::serverFileId)
+                                .filter(serverFileMetaCountDAO -> serverFileMetaCountDAO.count() == 1)
+                                .map(ServerFileMetaCountDAO::serverFileId)
                                 .collect(Collectors.toSet());
                         if (serverFileIdList.isEmpty()) {
                             return Mono.empty();
@@ -1122,7 +1122,7 @@ public abstract class AbstractFileService implements FileService {
      */
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> userFileMetadataIterable, User user) {
         return Mono.defer(() -> {
-            LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getGlobal().getRetentionTime());
+            LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime());
             Set<FileTrashRecord> fileTrashRecords = new HashSet<>();
             Set<Long> problemFileIdsSet = new HashSet<>();
             userFileMetadataIterable.forEach(userFile -> {

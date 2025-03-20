@@ -36,6 +36,11 @@ public class FileProperties {
     private global global = new global();
 
     /**
+     * 建立備份配置
+     */
+    private Backup backup = new Backup();
+
+    /**
      * 文件上傳配置
      */
     @Data
@@ -93,15 +98,23 @@ public class FileProperties {
         private Integer pageSize = 100;
 
         /**
-         * 回收桶文件保留時間，默認為 30，單位為天
-         */
-        private Integer retentionTime = 30;
-
-        /**
          * 顯示最近文件數量，默認為 20，當設置值小於等於0時，則不限制顯示數量
          */
         private Integer showRecentFileCount = 20;
 
         //private Integer maxFolderDepth = 10;
+    }
+
+    @Data
+    public static class Backup {
+        /**
+         * 回收桶文件保留時間，默認為 30，單位為天
+         */
+        private Integer retentionTime = 30;
+
+        /**
+         * 線上檔案歷程記錄備份保留數量，當設置值小於等於0時，則不限制保留數量，默認為 30
+         */
+        private Integer maxOnlineHistoryCount = 30;
     }
 }

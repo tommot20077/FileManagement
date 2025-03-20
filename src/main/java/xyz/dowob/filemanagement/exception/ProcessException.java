@@ -89,6 +89,17 @@ public class ProcessException extends Exception {
          * 錯誤信息: 文件垃圾桶記錄不存在
          */
         NOT_EXISTING_FILE_TRASH_RECORD(1211, "文件回收記錄不存在 ID: %s"),
+        /**
+         * 錯誤碼: 1212
+         * 錯誤信息: 應用差異文件到內容失敗
+         */
+        APPLY_PATCH_TO_CONTENT_FAILED(1212, "應用差異文件到內容失敗"),
+
+        /**
+         * 錯誤碼: 1213
+         * 錯誤信息: 線上檔案ID: %s 版本: %s ，存在差異文件和快照
+         */
+        EXISTING_DIFF_AND_SNAPSHOT(1213, "線上檔案ID: %s 版本: %s ，存在差異文件和快照"),
         ;
 
 

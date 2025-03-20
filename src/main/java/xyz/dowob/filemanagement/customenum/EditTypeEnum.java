@@ -28,5 +28,10 @@ public enum EditTypeEnum {
     /**
      * 還原歷程記錄
      */
-    REVERT_HISTORY_RECORD
+    REVERT_HISTORY_RECORD,
+
+    /**
+     * 刪除歷程記錄
+     */
+    DELETE_HISTORY_RECORD
 }

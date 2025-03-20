@@ -286,7 +286,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                 return Mono.just(false);
             }
             return Mono.defer(() -> {
-                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getGlobal().getRetentionTime());
+                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime());
                 FileTrashRecord fileTrashRecord = new FileTrashRecord(childFolderList.getFirst(), deleteTime);
                 childFolderList.forEach(userFile -> userFile.setIsDeleted(true));
                 Mono<Boolean> result = fileTrashRecordRepository

@@ -3,11 +3,11 @@ package xyz.dowob.filemanagement.data.file.dao;
 /**
  * @author yuan
  * @program FileManagement
- * @ClassName dao
+ * @ClassName ServerFileMetaCountDAO
  * @create 2025/2/7
  * @Version 1.0
  **/
 
 
-public record ServerFileMetaCountDao(Long serverFileId, Long count) {
+public record ServerFileMetaCountDAO(Long serverFileId, Long count) {
 }

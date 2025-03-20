@@ -45,21 +45,22 @@ public class UserOnlineFile {
     private Long lastModifiedBy;
 
     /**
-     * 快照數量
+     * 距離上次快照的間隔版本數量
      */
     @Column("current_snapshot_count")
-    private Integer currentSnapshotCount = 0;
+    private Integer currentSnapshotCount;
 
     /**
      * 最後一次歷史版本
      */
     @Column("last_history_version")
-    private Long lastHistoryVersion = 0L;
+    private Long lastHistoryVersion;
+
     /**
      * 是否匹配最後的歷史紀錄
      */
     @Column("is_match_history")
-    private Boolean isMatchHistory = true;
+    private Boolean isMatchHistory;
 
     /**
      * 重寫hashCode方法，獲取對象的hashCode

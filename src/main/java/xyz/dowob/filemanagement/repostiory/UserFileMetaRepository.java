@@ -12,7 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
-import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDao;
+import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDAO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -138,7 +138,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @return Mono<Long> 返回檔案數量
      */
-    default Flux<ServerFileMetaCountDao> countByServerFileIdInAndUserId(
+    default Flux<ServerFileMetaCountDAO> countByServerFileIdInAndUserId(
             @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, R2dbcEntityOperations entityOperations) {
 
         return entityOperations
@@ -146,7 +146,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                 .sql("SELECT server_file_id, COUNT(*) as count FROM user_file_metadata WHERE server_file_id IN (:serverFileIds) AND user_id = :userId GROUP BY server_file_id")
                 .bind("serverFileIds", serverFileIds)
                 .bind("userId", userId)
-                .map((row, metadata) -> new ServerFileMetaCountDao(row.get("server_file_id", Long.class), row.get("count", Long.class)))
+                .map((row, metadata) -> new ServerFileMetaCountDAO(row.get("server_file_id", Long.class), row.get("count", Long.class)))
                 .all();
     }
 

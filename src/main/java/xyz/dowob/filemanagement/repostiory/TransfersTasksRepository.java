@@ -47,7 +47,6 @@ public interface TransfersTasksRepository extends ReactiveCrudRepository<Transfe
      *
      * @return Flux<TransfersTask>
      */
-
     Flux<TransfersTask> findAllByStatusNotIn(@Param("status") List<TransfersStatusEnum> status);
 
 
