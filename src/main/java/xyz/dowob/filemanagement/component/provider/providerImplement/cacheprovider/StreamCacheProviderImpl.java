@@ -54,6 +54,10 @@ public class StreamCacheProviderImpl implements CacheProvider {
      */
     private final String CACHE_PREFIX;
 
+    /**
+     * 單個緩存塊的大小
+     */
+    private final int CHUNK_SIZE;
 
     /**
      * 文件流緩存提供者實現類的構造方法
@@ -64,6 +68,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
         this.redisProvider = redisProvider;
         this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
         this.CACHE_PREFIX = cacheProperties.getDownloadCachePrefix();
+        this.CHUNK_SIZE = cacheProperties.getChunkSize();
     }
 
 
@@ -77,7 +82,17 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @return Mono<T>
      */
     public <T> Mono<T> get(String key, Class<T> clazz) {
-        return redisProvider.getHashMap(CACHE_PREFIX, key, String.class).map(base64 -> {
+        return redisProvider.getHashMapByPattern(CACHE_PREFIX, key + "_*", String.class).collectList().flatMap(list -> {
+            if (list.isEmpty()) {
+                return Mono.empty();
+            }
+            StringBuilder stringBuilder = new StringBuilder();
+            list
+                    .stream()
+                    .sorted(Comparator.comparingInt(o -> Integer.parseInt(o.getKey().substring(o.getKey().lastIndexOf("_") + 1))))
+                    .forEach(entry -> stringBuilder.append(entry.getValue()));
+            return Mono.just(stringBuilder.toString());
+        }).map(base64 -> {
             Flux<DataBuffer> dataBufferFlux = formatBase64ToStream(base64);
             return new FluxDataPO<>(dataBufferFlux);
         }).cast(clazz);
@@ -95,7 +110,17 @@ public class StreamCacheProviderImpl implements CacheProvider {
      */
     @Override
     public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
-        return redisProvider.getHashMap(CACHE_PREFIX, key, String.class).flatMap(base64 -> formatBase64ToStream(base64).cast(clazz).collectList());
+        return redisProvider.getHashMapByPattern(CACHE_PREFIX, key + "_*", String.class).collectList().flatMap(list -> {
+            if (list.isEmpty()) {
+                return Mono.just(Collections.emptyList());
+            }
+            StringBuilder stringBuilder = new StringBuilder();
+            list
+                    .stream()
+                    .sorted(Comparator.comparingInt(o -> Integer.parseInt(o.getKey().substring(o.getKey().lastIndexOf("_") + 1))))
+                    .forEach(entry -> stringBuilder.append(entry.getValue()));
+            return Mono.just(stringBuilder.toString()).flatMapMany(base64 -> formatBase64ToStream(base64).cast(clazz)).collectList();
+        });
     }
 
     /**
@@ -141,7 +166,22 @@ public class StreamCacheProviderImpl implements CacheProvider {
                 return Flux.error(new UnsupportedOperationException("不支持的操作類型: " + o.getClass().getName()));
             });
         }
-        return formatStreamToBase64(dataBufferFlux).flatMap(base64 -> redisProvider.setHashMap(CACHE_PREFIX, key, base64, chooseTime)).then();
+        return formatStreamToBase64(dataBufferFlux).flatMapMany(base64 -> {
+
+            List<Mono<Void>> saveOperations = new ArrayList<>();
+            int totalChunks = (int) Math.ceil((double) base64.length() / CHUNK_SIZE);
+
+            for (int i = 0; i < totalChunks; i++) {
+                String chunkKey = key + "_" + (i + 1);
+                int start = i * CHUNK_SIZE;
+                int end = Math.min(start + CHUNK_SIZE, base64.length());
+
+                String chunkData = base64.substring(start, end);
+
+                saveOperations.add(redisProvider.setHashMap(CACHE_PREFIX, chunkKey, chunkData, chooseTime));
+            }
+            return Flux.merge(saveOperations);
+        }).then();
     }
 
 

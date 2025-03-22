@@ -5,13 +5,11 @@
     </Properties>
 
     <Appenders>
-        <!-- 控制台輸出 -->
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint} %clr{%5p} %clr{${sys:PID}}{magenta} %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%-30.30c{1.}}{cyan} %clr{:}{faint} %m%n%xwEx"/>
         </Console>
 
-        <!-- 一般日誌文件（不包含 ERROR 級別） -->
-        <RollingFile name="FileLogger" fileName="logs/app.log"
+        <RollingFile name="InfoLogger" fileName="logs/info/app.log"
                      filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout>
                 <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
@@ -20,28 +18,28 @@
                 <TimeBasedTriggeringPolicy/>
                 <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="50"/>
+            <DefaultRolloverStrategy max="30"/>
             <Filters>
                 <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="NEUTRAL"/>
+                <ThresholdFilter level="INFO" onMatch="ACCEPT" onMismatch="DENY"/>
             </Filters>
         </RollingFile>
 
-        <!-- 錯誤日誌文件（只包含 ERROR 及以上級別） -->
-        <RollingFile name="ErrorLogger" fileName="logs/error.log"
+        <RollingFile name="ErrorLogger" fileName="logs/error/error.log"
                      filePattern="logs/error-%d{yyyy-MM-dd}.log.gz">
             <PatternLayout>
                 <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
             <Filters>
                 <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
             </Filters>
         </RollingFile>
 
-        <!-- 新增 `runtime.log` -->
-        <RollingFile name="RuntimeLogger" fileName="logs/runtime.log"
+        <RollingFile name="RuntimeLogger" fileName="logs/runtime/runtime.log"
                      filePattern="logs/runtime-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout>
                 <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
@@ -51,14 +49,17 @@
                 <SizeBasedTriggeringPolicy size="10MB"/>
             </Policies>
             <DefaultRolloverStrategy max="50"/>
+            <Filters>
+                <ThresholdFilter level="INFO" onMatch="DENY" onMismatch="NEUTRAL"/>
+                <ThresholdFilter level="DEBUG" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
         </RollingFile>
 
-        <!-- 異步 Appender -->
         <Async name="AsyncConsole">
             <AppenderRef ref="Console"/>
         </Async>
-        <Async name="AsyncFileLogger">
-            <AppenderRef ref="FileLogger"/>
+        <Async name="AsyncInfoLogger">
+            <AppenderRef ref="InfoLogger"/>
         </Async>
         <Async name="AsyncErrorLogger">
             <AppenderRef ref="ErrorLogger"/>
@@ -69,17 +70,17 @@
     </Appenders>
 
     <Loggers>
-        <!-- Root Logger（INFO 級別，發送到 Console 和 FileLogger，不記錄 ERROR） -->
         <Root level="info">
             <AppenderRef ref="AsyncConsole"/>
-            <AppenderRef ref="AsyncFileLogger"/>
-            <AppenderRef ref="AsyncErrorLogger"/>
+            <AppenderRef ref="AsyncInfoLogger" level="info"/>
+            <AppenderRef ref="AsyncErrorLogger" level="error"/>
         </Root>
 
-        <!-- xyz.dowob.filemanagement（DEBUG 級別，發送到 Console 和 RuntimeLogger） -->
         <Logger name="xyz.dowob.filemanagement" level="debug" additivity="false">
             <AppenderRef ref="AsyncConsole"/>
-            <AppenderRef ref="AsyncRuntimeLogger"/>
+            <AppenderRef ref="AsyncRuntimeLogger" level="debug"/>
+            <AppenderRef ref="AsyncInfoLogger" level="info"/>
+            <AppenderRef ref="AsyncErrorLogger" level="error"/>
         </Logger>
     </Loggers>
 </Configuration>

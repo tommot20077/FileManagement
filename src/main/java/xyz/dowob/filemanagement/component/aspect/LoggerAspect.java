@@ -20,7 +20,9 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * 用於記錄 Component 和 ServiceInterface 層的日誌切面
@@ -168,15 +170,24 @@ public class LoggerAspect {
             if (error instanceof ValidationException) {
                 log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
                           usernameAndUserId[0],
-                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "", className, methodName, error.getMessage()
-                );
-            } else {
-                log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 錯誤訊息: {}",
-                          usernameAndUserId[0],
                           usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
                           className,
                           methodName,
                           error.getMessage()
+                );
+            } else {
+                String formattedArgs = Arrays
+                        .stream(joinPoint.getArgs())
+                        .map(arg -> arg != null ? arg.toString() : "null")
+                        .map(argStr -> argStr.length() > 500 ? argStr.substring(0, 500) + "..." : argStr)
+                        .collect(Collectors.joining(", "));
+
+
+                log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 傳入參數: {} | 錯誤訊息: {}",
+                          usernameAndUserId[0],
+                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
+                          className,
+                          methodName, formattedArgs, error.getMessage(), error
                 );
             }
         } else {

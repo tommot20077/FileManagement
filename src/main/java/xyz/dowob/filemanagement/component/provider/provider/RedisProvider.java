@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -325,6 +326,29 @@ public class RedisProvider {
     }
 
     /**
+     * 依照通配符獲取 HashMap 中的數據
+     * 其中，pattern 為通配符，clazz 為數據的類型
+     *
+     * @param hashKey Hash 的鍵
+     * @param pattern 通配符
+     * @param clazz   類型
+     * @param <T>     泛型
+     *
+     * @return 返回 Flux<Map.Entry<String, T>> 對象，其中 Key 為 Hash 的內部鍵，Value 為 Hash 的內部值
+     */
+    public <T> Flux<Map.Entry<String, T>> getHashMapByPattern(String hashKey, String pattern, Class<T> clazz) {
+        ScanOptions patternOptions = ScanOptions.scanOptions().match(pattern).build();
+        return redisTemplate.opsForHash().scan(hashKey, patternOptions).flatMap(entry -> {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || value == null) {
+                return Flux.empty();
+            }
+            return Flux.just(Map.entry(key.toString(), objectMapper.convertValue(value, clazz)));
+        });
+    }
+
+    /**
      * 刪除 Hash 中指定外部Key中內部Key的數據
      *
      * @param key      Hash 的鍵
@@ -338,6 +362,7 @@ public class RedisProvider {
 
     /**
      * 刪除 Hash 中指定外部Key中內部Key的數據，此為批量刪除
+     * 當 innerKey 為空時，則不進行操作
      *
      * @param key      Hash 的鍵
      * @param innerKey Hash 內部的鍵的列表
@@ -345,6 +370,9 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteHash(String key, List<String> innerKey) {
+        if (innerKey.isEmpty()) {
+            return Mono.empty();
+        }
         return redisTemplate.opsForHash().remove(key, innerKey.toArray()).then();
     }
 

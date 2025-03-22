@@ -103,7 +103,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     @Override
     public Mono<Void> deleteToken(CsrfToken token) {
         Long expireTime = Instant.now().getEpochSecond();
-        if (token != null) {
+        if (token != null && token.getToken() != null) {
             return redisProvider.deleteHash(CSRF_TOKEN_HEADER, token.getToken());
         }
 

@@ -60,4 +60,9 @@ public class CacheProperties {
      * 用戶資訊緩存過期時間，默認為1440，單位為分鐘
      */
     private Integer userInfoCacheExpireTime = 1440;
+
+    /**
+     * 緩存分塊大小，默認為 5MB，用於處理大文件的緩存，單位為Byte
+     */
+    private Integer chunkSize = 5 * 1024 * 1024;
 }
