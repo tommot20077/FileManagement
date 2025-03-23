@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -223,9 +224,12 @@ public class JwtTokenProviderImpl implements TokenProvider {
     private Mono<Long> updateExchangeAttributes(Long userId, Claims claims) {
         return CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
             String role = claims.get("role", String.class);
+            String requestId = UUID.randomUUID().toString();
+
             exchange.getAttributes().put("userId", userId);
             exchange.getAttributes().put("username", claims.get("username", String.class));
             exchange.getAttributes().put("role", RoleEnum.valueOf(role));
+            exchange.getAttributes().put("requestId", requestId);
         }).thenReturn(userId);
     }
 

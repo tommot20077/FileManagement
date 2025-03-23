@@ -248,12 +248,37 @@ public class ExceptionController implements ResponseUnity {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .path(exchange.getRequest().getURI().getPath())
-                .message("超出操作限制，請稍後再試")
+                .message("超出操作限制，請稍後再試，若問題持續請聯繫管理員並附上此ID: " + exchange.getAttribute("requestId"))
                 .data(null)
                 .build();
 
         return Mono.just(ResponseEntity.status(500).body(response));
     }
+
+    /**
+     * 處理資料庫操作錯誤
+     * 發生此異常可能是因為操作過於頻繁，導致資料庫操作失敗
+     *
+     * @param ex       NonTransientDataAccessResourceException 資料庫操作錯誤
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    @ExceptionHandler(NonTransientDataAccessResourceException.class)
+    private Mono<ResponseEntity<?>> handleDatabaseException(Throwable ex, ServerWebExchange exchange) {
+        log.error("資料庫操作錯誤: ", ex);
+        ApiResponseDTO<Void> response = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .path(exchange.getRequest().getURI().getPath())
+                .message("操作失敗，請稍後再試，若問題持續請聯繫管理員並附上此ID: " + exchange.getAttribute("requestId"))
+                .data(null)
+                .build();
+
+        return Mono.just(ResponseEntity.status(500).body(response));
+    }
+
 
     /**
      * 處理其他異常，部分異常為該錯誤類的內部類，無法直接捕獲
@@ -289,26 +314,11 @@ public class ExceptionController implements ResponseUnity {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .path(exchange.getRequest().getURI().getPath())
-                .message("超出操作限制，請稍後再試")
+                .message("超出操作限制，請稍後再試，若問題持續請聯繫管理員並附上此ID: " + exchange.getAttribute("requestId"))
                 .data(null)
                 .build();
 
         return Mono.just(ResponseEntity.status(429).body(response));
-    }
-
-    @ExceptionHandler(NonTransientDataAccessResourceException.class)
-    private Mono<ResponseEntity<?>> handleDatabaseException(Throwable ex, ServerWebExchange exchange) {
-        log.error("資料庫操作錯誤: ", ex);
-        ApiResponseDTO<Void> response = ApiResponseDTO
-                .<Void>builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .path(exchange.getRequest().getURI().getPath())
-                .message("操作失敗，請稍後再試或聯繫管理員")
-                .data(null)
-                .build();
-
-        return Mono.just(ResponseEntity.status(500).body(response));
     }
 
     /**
@@ -329,7 +339,7 @@ public class ExceptionController implements ResponseUnity {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .path(exchange.getRequest().getURI().getPath())
-                .message("伺服器內部處理錯誤")
+                .message("伺服器內部處理錯誤，請聯繫管理員並附上此ID: " + exchange.getAttribute("requestId"))
                 .data(null)
                 .build();
 

@@ -161,16 +161,15 @@ public class LoggerAspect {
      * @param error      錯誤
      */
     private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, Object result, Throwable error) {
-        String[] usernameAndUserId = getUserNameAndUserId(exchange);
+        String[] usernameAndUserId = getRequestIdAndUsernameAndUserId(exchange);
 
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
 
         if (error != null) {
             if (error instanceof ValidationException) {
-                log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
-                          usernameAndUserId[0],
-                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
+                log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
+                          usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
                           className,
                           methodName,
                           error.getMessage()
@@ -183,11 +182,9 @@ public class LoggerAspect {
                         .collect(Collectors.joining(", "));
 
 
-                log.error("請求者: {} {}| 所屬類: {} | 使用方法: {} | 傳入參數: {} | 錯誤訊息: {}",
-                          usernameAndUserId[0],
-                          usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
-                          className,
-                          methodName, formattedArgs, error.getMessage(), error
+                log.error("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 傳入參數: {} | 錯誤訊息: {}",
+                          usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
+                          className, methodName, formattedArgs, error.getMessage(), error
                 );
             }
         } else {
@@ -195,9 +192,8 @@ public class LoggerAspect {
                 return;
             }
 
-            log.debug("請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
-                      usernameAndUserId[0],
-                      usernameAndUserId[1] != null ? "(ID:" + usernameAndUserId[1] + ") " : "",
+            log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
+                      usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
                       className,
                       methodName,
                       result
@@ -223,19 +219,25 @@ public class LoggerAspect {
     }
 
 
-    private String[] getUserNameAndUserId(ServerWebExchange exchange) {
+    private String[] getRequestIdAndUsernameAndUserId(ServerWebExchange exchange) {
+        String requestId;
         String requestUsername;
         String requsetUserId;
+
         if (exchange == null) {
-            requestUsername = "未知";
+            requestId = "無";
+            requestUsername = "server";
             requsetUserId = null;
+
         } else if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
+            requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
             requestUsername = "請求者 IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
             requsetUserId = null;
         } else {
+            requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
             requestUsername = (String) exchange.getAttribute("username");
             requsetUserId = ((Long) exchange.getAttribute("userId")).toString();
         }
-        return new String[]{requestUsername, requsetUserId};
+        return new String[]{requestId, requestUsername, requsetUserId};
     }
 }
