@@ -13,6 +13,8 @@ import xyz.dowob.filemanagement.functionInterface.CacheRule;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 /**
@@ -37,6 +39,11 @@ public class CacheManager {
      * 緩存提供者的Map，用於存儲不同類型的緩存提供者
      */
     private final EnumMap<CacheProviderEnum, CacheProvider> cacheProviderMap;
+
+    /**
+     * 緩存鎖Map，用於存儲緩存的鎖
+     */
+    private static final Map<String, ReentrantLock> lockMap = new ConcurrentHashMap<>();
 
     /**
      * 緩存管理器的構造方法，用於初始化緩存提供者列表
@@ -179,10 +186,10 @@ public class CacheManager {
      * @return Mono<Void>
      */
     public Mono<Void> setCache(String key, Object value, CacheProviderEnum cacheProviderEnum, Duration expire) {
-        return Optional
-                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> provider.set(key, value, expire).subscribeOn(Schedulers.boundedElastic()))
-                .orElseGet(Mono::empty);
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            WriteLock.tryLock(key, cacheProviderEnum, k -> provider.set(key, value, expire).subscribeOn(Schedulers.boundedElastic()).subscribe());
+            return Mono.empty();
+        }).orElseGet(Mono::empty).then();
     }
 
 
@@ -196,7 +203,6 @@ public class CacheManager {
      */
     public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum) {
         return setCaches(keyValues, cacheProviderEnum, null);
-
     }
 
     /**
@@ -210,8 +216,10 @@ public class CacheManager {
      */
     public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
         return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
-            provider.setAll(keyValues, chooseTime).subscribeOn(Schedulers.boundedElastic()).subscribe();
+            WriteLock.tryLock(keyValues.keySet(),
+                              cacheProviderEnum,
+                              k -> provider.setAll(keyValues, expire).subscribeOn(Schedulers.boundedElastic()).subscribe()
+            );
             return Mono.empty();
         }).orElseGet(Mono::empty).then();
     }
@@ -227,9 +235,12 @@ public class CacheManager {
      */
     public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
         return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Mono<Void> action = provider.delete(key);
-            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
-        }).orElseGet(Mono::empty);
+            WriteLock.tryLock(key, cacheProviderEnum, k -> {
+                Mono<Void> action = provider.delete(key);
+                return isAsync ? action.subscribeOn(Schedulers.boundedElastic()).subscribe() : action;
+            });
+            return Mono.empty();
+        }).orElseGet(Mono::empty).then();
     }
 
     /**
@@ -255,9 +266,12 @@ public class CacheManager {
      */
     public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
         return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Mono<Void> action = provider.deleteAll(keys);
-            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
-        }).orElseGet(Mono::empty);
+            WriteLock.tryLock(keys, cacheProviderEnum, k -> {
+                Mono<Void> action = provider.deleteAll(keys);
+                return isAsync ? action.subscribeOn(Schedulers.boundedElastic()).subscribe() : action;
+            });
+            return Mono.empty();
+        }).orElseGet(Mono::empty).then();
     }
 
     /**
@@ -305,12 +319,12 @@ public class CacheManager {
      * @return Mono<T> 回傳緩存的值或source的回傳值
      */
     public <T> Mono<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Mono<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
-        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
-            return provider.get(key, clazz).switchIfEmpty(source.doOnNext(value -> {
-                applyCacheRule(cacheRules, value, chooseTime);
-            }));
-        }).orElseGet(() -> source.cast(clazz));
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.get(key, clazz).switchIfEmpty(source.doOnNext(value -> {
+                    WriteLock.tryLock(key, cacheProviderEnum, k -> applyCacheRule(cacheRules, value, expire));
+                })))
+                .orElseGet(() -> source.cast(clazz));
     }
 
     /**
@@ -343,12 +357,12 @@ public class CacheManager {
      * @return Flux<T> 回傳緩存的值或source的回傳值
      */
     public <T> Flux<T> runAndSetCache(String key, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
-        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
-            return provider.getAsList(key, clazz).flatMapMany(Flux::fromIterable).switchIfEmpty(source.doOnNext(value -> {
-                applyCacheRule(cacheRules, value, chooseTime);
-            }));
-        }).orElseGet(() -> source.cast(clazz));
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> provider.getAsList(key, clazz).flatMapMany(Flux::fromIterable).switchIfEmpty(source.doOnNext(value -> {
+                    WriteLock.tryLock(key, cacheProviderEnum, k -> applyCacheRule(cacheRules, value, expire));
+                })))
+                .orElseGet(() -> source.cast(clazz));
     }
 
     /**
@@ -384,17 +398,14 @@ public class CacheManager {
      * @return Mono<T> 回傳緩存的值或source的回傳值
      */
     public <T> Flux<T> runAndSetCache(Collection<String> keys, Class<T> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends T> source, List<CacheRule<T>> cacheRules, Duration expire) {
-        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
-            Duration chooseTime = Objects.requireNonNullElse(expire, provider.getDefaultExpire());
-            return provider.getAllAsMap(keys, clazz).flatMapMany(map -> {
-                if (map.isEmpty()) {
-                    return source.doOnNext(value -> {
-                        applyCacheRule(cacheRules, value, chooseTime);
-                    });
-                }
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> provider.getAllAsMap(keys, clazz).flatMapMany(map -> {
+            if (map.values().size() == keys.size()) {
                 return Flux.fromIterable(map.values());
+            }
+            return source.doOnNext(value -> {
+                WriteLock.tryLock(keys, cacheProviderEnum, k -> applyCacheRule(cacheRules, value, expire));
             });
-        }).orElseGet(() -> source.cast(clazz));
+        })).orElseGet(() -> source.cast(clazz));
     }
 
     /**
@@ -415,11 +426,9 @@ public class CacheManager {
         return Optional
                 .ofNullable(cacheProviderMap.get(cacheProviderEnum))
                 .map(provider -> provider.getAllAsMap(keys, clazz).switchIfEmpty(source.apply(keys).doOnNext(resultMap -> {
-                    if (!resultMap.isEmpty()) {
-                        resultMap.forEach((key, value) -> {
-                            applyCacheRule(cacheRules, value, Objects.requireNonNullElse(expire, provider.getDefaultExpire()));
-                        });
-                    }
+                    resultMap.forEach((key, value) -> {
+                        WriteLock.tryLock(key, cacheProviderEnum, k -> applyCacheRule(cacheRules, value, expire));
+                    });
                 })))
                 .orElseGet(() -> source.apply(keys));
     }
@@ -471,7 +480,60 @@ public class CacheManager {
      * @param expire     過期時間
      * @param <T>        回傳的類型
      */
-    private <T> void applyCacheRule(List<CacheRule<T>> cacheRules, T value, Duration expire) {
+    private <T> Void applyCacheRule(List<CacheRule<T>> cacheRules, T value, Duration expire) {
         Mono.when(cacheRules.stream().map(rule -> rule.apply(value, expire)).toList()).subscribeOn(Schedulers.boundedElastic()).subscribe();
+        return null;
+    }
+
+    /**
+     * 緩存鎖，用於對緩存進行加鎖操作
+     */
+    @SkipRecord
+    private static class WriteLock {
+        /**
+         * 生成鎖的key並且嘗試執行操作
+         *
+         * @param key               鍵
+         * @param cacheProviderEnum 緩存提供者的類型
+         * @param source            操作
+         */
+        private static void tryLock(String key, CacheProviderEnum cacheProviderEnum, Function<?, ?> source) {
+            String lockKey = cacheProviderEnum.name() + ":" + key;
+            doAction(lockKey, cacheProviderEnum, source);
+        }
+
+        /**
+         * 生成鎖的key並且嘗試執行操作
+         *
+         * @param keys              鍵
+         * @param cacheProviderEnum 緩存提供者的類型
+         * @param source            操作
+         */
+        private static void tryLock(Collection<String> keys, CacheProviderEnum cacheProviderEnum, Function<?, ?> source) {
+            StringBuilder keyBuilder = new StringBuilder();
+            keys.forEach(keyBuilder::append);
+            String lockKey = cacheProviderEnum.name() + ":" + keyBuilder;
+            doAction(lockKey, cacheProviderEnum, source);
+        }
+
+        /**
+         * 嘗試執行操作，如果獲取到鎖則執行操作，否則不執行
+         * 並且在操作完成後釋放鎖並且從鎖Map中移除
+         *
+         * @param lockKey           鎖的key
+         * @param cacheProviderEnum 緩存提供者的類型
+         * @param source            操作
+         */
+        private static void doAction(String lockKey, CacheProviderEnum cacheProviderEnum, Function<?, ?> source) {
+            ReentrantLock lock = lockMap.computeIfAbsent(lockKey, k -> new ReentrantLock());
+            try {
+                if (lock.tryLock()) {
+                    source.apply(null);
+                }
+            } finally {
+                lock.unlock();
+                lockMap.remove(lockKey);
+            }
+        }
     }
 }

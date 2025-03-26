@@ -89,6 +89,14 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.METHOD_NOT_ALLOWED.value());
     }
 
+    /**
+     * 處理不支持的媒體類型，當請求的媒體類型不正確時，返回一個 415 錯誤
+     *
+     * @param ex       UnsupportedMediaTypeStatusException 不支持的媒體類型
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
     @ExceptionHandler(UnsupportedMediaTypeStatusException.class)
     public Mono<ResponseEntity<?>> handleUnsupportedMediaTypeStatusException(UnsupportedMediaTypeStatusException ex, ServerWebExchange exchange) {
         log.debug("不支持的媒體類型: {}", ex.getMessage());

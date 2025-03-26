@@ -102,8 +102,8 @@ public class LoggerAspect {
                     return flux.doOnNext(item -> count.incrementAndGet()).doOnComplete(() -> {
                         String value = String.format("Flux<%s> 內元素數量: %d", method.getReturnType().getSimpleName(), count.get());
                         logOperation(exchange, joinPoint, processMethodSignature(method, value), null);
-                    }).doOnError(e -> {
-                        logOperation(exchange, joinPoint, null, e);
+                    }).doOnError(error -> {
+                        logOperation(exchange, joinPoint, "Flux 內處理失敗，已處理元素數量: " + count.get(), error);
                     });
                 });
             } else {

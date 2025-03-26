@@ -82,16 +82,19 @@ public enum FileEnum {
         MIME_TYPE_MAPPING.put("image/png", FileEnum.IMAGE);
         MIME_TYPE_MAPPING.put("image/gif", FileEnum.IMAGE);
         MIME_TYPE_MAPPING.put("image/webp", FileEnum.IMAGE);
+        MIME_TYPE_MAPPING.put("image", FileEnum.IMAGE);
 
         // 影片類型
         MIME_TYPE_MAPPING.put("video/mp4", FileEnum.VIDEO);
         MIME_TYPE_MAPPING.put("video/mpeg", FileEnum.VIDEO);
         MIME_TYPE_MAPPING.put("video/webm", FileEnum.VIDEO);
+        MIME_TYPE_MAPPING.put("video", FileEnum.VIDEO);
 
         // 音頻類型
         MIME_TYPE_MAPPING.put("audio/mpeg", FileEnum.MUSIC);
         MIME_TYPE_MAPPING.put("audio/wav", FileEnum.MUSIC);
         MIME_TYPE_MAPPING.put("audio/ogg", FileEnum.MUSIC);
+        MIME_TYPE_MAPPING.put("audio", FileEnum.MUSIC);
 
         // 文檔類型
         MIME_TYPE_MAPPING.put("application/pdf", FileEnum.DOCUMENT);
@@ -155,7 +158,12 @@ public enum FileEnum {
      * @return 返回文件類型
      */
     public static FileEnum fromMimeType(String mimeType) {
-        return MIME_TYPE_MAPPING.getOrDefault(mimeType, FileEnum.OTHER);
+        if (MIME_TYPE_MAPPING.containsKey(mimeType)) {
+            return MIME_TYPE_MAPPING.get(mimeType);
+        }
+
+        String generalType = mimeType.split("/")[0].toLowerCase();
+        return MIME_TYPE_MAPPING.getOrDefault(generalType, FileEnum.OTHER);
     }
 
     /**
