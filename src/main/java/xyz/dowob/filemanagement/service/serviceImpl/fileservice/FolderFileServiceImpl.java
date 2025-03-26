@@ -207,7 +207,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             return findAllChildFolder(parentFolderIdList, userFileList)
                     .flatMap(childFolderList -> {
                         List<Long> serverFileIds = childFolderList.stream().map(UserFileMetadata::getServerFileId).filter(Objects::nonNull).toList();
-                        return handleUserStorage(user, serverFileIds);
+                        return calculateFileSize(user, serverFileIds);
                     })
                     .then(Mono.when(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()), updateOwner(userFileList, user.getId())))
                     .then(userFileMetaRepository.delete(userFileMetadata));

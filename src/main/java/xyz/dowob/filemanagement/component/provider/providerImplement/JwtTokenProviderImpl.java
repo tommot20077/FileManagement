@@ -11,6 +11,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
@@ -132,6 +133,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
      * @return 用戶 ID
      */
     @Override
+    @SkipRecord
     public Mono<Long> validateToken(String token, Long userIdUseLess) {
         return Mono.defer(() -> {
             TokenCacheEntity cacheEntity = cacheTokenMap.get(token);

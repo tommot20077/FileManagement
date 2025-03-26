@@ -52,7 +52,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -471,9 +470,7 @@ public abstract class AbstractFileService implements FileService {
                 dataBufferPO.setTFlux(dataBufferFlux);
                 return Mono.just(dataBufferPO);
             });
-            return cacheManager
-                    .runAndSetCache(userFileDataBO.getGridFsId(), FluxDataPO.class,
-                                    CacheProviderEnum.FILE_STREAM_CACHE, fluxDataPOMono,
+            return cacheManager.runAndSetCache(userFileDataBO.getGridFsId(), FluxDataPO.class, CacheProviderEnum.FILE_STREAM_CACHE, fluxDataPOMono,
                                     Collections.singletonList(cacheManager.generateCacheRule(userFileDataBO.getGridFsId(),
                                                                                              CacheProviderEnum.FILE_STREAM_CACHE
                                     ))
@@ -626,7 +623,7 @@ public abstract class AbstractFileService implements FileService {
         return updateOwner(Collections.singletonList(userFileMetadata), user.getId()).then(Mono.defer(() -> {
             Mono<Void> deleteFile = Mono.empty();
             if (userFileMetadata.getServerFileId() != null) {
-                deleteFile = handleUserStorage(user, Collections.singletonList(userFileMetadata.getServerFileId()));
+                deleteFile = calculateFileSize(user, Collections.singletonList(userFileMetadata.getServerFileId()));
             }
             return deleteFile.then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()).then(userFileMetaRepository.deleteById(
                     userFileMetadata.getId().toString())));
@@ -857,29 +854,30 @@ public abstract class AbstractFileService implements FileService {
     //todo 線上檔案沒有serverFileId暫不紀錄
 
     /**
-     * 處理用戶儲存空間的共通實現
+     * 更新用戶儲存空間使用量，此方法會根據文件ID列表計算文件大小
+     * 此為重載方法、計算刪除的文件大小
      *
      * @param user          用戶信息
      * @param serverFileIds 服務器文件ID列表
      *
      * @return Mono<Void>
      */
-    protected Mono<Void> handleUserStorage(User user, List<Long> serverFileIds) {
+    protected Mono<Void> calculateFileSize(User user, List<Long> serverFileIds) {
         if (serverFileIds.isEmpty()) {
             return Mono.empty();
         }
-        AtomicLong totalSize = new AtomicLong(0);
         Map<Long, Long> serverFileIdMap = new ConcurrentHashMap<>();
         serverFileIds.forEach(serverFileId -> serverFileIdMap.put(serverFileId, serverFileIdMap.getOrDefault(serverFileId, 0L) + 1));
 
-        return serverFileMetaRepository.findAllByIdIn(serverFileIdMap.keySet()).doOnNext(serverFileMetadata -> {
-            long size = serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId());
-            totalSize.addAndGet(size);
-        }).then(handleUserStorage(user, totalSize.get(), true));
+        return serverFileMetaRepository
+                .findAllByIdIn(serverFileIdMap.keySet())
+                .map(serverFileMetadata -> serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId()))
+                .reduce(0L, Long::sum)
+                .flatMap(totalSize -> handleUserStorage(user, totalSize, true));
     }
 
     /**
-     * 更新用戶儲存空間的共通實現
+     * 更新用戶儲存空間使用量，此方法會根據文件大小計算用戶儲存空間使用量
      *
      * @param user     用戶信息
      * @param fileSize 要更新的文件大小
@@ -888,28 +886,21 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<Void>
      */
     private Mono<Void> handleUserStorage(User user, long fileSize, boolean isDelete) {
-        return Mono.defer(() -> {
-            if (isDelete) {
-                return userRepository.findById(user.getId()).flatMap(userEntity -> {
-                    long newStorageUsed = Math.max(userEntity.getUsedStorage() - fileSize, 0);
-                    userEntity.setUsedStorage(newStorageUsed);
-                    return userRepository.save(userEntity).then();
-                });
+        return Mono.defer(() -> userRepository.findById(user.getId()).flatMap(userEntity -> {
+            long newStorageUsed = isDelete ? Math.max(userEntity.getUsedStorage() - fileSize, 0) : userEntity.getUsedStorage() + fileSize;
+            if (user.getStorageLimit() != -1 && newStorageUsed > user.getStorageLimit()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
+                                                          ByteEnum.toReadableSize(user.getStorageLimit()),
+                                                          ByteEnum.toReadableSize(user.getUsedStorage()),
+                                                          ByteEnum.toReadableSize(fileSize)
+                ));
             }
+            userEntity.setUsedStorage(newStorageUsed);
 
-            if (user.getStorageLimit() == -1 || user.getStorageLimit() - fileSize >= 0) {
-                return userRepository.findById(user.getId()).flatMap(userEntity -> {
-                    long newStorageUsed = userEntity.getUsedStorage() + fileSize;
-                    userEntity.setUsedStorage(newStorageUsed);
-                    return userRepository.save(userEntity).then();
-                });
-            }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
-                                                      ByteEnum.toReadableSize(user.getStorageLimit()),
-                                                      ByteEnum.toReadableSize(user.getUsedStorage()),
-                                                      ByteEnum.toReadableSize(fileSize)
-            ));
-        });
+            List<String> keys = Arrays.asList(user.getId().toString(), userEntity.getUsername());
+            Mono<Void> cleanCache = cacheManager.deleteCaches(keys, CacheProviderEnum.USER_CACHE, true);
+            return userRepository.save(userEntity).then(cleanCache);
+        }));
     }
 
 

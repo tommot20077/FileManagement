@@ -231,7 +231,7 @@ public class LoggerAspect {
 
         } else if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
             requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
-            requestUsername = "請求者 IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+            requestUsername = "IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
             requsetUserId = null;
         } else {
             requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";

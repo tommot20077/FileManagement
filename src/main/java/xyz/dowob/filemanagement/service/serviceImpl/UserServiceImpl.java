@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
@@ -246,6 +247,7 @@ public class UserServiceImpl implements UserService {
      * @return Mono<User> 返回用戶對象
      */
     @Override
+    @SkipRecord
     public Mono<User> getUser(ServerWebExchange exchange) {
         final Object[] userId = new Object[1];
         return Mono.defer(() -> {

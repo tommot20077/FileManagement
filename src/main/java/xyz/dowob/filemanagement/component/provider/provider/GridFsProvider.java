@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.gridfs.ReactiveGridFsTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 
 /**
@@ -93,6 +94,7 @@ public class GridFsProvider {
      *
      * @return 返回查找到的檔案的數據流
      */
+    @SkipRecord
     public Mono<ReactiveGridFsResource> getResource(GridFSFile gridFsFile) {
         return gridFsTemplate.getResource(gridFsFile);
     }

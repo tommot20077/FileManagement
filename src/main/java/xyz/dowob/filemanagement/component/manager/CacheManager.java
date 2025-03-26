@@ -34,6 +34,7 @@ import java.util.function.Function;
  **/
 @Component
 @SuppressWarnings("unused")
+@SkipRecord
 public class CacheManager {
     /**
      * 緩存提供者的Map，用於存儲不同類型的緩存提供者

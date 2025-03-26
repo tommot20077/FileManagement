@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
@@ -29,7 +30,7 @@ import java.util.Objects;
  **/
 @Component
 @SuppressWarnings("unused")
-@HideOverLength
+@SkipRecord
 public class RedisProvider {
     /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的

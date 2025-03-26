@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
@@ -122,6 +123,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      * @return 返回CSRF Token
      */
     @Override
+    @SkipRecord
     public Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {
         return csrfTokenRepository.getCsrfTokenRepository().generateToken(request);
     }

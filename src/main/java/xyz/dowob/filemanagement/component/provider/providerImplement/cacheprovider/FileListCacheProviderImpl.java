@@ -5,7 +5,6 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.CacheProviderType;
-import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
@@ -27,7 +26,7 @@ import java.util.*;
  * @Version 1.0
  **/
 @Component
-@HideOverLength
+@SkipRecord
 @CacheProviderType(CacheProviderEnum.USER_FILE_LIST_CACHE)
 @ConditionalOnProperty(prefix = "cache", name = "enable-user-file-list-cache", havingValue = "true", matchIfMissing = true)
 public class FileListCacheProviderImpl implements CacheProvider {
