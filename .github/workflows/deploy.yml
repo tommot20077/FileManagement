@@ -217,6 +217,7 @@ jobs:
 
             # 清理無用的映像檔
             docker image prune -f
+            docker system prune -af
 
             # 使用 docker compose 重新構建並啟動前端服務
             echo "構建新前端容器"

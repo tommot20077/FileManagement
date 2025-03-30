@@ -210,16 +210,16 @@ public class TransfersTasksManager {
         List<TransfersStatusEnum> status = new ArrayList<>();
         status.add(TransfersStatusEnum.COMPLETED);
         status.add(TransfersStatusEnum.FAILED);
-        return transfersTasksRepository.findAllByStatusNotIn(status).collectList().map(unfinishedTasks -> {
+        return transfersTasksRepository.findAllByStatusNotIn(status).collectList().flatMap(unfinishedTasks -> {
             if (unfinishedTasks.isEmpty()) {
                 return Mono.empty();
             }
-            unfinishedTasks.stream().peek(transfersTask -> {
-                transfersTask.setStatus(TransfersStatusEnum.FAILED);
-                transfersTask.setFinishTime(LocalDateTime.now());
-                transfersTask.setMessage("伺服器關閉，任務被取消");
-            }).forEach(transfersTasksRepository::save);
-            return Mono.empty();
-        }).then();
+            for (TransfersTask unfinishedTask : unfinishedTasks) {
+                unfinishedTask.setStatus(TransfersStatusEnum.FAILED);
+                unfinishedTask.setFinishTime(LocalDateTime.now());
+                unfinishedTask.setMessage("伺服器關閉，任務被取消");
+            }
+            return transfersTasksRepository.saveAll(unfinishedTasks).then();
+        });
     }
 }
