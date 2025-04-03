@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.component.provider.providerImplement;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -21,6 +22,7 @@ import reactor.core.publisher.Mono;
  **/
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = {"spring.mail.username", "spring.mail.password"})
 public class EmailProviderImpl implements xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider {
     /**
      * JavaMailSender Java 郵件發送器

@@ -15,9 +15,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @create 2024-09-14 17:08
  * @Version 1.0
  **/
-@SpringBootApplication
-@EnableAspectJAutoProxy
 @EnableScheduling
+@EnableAspectJAutoProxy
+@SpringBootApplication(exclude = {org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class})
 public class FileManagementApplication {
     /**
      * Spring Boot 啟動方法

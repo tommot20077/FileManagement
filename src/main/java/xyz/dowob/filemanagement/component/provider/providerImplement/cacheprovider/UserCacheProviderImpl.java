@@ -59,6 +59,9 @@ public class UserCacheProviderImpl implements CacheProvider {
     public UserCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         this.redisProvider = redisProvider;
         this.CACHE_PREFIX = cacheProperties.getUserInfoCachePrefix();
+        if (cacheProperties.getUserInfoCacheExpireTime() <= 0) {
+            throw new IllegalArgumentException("用戶資訊緩存過期時間必須大於0");
+        }
         this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getUserInfoCacheExpireTime());
     }
 

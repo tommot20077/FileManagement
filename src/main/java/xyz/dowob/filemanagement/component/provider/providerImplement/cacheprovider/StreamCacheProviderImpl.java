@@ -65,9 +65,16 @@ public class StreamCacheProviderImpl implements CacheProvider {
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         this.redisProvider = redisProvider;
-        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
         this.CACHE_PREFIX = cacheProperties.getDownloadCachePrefix();
+
+        if (cacheProperties.getChunkSize() <= 0) {
+            throw new IllegalArgumentException("下載流緩存塊大小必須大於0");
+        }
         this.CHUNK_SIZE = cacheProperties.getChunkSize();
+        if (cacheProperties.getDownloadCacheExpireTime() <= 0) {
+            throw new IllegalArgumentException("下載流緩存過期時間必須大於0");
+        }
+        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
     }
 
 

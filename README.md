@@ -76,6 +76,58 @@
 
 ---
 
+## 安裝與使用
+
+### 1. **環境要求**
+
+- **docker**: 20.10.0+
+- **docker-compose**: 1.29.2+
+
+### 2. **安裝步驟**
+
+1. 下載位於 [/docker/src](https://github.com/tommot20077/FileManagement/tree/develop/docker/src)
+   內的所有檔案或是直接下載打包好的 `/docker/setup.zip` (請不要更動內部檔案的目錄結構以及名稱)。
+2. 將下載的檔案放到執行的目錄下(如果是下載的壓縮檔，則解壓縮到目標目錄)。
+3. 下載的設定黨已經做好設定，如果有需要自定義某修設定需在啟動之前請先確認各類的設定檔案
+    - `docker-compose.yml`：設定各個服務的版本、網路、端口等資訊，如果有需要調整請參考註解並更動相關樹定。
+    - `Dockerfile`：設定應用程式的建置過程，包含安裝 JDK、Maven 等必要工具。
+    - `wait-for-it.sh`：確保資料庫服務啟動後再啟動應用程式，避免因為資料庫尚未啟動而導致應用程式無法連線。
+    - `application.yml`：設定應用程式的基本參數，如資料庫連線、快取設定等。 (
+      更詳細的設定請參考 [範例設定檔案](https://github.com/tommot20077/FileManagement/blob/develop/src/main/resources/application-demo.yml))
+    - 各資料庫的設定檔案。(如果在其他設定有進行更改這邊也需要同步處理)
+4. 需要用戶手動配置的參數為
+    - `application.yml` 中的
+        - `spring.datasource.password`
+        - `spring.data.mongodb.url`
+        - `spring.data.redis.password` (需設定與 `redis.conf` 中的 `requirepass` 一致)
+        - `security.jwt-token.secret`
+    - `docker-compose.yml` 中的
+        - `MYSQL_ROOT_PASSWORD`
+        - `MONGO_INITDB_ROOT_USERNAME`
+        - `MONGO_INITDB_ROOT_PASSWORD`
+5. 服務控制
+    1. 啟動服務 在終端機中進入到下載的目錄下，執行以下指令啟動服務
+       ```bash
+       docker-compose up -d
+       ```
+    2. 關閉服務
+       ```bash
+       docker-compose down
+       ```
+    3. 查看服務狀態
+        ```bash
+        docker-compose ps
+        ```
+
+6. 補充:
+    - 如果需要安裝前端頁面的話可以將 `docker-compose.yml` 中的 `frontend`
+      註釋移除，並下載前端 [Dockerfile](https://github.com/tommot20077/FileManagementWeb/blob/master/docker/Dockerfile)
+      放入當前目錄下，然後執行以下指令
+        ```bash
+        docker-compose up -d filemanager_front
+        ```
+---
+
 ## 性能測試
 
 ### 1. **測試環境**
@@ -137,7 +189,7 @@
 
 - **檔案查詢**
     - 執行目標: 處理 10000個檔案查詢請求
-    - 執行條件: 於 10秒內發送 10000個檔案查詢請求，搜尋條件為部分檔案前墜名稱以及隨機名稱，其餘查詢條件關閉並關閉緩存
+  - 執行條件: 於 10秒內發送 10000個檔案查詢請求，搜尋條件為部分檔案前綴名稱以及隨機名稱，其餘查詢條件關閉並關閉緩存
 
 |      指標      | Reactive (WebFlux) | Blocking (MVC) |   差距   |
 |:------------:|:------------------:|:--------------:|:------:|
@@ -171,23 +223,23 @@
 
 - 關閉緩存
 
-|      指標      | Reactive (WebFlux) | Blocking (MVC) |   差距   |
-|:------------:|:------------------:|:--------------:|:------:|
-|  平均處理時間 (s)  |        0.8         |      1.4       | -42.9% |
-|  QPS (請求/秒)  |       206.3        |     117.9      |  +75%  |
-| 執行占用 CPU (%) |        60.7        |      72.4      | -16.2% |
-| 執行占用 RAM (%) |        28.6        |      34.8      | -20.8% |
-|   錯誤率 (%)    |         0          |       0        |  +0%   |
+| 指標 | Reactive (W ebFlux) | Bloc king (MVC) | 差距 |
+|:------------:|:-----------:--------------:----------:|:------:|
+| 平均處理時間 (s)  | 0.8 | 1.4 | -42.9% |
+| QPS (請求/秒)  | 206.3 | 117.9 | +75% |
+| 執行占用 CPU (%) | 60.7 | 72.4 | -16.2% |
+| 執行占用 RAM (%) | 28.6 | 34.8 | -20.8% |
+| 錯誤率 (%)    | 0 | 0 | +0% |
 
 - 開啟緩存
 
-|      指標      | Reactive (WebFlux) | Blocking (MVC) |   差距    |
-|:------------:|:------------------:|:--------------:|:-------:|
-|  平均處理時間 (s)  |        0.3         |      0.9       | -66.7%  |
-|  QPS (請求/秒)  |       547.3        |     182.4      | +200.1% |
-| 執行占用 CPU (%) |        40.9        |      45.5      | -10.1%  |
-| 執行占用 RAM (%) |        35.9        |      45.3      | -17.8%  |
-|   錯誤率 (%)    |         0          |       0        |   +0%   |
+| 指標 | Reactive (W ebFlux) | Bloc king (MVC) | 差距 |
+|:------------:|:-----------:--------------:----------:|:-------:|
+| 平均處理時間 (s)  | 0.3 | 0.9 | -66.7% |
+| QPS (請求/秒)  | 547.3 | 182.4 | +200.1% |
+| 執行占用 CPU (%) | 40.9 | 45.5 | -10.1% |
+| 執行占用 RAM (%) | 35.9 | 45.3 | -17.8% |
+| 錯誤率 (%)    | 0 | 0 | +0% |
 
 ---
 

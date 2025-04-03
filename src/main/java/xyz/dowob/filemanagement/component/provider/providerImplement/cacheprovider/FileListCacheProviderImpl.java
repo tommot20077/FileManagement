@@ -43,6 +43,9 @@ public class FileListCacheProviderImpl implements CacheProvider {
 
     public FileListCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         this.redisProvider = redisProvider;
+        if (cacheProperties.getFileListCacheExpireTime() <= 0) {
+            throw new IllegalArgumentException("文件列表緩存過期時間必須大於0");
+        }
         this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getFileListCacheExpireTime());
     }
 

@@ -52,21 +52,25 @@ public class FileProperties {
 
         /**
          * Websocket最大允許分塊大小，單位為 MB，默認為 20MB
+         * 注意如果有設定nginx的client_max_body_size，這個值必須小於nginx的設定
          */
         private Integer payloadLength = 20;
 
         /**
-         * 上傳分塊大小限制，單位為 MB，默認為 10MB，此參數需小於 payloadLength
+         * 上傳分塊大小限制，單位為 MB，默認為 10MB
+         * 此參數需小於 payloadLength，否則將會導致上傳失敗
          */
         private Integer chunkSize = 10;
 
         /**
          * 最大上傳任務限制，默認為 3
+         * 此值設定過高容易導致導致資料庫處理不及而使得處理性能下降
          */
         private Integer maxUploadTaskLimit = 3;
 
         /**
-         * 合併處理任務限制，默認為 3
+         * 單一位用戶合併檔案分塊的最大數量限制，默認為 3
+         * 建議此值設定為與 maxUploadTaskLimit 相同
          */
         private Integer combineProcessCountLimit = 3;
     }
@@ -77,7 +81,7 @@ public class FileProperties {
     @Data
     public static class Download {
         /**
-         * 下載檔案在客戶端的保留時間，默認為 3600，單位為秒
+         * 設定瀏覽器緩存的過期時間，單位為秒，默認為 3600 秒
          */
         private Long downloadCacheHeaderExpireTime = 3600L;
     }
@@ -107,6 +111,7 @@ public class FileProperties {
 
         /**
          * 顯示最近文件數量，默認為 20，當設置值小於等於0時，則不限制顯示數量
+         * 此參數用於用戶查詢最近使用的檔案所顯示的數量
          */
         private Integer showRecentFileCount = 20;
 

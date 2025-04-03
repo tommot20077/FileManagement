@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.service.serviceImpl;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.apache.logging.log4j.Logger;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +37,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -76,7 +78,7 @@ public class UserServiceImpl implements UserService {
     /**
      * 驗證碼服務
      */
-    private final EmailProvider emailProvider;
+    private final Optional<EmailProvider> emailProvider;
 
     /**
      * 安全配置屬性
@@ -110,6 +112,8 @@ public class UserServiceImpl implements UserService {
     public void init() {
         USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
         USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
+        Logger logger = org.apache.logging.log4j.LogManager.getLogger(UserServiceImpl.class);
+        logger.warn("emailProvider: {}", emailProvider.isPresent());
     }
 
     /**
@@ -196,18 +200,20 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<Void> sendResetPasswordMail(UserEmailDTO userEmailDTO) {
-        return validationService
-                .validateNotNull(userEmailDTO)
-                .then(Mono.defer(() -> userRepository
-                        .findByEmail(userEmailDTO.getEmail())
-                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
-                        .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
-                            String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
-                                                           token,
-                                                           securityProperties.getResetPasswordToken().getExpiration()
-                            );
-                            return emailProvider.sendEmail(user.getEmail(), "重置密碼", content);
-                        }))));
+        return emailProvider.map(provider -> {
+            return validationService
+                    .validateNotNull(userEmailDTO)
+                    .then(Mono.defer(() -> userRepository
+                            .findByEmail(userEmailDTO.getEmail())
+                            .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
+                            .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
+                                String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
+                                                               token,
+                                                               securityProperties.getResetPasswordToken().getExpiration()
+                                );
+                                return provider.sendEmail(user.getEmail(), "重置密碼", content);
+                            }))));
+        }).orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.UNSUPPORTED_OPERATION)));
     }
 
     /**

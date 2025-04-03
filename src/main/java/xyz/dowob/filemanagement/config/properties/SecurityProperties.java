@@ -150,6 +150,7 @@ public class SecurityProperties {
 
         /**
          * 跨域請求是否允許憑證，默認為 true
+         * 請注意如果這邊開啟的話，在設定跨域來源中就不可以使用 *，必須指定來源
          */
         private boolean allowCredentials = true;
     }
@@ -157,29 +158,30 @@ public class SecurityProperties {
     @Data
     public static class Csrf {
         /**
-         * CSRF 憑證的名稱，默認為 X-Csrf-Token
+         * CSRF 憑證的標頭名稱，用於前端ajax或fetch請求驗證用，默認為 X-CSRF-TOKEN
          */
         private String headerName = "X-Csrf-Token";
 
         /**
-         * CSRF 憑證的參數名稱，默認為 _csrf
+         * CSRF 憑證的參數名稱，用於前端表單驗證用，默認為 _csrf
          */
         private String parameterName = "_csrf";
 
         /**
          * CSRF 憑證的過期時間，默認為 5 分鐘
+         * 此值不應該設置過長，否則會導致 CSRF 憑證的安全性降低
          */
         private long expiration = 5;
 
         /**
-         * CSRF 憑證的存儲方式，默認為 LOCAL
+         * CSRF 憑證的存儲方式，默認為 LOCAL， 可選值為 LOCAL 和 REDIS
          */
         private CsrfTokenRepositoryEnum csrfTokenRepository = CsrfTokenRepositoryEnum.LOCAL;
 
         /**
-         * 允許的 Referer，默認為 *，即允許所有 Referer
+         * 允許的參考來源的正則表達式，默認允許所有的 http和 https來源
          * 此配置值為管理CSRF TOKEN的獲取安全性，指定的 Referer 可以獲取 CSRF TOKEN
-         * 預設允許來自HTTP和HTTPS的所有Referer
+         * 如果有需要保護獲取CSRF token的請求，則需要設置這個參數成你前端的域名
          */
         private String allowRefererPatten = "^https?://.*$";
     }
