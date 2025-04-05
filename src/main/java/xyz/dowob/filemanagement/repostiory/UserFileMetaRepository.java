@@ -61,10 +61,8 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
     default Flux<UserFileMetadata> findAllByParentFolderIdIn(List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
-        return entityOperations
-                .select(UserFileMetadata.class)
-                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("parent_folder_id").in(parentFolderId)))
-                .all();
+        Criteria criteria = Criteria.where("parent_folder_id").in(parentFolderId).and("is_deleted").is(false);
+        return entityOperations.select(UserFileMetadata.class).matching(org.springframework.data.relational.core.query.Query.query(criteria)).all();
     }
 
     /**

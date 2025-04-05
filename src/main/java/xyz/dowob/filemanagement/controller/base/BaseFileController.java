@@ -1,23 +1,32 @@
 package xyz.dowob.filemanagement.controller.base;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
@@ -25,6 +34,8 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static xyz.dowob.filemanagement.customenum.FileEnum.*;
@@ -221,5 +232,82 @@ public abstract class BaseFileController implements ResponseUnity {
                 return null;
             }
         }).filter(Objects::nonNull).toList();
+    }
+
+
+    /**
+     * 準備 Http 標頭
+     *
+     * @param action         預覽或是下載
+     * @param userFileDataBO 文件數據對象
+     *
+     * @return HttpHeaders 返回 Http 標頭
+     */
+    protected HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO, String rangeHeader) {
+        HttpHeaders headers = getHttpHeaders(userFileDataBO, rangeHeader);
+
+        if (action.equals(DownloadActionEnum.DOWNLOAD)) {
+            String encodedFilename = URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8);
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + encodedFilename);
+            headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
+        } else {
+            headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
+        }
+
+        String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime());
+        headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
+        return headers;
+    }
+
+    /**
+     * 獲取 Http 標頭
+     *
+     * @param userFileDataBO 文件數據對象
+     * @param rangeHeader    範圍標頭
+     *
+     * @return HttpHeaders 返回 Http 標頭
+     */
+    private HttpHeaders getHttpHeaders(UserFileDataBO userFileDataBO, String rangeHeader) {
+        HttpHeaders headers = new HttpHeaders();
+        long fileSize = userFileDataBO.getFileSize();
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String[] ranges = rangeHeader.replace("bytes=", "").split("-");
+            long start = Long.parseLong(ranges[0]);
+            long end = ranges.length > 1 && !ranges[1].isEmpty() ? Long.parseLong(ranges[1]) : fileSize - 1;
+
+            headers.set(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileSize);
+            headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(end - start + 1));
+            headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+        } else {
+            headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileSize));
+            headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
+        }
+        return headers;
+    }
+
+
+    /**
+     * 處理驗證異常，因為回傳格式不同，所以不可使用 {@link #handleError(Mono, ServerWebExchange)} 方法
+     * 此方法用於處理文件下載的驗證異常
+     *
+     * @param e        驗證異常
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
+     */
+    protected Mono<ResponseEntity<Flux<DataBuffer>>> handleValidationError(ValidationException e, ServerWebExchange exchange) {
+        String errorMessage = String.format("下载失败: %s", e.getMessage());
+        ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+
+        try {
+            objectMapper.registerModule(new JavaTimeModule());
+            byte[] responseBytes = objectMapper.writeValueAsString(apiResponse).getBytes();
+            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(responseBytes);
+
+            return Mono.just(ResponseEntity.status(e.getErrorCode().getHttpStatus()).contentType(MediaType.APPLICATION_JSON).body(Flux.just(buffer)));
+        } catch (JsonProcessingException ex) {
+            return Mono.error(new RuntimeException(ex));
+        }
     }
 }

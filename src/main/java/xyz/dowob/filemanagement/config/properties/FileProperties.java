@@ -83,7 +83,24 @@ public class FileProperties {
         /**
          * 設定瀏覽器緩存的過期時間，單位為秒，默認為 3600 秒
          */
-        private Long downloadCacheHeaderExpireTime = 3600L;
+        private int downloadCacheHeaderExpireTime = 3600;
+
+        /**
+         * 設定下載檔案的緩衝區大小，單位為 B，默認為 4096 KB
+         */
+        private int zipBufferSize = 4096;
+
+        /**
+         * 下載資料夾的壓縮檔案暫存路徑，默認為 ./temp
+         */
+        private String folderTempDownloadPath = "./temp/folder-zip";
+
+        /**
+         * 單次資料夾下載的最大併發數量限制，默認為 5
+         * 此值用於限制資料夾一邊查詢一邊寫入到壓縮檔案的最大併發數量
+         * 若此值設定過高，則可能會導致資料夾下載 GridFS 的性能下降
+         */
+        private int folderDownloadConcurrentLimit = 5;
     }
 
     /**

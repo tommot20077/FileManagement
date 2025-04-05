@@ -4,9 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
 import jakarta.annotation.Nullable;
+import org.bson.types.ObjectId;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.data.mongodb.gridfs.ReactiveGridFsResource;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -19,23 +25,26 @@ import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
+import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
-import xyz.dowob.filemanagement.entity.FileTrashRecord;
-import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.entity.UserFileMetadata;
-import xyz.dowob.filemanagement.entity.UserFileShareRecord;
+import xyz.dowob.filemanagement.entity.*;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.*;
 import xyz.dowob.filemanagement.service.serviceInterface.AbstractFileService;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * 文件夾文件服務實現，處理文件夾的相關操作
@@ -52,8 +61,23 @@ import java.util.stream.Collectors;
 @Service
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
+    /**
+     * 文件夾下載的臨時路徑
+     */
+    private final String downloadFolderPath;
+
+    /**
+     * 文件夾下載的緩衝區大小，當此值設定為0或負數時，則使用默認值4096
+     */
+    private final int bufferSize;
+
+    /**
+     * 單個文件夾下載的最大併發限制，當此值設定為0或負數時，則使用默認值5
+     */
+    private final int maxConcurrentLimit;
+
     public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
-                                 @Nullable FolderListTreeProvider folderListTreeProvider) {
+                                 @Nullable FolderListTreeProvider folderListTreeProvider) throws ProcessException {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
@@ -66,14 +90,32 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               rateLimiterConfig,
               folderListTreeProvider,
               fileTrashRecordRepository,
-              entityOperations,
-              transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
+              entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
         );
+        int maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
+        this.maxConcurrentLimit = maxConcurrentLimit > 0 ? maxConcurrentLimit : 5;
+
+        String tempDownloadPath = fileProperties.getDownload().getFolderTempDownloadPath();
+        if (!tempDownloadPath.endsWith("/")) {
+            tempDownloadPath = tempDownloadPath + "/";
+        }
+        this.downloadFolderPath = tempDownloadPath;
+
+        File file = new File(tempDownloadPath);
+        if (!file.exists() && !file.mkdirs()) {
+            throw new ProcessException(ProcessException.ErrorCode.CREATE_TEMP_DOWNLOAD_FOLDER_FAILED, tempDownloadPath);
+        }
+
+
+        int bs = fileProperties.getDownload().getZipBufferSize();
+        if (bs <= 0) {
+            bs = 4096;
+        }
+        this.bufferSize = bs;
     }
-    //todo 後期加入下載資料夾的功能
 
     /**
-     * 創建文件夾的共通實現
+     * 創建文件夾的實現
      *
      * @param fileEditDTO 文件編輯數據
      * @param user        用戶信息
@@ -112,7 +154,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 編輯文件夾的共通實現
+     * 編輯文件夾的實現
      *
      * @param fileEditDTO 文件編輯數據
      * @param user        用戶信息
@@ -137,7 +179,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         });
                     }
                        return Mono.just(fileEditDTO.getUserFileMetadata());
-                }).doOnNext(userFileMetadata -> redisProvider
+                   }).doOnNext(userFileMetadata -> redisProvider
                         .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
                         .subscribeOn(Schedulers.boundedElastic())
                         .subscribe())
@@ -189,7 +231,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 刪除文件夾的共通實現
+     * 刪除文件夾的實現
      *
      * @param folder 文件
      * @param user   用戶信息
@@ -215,7 +257,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 恢復文件夾的共通實現
+     * 恢復文件夾的實現
      *
      * @param folder 資料夾
      * @param user   用戶
@@ -271,7 +313,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 批量恢復文件夾的共通實現
+     * 批量恢復文件夾的實現
      *
      * @param folders 資料夾
      * @param user    用戶
@@ -284,7 +326,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 刪除文件夾的共通實現
+     * 刪除文件夾的實現
      *
      * @param folder 文件夾
      * @param user   用戶
@@ -323,7 +365,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     }
 
     /**
-     * 批量刪除文件夾的共通實現
+     * 批量刪除文件夾的實現
      *
      * @param folders 文件夾
      * @param user    用戶
@@ -333,6 +375,187 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     @Override
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
+    }
+
+    /**
+     * 下載文件夾的實現
+     * 此方法會查詢所有子文件夾和文件，並將其壓縮成一個zip文件後返回成 UserFileDataBO對象
+     * <p>
+     * 對於創建 ZipOutputStream、關閉 ZipOutputStream、刪除臨時檔案可能會回傳 Mono.error
+     *
+     * @param rootFolder 根文件夾
+     * @param user       用戶
+     *
+     * @return Mono<UserFileDataBO> 文件數據
+     */
+    @Override
+    public Mono<UserFileDataBO> downloadFolder(UserFileMetadata rootFolder, User user) {
+        try {
+            String zipFileName = getTempZipFilename(rootFolder);
+            String tempDownloadPath = downloadFolderPath + zipFileName;
+            return Mono
+                    .usingWhen(Mono.just(new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(tempDownloadPath)))),
+                               zos -> processFolder(zos, rootFolder, rootFolder.getFilename()),
+                               zos -> Mono.fromRunnable(() -> {
+                                   try {
+                                       zos.close();
+                                   } catch (IOException e) {
+                                       throw Exceptions.propagate(e);
+                                   }
+                               }).subscribeOn(Schedulers.boundedElastic())
+                    )
+                    .then(Mono.defer(() -> {
+                        File zipFile = new File(tempDownloadPath);
+                        long fileSize = zipFile.length();
+                        Flux<DataBuffer> dataFlux = DataBufferUtils.read(zipFile.toPath(), DefaultDataBufferFactory.sharedInstance, bufferSize);
+
+                        UserFileDataBO userFileDataBO = UserFileDataBO
+                                .builder()
+                                .fileSize(fileSize)
+                                .filename(zipFileName)
+                                .fileType(FileEnum.ZIP)
+                                .dataStream(dataFlux)
+                                .build();
+                        return Mono.just(userFileDataBO);
+                    }).doFinally(signal -> {
+                        File file = new File(tempDownloadPath);
+                        if (file.exists() && !file.delete()) {
+                            throw new RuntimeException(new ProcessException(ProcessException.ErrorCode.DELETE_TEMP_FILE_FAILED, tempDownloadPath));
+                        }
+                    }));
+        } catch (FileNotFoundException e) {
+            throw Exceptions.propagate(e);
+        }
+    }
+
+    /**
+     * 處理文件夾的壓縮
+     * 根據所查詢到的當前目錄下的檔案進行處理
+     * 若當前目錄下有子文件夾，則會遞迴調用此方法
+     * 若當前目錄下有文件且該文件存在於 GridFS 中，則會調用 zipFileBatch 方法進行檔案壓縮
+     *
+     * @param zipOutputStream 壓縮輸出流
+     * @param folder          文件夾
+     * @param parentPath      父路徑
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> processFolder(ZipOutputStream zipOutputStream, UserFileMetadata folder, String parentPath) {
+        return Mono.defer(() -> findFoldersWithSameParentFolderId(Collections.singletonList(folder.getId())).flatMap(files -> {
+            List<UserFileMetadata> subFolders = new ArrayList<>();
+            List<UserFileMetadata> generalFile = new ArrayList<>();
+            files.forEach(file -> {
+                if (file.getFileType() == FileEnum.FOLDER) {
+                    subFolders.add(file);
+                } else if (file.getServerFileId() != null) {
+                    generalFile.add(file);
+                }
+            });
+
+            Mono<Void> filesProcessing = zipFileBatch(zipOutputStream, generalFile, parentPath);
+
+            Mono<Void> foldersProcessing = Flux.fromIterable(subFolders).flatMap(subFolder -> {
+                String newPath = parentPath + "/" + subFolder.getFilename();
+                return Mono.fromCallable(() -> {
+                    synchronized (zipOutputStream) {
+                        zipOutputStream.putNextEntry(new ZipEntry(newPath + "/"));
+                        zipOutputStream.closeEntry();
+                    }
+                    return null;
+                }).subscribeOn(Schedulers.boundedElastic()).then(processFolder(zipOutputStream, subFolder, newPath));
+            }).then();
+
+            return filesProcessing.then(foldersProcessing);
+        }));
+    }
+
+    /**
+     * 獲取文件資源
+     * 給定一個文件列表，將返回一個包含 GridFs 檔案資源和對應的用戶文件元數據的 Flux
+     * 其鍵為 GridFs 檔案資源，值為對應的用戶文件元數據列表
+     *
+     * @param files 文件列表
+     *
+     * @return Flux<Map.Entry < ReactiveGridFsResource, List < UserFileMetadata>>>
+     */
+    private Flux<Map.Entry<ReactiveGridFsResource, List<UserFileMetadata>>> getFileResource(List<UserFileMetadata> files) {
+        ConcurrentMap<Long, List<UserFileMetadata>> serverIds = files
+                .stream()
+                .filter(file -> file.getServerFileId() != null)
+                .collect(Collectors.groupingByConcurrent(UserFileMetadata::getServerFileId));
+        if (serverIds.isEmpty()) {
+            return Flux.empty();
+        }
+
+        return serverFileMetaRepository.findAllByIdIn(serverIds.keySet()).collectList().flatMapMany(serverFileMetadataList -> {
+            Map<ObjectId, ServerFileMetadata> serverFileMetadataMap = serverFileMetadataList
+                    .stream()
+                    .collect(Collectors.toMap(metadata -> new ObjectId(metadata.getGridFsId()), serverFileMetadata -> serverFileMetadata));
+
+            return gridFsProvider
+                    .findFilesById(serverFileMetadataMap.keySet())
+                    .flatMapMany(gridFsFilesMap -> Flux
+                            .fromIterable(gridFsFilesMap.values())
+                            .flatMap(gridFSFile -> gridFsProvider.getResource(gridFSFile).flatMap(resource -> {
+                                List<UserFileMetadata> userFileMetadatas = serverIds.get(serverFileMetadataMap.get(gridFSFile.getObjectId()).getId());
+                                return Mono.just(new AbstractMap.SimpleEntry<>(resource, userFileMetadatas));
+                            })));
+        });
+    }
+
+
+    /**
+     * 批量壓縮文件
+     * 對於給定的文件列表，將其壓縮到指定的 ZipOutputStream 中
+     * 這個方法會遍歷所有的文件資源，並將其寫入到 ZipOutputStream 中
+     * 如果文件資源的輸入流無法獲取或是寫入過程中發生錯誤，則會拋出異常
+     *
+     * @param zipOutputStream 壓縮輸出流
+     * @param files           文件列表
+     * @param parentPath      父路徑
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> zipFileBatch(ZipOutputStream zipOutputStream, List<UserFileMetadata> files, String parentPath) {
+        Flux<Map.Entry<ReactiveGridFsResource, List<UserFileMetadata>>> fileResourceFlux = getFileResource(files);
+
+        return fileResourceFlux.flatMap(entry -> {
+            ReactiveGridFsResource resource = entry.getKey();
+            List<UserFileMetadata> userFileMetadatas = entry.getValue();
+
+            return Flux.fromIterable(userFileMetadatas).flatMap(file -> {
+                String filePath = parentPath + "/" + file.getFilename();
+                return resource
+                        .getInputStream()
+                        .flatMap(inputStream -> Mono.usingWhen(Mono.just(inputStream), resourceInputStream -> Mono.fromCallable(() -> {
+                            try {
+                                synchronized (zipOutputStream) {
+                                    zipOutputStream.putNextEntry(new ZipEntry(filePath));
+                                    ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+                                    ReadableByteChannel channel = Channels.newChannel(resourceInputStream);
+                                    WritableByteChannel outputChannel = Channels.newChannel(zipOutputStream);
+
+                                    while (channel.read(buffer) != -1) {
+                                        buffer.flip();
+                                        outputChannel.write(buffer);
+                                        buffer.clear();
+                                    }
+
+                                    zipOutputStream.closeEntry();
+                                }
+                                return true;
+                            } catch (IOException e) {
+                                throw Exceptions.propagate(e);
+                            }
+                        }).subscribeOn(Schedulers.boundedElastic()), stream -> Mono.fromRunnable(() -> {
+                            try {
+                                stream.close();
+                            } catch (IOException e) {
+                                throw Exceptions.propagate(e);
+                            }
+                        }).subscribeOn(Schedulers.boundedElastic())));
+            }, maxConcurrentLimit);
+        }).then();
     }
 
 
@@ -345,12 +568,16 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * @return Mono<Void>
      */
     private Mono<List<UserFileMetadata>> findAllChildFolder(List<Long> parentFolderIdList, List<UserFileMetadata> childFolderList) {
-        return findFoldersWithSameParentFolderId(parentFolderIdList).flatMap(nextChildFolder -> {
-            childFolderList.addAll(nextChildFolder);
-            if (nextChildFolder.isEmpty()) {
-                return childFolderList.isEmpty() ? Mono.empty() : Mono.just(childFolderList);
+        return findFoldersWithSameParentFolderId(parentFolderIdList).flatMap(subFile -> {
+            List<UserFileMetadata> nextSubFolder = subFile
+                    .stream()
+                    .filter(userFileMetadata -> userFileMetadata.getFileType() == FileEnum.FOLDER)
+                    .toList();
+            if (nextSubFolder.isEmpty()) {
+                return Mono.just(childFolderList);
             }
-            return findAllChildFolder(nextChildFolder.stream().map(UserFileMetadata::getId).toList(), childFolderList);
+            childFolderList.addAll(nextSubFolder);
+            return findAllChildFolder(nextSubFolder.stream().map(UserFileMetadata::getId).toList(), childFolderList);
         });
     }
 
@@ -364,10 +591,18 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     private Mono<List<UserFileMetadata>> findFoldersWithSameParentFolderId(List<Long> parentFolderId) {
         return userFileMetaRepository.findAllByParentFolderIdIn(parentFolderId, entityOperations)
                 .collectList()
-                .map(userFileMetadataList -> userFileMetadataList
-                        .stream()
-                        .filter(fileMeta -> fileMeta.getFileType() == FileEnum.FOLDER)
-                        .collect(Collectors.toList()))
                 .switchIfEmpty(Mono.just(Collections.emptyList()));
     }
+
+    /**
+     * 獲取臨時壓縮文件名
+     *
+     * @param folder 文件夾
+     *
+     * @return String
+     */
+    private String getTempZipFilename(UserFileMetadata folder) {
+        return folder.getId() + "_" + folder.getFilename() + ".zip";
+    }
 }
+

@@ -2,9 +2,7 @@ package xyz.dowob.filemanagement.data.file.bo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import xyz.dowob.filemanagement.customenum.FileEnum;
@@ -32,7 +30,9 @@ import java.util.Set;
  **/
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class UserFileDataBO {
     /**
      * 用戶文件ID
@@ -125,6 +125,13 @@ public class UserFileDataBO {
         this.shareType = userFileMetadata.getShareType();
     }
 
+    /**
+     * 用戶文件數據業務對象構造函數
+     *
+     * @param serverFileMetadata   服務器文件元數據對象
+     * @param userFileMetadata     用戶文件元數據對象
+     * @param userFileShareRecords 用戶文件共享記錄對象集合
+     */
     public UserFileDataBO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, Collection<UserFileShareRecord> userFileShareRecords) {
         UserFileDataBO userFileDataBO = new UserFileDataBO(serverFileMetadata, userFileMetadata);
         userFileShareRecords.forEach(record -> userFileDataBO.shareUsers.add(record.getUserId()));
@@ -148,6 +155,14 @@ public class UserFileDataBO {
         this.uploadTime = userFileMetadata.getUploadTime();
     }
 
+    /**
+     * 用戶文件數據業務對象構造函數
+     *
+     * @param userOnlineFile       用戶線上檔案對象
+     * @param userFileMetadata     用戶文件元數據對象
+     * @param content              編輯器內容對象
+     * @param userFileShareRecords 用戶文件共享記錄對象集合
+     */
     public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, EditorContentDTO content, Collection<UserFileShareRecord> userFileShareRecords) {
         UserFileDataBO userFileDataBO = new UserFileDataBO(userOnlineFile, userFileMetadata, content);
         userFileShareRecords.forEach(record -> userFileDataBO.shareUsers.add(record.getUserId()));

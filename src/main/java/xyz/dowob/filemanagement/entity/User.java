@@ -126,5 +126,3 @@ public class User {
         return Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 }
-
-//todo 前端預覽更多類型

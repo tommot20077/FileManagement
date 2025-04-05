@@ -12,7 +12,7 @@
         <RollingFile name="InfoLogger" fileName="logs/info/app.log"
                      filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy/>
@@ -42,7 +42,7 @@
         <RollingFile name="RuntimeLogger" fileName="logs/runtime/runtime.log"
                      filePattern="logs/runtime-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy/>

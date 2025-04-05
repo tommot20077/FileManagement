@@ -106,6 +106,18 @@ public class ProcessException extends Exception {
          * 錯誤信息: 文件夾樹存在循環引用
          */
         FOLDER_TREE_EXISTING_CYCLE(1214, "文件夾樹存在循環引用"),
+
+        /**
+         * 錯誤碼: 1215
+         * 錯誤信息: 刪除臨時檔案失敗
+         */
+        DELETE_TEMP_FILE_FAILED(1215, "刪除臨時檔案失敗，檔案位置: %s"),
+
+        /**
+         * 錯誤碼: 1216
+         * 錯誤信息: 創建臨時下載資料夾失敗
+         */
+        CREATE_TEMP_DOWNLOAD_FOLDER_FAILED(1216, "創建臨時下載資料夾失敗，資料夾位置: %s"),
         ;
 
 

@@ -338,16 +338,13 @@ public class ExceptionController implements ResponseUnity {
      * @return Mono<ResponseEntity> 回應實體
      */
     private Mono<ResponseEntity<?>> handleUnknownException(Throwable ex, ServerWebExchange exchange) {
-        log.error("錯誤類型: {}", ex.getClass().getName());
-        log.error("發生未知錯誤: {}", ex.getMessage());
-        log.error("錯誤起因: ", ex.getCause());
-        log.error("錯誤堆棧: ", ex);
+        String requestId = exchange.getAttribute("requestId");
+        log.error("請求ID: {} 發生未知錯誤", requestId, ex);
         ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
                 .<Void>builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .path(exchange.getRequest().getURI().getPath())
-                .message("伺服器內部處理錯誤，請聯繫管理員並附上此ID: " + exchange.getAttribute("requestId"))
+                .path(exchange.getRequest().getURI().getPath()).message("伺服器內部處理錯誤，請聯繫管理員並附上此ID: " + requestId)
                 .data(null)
                 .build();
 

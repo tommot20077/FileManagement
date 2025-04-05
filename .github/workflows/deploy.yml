@@ -1,4 +1,4 @@
-name: 部屬到生產環境
+name: 部署到生產環境
 
 on:
   push:
@@ -7,13 +7,12 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: 檢出代碼
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 測試開始通知
         run: echo "開始部署前的測試流程..."
@@ -80,27 +79,27 @@ jobs:
           echo "::group::後端部署進度"
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             set -e
-          
+
             # 顯示部署信息
             echo "部署信息:"
             echo "  - 時間: $(date)"
             echo "  - 分支: ${GITHUB_REF##*/}"
             echo "  - 提交: ${GITHUB_SHA}"
-          
+
             # 進入專案目錄
             cd /root/dev/FileManager
             echo "更新到最新代碼"
-          
+
             # 拉取最新代碼確保獲取所有遠端變更
             git fetch --all
-          
+
             # 強制同步到遠端分支
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
-          
+
             # 使用 Maven 構建 JAR (使用 OpenJDK 21)
             echo "構建應用"
             ./mvnw clean package -DskipTests
-          
+
             # 確認 target 目錄內是否有 JAR 文件
             JAR_FILE=$(find target -maxdepth 1 -name "*.jar" | head -n 1)
 
@@ -110,39 +109,39 @@ jobs:
             else
               echo "構建成功: 找到 JAR => $JAR_FILE"
             fi
-          
+
             echo "停止現有服務"
             # 使用 docker compose 停止現有服務
             docker compose down filemanager-end
-          
+
             # 刪除舊的映像檔 (若存在)
             if [ "$(docker images -q filemanager-end:latest)" ]; then
               echo "刪除舊映像檔"
               docker rmi filemanager-end:latest
             fi
-          
+
             # 清理無用的映像檔
             docker image prune -f
-          
+
             # 使用 docker compose 重新構建並啟動服務
             echo "構建新容器"
             docker compose build filemanager-end
-          
+
             echo "啟動服務"
             docker compose up -d filemanager-end
-          
+
             # 檢查服務狀態
             echo "檢查服務狀態"
             docker ps | grep filemanager-end
-          
+
             # 等待服務啟動
             echo "等待服務啟動 (10秒)"
             sleep 10
-          
+
             # 檢查日誌
             echo "最近日誌:"
             docker logs --tail 50 filemanager-end
-          
+
             # 檢查服務健康狀態
             echo "健康檢查"
             if docker ps | grep filemanager-end | grep -q "Up"; then
@@ -285,3 +284,116 @@ jobs:
             exit 1
           EOF
           echo "::endgroup::"
+  
+
+  update_setup_zip:
+    if: github.event_name != 'pull_request'
+    needs: [ deploy_backend, deploy_frontend ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 檢查 Releases 中是否已有 setup.zip
+        id: check_release_asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/latest | jq -r '.id')
+
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+            ASSET_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets | jq -r '.[] | select(.name == "setup.zip") | .id')
+
+            if [ -n "$ASSET_ID" ] && [ "$ASSET_ID" != "null" ]; then
+              echo "GitHub Releases 中已存在 setup.zip (Asset ID: $ASSET_ID)"
+              echo "exists=true" >> $GITHUB_OUTPUT
+            else
+              echo "GitHub Releases 中不存在 setup.zip"
+              echo "exists=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "未找到 latest Release，視為 setup.zip 不存在"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 檢查 docker/src 是否有改動
+        id: check_changes
+        if: steps.check_release_asset.outputs.exists == 'true'
+        run: |
+          echo "比較 ${{ github.event.before }} 和 ${{ github.sha }}"
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '^docker/src/'; then
+            echo "docker/src 有改動"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "docker/src 無改動"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 安裝 zip
+        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
+        run: sudo apt-get install -y zip
+
+      - name: 建立新的壓縮檔
+        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "建立新的壓縮檔..."
+          if [ ! -d "docker/src" ]; then
+            echo "錯誤：docker/src 目錄不存在" >&2
+            exit 1
+          fi
+          cd docker/src
+          zip -r setup.zip .
+          echo "新的壓縮檔已建立 $(pwd)/setup.zip"
+
+      - name: 清理 latest Release 中的所有舊資產
+        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/latest | jq -r '.id')
+
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+            # 獲取所有資產的 ID
+            ASSET_IDS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets | jq -r '.[].id')
+
+            if [ -n "$ASSET_IDS" ]; then
+              echo "找到以下舊資產，將全部刪除："
+              echo "$ASSET_IDS"
+              for ASSET_ID in $ASSET_IDS; do
+                echo "刪除資產 ID: $ASSET_ID"
+                curl -X DELETE \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  https://api.github.com/repos/${{ github.repository }}/releases/assets/$ASSET_ID
+              done
+            else
+              echo "latest Release 中無資產可刪除"
+            fi
+          else
+            echo "未找到 latest Release，將創建新版本"
+          fi
+
+      - name: 發佈新 setup.zip 到 GitHub Releases
+        if: steps.check_release_asset.outputs.exists == 'false' || steps.check_changes.outputs.has_changes == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "latest"
+          name: "Docker 安裝設定檔"
+          body: "本更新為版本 ${{ github.sha }} 所提交的自動更新"
+          files: docker/src/setup.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

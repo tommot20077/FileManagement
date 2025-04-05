@@ -851,8 +851,6 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
-    //todo 線上檔案沒有serverFileId暫不紀錄
-
     /**
      * 更新用戶儲存空間使用量，此方法會根據文件ID列表計算文件大小
      * 此為重載方法、計算刪除的文件大小

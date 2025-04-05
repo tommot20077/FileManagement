@@ -80,5 +80,6 @@ logging:
     dateformat: yyyy-MM-dd HH:mm:ss.SSS
 file:
   upload:
+    # 這邊需要依照需求修改，設置越大請求的次數會越少但記憶體的使用量會越大
     chunk-size: 2
 

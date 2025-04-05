@@ -2,10 +2,12 @@ package xyz.dowob.filemanagement.controller.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
@@ -59,8 +61,7 @@ public class WebFolderController extends BaseFolderController {
               fileProperties,
               validationService,
               folderService,
-              userLimiterStrategy,
-              objectMapper, filePermissionRuleManager,
+              userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }
@@ -203,5 +204,18 @@ public class WebFolderController extends BaseFolderController {
     @PostMapping("/tree")
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return super.buildTree(exchange);
+    }
+
+    /**
+     * 下載資料夾，將資料夾及其內容打包下載。
+     *
+     * @param id       資料夾 ID，用來標識要下載的資料夾。
+     * @param exchange 請求對象，包含請求上下文信息。
+     *
+     * @return 返回下載結果，成功返回 OK，失敗返回 BAD_REQUEST。
+     */
+    @GetMapping("/{id}/download")
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFolder(@PathVariable Long id, ServerWebExchange exchange) {
+        return super.downloadFolder(id, exchange);
     }
 }

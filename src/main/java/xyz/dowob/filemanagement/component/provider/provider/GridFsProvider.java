@@ -14,6 +14,9 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 
+import java.util.Collection;
+import java.util.Map;
+
 /**
  * 此類用於提供 GridFs 的操作方法，透過自定義方法操作 GridFsTemplate 來對檔案進行操作
  *
@@ -77,6 +80,20 @@ public class GridFsProvider {
     }
 
     /**
+     * 通過檔案名集合查找檔案
+     *
+     * @param filenames 檔案名集合
+     *
+     * @return 返回查找到的檔案
+     */
+    public Mono<Map<String, GridFSFile>> findFilesByFileName(Collection<String> filenames) {
+        return gridFsTemplate
+                .find(Query.query(Criteria.where("filename").in(filenames)))
+                .collectMap(GridFSFile::getFilename, gridFSFile -> gridFSFile);
+
+    }
+
+    /**
      * 通過檔案 ID 查找檔案
      *
      * @param id 檔案 ID
@@ -85,6 +102,17 @@ public class GridFsProvider {
      */
     public Mono<GridFSFile> findFileById(ObjectId id) {
         return gridFsTemplate.findOne(Query.query(Criteria.where("_id").is(id)));
+    }
+
+    /**
+     * 通過檔案 ID 集合查找檔案
+     *
+     * @param ids 檔案 ID 集合
+     *
+     * @return 返回查找到的檔案
+     */
+    public Mono<Map<ObjectId, GridFSFile>> findFilesById(Collection<ObjectId> ids) {
+        return gridFsTemplate.find(Query.query(Criteria.where("_id").in(ids))).collectMap(GridFSFile::getObjectId, gridFSFile -> gridFSFile);
     }
 
     /**
@@ -121,5 +149,13 @@ public class GridFsProvider {
         return gridFsTemplate.delete(Query.query(Criteria.where("_id").is(id)));
     }
 
-
+    /**
+     * 獲取 GridFsTemplate
+     *
+     * @return GridFsTemplate
+     */
+    @SkipRecord
+    public ReactiveGridFsTemplate getGridFsTemplate() {
+        return gridFsTemplate;
+    }
 }

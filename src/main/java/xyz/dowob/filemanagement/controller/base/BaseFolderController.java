@@ -2,17 +2,23 @@ package xyz.dowob.filemanagement.controller.base;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Nullable;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
@@ -220,5 +226,26 @@ public abstract class BaseFolderController extends BaseFileController {
      */
     public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, String id) {
         return super.restoreFile(exchange, id, FileEnum.FOLDER);
+    }
+
+    /**
+     * 下載資料夾，將資料夾及其內容打包下載。
+     *
+     * @param id       資料夾 ID，用來標識要下載的資料夾。
+     * @param exchange 請求對象，包含請求上下文信息。
+     *
+     * @return 返回下載結果，成功返回 OK，失敗返回 BAD_REQUEST。
+     */
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFolder(Long id, ServerWebExchange exchange) {
+        return userService.getUser(exchange).flatMap(user -> {
+            return permissionService
+                    .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
+                    .flatMap(folder -> validationService
+                            .validateFileType(folder, FileEnum.FOLDER)
+                            .then(folderService.downloadFolder(folder, user).map(userFileDataBO -> {
+                                HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null);
+                                return ResponseEntity.status(HttpStatus.OK).headers(headers).body(userFileDataBO.getDataStream());
+                            })));
+        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
     }
 }

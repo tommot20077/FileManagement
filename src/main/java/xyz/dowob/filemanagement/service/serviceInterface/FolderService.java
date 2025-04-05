@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -48,11 +49,23 @@ public interface FolderService extends BaseFileService {
      * 刪除文件夾的接口
      *
      * @param folder 文件夾
-     * @param user     用戶信息
+     * @param user   用戶信息
      *
      * @return 返回刪除結果
      */
     default Mono<Void> deleteFolder(UserFileMetadata folder, User user) {
+        return Mono.empty();
+    }
+
+    /**
+     * 下載文件夾的接口
+     *
+     * @param folder 文件夾
+     * @param user   用戶信息
+     *
+     * @return 檔案數據傳輸對象
+     */
+    default Mono<UserFileDataBO> downloadFolder(UserFileMetadata folder, User user) {
         return Mono.empty();
     }
 

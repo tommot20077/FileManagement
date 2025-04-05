@@ -124,8 +124,7 @@ public class CronTaskManager {
         return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMap(userFileMetaList -> {
             Map<String, Integer> serverFileIdMap = userFileMetaList
                     .stream()
-                    .filter(metadata -> metadata.getFileType() != FileEnum.FOLDER)
-                    .filter(metadata -> metadata.getServerFileId() != null) //todo 線上檔案沒有serverFileId暫不紀錄
+                    .filter(metadata -> metadata.getFileType() != FileEnum.FOLDER).filter(metadata -> metadata.getServerFileId() != null)
                     .collect(Collectors.groupingBy(metadata -> metadata.getServerFileId().toString(),
                                                    Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
                     ));
