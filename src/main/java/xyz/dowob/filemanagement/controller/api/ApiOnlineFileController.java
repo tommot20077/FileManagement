@@ -1,10 +1,12 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
@@ -70,16 +72,17 @@ public class ApiOnlineFileController extends BaseOnlineFileController {
 
     /**
      * 下載指定文件。
-     *
+     * @param action   下載行為，預設為預覽。
      * @param id       目標文件的 ID。
      * @param exchange 當前請求上下文。
      *
      * @return Mono<ResponseEntity < ?>>，包含文件下載鏈接或內容。
      */
-    @GetMapping("/{id}")
     @HideOverLength
-    public Mono<ResponseEntity<?>> downloadFile(@PathVariable String id, ServerWebExchange exchange) {
-        return super.downloadFile(id, exchange);
+    @GetMapping("/{id}")
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
+            @PathVariable String id, @RequestParam(required = false, defaultValue = "preview") String action, ServerWebExchange exchange) {
+        return super.downloadFile(action, id, exchange);
     }
 
     /**

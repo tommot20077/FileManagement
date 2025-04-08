@@ -1,26 +1,33 @@
 package xyz.dowob.filemanagement.controller.base;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
+import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 在線文件控制器抽象類，用於處理在線文件的相關請求
@@ -94,20 +101,34 @@ public class BaseOnlineFileController extends BaseFileController {
      *
      * @return Mono<ResponseEntity < ?>> 返回異步處理的結果，包含文件內容和文件名
      */
-    public Mono<ResponseEntity<?>> downloadFile(String id, ServerWebExchange exchange) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
-            return permissionService
-                    .validateUserPermission(user,
-                                            Long.parseLong(id),
-                                            FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager)
-                    )
-                    .flatMap(file -> validationService
-                            .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
-                            .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).downloadFile(file, user).flatMap(userFileDataBO -> {
-                                Map<String, Object> data = Map.of("content", userFileDataBO.getContent(), "filename", userFileDataBO.getFilename());
-                                return createResponseEntity(createResponse(exchange, "下載成功", data));
-                            })));
-        }), exchange);
+    public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(String action, String id, ServerWebExchange exchange) {
+        FileService fileService = fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT);
+        DownloadActionEnum actionEnum = DownloadActionEnum.getType(action);
+        Collection<Permission<UserFileMetadata>> rules = FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager);
+        return userService.getUser(exchange).flatMap(user -> {
+            return permissionService.validateUserPermission(user, Long.parseLong(id), rules).flatMap(file -> {
+                return validationService
+                        .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
+                        .then(fileService.downloadFile(file, user, actionEnum.name()).flatMap(userFileDataBO -> {
+                            try {
+                                if (actionEnum == DownloadActionEnum.PREVIEW) {
+                                    Map<String, Object> data = new HashMap<>();
+                                    data.put("content", userFileDataBO.getContent());
+                                    data.put("filename", userFileDataBO.getFilename());
+                                    ApiResponseDTO<?> apiResponse = createResponse(exchange, "下載成功", data);
+                                    byte[] responseBytes = objectMapper.writeValueAsString(apiResponse).getBytes();
+                                    DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(responseBytes);
+                                    return Mono.just(ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(Flux.just(buffer)));
+                                }
+
+                                HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null, false);
+                                return Mono.just(ResponseEntity.status(200).headers(headers).body(userFileDataBO.getDataBufferFlux()));
+                            } catch (JsonProcessingException ex) {
+                                return Mono.error(new RuntimeException(ex));
+                            }
+                        }));
+            });
+        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
     }
 
     /**

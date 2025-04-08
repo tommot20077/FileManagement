@@ -18,10 +18,15 @@ import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
+import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
+import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
+import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
+import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
@@ -104,13 +109,25 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @param userFileMetadata 文件的元數據，包含文件ID和其他元數據信息。
      * @param user             當前操作的用戶。
-     * @param range            可選參數，文件下載範圍，默認為整個文件。
+     * @param optional         可選參數，此處為下載類型
      *
      * @return Mono<UserFileDataBO> 包含文件數據和元數據的業務對象。
      */
     @Override
-    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... range) {
+    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
         return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
+            if (Objects.equals(optional[0], DownloadActionEnum.DOWNLOAD.name())) {
+                ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
+                return convertProvider.convertToDataBuffer(userOnlineFile.getContent()).flatMap(dataBufferSize -> {
+                    UserFileDataBO userFileDataBO = new UserFileDataBO();
+                    userFileDataBO.setFilename(userFileMetadata.getFilename());
+                    userFileDataBO.setFileType(FileEnum.ONLINE_DOCUMENT);
+                    userFileDataBO.setFileSize(dataBufferSize.size());
+                    userFileDataBO.setDataBufferFlux(dataBufferSize.dataBuffer());
+                    userFileDataBO.setFilename(formatFileName(userFileMetadata.getFilename(), ConvertProviderEnum.DOCX));
+                    return Mono.just(userFileDataBO);
+                });
+            }
             try {
                 EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
                 userFileMetadata.setLastAccessTime(LocalDateTime.now());
@@ -334,16 +351,17 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             lastContentJsonDTOMono = formatJsonToEditorContentJsonDTO(userOnlineFile.getContent());
         } else {
             lastContentJsonDTOMono = userOnlineFileHistoryRepository
-                    .findByFileIdAndVersion(userOnlineFile.getId(), userOnlineFile.getLastHistoryVersion()).flatMap(this::getCompleteContent);
+                    .findByFileIdAndVersion(userOnlineFile.getId(), userOnlineFile.getLastHistoryVersion())
+                    .flatMap(this::getCompleteContent);
         }
 
 
         return lastContentJsonDTOMono.flatMap(compareContentDTO -> Mono.defer(() -> {
-                                         if (compareContentDTO.equals(fileEditDTO.getContent())) {
+            if (compareContentDTO.equals(fileEditDTO.getContent())) {
                         return Mono.error(new ValidationException(ValidationException.ErrorCode.NO_CHANGE_IN_CONTENT));
                     }
 
-                                         Mono<String> diffResult = calculateFileContentDiff(compareContentDTO, fileEditDTO.getContent());
+            Mono<String> diffResult = calculateFileContentDiff(compareContentDTO, fileEditDTO.getContent());
                     if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
                         userOnlineFile.setContent(EMPTY_CONTENT);
                         return diffResult;
@@ -352,8 +370,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                         userOnlineFile.setContent(newContent);
                         return diffResult;
                     });
-                }))
-                .flatMap(diffResult -> userOnlineFileHistoryRepository.findTopNByFileIdOrderByVersionDesc(userOnlineFile.getId(), 1)
+        })).flatMap(diffResult -> userOnlineFileHistoryRepository.findTopNByFileIdOrderByVersionDesc(userOnlineFile.getId(), 1)
                         .map(UserOnlineFileHistory::getVersion)
                         .defaultIfEmpty(0L)
                         .flatMap(version -> {
@@ -461,7 +478,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             Patch<String> patch = DiffUtils.diff(oldLines, newLines);
             CustomPatchPO.Patch customPath = CustomPatchPO.Patch.fromPatch(patch);
             return objectMapper.writeValueAsString(customPath);
-        }).onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.CALCULATE_CONTENT_DIFFERENCE_FAILED));
+        }).onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.CALCULATE_CONTENT_DIFFERENCE_FAILED, e));
     }
 
 
@@ -750,6 +767,10 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
             return Mono.empty();
         });
+    }
+
+    private String formatFileName(String filename, ConvertProviderEnum convertProviderEnum) {
+        return filename.split("\\.")[0] + "." + convertProviderEnum.getSuffix();
     }
 }
 

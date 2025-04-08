@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.dto.EditorContentDTO;
@@ -38,66 +39,87 @@ public class UserFileDataBO {
      * 用戶文件ID
      */
     private Long userFileId;
+
     /**
      * 服務器文件ID
      */
     private Long serverFileId;
+
     /**
      * 用戶ID
      */
     private Long userId;
+
     /**
      * 文件名稱
      */
     private String filename;
+
     /**
      * 父文件夾ID
      */
     private Long parentFolderId;
+
     /**
      * 文件類型
      */
     private FileEnum fileType;
+
     /**
      * 文件大小
      */
     private Long fileSize;
+
     /**
      * 共享類型
      */
     private FileShareTypeEnum shareType;
+
     /**
      * 共享用戶
      */
     private Set<Long> shareUsers = new HashSet<>();
+
     /**
      * 最後更改時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
+
     /**
      * 上傳時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadTime;
+
     /**
      * GridFS ID
      */
     private String gridFsId;
+
     /**
      * MD5值
      */
     private String md5;
+
     /**
-     * 數據流
+     * 數據流 dataBuffer
      */
     @JsonIgnore
-    private Flux<DataBuffer> dataStream;
+    private Flux<DataBuffer> dataBufferFlux;
+
+    /**
+     * 數據流 byte[]
+     */
+    @JsonIgnore
+    private Mono<byte[]> dataBufferByte;
+
     /**
      * 字符串內容
      */
     @JsonIgnore
     private EditorContentDTO content;
+
     /**
      * 最後修改者
      */

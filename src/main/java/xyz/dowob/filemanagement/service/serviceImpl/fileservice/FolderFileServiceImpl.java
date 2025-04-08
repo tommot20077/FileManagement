@@ -413,8 +413,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                                 .builder()
                                 .fileSize(fileSize)
                                 .filename(zipFileName)
-                                .fileType(FileEnum.ZIP)
-                                .dataStream(dataFlux)
+                                .fileType(FileEnum.ZIP).dataBufferFlux(dataFlux)
                                 .build();
                         return Mono.just(userFileDataBO);
                     }).doFinally(signal -> {

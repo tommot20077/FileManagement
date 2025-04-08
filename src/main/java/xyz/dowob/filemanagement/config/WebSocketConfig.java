@@ -39,7 +39,6 @@ public class WebSocketConfig {
      */
     private final JwtWebSocketHandlerAdapter jwtWebSocketHandlerAdapter;
 
-
     /**
      * 配置 WebSocket 映射，將 WebSocket 請求映射到對應的處理器
      *

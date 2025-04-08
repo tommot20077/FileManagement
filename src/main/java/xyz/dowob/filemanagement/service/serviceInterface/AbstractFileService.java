@@ -197,6 +197,14 @@ public abstract class AbstractFileService implements FileService {
         return listDTOFlux.collectList().flatMap(list -> filterAndPageResponse(list, fileFilterDTO));
     }
 
+    /**
+     * 獲取用戶文件列表的緩存鍵
+     *
+     * @param userId   用戶ID
+     * @param searchId 搜索ID
+     *
+     * @return 緩存鍵名
+     */
     protected String getUserFileListBaseKey(Long userId, Long searchId) {
         String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
         return String.format(PAGE_KEY_FORMAT, userId, Objects.requireNonNullElse(searchId, 0L));
@@ -209,7 +217,6 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<UploadResponseDTO>
      */
-
     public Mono<UploadResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO) {
         String transferTaskId = uploadChunkDTO.getTransferTaskId();
         String key = "upload_task:" + transferTaskId;
@@ -446,10 +453,11 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param userFileMetadata 文件
      * @param user             用戶信息
+     * @param optional         其他可選參數(此處為請求頭的Range)
      *
-     * @return Mono<UserFileDataBO>
+     * @return Mono<UserFileDataBO> 文件數據對象
      */
-    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... rangeHeader) {
+    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
         return Mono.defer(() -> {
             userFileMetadata.setLastAccessTime(LocalDateTime.now());
             userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
@@ -476,11 +484,11 @@ public abstract class AbstractFileService implements FileService {
                                     ))
                     )
                     .map(dataBufferPO -> {
-                        long[] range = getRangeFromHeader(rangeHeader[0], userFileDataBO.getFileSize());
+                        long[] range = getRangeFromHeader(optional[0], userFileDataBO.getFileSize());
                         FluxDataPO<DataBuffer> dataBuffer = new FluxDataPO<>();
-                        userFileDataBO.setDataStream(streamFileFromGridFS(dataBuffer.formatAndSet(dataBufferPO.getTFlux(), DataBuffer.class),
-                                                                          range[0],
-                                                                          range[1]
+                        userFileDataBO.setDataBufferFlux(streamFileFromGridFS(dataBuffer.formatAndSet(dataBufferPO.getTFlux(), DataBuffer.class),
+                                                                              range[0],
+                                                                              range[1]
                         ));
                         return userFileDataBO;
                     });
@@ -693,7 +701,7 @@ public abstract class AbstractFileService implements FileService {
                         .flatMap(this.gridFsProvider::getResource)
                         .flatMap(resource -> DataBufferUtils
                                 .join(resource.getDownloadStream())
-                                .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM,
+                                .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM, e,
                                                                                     transferTaskId + "_chunk_" + index
                                 )))
                                 .map(dataBuffer -> {

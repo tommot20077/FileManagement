@@ -243,8 +243,8 @@ public abstract class BaseFolderController extends BaseFileController {
                     .flatMap(folder -> validationService
                             .validateFileType(folder, FileEnum.FOLDER)
                             .then(folderService.downloadFolder(folder, user).map(userFileDataBO -> {
-                                HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null);
-                                return ResponseEntity.status(HttpStatus.OK).headers(headers).body(userFileDataBO.getDataStream());
+                                HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null, false);
+                                return ResponseEntity.status(HttpStatus.OK).headers(headers).body(userFileDataBO.getDataBufferFlux());
                             })));
         }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
     }

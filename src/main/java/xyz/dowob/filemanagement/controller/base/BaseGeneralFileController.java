@@ -149,9 +149,9 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      */
     private Mono<ResponseEntity<Flux<DataBuffer>>> downloadAndPrepareResponse(UserFileMetadata file, User user, DownloadActionEnum action, String rangeHeader) {
         return fileServiceStrategy.getFileService().downloadFile(file, user, rangeHeader).map(userFileDataBO -> {
-            HttpHeaders headers = prepareHttpHeaders(action, userFileDataBO, rangeHeader);
+            HttpHeaders headers = prepareHttpHeaders(action, userFileDataBO, rangeHeader, true);
             HttpStatus status = rangeHeader != null ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK;
-            return ResponseEntity.status(status).headers(headers).body(userFileDataBO.getDataStream());
+            return ResponseEntity.status(status).headers(headers).body(userFileDataBO.getDataBufferFlux());
         });
     }
 

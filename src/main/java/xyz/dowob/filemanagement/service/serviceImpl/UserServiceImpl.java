@@ -2,7 +2,6 @@ package xyz.dowob.filemanagement.service.serviceImpl;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.apache.logging.log4j.Logger;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -112,8 +111,6 @@ public class UserServiceImpl implements UserService {
     public void init() {
         USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
         USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
-        Logger logger = org.apache.logging.log4j.LogManager.getLogger(UserServiceImpl.class);
-        logger.warn("emailProvider: {}", emailProvider.isPresent());
     }
 
     /**

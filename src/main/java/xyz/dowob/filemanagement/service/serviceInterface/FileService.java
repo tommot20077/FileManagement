@@ -52,10 +52,11 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
      *
      * @param file 文件
      * @param user   用戶信息
+     * @param optional 其他可選參數
      *
      * @return 返回文件下載流
      */
-    default Mono<UserFileDataBO> downloadFile(UserFileMetadata file, User user, String... range) {
+    default Mono<UserFileDataBO> downloadFile(UserFileMetadata file, User user, String... optional) {
         return Mono.empty();
     }
 

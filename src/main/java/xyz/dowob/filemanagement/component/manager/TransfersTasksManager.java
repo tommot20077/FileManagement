@@ -1,7 +1,6 @@
 package xyz.dowob.filemanagement.component.manager;
 
 import jakarta.annotation.PreDestroy;
-import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
@@ -29,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Version 1.0
  **/
 @Component
-@Log4j2
 public class TransfersTasksManager {
     /**
      * 用於存儲正在進行的傳輸任務，key 為檔案的 MD5 值，value 為檔案的傳輸任務Map
@@ -65,15 +63,6 @@ public class TransfersTasksManager {
     public Mono<Boolean> registerUploadTask(FileMetadataDTO fileMetadataDTO, String transferTaskId) {
         return Mono.defer(() -> {
             if (activeTransfersTask.containsKey(fileMetadataDTO.getMd5())) {
-                Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(fileMetadataDTO.getMd5());
-                transfersTaskMap.forEach((key, value) -> {
-                    if (value.getStatus() == TransfersStatusEnum.UPLOADING) {
-                        log.debug("發現相同檔案正在上傳，MD5: {}, 現有任務ID: {}, 重複任務ID: {}", fileMetadataDTO.getMd5(),
-                                  value.getTransferTaskId(),
-                                  transferTaskId
-                        );
-                    }
-                });
                 return Mono.just(false);
             }
             return createTransfersTask(fileMetadataDTO, transferTaskId, TransfersStatusEnum.UPLOADING).thenReturn(true);
@@ -148,7 +137,6 @@ public class TransfersTasksManager {
     public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
         TransfersTask transfersTask = activeTransfersTask.get(md5).get(transfersTaskId);
         if (transfersTask == null) {
-            log.error("無法找到MD5為{}的任務", md5);
             return Mono.error(new ProcessException(ProcessException.ErrorCode.NOT_EXISTING_MD5_TRANSFERS_TASK, md5));
         }
         transfersTask.setStatus(status);

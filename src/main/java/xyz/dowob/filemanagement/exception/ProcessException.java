@@ -31,6 +31,34 @@ public class ProcessException extends Exception {
         this.errorCode = errorCode;
     }
 
+    /**
+     * 自定義錯誤類型，此為帶有異常原因的錯誤類型
+     *
+     * @param errorCode 錯誤碼
+     * @param cause     異常原因
+     * @param args      額外補充參數
+     */
+    public ProcessException(ErrorCode errorCode, Throwable cause, Object... args) {
+        super(buildMessage(errorCode, cause, args), cause);
+        this.errorCode = errorCode;
+    }
+
+
+    /**
+     * 建立錯誤訊息
+     *
+     * @param errorCode 錯誤碼
+     * @param cause     異常原因
+     * @param args      額外補充參數
+     */
+    private static String buildMessage(ErrorCode errorCode, Throwable cause, Object... args) {
+        String baseMessage = String.format(errorCode.getMessage(), args);
+        if (cause != null) {
+            return baseMessage + "\n原因: " + cause;
+        }
+        return baseMessage;
+    }
+
     @Getter
     @AllArgsConstructor
     public enum ErrorCode {
@@ -39,56 +67,67 @@ public class ProcessException extends Exception {
          * 錯誤信息: 上傳任務不存在
          */
         NOT_EXISTING_UPLOAD_TASK(1201, "上傳任務 ID: %s 不存在"),
+
         /**
          * 錯誤碼: 1202
          * 錯誤信息: 當前轉換任務MD5不存在
          */
         NOT_EXISTING_MD5_TRANSFERS_TASK(1202, "當前轉換任務 MD5: %s 不存在"),
+
         /**
          * 錯誤碼: 1203
          * 錯誤信息: MD5校驗失敗
          */
         MD5_NOT_MATCH(1203, "MD5校驗失敗"),
+
         /**
          * 錯誤碼: 1204
          * 錯誤信息: 伺服器文件不存在
          */
         USER_HAVE_NOT_EXIST_SERVER_FILE(1204, "用戶擁有不存在於伺服器的文件，伺服器檔案ID:%s，用戶檔案ID:%s"),
+
         /**
          * 錯誤碼: 1205
          * 錯誤信息:
          */
         GRIDFS_FILE_NOT_FOUND(1205, "無法獲取GradFS的檔案，伺服器檔案ID：%s"),
+
         /**
          * 錯誤碼: 1206
          * 錯誤信息: 無法獲取檔案流
          */
         CANNOT_GET_FILE_STREAM(1206, "無法獲取檔案流 任務ID：%s"),
+
         /**
          * 錯誤碼: 1207
          * 錯誤信息: 無法將數據格式化為JSON
          */
         FORMAT_DATA_TO_JSON_FAILED(1207, "無法將數據格式化為JSON"),
+
         /**
          * 錯誤碼: 1208
          * 錯誤信息: 構建文件樹失敗
          */
         BUILD_FILE_TREE_FAILED(1208, "構建文件樹失敗: %s"),
+
         /**
          * 錯誤碼: 1209
          * 錯誤信息: 文件大小不匹配
          */
-        FILE_SIZE_NOT_MATCH(1209, "文件大小不匹配"),
+        FILE_SIZE_NOT_MATCH(1209, "檔案大小不匹配"),
+
         /**
          * 錯誤碼: 1210
          * 錯誤信息: 計算文件差異失敗
          */
         CALCULATE_CONTENT_DIFFERENCE_FAILED(1210, "計算文件差異失敗"),
+
         /**
          * 錯誤碼: 1211
          * 錯誤信息: 文件垃圾桶記錄不存在
          */
         NOT_EXISTING_FILE_TRASH_RECORD(1211, "文件回收記錄不存在 ID: %s"),
+
         /**
          * 錯誤碼: 1212
          * 錯誤信息: 應用差異文件到內容失敗
@@ -118,8 +157,13 @@ public class ProcessException extends Exception {
          * 錯誤信息: 創建臨時下載資料夾失敗
          */
         CREATE_TEMP_DOWNLOAD_FOLDER_FAILED(1216, "創建臨時下載資料夾失敗，資料夾位置: %s"),
-        ;
 
+        /**
+         * 錯誤碼: 1217
+         * 錯誤信息: 轉換 JSON 到目標格式失敗
+         */
+        CONVERT_JSON_TO_TARGET_FAILED(1217, "轉換 JSON 到目標格式 %s 失敗"),
+        ;
 
 
         /**

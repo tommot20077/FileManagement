@@ -2,7 +2,6 @@ package xyz.dowob.filemanagement.controller.base;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
@@ -240,10 +239,11 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @param action         預覽或是下載
      * @param userFileDataBO 文件數據對象
+     * @param enableCache    是否啟用緩存
      *
      * @return HttpHeaders 返回 Http 標頭
      */
-    protected HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO, String rangeHeader) {
+    protected HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO, String rangeHeader, boolean enableCache) {
         HttpHeaders headers = getHttpHeaders(userFileDataBO, rangeHeader);
 
         if (action.equals(DownloadActionEnum.DOWNLOAD)) {
@@ -254,8 +254,11 @@ public abstract class BaseFileController implements ResponseUnity {
             headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
         }
 
-        String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime());
-        headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
+        if (enableCache) {
+            String cacheControl = String.format("private, max-age=%d", fileProperties.getDownload().getDownloadCacheHeaderExpireTime());
+            headers.add(HttpHeaders.CACHE_CONTROL, cacheControl);
+        }
+
         return headers;
     }
 
@@ -301,7 +304,6 @@ public abstract class BaseFileController implements ResponseUnity {
         ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
 
         try {
-            objectMapper.registerModule(new JavaTimeModule());
             byte[] responseBytes = objectMapper.writeValueAsString(apiResponse).getBytes();
             DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(responseBytes);
 
