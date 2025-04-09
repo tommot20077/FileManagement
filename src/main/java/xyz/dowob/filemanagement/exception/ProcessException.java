@@ -163,6 +163,12 @@ public class ProcessException extends Exception {
          * 錯誤信息: 轉換 JSON 到目標格式失敗
          */
         CONVERT_JSON_TO_TARGET_FAILED(1217, "轉換 JSON 到目標格式 %s 失敗"),
+
+        /**
+         * 錯誤碼: 1218
+         * 錯誤信息: 創建檔案流失敗
+         */
+        CREATE_STREAM_FAILED(1218, "創建檔案流失敗"),
         ;
 
 

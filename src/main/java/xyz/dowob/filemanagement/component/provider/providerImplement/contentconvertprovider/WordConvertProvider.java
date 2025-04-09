@@ -5,6 +5,7 @@ import org.apache.poi.openxml4j.opc.PackagePart;
 import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
@@ -16,6 +17,7 @@ import xyz.dowob.filemanagement.exception.ProcessException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
@@ -126,18 +128,19 @@ public class WordConvertProvider implements ContentConvertProvider {
     }
 
     /**
-     * 將 Quill 的 JSON 內容轉換為 Word 文檔並輸出為 byte[]
+     * 將 Quill 的 JSON 內容轉換為 Word 文檔並輸出為 InputStream
      *
      * @param content Quill 的 JSON 內容
      *
-     * @return Mono<byte [ ]> 包含轉換後的 Word 文檔的 byte[]
+     * @return Mono<InputStream> 包含轉換後的 Word 文檔的 InputStream
      */
     @Override
-    public Mono<byte[]> convertToByte(String content) {
-        return formatToDocument(content).flatMap(document -> convertToOutputStream(document).flatMap(outputStream -> {
-            byte[] bytes = outputStream.toByteArray();
-            return Mono.just(bytes);
-        }));
+    public Mono<InputStream> convertToInputStream(String content) {
+        return convertToDataBuffer(content).flatMap(record -> record
+                .dataBuffer()
+                .transform(DataBufferUtils::join)
+                .as(Mono::from)
+                .map(DataBuffer::asInputStream));
     }
 
 

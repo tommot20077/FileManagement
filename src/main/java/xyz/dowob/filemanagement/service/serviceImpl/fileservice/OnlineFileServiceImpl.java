@@ -124,7 +124,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                     userFileDataBO.setFileType(FileEnum.ONLINE_DOCUMENT);
                     userFileDataBO.setFileSize(dataBufferSize.size());
                     userFileDataBO.setDataBufferFlux(dataBufferSize.dataBuffer());
-                    userFileDataBO.setFilename(formatFileName(userFileMetadata.getFilename(), ConvertProviderEnum.DOCX));
+
+                    String name = userFileMetadata.getFilename().split("\\.")[0] + "." + ConvertProviderEnum.DOCX.getSuffix();
+                    userFileDataBO.setFilename(name);
                     return Mono.just(userFileDataBO);
                 });
             }
@@ -767,10 +769,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
             return Mono.empty();
         });
-    }
-
-    private String formatFileName(String filename, ConvertProviderEnum convertProviderEnum) {
-        return filename.split("\\.")[0] + "." + convertProviderEnum.getSuffix();
     }
 }
 

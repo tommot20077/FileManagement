@@ -4,6 +4,8 @@ import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.InputStream;
+
 /**
  * 內容轉換器接口，提供將內容轉換為字節數組或數據緩衝區的功能
  *
@@ -16,13 +18,13 @@ import reactor.core.publisher.Mono;
 
 public interface ContentConvertProvider {
     /**
-     * 將內容轉換為字節數組
+     * 將內容轉換為輸入流
      *
      * @param content 要轉換的內容
      *
-     * @return 轉換後的字節數組
+     * @return 轉換後的輸入流
      */
-    default Mono<byte[]> convertToByte(String content) {
+    default Mono<InputStream> convertToInputStream(String content) {
         return Mono.empty();
     }
 

@@ -19,10 +19,14 @@ import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
+import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
+import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
+import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
@@ -89,8 +93,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               circuitBreakerConfig,
               rateLimiterConfig,
               folderListTreeProvider,
-              fileTrashRecordRepository,
-              entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
+              fileTrashRecordRepository, entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
         );
         int maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
         this.maxConcurrentLimit = maxConcurrentLimit > 0 ? maxConcurrentLimit : 5;
@@ -412,8 +415,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         UserFileDataBO userFileDataBO = UserFileDataBO
                                 .builder()
                                 .fileSize(fileSize)
-                                .filename(zipFileName)
-                                .fileType(FileEnum.ZIP).dataBufferFlux(dataFlux)
+                                .filename(zipFileName).fileType(FileEnum.ZIP).dataBufferFlux(dataFlux)
                                 .build();
                         return Mono.just(userFileDataBO);
                     }).doFinally(signal -> {
@@ -440,18 +442,29 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * @return Mono<Void>
      */
     private Mono<Void> processFolder(ZipOutputStream zipOutputStream, UserFileMetadata folder, String parentPath) {
-        return Mono.defer(() -> findFoldersWithSameParentFolderId(Collections.singletonList(folder.getId())).flatMap(files -> {
+        return Mono.defer(() -> findFilesWithSameParentFolderId(Collections.singletonList(folder.getId())).flatMap(files -> {
             List<UserFileMetadata> subFolders = new ArrayList<>();
             List<UserFileMetadata> generalFile = new ArrayList<>();
+            List<UserFileMetadata> onlineFile = new ArrayList<>();
             files.forEach(file -> {
                 if (file.getFileType() == FileEnum.FOLDER) {
                     subFolders.add(file);
+                } else if (file.getFileType() == FileEnum.ONLINE_DOCUMENT) {
+                    onlineFile.add(file);
                 } else if (file.getServerFileId() != null) {
                     generalFile.add(file);
                 }
             });
+            Map<FileEnum, List<UserFileMetadata>> filesMap = new HashMap<>();
+            filesMap.put(FileEnum.ONLINE_DOCUMENT, onlineFile);
+            filesMap.put(FileEnum.OTHER, generalFile);
 
-            Mono<Void> filesProcessing = zipFileBatch(zipOutputStream, generalFile, parentPath);
+            Flux<Map.Entry<InputStream, List<UserFileMetadata>>> fileResourceFlux = getGeneralFileResource(filesMap.get(FileEnum.OTHER));
+            Flux<Map.Entry<InputStream, List<UserFileMetadata>>> onlineFileFlux = getOnlineFileResource(filesMap.get(FileEnum.ONLINE_DOCUMENT));
+
+            Mono<Void> filesProcessing = Mono.when(handleGeneralFiles(zipOutputStream, fileResourceFlux, parentPath),
+                                                   handleGeneralFiles(zipOutputStream, onlineFileFlux, parentPath)
+            );
 
             Mono<Void> foldersProcessing = Flux.fromIterable(subFolders).flatMap(subFolder -> {
                 String newPath = parentPath + "/" + subFolder.getFilename();
@@ -470,14 +483,14 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
     /**
      * 獲取文件資源
-     * 給定一個文件列表，將返回一個包含 GridFs 檔案資源和對應的用戶文件元數據的 Flux
-     * 其鍵為 GridFs 檔案資源，值為對應的用戶文件元數據列表
+     * 給定一個文件列表，將返回一個包含 檔案 InputStream 和對應的用戶文件元數據的 Flux
+     * 其鍵為 InputStream，值為對應的用戶文件元數據列表
      *
      * @param files 文件列表
      *
-     * @return Flux<Map.Entry < ReactiveGridFsResource, List < UserFileMetadata>>>
+     * @return Flux<Map.Entry < InputStream, List < UserFileMetadata>>>
      */
-    private Flux<Map.Entry<ReactiveGridFsResource, List<UserFileMetadata>>> getFileResource(List<UserFileMetadata> files) {
+    private Flux<Map.Entry<InputStream, List<UserFileMetadata>>> getGeneralFileResource(List<UserFileMetadata> files) {
         ConcurrentMap<Long, List<UserFileMetadata>> serverIds = files
                 .stream()
                 .filter(file -> file.getServerFileId() != null)
@@ -495,11 +508,39 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     .findFilesById(serverFileMetadataMap.keySet())
                     .flatMapMany(gridFsFilesMap -> Flux
                             .fromIterable(gridFsFilesMap.values())
-                            .flatMap(gridFSFile -> gridFsProvider.getResource(gridFSFile).flatMap(resource -> {
-                                List<UserFileMetadata> userFileMetadatas = serverIds.get(serverFileMetadataMap.get(gridFSFile.getObjectId()).getId());
-                                return Mono.just(new AbstractMap.SimpleEntry<>(resource, userFileMetadatas));
-                            })));
+                            .flatMap(gridFSFile -> gridFsProvider
+                                    .getResource(gridFSFile)
+                                    .flatMap(ReactiveGridFsResource::getInputStream)
+                                    .flatMap(inputStream -> {
+                                        List<UserFileMetadata> metadatas = serverIds.get(serverFileMetadataMap.get(gridFSFile.getObjectId()).getId());
+                                        return Mono.just(new AbstractMap.SimpleEntry<>(inputStream, metadatas));
+                                    })));
         });
+    }
+
+    /**
+     * 獲取線上文件資源
+     * 給定一個文件列表，將返回一個包含 檔案 InputStream 和對應的用戶文件元數據的 Flux
+     * 其鍵為 InputStream，值為對應的用戶文件元數據列表
+     *
+     * @param files 文件列表
+     *
+     * @return Flux<Map.Entry < InputStream, List < UserFileMetadata>>>
+     */
+    private Flux<Map.Entry<InputStream, List<UserFileMetadata>>> getOnlineFileResource(List<UserFileMetadata> files) {
+        Map<String, UserFileMetadata> userFileMetadataMap = files
+                .stream()
+                .collect(Collectors.toMap(metadata -> metadata.getId().toString(), userFileMetadata -> userFileMetadata));
+
+        ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
+        return userOnlineFileRepository
+                .findAllById(userFileMetadataMap.keySet())
+                .flatMap(userOnlineFile -> convertProvider.convertToInputStream(userOnlineFile.getContent()).flatMap(inputStream -> {
+                    UserFileMetadata userFileMetadata = userFileMetadataMap.get(userOnlineFile.getId().toString());
+                    String name = userFileMetadata.getFilename().split("\\.")[0] + "." + ConvertProviderEnum.DOCX.getSuffix();
+                    userFileMetadata.setFilename(name);
+                    return Mono.just(new AbstractMap.SimpleEntry<>(inputStream, Collections.singletonList(userFileMetadata)));
+                }));
     }
 
 
@@ -510,51 +551,63 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * 如果文件資源的輸入流無法獲取或是寫入過程中發生錯誤，則會拋出異常
      *
      * @param zipOutputStream 壓縮輸出流
-     * @param files           文件列表
+     * @param flux            文件資源的 Flux
      * @param parentPath      父路徑
      *
      * @return Mono<Void>
      */
-    private Mono<Void> zipFileBatch(ZipOutputStream zipOutputStream, List<UserFileMetadata> files, String parentPath) {
-        Flux<Map.Entry<ReactiveGridFsResource, List<UserFileMetadata>>> fileResourceFlux = getFileResource(files);
-
-        return fileResourceFlux.flatMap(entry -> {
-            ReactiveGridFsResource resource = entry.getKey();
+    private Mono<Void> handleGeneralFiles(ZipOutputStream zipOutputStream, Flux<Map.Entry<InputStream, List<UserFileMetadata>>> flux, String parentPath) {
+        return flux.flatMap(entry -> {
+            InputStream inputStream = entry.getKey();
             List<UserFileMetadata> userFileMetadatas = entry.getValue();
 
             return Flux.fromIterable(userFileMetadatas).flatMap(file -> {
                 String filePath = parentPath + "/" + file.getFilename();
-                return resource
-                        .getInputStream()
-                        .flatMap(inputStream -> Mono.usingWhen(Mono.just(inputStream), resourceInputStream -> Mono.fromCallable(() -> {
-                            try {
-                                synchronized (zipOutputStream) {
-                                    zipOutputStream.putNextEntry(new ZipEntry(filePath));
-                                    ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
-                                    ReadableByteChannel channel = Channels.newChannel(resourceInputStream);
-                                    WritableByteChannel outputChannel = Channels.newChannel(zipOutputStream);
-
-                                    while (channel.read(buffer) != -1) {
-                                        buffer.flip();
-                                        outputChannel.write(buffer);
-                                        buffer.clear();
-                                    }
-
-                                    zipOutputStream.closeEntry();
-                                }
-                                return true;
-                            } catch (IOException e) {
-                                throw Exceptions.propagate(e);
-                            }
-                        }).subscribeOn(Schedulers.boundedElastic()), stream -> Mono.fromRunnable(() -> {
-                            try {
-                                stream.close();
-                            } catch (IOException e) {
-                                throw Exceptions.propagate(e);
-                            }
-                        }).subscribeOn(Schedulers.boundedElastic())));
+                return writeIntoZip(inputStream, zipOutputStream, filePath);
             }, maxConcurrentLimit);
         }).then();
+    }
+
+
+    /**
+     * 將文件寫入到 ZipOutputStream 中
+     * 此方法會將給定的 InputStream 寫入到 ZipOutputStream 中
+     * 如果寫入過程中發生錯誤，則會拋出異常
+     *
+     * @param inputStream     輸入流
+     * @param zipOutputStream 壓縮輸出流
+     * @param filePath        文件路徑
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> writeIntoZip(InputStream inputStream, ZipOutputStream zipOutputStream, String filePath) {
+        return Mono.usingWhen(Mono.just(inputStream), resourceInputStream -> Mono.fromCallable(() -> {
+            try {
+                synchronized (zipOutputStream) {
+                    zipOutputStream.putNextEntry(new ZipEntry(filePath));
+                    ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+                    ReadableByteChannel channel = Channels.newChannel(resourceInputStream);
+                    WritableByteChannel outputChannel = Channels.newChannel(zipOutputStream);
+
+                    while (channel.read(buffer) != -1) {
+                        buffer.flip();
+                        outputChannel.write(buffer);
+                        buffer.clear();
+                    }
+
+                    zipOutputStream.closeEntry();
+                }
+                return true;
+            } catch (IOException e) {
+                throw Exceptions.propagate(e);
+            }
+        }).then().subscribeOn(Schedulers.boundedElastic()), stream -> Mono.fromRunnable(() -> {
+            try {
+                stream.close();
+            } catch (IOException e) {
+                throw Exceptions.propagate(e);
+            }
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
 
@@ -567,7 +620,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * @return Mono<Void>
      */
     private Mono<List<UserFileMetadata>> findAllChildFolder(List<Long> parentFolderIdList, List<UserFileMetadata> childFolderList) {
-        return findFoldersWithSameParentFolderId(parentFolderIdList).flatMap(subFile -> {
+        return findFilesWithSameParentFolderId(parentFolderIdList).flatMap(subFile -> {
             List<UserFileMetadata> nextSubFolder = subFile
                     .stream()
                     .filter(userFileMetadata -> userFileMetadata.getFileType() == FileEnum.FOLDER)
@@ -587,7 +640,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      *
      * @return Mono<List < Long>>
      */
-    private Mono<List<UserFileMetadata>> findFoldersWithSameParentFolderId(List<Long> parentFolderId) {
+    private Mono<List<UserFileMetadata>> findFilesWithSameParentFolderId(List<Long> parentFolderId) {
         return userFileMetaRepository.findAllByParentFolderIdIn(parentFolderId, entityOperations)
                 .collectList()
                 .switchIfEmpty(Mono.just(Collections.emptyList()));
