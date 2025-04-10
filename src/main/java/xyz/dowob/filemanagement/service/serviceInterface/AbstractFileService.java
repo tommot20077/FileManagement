@@ -298,7 +298,7 @@ public abstract class AbstractFileService implements FileService {
      */
     protected Mono<Void> cleanUserListCache(Long userId, Long... folderIds) {
         List<String> keys = Arrays.stream(folderIds).distinct().map(folderId -> getUserFileListBaseKey(userId, folderId)).toList();
-        return cacheManager.deleteCaches(keys, CacheProviderEnum.USER_FILE_LIST_CACHE, true);
+        return cacheManager.deleteCaches(keys, CacheProviderEnum.USER_FILE_LIST_CACHE);
     }
 
     /**
@@ -904,7 +904,7 @@ public abstract class AbstractFileService implements FileService {
             userEntity.setUsedStorage(newStorageUsed);
 
             List<String> keys = Arrays.asList(user.getId().toString(), userEntity.getUsername());
-            Mono<Void> cleanCache = cacheManager.deleteCaches(keys, CacheProviderEnum.USER_CACHE, true);
+            Mono<Void> cleanCache = cacheManager.deleteCaches(keys, CacheProviderEnum.USER_CACHE);
             return userRepository.save(userEntity).then(cleanCache);
         }));
     }

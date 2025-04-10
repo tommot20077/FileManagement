@@ -93,7 +93,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               circuitBreakerConfig,
               rateLimiterConfig,
               folderListTreeProvider,
-              fileTrashRecordRepository, entityOperations, transactionalOperator, userFIleShareRecordRepository, objectMapper, cacheManager
+              fileTrashRecordRepository,
+              entityOperations,
+              transactionalOperator,
+              userFIleShareRecordRepository,
+              objectMapper,
+              cacheManager
         );
         int maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
         this.maxConcurrentLimit = maxConcurrentLimit > 0 ? maxConcurrentLimit : 5;
@@ -166,71 +171,77 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      */
     @Override
     public Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
+        Long oldParentFolderId = fileEditDTO.getParentFolderId();
         return Mono.defer(() -> {
-                       if (fileEditDTO.getParentFolderFileMetadata() != null) {
-                           return getUserFilePaths(fileEditDTO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
-                            if (nodeList
-                                    .stream()
-                                    .filter(node -> Objects.nonNull(node.getFolderId()))
-                                    .anyMatch(node -> node.getFolderId().toString().equals(fileEditDTO.getFileId()))) {
-                                return Mono.error(new ValidationException(ValidationException.ErrorCode.MOVE_TO_CHILD_FOLDER,
-                                                                          fileEditDTO.getFileId(),
-                                                                          fileEditDTO.getParentFolderId()
-                                ));
-                            }
-                            return Mono.just(fileEditDTO.getUserFileMetadata());
-                        });
+            if (fileEditDTO.getParentFolderFileMetadata() != null) {
+                return getUserFilePaths(fileEditDTO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
+                    if (nodeList
+                            .stream()
+                            .filter(node -> Objects.nonNull(node.getFolderId()))
+                            .anyMatch(node -> node.getFolderId().toString().equals(fileEditDTO.getFileId()))) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.MOVE_TO_CHILD_FOLDER,
+                                                                  fileEditDTO.getFileId(),
+                                                                  fileEditDTO.getParentFolderId()
+                        ));
                     }
-                       return Mono.just(fileEditDTO.getUserFileMetadata());
-                   }).doOnNext(userFileMetadata -> redisProvider
-                        .deleteList(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()))
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .subscribe())
-                .flatMap(userFileMetadata -> {
-                    if (folderListTreeProvider != null) {
-                        try {
-                            folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO);
-                        } catch (ValidationException e) {
-                            return Mono.error(e);
-                        }
-                    }
-
-
-                    userFileMetadata.setFilename(fileEditDTO.getFilename());
-                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
-                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
-
-                    FileShareTypeEnum shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
-                    userFileMetadata.setShareType(shareType);
-
-                    Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
-                    userFileMetadata.setIsStar(isStar);
-
-                    if (fileEditDTO.getRecursiveSetting()) {
-                        Mono<Void> handleChildFolder = findAllChildFolder(Collections.singletonList(userFileMetadata.getId()),
-                                                                          new ArrayList<>()
-                        ).flatMap(childFolderList -> {
-                            Mono<Void> processShareUserMono = processShareUser(childFolderList, fileEditDTO).then();
-                            Mono<Void> settingChildFolder = Mono.defer(() -> {
-                                childFolderList.forEach(childFolder -> {
-                                    childFolder.setShareType(shareType);
-                                });
-                                return userFileMetaRepository.saveAll(childFolderList).then();
-                            });
-
-                            Long[] parentFolderIds = childFolderList.stream().map(UserFileMetadata::getId).toArray(Long[]::new);
-                            Mono<Void> cleanUserListCache = cleanUserListCache(user.getId(), parentFolderIds);
-
-                            return Mono.when(processShareUserMono, settingChildFolder).then(cleanUserListCache);
-                        });
-                        transactionalOperator.transactional(handleChildFolder).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                    }
-
-
-                    Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
-                    Mono<Void> cleanUserListCache = cleanUserListCache(user.getId(), fileEditDTO.getParentFolderId());
-                    return Mono.when(processShareUserMono, userFileMetaRepository.save(userFileMetadata), cleanUserListCache);
+                    return Mono.just(fileEditDTO.getUserFileMetadata());
                 });
+            }
+            return Mono.just(fileEditDTO.getUserFileMetadata());
+        }).flatMap(userFileMetadata -> {
+            if (folderListTreeProvider != null) {
+                try {
+                    folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO);
+                } catch (ValidationException e) {
+                    return Mono.error(e);
+                }
+            }
+
+            userFileMetadata.setFilename(fileEditDTO.getFilename());
+            userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+
+            FileShareTypeEnum shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
+            userFileMetadata.setShareType(shareType);
+
+            Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
+            userFileMetadata.setIsStar(isStar);
+
+            Set<Long> cleanMainCacheFolder = new HashSet<>();
+            cleanMainCacheFolder.add(oldParentFolderId);
+            cleanMainCacheFolder.add(fileEditDTO.getParentFolderId());
+
+            Mono<Void> handleChildMono = Mono.empty();
+            if (fileEditDTO.getRecursiveSetting()) {
+                handleChildMono = Mono.defer(() -> {
+                    findAllChildFolder(Collections.singletonList(userFileMetadata.getId()), new ArrayList<>()).flatMap(childFolderList -> {
+                        Mono<Void> processShareUserMono = processShareUser(childFolderList, fileEditDTO).then();
+                        Mono<Void> settingChildFolder = Mono.defer(() -> {
+                            childFolderList.forEach(childFolder -> {
+                                childFolder.setShareType(shareType);
+                            });
+                            return userFileMetaRepository.saveAll(childFolderList).then();
+                        });
+
+                        Set<Long> cleanChildCacheFolder = new HashSet<>();
+                        childFolderList.forEach(childFolder -> {
+                            cleanChildCacheFolder.add(childFolder.getParentFolderId());
+                        });
+
+                        return Mono
+                                .when(processShareUserMono, settingChildFolder)
+                                .then(cleanUserListCache(user.getId(), cleanChildCacheFolder.toArray(new Long[0])));
+
+                    }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    return Mono.empty();
+                });
+            }
+
+            Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
+            return transactionalOperator
+                    .transactional(handleChildMono.then(Mono.when(processShareUserMono, userFileMetaRepository.save(userFileMetadata))))
+                    .then(Mono.defer(() -> cleanUserListCache(user.getId(), cleanMainCacheFolder.toArray(new Long[0]))));
+        });
     }
 
     /**
@@ -414,8 +425,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
                         UserFileDataBO userFileDataBO = UserFileDataBO
                                 .builder()
-                                .fileSize(fileSize)
-                                .filename(zipFileName).fileType(FileEnum.ZIP).dataBufferFlux(dataFlux)
+                                .fileSize(fileSize).filename(zipFileName).fileType(FileEnum.ZIP).dataBufferFlux(dataFlux)
                                 .build();
                         return Mono.just(userFileDataBO);
                     }).doFinally(signal -> {
