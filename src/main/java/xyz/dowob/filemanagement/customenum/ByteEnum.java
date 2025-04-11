@@ -62,6 +62,7 @@ public enum ByteEnum {
         return convertToByte(size, GIGABYTE);
     }
 
+
     /**
      * 將文件大小轉換為字節數
      *
@@ -73,6 +74,7 @@ public enum ByteEnum {
     public static long convertToByte(long size, ByteEnum target) {
         return size * target.bytes;
     }
+
 
     /**
      * 將字節數轉換為可讀的文件大小，保留兩位小數

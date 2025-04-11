@@ -42,8 +42,8 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
         super(errorAttributes, webProperties.getResources(), applicationContext);
         super.setMessageWriters(serverCodecConfigurer.getWriters());
         super.setMessageReaders(serverCodecConfigurer.getReaders());
-
     }
+
 
     /**
      * 獲取路由函數
@@ -56,6 +56,7 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
     protected RouterFunction<ServerResponse> getRoutingFunction(ErrorAttributes errorAttributes) {
         return RouterFunctions.route(RequestPredicates.all(), this::handleException);
     }
+
 
     /**
      * 異常處理方法
@@ -74,7 +75,6 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
                                                                    null
         );
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
-
 
         if (error instanceof ValidationException validationException) {
             apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),

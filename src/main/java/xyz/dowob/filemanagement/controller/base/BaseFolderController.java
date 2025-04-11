@@ -84,6 +84,7 @@ public abstract class BaseFolderController extends BaseFileController {
         this.folderService = folderService;
     }
 
+
     /**
      * 刪除資料夾，該操作會刪除資料夾內所有檔案。
      *
@@ -104,6 +105,7 @@ public abstract class BaseFolderController extends BaseFileController {
                         .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null))));
         return handleError(result, exchange);
     }
+
 
     /**
      * 編輯資料夾，修改資料夾名稱、位置以及分享狀態。
@@ -140,6 +142,7 @@ public abstract class BaseFolderController extends BaseFileController {
         return handleError(responseEntityMono, exchange);
     }
 
+
     /**
      * 創建資料夾，根據用戶提供的資料夾資料創建新的資料夾。
      *
@@ -163,6 +166,7 @@ public abstract class BaseFolderController extends BaseFileController {
         }), exchange);
     }
 
+
     /**
      * 獲取資料夾的路徑，根據資料夾 ID 返回該資料夾的完整路徑信息。
      *
@@ -185,6 +189,7 @@ public abstract class BaseFolderController extends BaseFileController {
         }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
     }
 
+
     /**
      * 建立用戶資料夾樹，根據系統配置和用戶資料夾結構建立資料夾樹。
      *
@@ -204,6 +209,7 @@ public abstract class BaseFolderController extends BaseFileController {
         }), exchange);
     }
 
+
     /**
      * 移動資料夾到回收站。
      *
@@ -216,6 +222,7 @@ public abstract class BaseFolderController extends BaseFileController {
         return super.removeFile(exchange, id, FileEnum.FOLDER);
     }
 
+
     /**
      * 還原資料夾，將回收站中的資料夾還原到原來的位置。
      *
@@ -227,6 +234,7 @@ public abstract class BaseFolderController extends BaseFileController {
     public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, String id) {
         return super.restoreFile(exchange, id, FileEnum.FOLDER);
     }
+
 
     /**
      * 下載資料夾，將資料夾及其內容打包下載。

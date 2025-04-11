@@ -20,21 +20,29 @@ public class FileVersionDTO {
      * 當前版本號
      */
     private Long version;
+
     /**
      * 修改者
      */
     private Long modifiedBy;
+
     /**
      * 修改時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime modifiedTime;
+
     /**
      * 修改註釋
      */
     private String note;
 
 
+    /**
+     * 構造函數，從 UserOnlineFileHistory 對象中初始化 FileVersionDTO 對象
+     *
+     * @param userOnlineFileHistory 用戶在線文件歷史對象
+     */
     public FileVersionDTO(UserOnlineFileHistory userOnlineFileHistory) {
         this.version = userOnlineFileHistory.getVersion();
         this.modifiedBy = userOnlineFileHistory.getModifiedBy();

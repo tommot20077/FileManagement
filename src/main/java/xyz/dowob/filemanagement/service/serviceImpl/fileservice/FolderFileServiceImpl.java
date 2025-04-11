@@ -80,6 +80,25 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      */
     private final int maxConcurrentLimit;
 
+
+    /**
+     * 文件夾文件服務實現類，繼承 @see {@link AbstractFileService}
+     *
+     * @param serverFileMetaRepository      伺服器檔案元數據操作介面
+     * @param userFileMetaRepository        用戶檔案元數據操作介面
+     * @param redisProvider                 Redis提供者
+     * @param gridFsProvider                GridFS提供者
+     * @param transfersTasksManager         傳輸任務管理器
+     * @param fileProperties                檔案屬性配置
+     * @param circuitBreakerConfig          CircuitBreaker配置
+     * @param userRepository                用戶操作介面
+     * @param userOnlineFileRepository      用戶在線檔案操作介面
+     * @param entityOperations              R2DBC實體操作介面
+     * @param fileTrashRecordRepository     檔案垃圾桶記錄操作介面
+     * @param transactionalOperator         事務操作介面
+     * @param rateLimiterConfig             RateLimiter配置
+     * @param userFIleShareRecordRepository 用戶檔案分享記錄操作介面
+     */
     public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
                                  @Nullable FolderListTreeProvider folderListTreeProvider) throws ProcessException {
         super(serverFileMetaRepository,
@@ -122,6 +141,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         this.bufferSize = bs;
     }
 
+
     /**
      * 創建文件夾的實現
      *
@@ -160,6 +180,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             return transactionalOperator.transactional(action).then();
         });
     }
+
 
     /**
      * 編輯文件夾的實現
@@ -244,6 +265,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         });
     }
 
+
     /**
      * 刪除文件夾的實現
      *
@@ -269,6 +291,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     .then(userFileMetaRepository.delete(userFileMetadata));
         });
     }
+
 
     /**
      * 恢復文件夾的實現
@@ -326,6 +349,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         })));
     }
 
+
     /**
      * 批量恢復文件夾的實現
      *
@@ -338,6 +362,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> restoreFile(folder, user));
     }
+
 
     /**
      * 刪除文件夾的實現
@@ -378,6 +403,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         });
     }
 
+
     /**
      * 批量刪除文件夾的實現
      *
@@ -390,6 +416,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
     }
+
 
     /**
      * 下載文件夾的實現
@@ -438,6 +465,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             throw Exceptions.propagate(e);
         }
     }
+
 
     /**
      * 處理文件夾的壓縮
@@ -491,6 +519,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         }));
     }
 
+
     /**
      * 獲取文件資源
      * 給定一個文件列表，將返回一個包含 檔案 InputStream 和對應的用戶文件元數據的 Flux
@@ -527,6 +556,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                                     })));
         });
     }
+
 
     /**
      * 獲取線上文件資源
@@ -643,6 +673,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         });
     }
 
+
     /**
      * 查詢具有相同父文件夾ID的文件夾
      *
@@ -655,6 +686,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                 .collectList()
                 .switchIfEmpty(Mono.just(Collections.emptyList()));
     }
+
 
     /**
      * 獲取臨時壓縮文件名

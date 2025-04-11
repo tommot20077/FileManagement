@@ -11,7 +11,6 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.Tika;
 import org.bson.types.ObjectId;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.data.mongodb.gridfs.ReactiveGridFsResource;
@@ -164,6 +163,7 @@ public abstract class AbstractFileService implements FileService {
         CHUNK_SIZE = (long) fileProperties.getUpload().getChunkSize() * 1024 * 1024;
     }
 
+
     /**
      * 獲取用戶文件列表的共通實現
      *
@@ -197,6 +197,7 @@ public abstract class AbstractFileService implements FileService {
         return listDTOFlux.collectList().flatMap(list -> filterAndPageResponse(list, fileFilterDTO));
     }
 
+
     /**
      * 獲取用戶文件列表的緩存鍵
      *
@@ -209,6 +210,7 @@ public abstract class AbstractFileService implements FileService {
         String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
         return String.format(PAGE_KEY_FORMAT, userId, Objects.requireNonNullElse(searchId, 0L));
     }
+
 
     /**
      * 上傳文件分塊的共通實現
@@ -224,7 +226,7 @@ public abstract class AbstractFileService implements FileService {
 
         return Mono.defer(() -> redisProvider
                 .getHashMap(key, "DTO")
-                .switchIfEmpty(Mono.error(new ProcessException(ProcessException.ErrorCode.NOT_EXISTING_UPLOAD_TASK, transferTaskId)))
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_UPLOAD_TASK, transferTaskId)))
                 .flatMap(task -> redisProvider.isChunkSetPending(pendingChunkKey, uploadChunkDTO.getChunkIndex()).flatMap(isPending -> {
                     if (isPending) {
                         return processChunk(uploadChunkDTO, transferTaskId, key, pendingChunkKey);
@@ -252,6 +254,7 @@ public abstract class AbstractFileService implements FileService {
                     });
                 })));
     }
+
 
     /**
      * 獲取用戶文件列表路徑的共通實現
@@ -288,6 +291,7 @@ public abstract class AbstractFileService implements FileService {
         }));
     }
 
+
     /**
      * 清除用戶文件列表緩存的共通實現
      *
@@ -300,6 +304,7 @@ public abstract class AbstractFileService implements FileService {
         List<String> keys = Arrays.stream(folderIds).distinct().map(folderId -> getUserFileListBaseKey(userId, folderId)).toList();
         return cacheManager.deleteCaches(keys, CacheProviderEnum.USER_FILE_LIST_CACHE);
     }
+
 
     /**
      * 過濾所需的檔案元素並分頁
@@ -322,6 +327,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 從數據庫中獲取用戶文件列表，並格式化為 {@link UserFileListDTO} 對象
      * 這邊會將文件元數據和其對應的共享用戶表、檔案數據表進行關聯輸出
@@ -331,7 +337,6 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Flux<UserFileListDTO> 檔案列表流
      */
-    //todo 後期改這這查詢分發子類型
     private Flux<UserFileListDTO> formatUserFileMetaToListDto(Flux<UserFileMetadata> userFileMetadataFlux) {
         Set<Long> serverFileIds = new HashSet<>();
         Set<Long> userFileIds = new HashSet<>();
@@ -448,6 +453,7 @@ public abstract class AbstractFileService implements FileService {
         };
     }
 
+
     /**
      * 下載文件的共通實現
      *
@@ -520,6 +526,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 獲取總分塊數的共通實現
      *
@@ -530,6 +537,7 @@ public abstract class AbstractFileService implements FileService {
     protected int getTotalChunks(long fileSize) {
         return (int) Math.ceil((double) fileSize / CHUNK_SIZE);
     }
+
 
     /**
      * 上傳文件的共通實現
@@ -557,6 +565,7 @@ public abstract class AbstractFileService implements FileService {
                                                       .build()));
         }).switchIfEmpty(initialUpload(fileMetadataDTO));
     }
+
 
     /**
      * 編輯文件的共通實現
@@ -603,6 +612,7 @@ public abstract class AbstractFileService implements FileService {
         return FileEnum.fromMimeType(mimeType);
     }
 
+
     /**
      * 合併分塊數據的共通實現
      *
@@ -618,6 +628,7 @@ public abstract class AbstractFileService implements FileService {
             return buffer.array();
         });
     }
+
 
     /**
      * 刪除文件的共通實現
@@ -637,6 +648,7 @@ public abstract class AbstractFileService implements FileService {
                     userFileMetadata.getId().toString())));
         }));
     }
+
 
     /**
      * 刪除暫存分塊數據的共通實現
@@ -675,6 +687,7 @@ public abstract class AbstractFileService implements FileService {
         userFileMetadata.setLastAccessTime(LocalDateTime.now());
         return userFileMetaRepository.save(userFileMetadata);
     }
+
 
     /**
      * 合併已上傳的文件分塊的共通實現
@@ -782,6 +795,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 處理MD5校驗成功後的文件存儲邏輯的共通實現
      *
@@ -822,6 +836,7 @@ public abstract class AbstractFileService implements FileService {
                 });
     }
 
+
     /**
      * 更新文件擁有者的共通實現
      * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
@@ -859,6 +874,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 更新用戶儲存空間使用量，此方法會根據文件ID列表計算文件大小
      * 此為重載方法、計算刪除的文件大小
@@ -881,6 +897,7 @@ public abstract class AbstractFileService implements FileService {
                 .reduce(0L, Long::sum)
                 .flatMap(totalSize -> handleUserStorage(user, totalSize, true));
     }
+
 
     /**
      * 更新用戶儲存空間使用量，此方法會根據文件大小計算用戶儲存空間使用量
@@ -919,40 +936,30 @@ public abstract class AbstractFileService implements FileService {
      */
     protected Mono<UploadResponseDTO> initialUpload(FileMetadataDTO fileMetadataDTO) {
         String uploadTaskId = UUID.randomUUID().toString();
-        return transfersTasksManager.registerUploadTask(fileMetadataDTO, uploadTaskId).flatMap(isRegisterSuccess -> {
-            if (isRegisterSuccess) {
-                UploadTaskBO task = fileMetadataDTO.formatToTransferTask(uploadTaskId, "初始化任務成功");
-                String key = "upload_task:" + uploadTaskId;
-                int totalChunks = getTotalChunks(fileMetadataDTO.getFileSize());
+        return transfersTasksManager.registerUploadTask(fileMetadataDTO, uploadTaskId).then(Mono.defer(() -> {
+            UploadTaskBO task = fileMetadataDTO.formatToTransferTask(uploadTaskId, "初始化任務成功");
+            String key = "upload_task:" + uploadTaskId;
+            int totalChunks = getTotalChunks(fileMetadataDTO.getFileSize());
 
-                return redisProvider
-                        .setHashMap(key, "DTO", task, Duration.ofHours(6))
-                        .then(redisProvider.setHashMap(key, "uploaded_count", 0, Duration.ofHours(6)))
-                        .then(redisProvider.setHashMap(key, "total_chunks", totalChunks, Duration.ofHours(6)))
-                        .then(redisProvider.generateChunkSet(key + ":pending_chunks", totalChunks))
-                        .then(Mono.just(UploadResponseDTO
-                                                .builder()
-                                                .transferTaskId(uploadTaskId)
-                                                .totalChunks(totalChunks)
-                                                .chunkSize(CHUNK_SIZE)
-                                                .progress(0.0)
-                                                .isSuccess(true)
-                                                .isFinished(false)
-                                                .message("初始化任務成功")
-                                                .build()));
-            } else {
-                String md5 = fileMetadataDTO.getMd5();
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.EXISTING_TRANSFER_TASK,
-                                                          md5,
-                                                          transfersTasksManager
-                                                                  .getTransfersTask(md5, TransfersStatusEnum.UPLOADING)
-                                                                  .getFirst()
-                                                                  .getTransferTaskId()
-                ));
-            }
-        });
+            return redisProvider
+                    .setHashMap(key, "DTO", task, Duration.ofHours(6))
+                    .then(redisProvider.setHashMap(key, "uploaded_count", 0, Duration.ofHours(6)))
+                    .then(redisProvider.setHashMap(key, "total_chunks", totalChunks, Duration.ofHours(6)))
+                    .then(redisProvider.generateChunkSet(key + ":pending_chunks", totalChunks))
+                    .thenReturn(UploadResponseDTO
+                                        .builder()
+                                        .transferTaskId(uploadTaskId)
+                                        .totalChunks(totalChunks)
+                                        .chunkSize(CHUNK_SIZE)
+                                        .progress(0.0)
+                                        .isSuccess(true)
+                                        .isFinished(false)
+                                        .message("初始化任務成功")
+                                        .build());
+        }));
     }
 
+    
     /**
      * 處理文件分塊的共通實現
      *
@@ -967,8 +974,9 @@ public abstract class AbstractFileService implements FileService {
         int chunkIndex = uploadChunkDTO.getChunkIndex();
         int totalChunks = uploadChunkDTO.getTotalChunks();
 
-        DataBufferFactory dataBufferFactory = new DefaultDataBufferFactory();
-        Flux<DataBuffer> chunkData = Flux.just(dataBufferFactory.wrap(uploadChunkDTO.getChunkData()));
+        Flux<DataBuffer> chunkData = uploadChunkDTO
+                .getChunkDataFlux()
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NULL_DTO)));
 
         return redisProvider
                 .deleteSet(pendingChunkKey, chunkIndex)
@@ -1014,6 +1022,7 @@ public abstract class AbstractFileService implements FileService {
                         })));
     }
 
+
     /**
      * 從回收站還原文件
      *
@@ -1025,6 +1034,7 @@ public abstract class AbstractFileService implements FileService {
     public Mono<UserFileMetadata> restoreFile(UserFileMetadata userFileMetadata, User user) {
         return restoreFile(Collections.singletonList(userFileMetadata), user).next();
     }
+
 
     /**
      * 從回收站批量還原文件
@@ -1054,6 +1064,7 @@ public abstract class AbstractFileService implements FileService {
                 .transactional(recoverFileMethod(userFileMetadataMap, problemFileIdsSet).then(Mono.just(true)))
                 .thenMany(Flux.fromIterable(userFileMetadataMap.values()));
     }
+
 
     /**
      * 還原文件輔助方法
@@ -1098,6 +1109,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 刪除文件到回收站
      *
@@ -1109,6 +1121,7 @@ public abstract class AbstractFileService implements FileService {
     public Mono<Boolean> removeFile(UserFileMetadata userFileMetadata, User user) {
         return removeFile(Collections.singletonList(userFileMetadata), user);
     }
+
 
     /**
      * 將檔案批量刪除到回收站
@@ -1149,6 +1162,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 搜索用戶文件
      *
@@ -1185,6 +1199,7 @@ public abstract class AbstractFileService implements FileService {
                             return new UserFileListDTO(serverFileMetadata, userFileMetadata, shareUserMap.get(userFileMetadata.getId()));
                         }));
     }
+
 
     /**
      * 處理檔案元數據的共享用戶的變更方法
@@ -1232,6 +1247,7 @@ public abstract class AbstractFileService implements FileService {
         });
     }
 
+
     /**
      * 獲取標頭中的範圍，若無則返回文件大小的範圍
      *
@@ -1253,6 +1269,7 @@ public abstract class AbstractFileService implements FileService {
         }
         return new long[]{start, end};
     }
+
 
     /**
      * 將檔案輸入流轉換為數據流
@@ -1283,6 +1300,7 @@ public abstract class AbstractFileService implements FileService {
         return Mono.just(new UserFileMetadata());
     }
 
+
     /**
      * 根據ID獲取一個用戶文件元數據實體
      *
@@ -1294,12 +1312,14 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository.findById(id.toString());
     }
 
+
     /**
      * 獲取所有用戶文件元數據實體
      */
     public Flux<UserFileMetadata> getAllUserFileMetadata() {
         return userFileMetaRepository.findAll();
     }
+
 
     /**
      * 更新一個用戶文件元數據實體
@@ -1310,6 +1330,7 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository.save(entity).then();
     }
 
+
     /**
      * 刪除一個用戶文件元數據實體
      *
@@ -1319,6 +1340,7 @@ public abstract class AbstractFileService implements FileService {
         return userFileMetaRepository.deleteById(entity.getId().toString());
     }
 
+
     /**
      * 創建一個新的服務器文件元數據實體
      *
@@ -1327,6 +1349,7 @@ public abstract class AbstractFileService implements FileService {
     public Mono<ServerFileMetadata> createServerFileMetadata() {
         return Mono.just(new ServerFileMetadata());
     }
+
 
     /**
      * 根據ID獲取一個服務器文件元數據實體
@@ -1339,6 +1362,7 @@ public abstract class AbstractFileService implements FileService {
         return serverFileMetaRepository.findById(id.toString());
     }
 
+
     /**
      * 獲取所有服務器文件元數據實體
      */
@@ -1346,6 +1370,7 @@ public abstract class AbstractFileService implements FileService {
     public Flux<ServerFileMetadata> getAllServerFileMetadata() {
         return serverFileMetaRepository.findAll();
     }
+
 
     /**
      * 更新一個服務器文件元數據實體
@@ -1356,6 +1381,7 @@ public abstract class AbstractFileService implements FileService {
     public Mono<ServerFileMetadata> updateServerFileMetadata(@NotNull ServerFileMetadata entity) {
         return serverFileMetaRepository.save(entity);
     }
+
 
     /**
      * 刪除一個服務器文件元數據實體

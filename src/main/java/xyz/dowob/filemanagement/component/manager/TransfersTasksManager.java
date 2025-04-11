@@ -8,6 +8,7 @@ import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.TransfersTask;
 import xyz.dowob.filemanagement.exception.ProcessException;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.TransfersTasksRepository;
 
 import java.time.LocalDateTime;
@@ -40,6 +41,9 @@ public class TransfersTasksManager {
      */
     private final TransfersTasksRepository transfersTasksRepository;
 
+    /**
+     * FileProperties 用於操作文件上傳相關配置的類
+     */
     private final FileProperties fileProperties;
 
     /**
@@ -52,28 +56,45 @@ public class TransfersTasksManager {
         this.fileProperties = fileProperties;
     }
 
+
     /**
      * 用於註冊一個新的上傳任務
+     * 將檢查任務是否已經存在，如果存在，則拋出異常
+     * 並且檢查檔案大小是否超過限制，如果超過限制，則拋出異常
+     * 不然的話，則創建一個新的上傳任務
      *
      * @param fileMetadataDTO 檔案的元數據
      * @param transferTaskId  任務ID
      *
-     * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
+     * @return Mono<Void>
      */
-    public Mono<Boolean> registerUploadTask(FileMetadataDTO fileMetadataDTO, String transferTaskId) {
+    public Mono<Void> registerUploadTask(FileMetadataDTO fileMetadataDTO, String transferTaskId) {
         return Mono.defer(() -> {
+            String md5 = fileMetadataDTO.getMd5();
             if (activeTransfersTask.containsKey(fileMetadataDTO.getMd5())) {
-                return Mono.just(false);
+                String alreadyTransferTaskId = this.getTransfersTask(md5, TransfersStatusEnum.UPLOADING).getFirst().getTransferTaskId();
+                ValidationException error = new ValidationException(ValidationException.ErrorCode.EXISTING_TRANSFER_TASK, md5, alreadyTransferTaskId);
+                return Mono.error(error);
             }
-            return createTransfersTask(fileMetadataDTO, transferTaskId, TransfersStatusEnum.UPLOADING).thenReturn(true);
+            boolean isLimitSize = fileProperties.getUpload().getMaxUploadFileSize() > 0;
+            if (isLimitSize && fileMetadataDTO.getFileSize() > fileProperties.getUpload().getMaxUploadFileSize()) {
+                ValidationException error = new ValidationException(ValidationException.ErrorCode.FILE_SIZE_LIMIT,
+                                                                    fileMetadataDTO.getFileSize(),
+                                                                    fileProperties.getUpload().getMaxUploadFileSize()
+                );
+                return Mono.error(error);
+            }
+            return createTransfersTask(fileMetadataDTO, transferTaskId, TransfersStatusEnum.UPLOADING);
         });
     }
+
 
     /**
      * 用於註冊一個新的轉換任務
      *
      * @param fileMetadataDTO 檔案的元數據
      * @param transferTaskId  任務ID
+     * @param status          任務狀態
      *
      * @return Mono<Boolean> 返回一個 Mono 對象，當註冊成功時返回 true，否則返回 false
      */
@@ -81,11 +102,14 @@ public class TransfersTasksManager {
         return createTransfersTask(fileMetadataDTO, transferTaskId, null, null, status);
     }
 
+
     /**
      * 用於創建一個新的傳輸任務，當任務創建成功時，將任務存入 activeTransfersTask 中以及數據庫中
      *
      * @param fileMetadataDTO 檔案的元數據
      * @param transferTaskId  任務ID
+     * @param gridFsId        GridFS 檔案ID
+     * @param message         任務消息
      * @param status          任務狀態
      *
      * @return Mono<Void> 返回一個 Mono 對象
@@ -102,6 +126,7 @@ public class TransfersTasksManager {
         activeTransfersTask.put(fileMetadataDTO.getMd5(), Map.of(transferTaskId, transfersTask));
         return transfersTasksRepository.save(transfersTask).then();
     }
+
 
     /**
      * 用於完成一個傳輸任務時，更新任務的狀態
@@ -121,6 +146,7 @@ public class TransfersTasksManager {
                                    true
         ).doOnSuccess(aVoid -> activeTransfersTask.remove(md5));
     }
+
 
     /**
      * 用於更新一個傳輸任務的狀態
@@ -152,6 +178,7 @@ public class TransfersTasksManager {
         return transfersTasksRepository.save(transfersTask).then();
     }
 
+
     /**
      * 用於獲取一個檔案的所有傳輸任務，可以根據任務狀態進行過濾
      * 當檔案不存在時，返回空列表
@@ -175,6 +202,7 @@ public class TransfersTasksManager {
         return Collections.emptyList();
     }
 
+
     /**
      * 獲取當前可用的線程數量
      * 此方法獲取可用線程數量的計算方式為：最大線程數 - 正在進行的任務數量
@@ -182,11 +210,13 @@ public class TransfersTasksManager {
      *
      * @return int 返回一個整數，表示可用線程數量
      */
+    @Deprecated
     public int getAvailableThreadCount() {
         return Math.min(Math.max((Runtime.getRuntime().availableProcessors() - activeTransfersTask.size()), 1),
                         fileProperties.getUpload().getCombineProcessCountLimit()
         );
     }
+
 
     /**
      * 用於在應用關閉時，將所有未完成的任務設置為失敗

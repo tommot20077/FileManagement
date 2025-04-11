@@ -46,6 +46,7 @@ public class UserFileShareRecord {
         this.fileId = fileId;
     }
 
+
     /**
      * 重寫toString方法，用於打印對象
      *
@@ -59,6 +60,7 @@ public class UserFileShareRecord {
         map.put("fileId", fileId);
         return map.toString();
     }
+
 
     /**
      * 重寫equals方法，用於判斷用戶是否相同
@@ -78,6 +80,7 @@ public class UserFileShareRecord {
         UserFileShareRecord record = (UserFileShareRecord) o;
         return id.equals(record.id);
     }
+
 
     /**
      * 重寫hashCode方法，用於判斷用戶是否相同

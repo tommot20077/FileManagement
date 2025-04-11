@@ -36,7 +36,6 @@ public class CacheProperties {
      */
     private Integer downloadCacheExpireTime = 30;
 
-
     /**
      * 是否啟用用戶檔案列表緩存，默認為 true
      * 建議開啟，這樣可以有效提升檔案列表的查詢效率
@@ -47,7 +46,6 @@ public class CacheProperties {
      * 文件列表緩存過期時間，默認為 60，單位為分鐘，此值必須大於0否則會報錯
      */
     private Integer fileListCacheExpireTime = 60;
-
 
     /**
      * 是否啟用用戶資訊緩存，默認為啟用

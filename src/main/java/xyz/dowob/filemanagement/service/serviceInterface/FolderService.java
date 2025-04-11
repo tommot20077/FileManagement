@@ -9,6 +9,7 @@ import xyz.dowob.filemanagement.entity.UserFileMetadata;
 /**
  * 文件夾業務邏輯接口，定義了文件夾業務邏輯的相關方法
  * 用於定義文件夾的增刪改查操作
+ * 繼承了 {@link BaseFileService} 接口，內部定義了檔案的基本操作
  *
  * @author yuan
  * @program FileManagement
@@ -32,6 +33,7 @@ public interface FolderService extends BaseFileService {
         return Mono.empty();
     }
 
+
     /**
      * 編輯文件夾的接口
      *
@@ -45,6 +47,7 @@ public interface FolderService extends BaseFileService {
         return Mono.empty();
     }
 
+
     /**
      * 刪除文件夾的接口
      *
@@ -56,6 +59,7 @@ public interface FolderService extends BaseFileService {
     default Mono<Void> deleteFolder(UserFileMetadata folder, User user) {
         return Mono.empty();
     }
+
 
     /**
      * 下載文件夾的接口

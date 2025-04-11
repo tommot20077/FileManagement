@@ -43,6 +43,7 @@ public class TokenStrategy {
         tokenStrategies.put(TokenEnum.RESET_PASSWORD_TOKEN, passwordResetTokenProviderImpl);
     }
 
+
     /**
      * 根據 TokenEnum 返回對應的 TokenProvider
      *

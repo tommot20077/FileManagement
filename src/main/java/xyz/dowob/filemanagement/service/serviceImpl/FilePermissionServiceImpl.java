@@ -67,6 +67,7 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
                 .flatMap(file -> checkPermissions(user, file, rules));
     }
 
+
     /**
      * 驗證用戶是否有權限多個檔案Id
      * 通過設置不同的權限規則來實現不同的權限驗證
@@ -119,6 +120,7 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
         });
     }
 
+
     /**
      * 保留值搜索方法，在搜索用戶檔案元數據時，如果找不到文件，則檢查輸入的文件ID是否是保留值
      * 當文件ID是保留值時，則返回一個虛擬的文件元數據，否則拋出 ValidationException 異常
@@ -141,7 +143,5 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
             return Mono.just(dummyData);
         }
         return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId));
-
-
     }
 }

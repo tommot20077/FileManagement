@@ -147,6 +147,7 @@ public class UserFileDataBO {
         this.shareType = userFileMetadata.getShareType();
     }
 
+
     /**
      * 用戶文件數據業務對象構造函數
      *
@@ -158,6 +159,7 @@ public class UserFileDataBO {
         UserFileDataBO userFileDataBO = new UserFileDataBO(serverFileMetadata, userFileMetadata);
         userFileShareRecords.forEach(record -> userFileDataBO.shareUsers.add(record.getUserId()));
     }
+
 
     /**
      * 用戶文件數據業務對象構造函數
@@ -176,6 +178,7 @@ public class UserFileDataBO {
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.uploadTime = userFileMetadata.getUploadTime();
     }
+
 
     /**
      * 用戶文件數據業務對象構造函數

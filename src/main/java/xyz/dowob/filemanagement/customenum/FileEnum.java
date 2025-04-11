@@ -150,6 +150,7 @@ public enum FileEnum {
         FILE_ENUM_MAP.put(FileEnum.ZIP, zipMap);
     }
 
+
     /**
      * 根據 MIME 類型獲取文件類型，如果找不到對應的文件類型，則返回其他類型
      *
@@ -165,6 +166,7 @@ public enum FileEnum {
         String generalType = mimeType.split("/")[0].toLowerCase();
         return MIME_TYPE_MAPPING.getOrDefault(generalType, FileEnum.OTHER);
     }
+
 
     /**
      * 根據文件名獲取文件類型，如果找不到對應的文件類型，則返回其他類型
@@ -183,6 +185,7 @@ public enum FileEnum {
         }
         return getDefaultMediaType(fileEnum);
     }
+
 
     /**
      * 獲取默認的 MIME 類型

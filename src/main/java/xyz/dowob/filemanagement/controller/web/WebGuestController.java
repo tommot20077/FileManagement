@@ -38,6 +38,7 @@ public class WebGuestController extends BaseGuestController {
         super(authorizationService, userService, securityProperties);
     }
 
+
     /**
      * 訪客註冊 Web請求
      *
@@ -49,6 +50,7 @@ public class WebGuestController extends BaseGuestController {
     public Mono<ResponseEntity<?>> register(@RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return super.register(registerUserDTO, exchange);
     }
+
 
     /**
      * 訪客登入 Web請求
@@ -62,6 +64,7 @@ public class WebGuestController extends BaseGuestController {
     public Mono<ResponseEntity<?>> login(@RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
         return super.login(authRequestDTO, exchange, true);
     }
+
 
     /**
      * 發送重置密碼郵件
@@ -77,6 +80,7 @@ public class WebGuestController extends BaseGuestController {
         return super.sendResetPasswordMail(userMail, exchange);
     }
 
+
     /**
      * 重置密碼的請求
      * 用戶提供重置密碼的驗證信息後，系統將更新用戶的密碼。
@@ -90,6 +94,7 @@ public class WebGuestController extends BaseGuestController {
     public Mono<ResponseEntity<?>> resetPassword(@RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return super.resetPassword(resetPasswordDTO, exchange);
     }
+
 
     /**
      * 確認當前用戶授權狀態，並返回用戶信息

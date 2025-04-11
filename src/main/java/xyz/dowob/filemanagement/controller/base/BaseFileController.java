@@ -96,7 +96,7 @@ public abstract class BaseFileController implements ResponseUnity {
     /**
      * 自定義文件類型，表示支持的文件類型枚舉，包含圖片、視頻、音樂、文檔等。
      */
-    protected final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
+    protected static final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
 
 
     /**
@@ -162,6 +162,7 @@ public abstract class BaseFileController implements ResponseUnity {
         }), exchange);
     }
 
+
     /**
      * 移除檔案到回收站，將指定檔案移動至回收站。
      *
@@ -187,6 +188,7 @@ public abstract class BaseFileController implements ResponseUnity {
                     return createResponseEntity(apiResponse);
                 })), exchange);
     }
+
 
     /**
      * 還原檔案，將指定檔案從回收站中還原。
@@ -214,6 +216,7 @@ public abstract class BaseFileController implements ResponseUnity {
                     return createResponseEntity(apiResponse);
                 }))), exchange);
     }
+
 
     /**
      * 獲取文件類型列表，將傳入的字符串類型轉換為對應的枚舉類型。
@@ -261,6 +264,7 @@ public abstract class BaseFileController implements ResponseUnity {
 
         return headers;
     }
+
 
     /**
      * 獲取 Http 標頭

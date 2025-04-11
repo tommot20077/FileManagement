@@ -56,7 +56,8 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
-     * @param parentFolderId 父文件夾ID
+     * @param parentFolderId   父文件夾ID
+     * @param entityOperations R2dbc實體操作
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
@@ -65,10 +66,13 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         return entityOperations.select(UserFileMetadata.class).matching(org.springframework.data.relational.core.query.Query.query(criteria)).all();
     }
 
+
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據並可指定是否需要顯示刪除檔案，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
-     * @param parentFolderId 父文件夾ID
+     * @param parentFolderId   父文件夾ID
+     * @param isDeleted        是否顯示刪除檔案
+     * @param entityOperations R2dbc實體操作
      *
      * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
      */
@@ -82,6 +86,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                                                                                              .is(isDeleted)))
                 .all();
     }
+
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據(此方法為查詢根文件夾)
@@ -98,13 +103,19 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      *
      * @param userId 用戶ID
      * @param isStar 是否為星標檔案
-     **/
+     * @param isDeleted 是否為刪除檔案
+     *
+     * @return Flux<UserFileMetadata> 返回所有星標檔案元數據
+     */
     Flux<UserFileMetadata> findAllByUserIdAndIsStarAndIsDeleted(Long userId, Boolean isStar, Boolean isDeleted);
 
     /**
      * 根據用戶ID和最後訪問時間查詢檔案元數據
      *
-     * @param userId 用戶ID
+     * @param userId           用戶ID
+     * @param type             檔案類型
+     * @param limit            限制返回的檔案數量
+     * @param entityOperations R2dbc實體操作
      *
      * @return Flux<UserFileMetadata> 返回所有檔案元數據
      */
@@ -127,6 +138,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         return entityOperations.select(query, UserFileMetadata.class);
     }
 
+
     /**
      * 計算該用戶擁有同一伺服器檔案的檔案數量
      *
@@ -134,7 +146,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @param serverFileIds    伺服器檔案ID
      * @param entityOperations R2dbc實體操作
      *
-     * @return Mono<Long> 返回檔案數量
+     * @return Flux<ServerFileMetaCountDAO> 返回所有檔案計數紀錄 {@link ServerFileMetaCountDAO}
      */
     default Flux<ServerFileMetaCountDAO> countByServerFileIdInAndUserId(
             @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, R2dbcEntityOperations entityOperations) {
@@ -148,12 +160,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                 .all();
     }
 
+
     /**
      * 根據用戶ID查詢所有位於回收站的檔案元數據，並轉換查詢為UserFileMetadata結果，並按照是否為資料夾和檔案名稱排序
      *
      * @param userId 用戶ID
+     * @param r2dbcEntityOperations R2dbc實體操作
      *
-     * @return Flux<UserFileMetadata>
+     * @return Flux<UserFileMetadata> 返回查詢結果
      */
     default Flux<UserFileMetadata> findAllByUserIdOrderByIsFolder(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
         return r2dbcEntityOperations
@@ -171,6 +185,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                             .all();
                 });
     }
+
 
     /**
      * 根據用戶ID查詢所有共享給該用戶的檔案元數據
@@ -201,6 +216,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                             .all();
                 });
     }
+
 
     /**
      * 根據用戶ID和過濾條件查詢檔案元數據
@@ -274,6 +290,14 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     }
 
 
+    /**
+     * 根據檔案ID查詢檔案共享類型
+     *
+     * @param fileId                檔案ID
+     * @param r2dbcEntityOperations R2dbc實體操作
+     *
+     * @return Mono<FileShareTypeEnum>
+     */
     default Mono<FileShareTypeEnum> getShareTypeByFileId(Long fileId, R2dbcEntityOperations r2dbcEntityOperations) {
         return r2dbcEntityOperations
                 .select(UserFileMetadata.class)

@@ -26,7 +26,7 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
      *
      * @param username 用戶名
      *
-     * @return Mono<User>
+     * @return Mono<User> 符合條件的用戶
      */
     Mono<User> findByUsername(String username);
 
@@ -35,7 +35,7 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
      *
      * @param usernames 用戶名集合
      *
-     * @return Flux<User>
+     * @return Flux<User> 所有符合條件的用戶
      */
     Flux<User> findAllByUsernameIn(Collection<String> usernames);
 
@@ -44,7 +44,7 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
      *
      * @param userIds 用戶ID集合
      *
-     * @return Flux<User>
+     * @return Flux<User> 所有符合條件的用戶
      */
     Flux<User> findAllByIdIn(Collection<Long> userIds);
 
@@ -53,7 +53,7 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
      *
      * @param email 信箱
      *
-     * @return Mono<User>
+     * @return Mono<User> 符合條件的用戶
      */
     Mono<User> findByEmail(String email);
 
@@ -62,7 +62,7 @@ public interface UserRepository extends ReactiveCrudRepository<User, Long> {
      *
      * @param emails 信箱集合
      *
-     * @return Flux<User>
+     * @return Flux<User> 所有符合條件的用戶
      */
     Flux<User> findAllByEmailIn(Collection<String> emails);
 

@@ -12,6 +12,8 @@ import xyz.dowob.filemanagement.entity.User;
  * 用戶業務邏輯接口
  * 定義了用戶業務邏輯的相關方法
  * 用戶業務邏輯主要包括用戶註冊、用戶登入、用戶登出、用戶修改密碼、用戶修改信箱、用戶忘記密碼、用戶重置密碼等方法
+ * 繼承了 {@link CrudService} 接口，內部定義了用戶的基本操作
+ *
  * @author yuan
  * @program FileManagement
  * @ClassName UserService

@@ -38,6 +38,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
         super(securityProperties);
     }
 
+
     /**
      * 保存 CsrfToken 的 Map
      */
@@ -60,6 +61,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
         return Mono.just(csrfToken);
     }
 
+
     /**
      * 保存 CsrfToken，這裡不做任何操作
      *
@@ -72,6 +74,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<Void> saveToken(ServerWebExchange exchange, CsrfToken token) {
         return Mono.empty();
     }
+
 
     /**
      * 加載 CsrfToken，並檢查是否合法
@@ -92,6 +95,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
         }
         return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN));
     }
+
 
     /**
      * 刪除不需要的憑證

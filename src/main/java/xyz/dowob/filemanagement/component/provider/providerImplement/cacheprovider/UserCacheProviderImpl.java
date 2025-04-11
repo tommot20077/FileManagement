@@ -65,6 +65,7 @@ public class UserCacheProviderImpl implements CacheProvider {
         this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getUserInfoCacheExpireTime());
     }
 
+
     /**
      * 根據key獲取緩存數據
      *
@@ -76,6 +77,7 @@ public class UserCacheProviderImpl implements CacheProvider {
     public <T> Mono<T> get(String hashKey, Class<T> clazz) {
         return redisProvider.getHashMap(CACHE_PREFIX, hashKey, clazz);
     }
+
 
     /**
      * 根據key獲取緩存數據，此為批量查詢
@@ -112,6 +114,7 @@ public class UserCacheProviderImpl implements CacheProvider {
         return redisProvider.setHashMap(CACHE_PREFIX, hashKey, value, chooseTime);
     }
 
+
     /**
      * 設定緩存數據，此為批量設定
      *
@@ -127,6 +130,7 @@ public class UserCacheProviderImpl implements CacheProvider {
 
     }
 
+
     /**
      * 刪除緩存數據
      *
@@ -138,6 +142,7 @@ public class UserCacheProviderImpl implements CacheProvider {
     public Mono<Void> delete(String hashKey) {
         return redisProvider.deleteHash(CACHE_PREFIX, hashKey);
     }
+
 
     /**
      * 刪除緩存數據，此為批量刪除
@@ -153,6 +158,7 @@ public class UserCacheProviderImpl implements CacheProvider {
         }
         return redisProvider.deleteHash(CACHE_PREFIX, hashKeys.stream().toList());
     }
+
 
     /**
      * 獲取緩存數據的默認過期時間

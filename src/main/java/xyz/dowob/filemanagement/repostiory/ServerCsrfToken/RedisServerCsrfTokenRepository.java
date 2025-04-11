@@ -59,6 +59,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
         return redisProvider.setHashMap(CSRF_TOKEN_HEADER, uuid, expireTime, Duration.ofMinutes(expireTime)).thenReturn(csrfToken);
     }
 
+
     /**
      * 保存 CSRF Token，這裡不做任何操作
      *
@@ -71,6 +72,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<Void> saveToken(ServerWebExchange exchange, CsrfToken token) {
         return Mono.empty();
     }
+
 
     /**
      * 加載 CSRF Token，並檢查是否合法
@@ -96,6 +98,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
                     return Mono.just(new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, userToken));
                 });
     }
+
 
     /**
      * 清理憑證

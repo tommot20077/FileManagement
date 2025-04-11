@@ -1,14 +1,4 @@
 package xyz.dowob.filemanagement.unity;
-
-/**
- * @author yuan
- * @program FileManagement
- * @ClassName ResponseUnity
- * @description
- * @create 2024-09-23 19:44
- * @Version 1.0
- **/
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -46,6 +36,7 @@ public interface ResponseUnity {
         return createResponseEntity(apiResponse, responseCode);
     }
 
+
     /**
      * 用於創建返回Mono<ResponseEntity>的方法，根據請求的結果創建對應的控制器可以處理的3位數狀態碼
      *
@@ -57,6 +48,7 @@ public interface ResponseUnity {
     default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, Integer responseCode) {
         return Mono.just(ResponseEntity.status(Objects.requireNonNullElse(responseCode, 200)).body(apiResponse));
     }
+
 
     /**
      * 用於創建返回ResponseEntity的方法，此為重載方法
@@ -71,6 +63,7 @@ public interface ResponseUnity {
     default Mono<ResponseEntity<?>> createResponseEntity(ApiResponseDTO<?> apiResponse, MultiValueMap<String, String> headers) {
         return Mono.just(new ResponseEntity<>(apiResponse, headers, apiResponse.getStatus()));
     }
+
 
     /**
      * 用於創建返回ApiResponseDTO的方法，根據請求的結果創建對應的ApiResponseDTO
@@ -87,6 +80,7 @@ public interface ResponseUnity {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
     }
 
+
     /**
      * 用於創建返回ApiResponseDTO的方法，此為重載方法
      * 適用指定路徑的請求
@@ -101,6 +95,7 @@ public interface ResponseUnity {
     default <T> ApiResponseDTO<T> createResponse(String path, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
     }
+
 
     /**
      * 用於創建返回ApiResponseDTO的方法，此為重載方法
@@ -118,6 +113,7 @@ public interface ResponseUnity {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, session.getHandshakeInfo().getUri().getPath(), message, data);
     }
 
+
     /**
      * 用於創建返回ApiResponseDTO的方法，此為重載方法，默認狀態碼為200
      *
@@ -132,6 +128,7 @@ public interface ResponseUnity {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, request.getRequest().getURI().getPath(), message, data);
     }
 
+
     /**
      * 用於創建返回ApiResponseDTO的方法，此為重載方法，默認狀態碼為200，適用指定路徑的請求
      *
@@ -144,6 +141,7 @@ public interface ResponseUnity {
     default <T> ApiResponseDTO<T> createResponse(String path, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, path, message, data);
     }
+
 
     /**
      * 統一處理錯誤

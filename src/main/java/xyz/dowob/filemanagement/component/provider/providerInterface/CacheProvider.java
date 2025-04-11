@@ -34,6 +34,7 @@ public interface CacheProvider {
         return Mono.empty();
     }
 
+
     /**
      * 查詢緩存集合 (返回一個 List)
      *
@@ -46,6 +47,7 @@ public interface CacheProvider {
     default <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
         return Mono.empty();
     }
+
 
     /**
      * 批量查詢緩存 (返回一個 Map)
@@ -60,6 +62,7 @@ public interface CacheProvider {
         return Mono.empty();
     }
 
+
     /**
      * 批量查詢緩存列表 (返回一個 Map，內部為列表)
      *
@@ -72,6 +75,7 @@ public interface CacheProvider {
     default <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
         return Mono.empty();
     }
+
 
     /**
      * 設定單個緩存值
@@ -86,6 +90,7 @@ public interface CacheProvider {
         return Mono.empty();
     }
 
+
     /**
      * 批量設置緩存值
      *
@@ -98,6 +103,7 @@ public interface CacheProvider {
         return Mono.empty();
     }
 
+
     /**
      * 刪除單個緩存鍵
      *
@@ -109,6 +115,7 @@ public interface CacheProvider {
         return Mono.empty();
     }
 
+
     /**
      * 批量刪除緩存鍵
      *
@@ -119,6 +126,7 @@ public interface CacheProvider {
     default Mono<Void> deleteAll(Collection<String> keys) {
         return Mono.empty();
     }
+
 
     /**
      * 獲取默認過期時間

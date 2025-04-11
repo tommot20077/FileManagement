@@ -84,6 +84,7 @@ public class ServerFileMetadata {
         return id.hashCode();
     }
 
+
     /**
      * 重寫equals方法，使用id作為判斷是否相等的依據
      *
@@ -102,6 +103,7 @@ public class ServerFileMetadata {
         ServerFileMetadata that = (ServerFileMetadata) o;
         return id.equals(that.id);
     }
+
 
     /**
      * 重寫toString方法，將文件元數據轉換為HashMap

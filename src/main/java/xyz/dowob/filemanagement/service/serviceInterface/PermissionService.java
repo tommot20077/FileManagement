@@ -54,6 +54,7 @@ public interface PermissionService<T> {
         return validateUserPermission(user, fileId, null);
     }
 
+
     /**
      * 驗證用戶是否有權限多個檔案Id，使用默認的權限規則
      *

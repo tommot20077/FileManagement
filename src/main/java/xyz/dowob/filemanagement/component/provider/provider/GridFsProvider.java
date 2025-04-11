@@ -56,6 +56,7 @@ public class GridFsProvider {
         this.uploadOptions = new GridFSUploadOptions().chunkSizeBytes(1022 * 1024 * fileProperties.getUpload().getPayloadLength());
     }
 
+
     /**
      * 將檔案存入 GridFs
      *
@@ -68,6 +69,7 @@ public class GridFsProvider {
         return gridFsTemplate.store(dataBufferFlux, filename, uploadOptions);
     }
 
+
     /**
      * 通過檔案名查找檔案
      *
@@ -78,6 +80,7 @@ public class GridFsProvider {
     public Mono<GridFSFile> findFileByFileName(String filename) {
         return gridFsTemplate.findOne(Query.query(Criteria.where("filename").is(filename)));
     }
+
 
     /**
      * 通過檔案名集合查找檔案
@@ -93,6 +96,7 @@ public class GridFsProvider {
 
     }
 
+
     /**
      * 通過檔案 ID 查找檔案
      *
@@ -104,6 +108,7 @@ public class GridFsProvider {
         return gridFsTemplate.findOne(Query.query(Criteria.where("_id").is(id)));
     }
 
+
     /**
      * 通過檔案 ID 集合查找檔案
      *
@@ -114,6 +119,7 @@ public class GridFsProvider {
     public Mono<Map<ObjectId, GridFSFile>> findFilesById(Collection<ObjectId> ids) {
         return gridFsTemplate.find(Query.query(Criteria.where("_id").in(ids))).collectMap(GridFSFile::getObjectId, gridFSFile -> gridFSFile);
     }
+
 
     /**
      * 獲取檔案的數據流
@@ -127,6 +133,7 @@ public class GridFsProvider {
         return gridFsTemplate.getResource(gridFsFile);
     }
 
+
     /**
      * 通過檔案名刪除檔案
      *
@@ -138,6 +145,7 @@ public class GridFsProvider {
         return gridFsTemplate.delete(Query.query(Criteria.where("filename").is(filename)));
     }
 
+
     /**
      * 通過檔案 ID 刪除檔案
      *
@@ -148,6 +156,7 @@ public class GridFsProvider {
     public Mono<Void> deleteFileById(ObjectId id) {
         return gridFsTemplate.delete(Query.query(Criteria.where("_id").is(id)));
     }
+
 
     /**
      * 獲取 GridFsTemplate

@@ -165,6 +165,7 @@ public class FilePermissionRuleManager {
         };
     }
 
+
     /**
      * 獲取默認的允許擁有者訪問的權限規則
      *
@@ -174,6 +175,7 @@ public class FilePermissionRuleManager {
     public Permission<UserFileMetadata> getAllowOwner() {
         return allowOwner;
     }
+
 
     /**
      * 獲取默認的允許共享者訪問的權限規則
@@ -185,6 +187,7 @@ public class FilePermissionRuleManager {
         return allowShared;
     }
 
+
     /**
      * 獲取默認的阻止保留搜索ID的權限規則
      *
@@ -194,6 +197,7 @@ public class FilePermissionRuleManager {
     public Permission<UserFileMetadata> getBlockNotSearchOperation() {
         return blockNotSearchOperation;
     }
+
 
     /**
      * 獲取默認的阻止已刪除的文件的權限規則

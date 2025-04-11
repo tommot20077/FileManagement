@@ -24,6 +24,7 @@ public class QuillContentPO {
         public List<Operation> delta;
     }
 
+
     /**
      * Operation 類，其包含了 Quill 的單個操作
      * 這些操作是 Quill 編輯器的內部表示，包含了文本的插入、語句的屬性等

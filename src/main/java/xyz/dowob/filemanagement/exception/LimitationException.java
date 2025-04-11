@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
 /**
+ * 用於定義用戶限制異常類，當用戶操作超出限制時拋出
  * @author yuan
  * @program FileManagement
  * @ClassName LimitionException
@@ -13,8 +14,17 @@ import org.springframework.http.HttpStatus;
  **/
 @Getter
 public class LimitationException extends Exception {
+    /**
+     * 錯誤碼
+     */
     private final ErrorCode errorCode;
 
+    /**
+     * 錯誤的構造函數
+     *
+     * @param errorCode 錯誤碼
+     * @param args      錯誤信息參數
+     */
     public LimitationException(ErrorCode errorCode, Object... args) {
         super(String.format(errorCode.getMessage(), args));
         this.errorCode = errorCode;
@@ -36,8 +46,19 @@ public class LimitationException extends Exception {
         FILE_CHUNK_EXCEED_LIMIT(1302, HttpStatus.TOO_MANY_REQUESTS, "%s"),
         ;
 
+        /**
+         * 自定義錯誤碼
+         */
         private final int code;
+
+        /**
+         * 錯誤碼對應的 HTTP 狀態碼
+         */
         private final HttpStatus httpStatus;
+
+        /**
+         * 錯誤信息
+         */
         private final String message;
     }
 }

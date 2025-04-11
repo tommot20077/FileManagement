@@ -17,28 +17,37 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum TransmissionEnum {
     /**
-     * Tus 協議，適合大檔案上傳，支持斷點續傳 (暫不支持)
-     */
-    //TUS("tus"),
-
-    /**
      * Multipart 協議，適合小檔案上傳
      */
-    //MULTIPART("multipart"),
+    MULTIPART("multipart"),
 
     /**
-     * 分塊協議，適合大檔案上傳
+     * 分塊協議，適合大檔案上傳，支持斷點續傳(需要前端支持)
      */
-    CHUNK("chunk"),
-
-    /**
-     * 混合協議，根據檔案大小自動選擇協議
-     */
-    MIXED("mixed");
+    CHUNK("chunk");
 
     /**
      * 傳輸類型
      */
     private final String type;
 
+    /**
+     * 根據傳輸類型獲取對應的傳輸協議
+     *
+     * @param type 傳輸類型
+     *
+     * @return 傳輸協議
+     */
+    public static TransmissionEnum fromType(String type) {
+        if (type == null || type.isEmpty()) {
+            return null;
+        }
+        String standardType = type.toUpperCase().trim();
+        for (TransmissionEnum transmissionEnum : TransmissionEnum.values()) {
+            if (transmissionEnum.name().equals(standardType)) {
+                return transmissionEnum;
+            }
+        }
+        return null;
+    }
 }

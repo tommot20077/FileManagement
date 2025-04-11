@@ -74,6 +74,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         this.key = Keys.hmacShaKeyFor(encodedSecret);
     }
 
+
     /**
      * 根據用戶 ID 生成 JWT 憑證，會根據 Token 實體中的 JWT 憑證版本進行版本管理
      * 其中 subject 為用戶 ID，claim 中包含 JWT 憑證版本
@@ -118,6 +119,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         });
     }
 
+
     /**
      * 驗證 JWT 憑證，獲取用戶 ID
      * 此方法會根據 JWT 憑證中的用戶 ID 進行驗證，並根據 Token 快取或資料庫實體中的 JWT 憑證版本進行版本管理
@@ -145,6 +147,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         });
     }
 
+
     /**
      * 根據用戶 ID 刪除 JWT 憑證
      * 此方法會根據用戶 ID 查找 Token 實體，並將 JWT 憑證版本將被重新設定，過期時間設為空
@@ -165,6 +168,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         }).then();
     }
 
+
     /**
      * 根據 JWT 憑證獲取 JWT 憑證中的 Claims
      * 當 JWT 憑證無效時，傳出 JWT_TOKEN_INVALID 錯誤
@@ -182,6 +186,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
             }
         });
     }
+
 
     /**
      * 驗證 JWT 憑證中的 Claims，並根據快取中的 JWT 憑證版本進行版本管理
@@ -215,6 +220,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         }).switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID)));
     }
 
+
     /**
      * 將用戶 ID 和用戶名存入 ServerWebExchange 的屬性中，方便後續操作時提取資訊
      *
@@ -234,6 +240,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
             exchange.getAttributes().put("requestId", requestId);
         }).thenReturn(userId);
     }
+
 
     /**
      * 驗證快取中的 JWT 憑證是否有效
@@ -268,6 +275,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
         return cacheEntity.version().equals(version);
     }
 
+
     /**
      * 更新快取中的 JWT 憑證記錄
      *
@@ -282,6 +290,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
                                                                                           .toInstant()) : null;
         cacheTokenMap.put(token, new TokenCacheEntity(tokenEntity.getJwtTokenVersion(), userId, expireTime));
     }
+
 
     /**
      * TokenCacheEntity 用於記錄 JWT 憑證的版本、用戶 ID 和過期時間

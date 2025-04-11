@@ -64,6 +64,7 @@ public class PagedResponseDTO<T> {
         return map.toString();
     }
 
+
     /**
      * 將列表轉換為字符串，如果列表長度大於30，則截取前30個字符
      *

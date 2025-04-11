@@ -38,6 +38,7 @@ public class CircuitBreakersConfig {
                 .build();
     }
 
+
     /**
      * 限流器配置，用於配置限流器的相關參數
      * 當前配置超時時間為 5 秒，限流器刷新時間為 1 秒，限流器限制的請求次數為 5

@@ -56,6 +56,7 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
         }, WebSocketSession::close, true).onErrorResume(e -> Mono.error(new RuntimeException("WebSocket處理連線時發生錯誤")));
     }
 
+
     /**
      * 獲取錯誤代碼，利用錯誤訊息來獲取對應的錯誤代碼
      * 當錯誤訊息為null時，返回預設的WebSocket連線錯誤代碼

@@ -24,6 +24,7 @@ public interface UserOnlineFileHistoryRepository extends ReactiveCrudRepository<
      * 查詢用戶最新的在線文件歷史數據
      *
      * @param fileId 文件id
+     * @param n      前n條數據
      *
      * @return 用戶在線文件歷史數據
      */
@@ -59,6 +60,13 @@ public interface UserOnlineFileHistoryRepository extends ReactiveCrudRepository<
      */
     Flux<UserOnlineFileHistory> findAllByFileIdAndPreviousVersion(Long fileId, Long previousVersion);
 
+    /**
+     * 查詢用戶在線文件歷史數據的數量和最早的版本號
+     *
+     * @param fileId 文件id
+     *
+     * @return 用戶在線文件歷史數據的數量和最早的版本號 {@link OnlineHistoryCountAndOldestDAO}
+     */
     @Query("SELECT COUNT(*) AS count, MIN(version) as version FROM user_online_file_history WHERE file_id = :fileId")
     Mono<OnlineHistoryCountAndOldestDAO> getOldestVersionAndCountByFileId(Long fileId);
 }

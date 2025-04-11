@@ -113,6 +113,7 @@ public class UserServiceImpl implements UserService {
         USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
     }
 
+
     /**
      * 此方法之後為UserService接口中的方法實現
      * 用戶註冊
@@ -132,6 +133,7 @@ public class UserServiceImpl implements UserService {
         }));
     }
 
+
     /**
      * 用戶登入
      *
@@ -145,6 +147,7 @@ public class UserServiceImpl implements UserService {
     public Mono<String> login(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
         return validationService.validateNotNull(authRequestDTO).then(authorizationService.authenticate(authRequestDTO, request));
     }
+
 
     /**
      * 用戶登出，並調用憑證服務進行憑證撤銷
@@ -164,6 +167,7 @@ public class UserServiceImpl implements UserService {
                 .doFinally(signalType -> SecurityContextHolder.clearContext());
     }
 
+
     /**
      * 用戶修改密碼
      *
@@ -176,6 +180,7 @@ public class UserServiceImpl implements UserService {
         return null;
     }
 
+
     /**
      * 用戶修改信箱
      *
@@ -187,6 +192,7 @@ public class UserServiceImpl implements UserService {
     public Mono<User> changeEmail(User user) {
         return null;
     }
+
 
     /**
      * 發送重置密碼郵件，並依照VerificationCodeExpiration設定的時間內有效
@@ -213,6 +219,7 @@ public class UserServiceImpl implements UserService {
         }).orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.UNSUPPORTED_OPERATION)));
     }
 
+
     /**
      * 重置密碼，並且撤銷憑證
      *
@@ -238,6 +245,7 @@ public class UserServiceImpl implements UserService {
                                                   .then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
                                       }))));
     }
+
 
     /**
      * 用於獲取用戶的方法，根據請求對象獲取用戶對象
@@ -278,6 +286,7 @@ public class UserServiceImpl implements UserService {
         }).switchIfEmpty(Mono.empty());
     }
 
+
     /**
      * 此方法之後為CrudService接口中的方法實現
      * 創建一個新的實體
@@ -288,6 +297,7 @@ public class UserServiceImpl implements UserService {
     public Mono<User> create() {
         return Mono.empty();
     }
+
 
     /**
      * 根據ID獲取一個實體
@@ -301,6 +311,7 @@ public class UserServiceImpl implements UserService {
         return userRepository.findById(userId);
     }
 
+
     /**
      * 獲取所有實體
      */
@@ -310,6 +321,7 @@ public class UserServiceImpl implements UserService {
     public Flux<User> getAll() {
         return userRepository.findAll();
     }
+
 
     /**
      * 根據參數獲取所有實體
@@ -361,6 +373,7 @@ public class UserServiceImpl implements UserService {
         return cacheUserFlux.concatWith(userRepositoryFlux);
     }
 
+
     /**
      * 更新一個實體
      *
@@ -371,6 +384,7 @@ public class UserServiceImpl implements UserService {
         return Mono.empty();
     }
 
+
     /**
      * 刪除一個實體
      *
@@ -380,6 +394,4 @@ public class UserServiceImpl implements UserService {
     public Mono<Void> delete(User entity) {
         return Mono.empty();
     }
-
-
 }

@@ -9,6 +9,7 @@ import xyz.dowob.filemanagement.entity.User;
 /**
  * 憑證服務接口
  * 定義憑證會根據在工廠中的生成、驗證、刪除方法
+ * 繼承了 {@link CrudService} 接口，內部定義了憑證的基本操作
  *
  * @author yuan
  * @program File-Management

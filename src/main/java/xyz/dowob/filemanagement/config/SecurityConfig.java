@@ -72,11 +72,19 @@ public class SecurityConfig {
     @Resource(name = "csrfValidationFilter")
     private WebFilter csrfTokenResponseFilter;
 
+    /**
+     * SecurityConfig 的構造函數
+     *
+     * @param securityContextRepository JwtSecurityContextRepository 用於操作安全上下文的數據庫操作類
+     * @param objectMapper              ObjectMapper 用於對象與 JSON 之間的轉換
+     * @param securityProperties        SecurityProperties 用於配置安全相關的參數
+     */
     public SecurityConfig(JwtSecurityContextRepository securityContextRepository, ObjectMapper objectMapper, SecurityProperties securityProperties) {
         this.securityContextRepository = securityContextRepository;
         this.objectMapper = objectMapper;
         this.securityProperties = securityProperties;
     }
+
 
     /**
      * 配置安全過濾器鏈
@@ -101,8 +109,6 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers("/web/v1/guest/**", "/api/v1/guest/**", "/docs/**", "/ws/**", "/actuator/health")
                         .permitAll()
-                        //.pathMatchers("/api/user/getAllUserInfo")
-                        //.hasRole("ADMIN")
                         .anyExchange()
                         .authenticated())
                 .securityContextRepository(securityContextRepository)
@@ -113,6 +119,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.FORBIDDEN)))
                 .build();
     }
+
 
     /**
      * 配置 CORS
@@ -154,6 +161,7 @@ public class SecurityConfig {
         return source;
     }
 
+
     /**
      * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息
      *
@@ -179,6 +187,7 @@ public class SecurityConfig {
             throw new RuntimeException(ex);
         }
     }
+
 
     /**
      * 密碼加密處理的 Bean

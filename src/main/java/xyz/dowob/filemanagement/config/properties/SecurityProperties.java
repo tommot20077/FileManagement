@@ -65,6 +65,7 @@ public class SecurityProperties {
         }
     }
 
+
     /**
      * JWT 令牌設定
      */
@@ -80,6 +81,7 @@ public class SecurityProperties {
          */
         private int expiration = 1440;
     }
+
 
     /**
      * 重置密碼憑證配置

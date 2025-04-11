@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.codec.multipart.Part;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
@@ -16,11 +15,9 @@ import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGeneralFileController;
-import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
-import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -56,6 +53,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         );
     }
 
+
     /**
      * 上傳文件的 Web 請求，此步驟為預先上傳文件的元數據檢驗檔案的步驟
      * 處理完成之後依照結果提供繼續上傳文件分塊或是完成操作
@@ -68,6 +66,21 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     @PostMapping("/upload")
     public Mono<ResponseEntity<?>> uploadFile(@RequestBody FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         return super.uploadFile(fileMetadataDTO, exchange);
+    }
+
+
+    /**
+     * 上傳文件分塊的 Web 請求，根據文件 ID 上傳文件分塊
+     * 會依照用戶的選擇的上傳方式來進行上傳
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     */
+    @PostMapping("/upload-chunk")
+    public Mono<ResponseEntity<?>> uploadFileData(
+            @RequestParam(name = "type", required = false) String transmissionType, ServerWebExchange exchange) {
+        return handleError(super.uploadFileData(transmissionType, exchange), exchange);
     }
 
 
@@ -87,6 +100,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
             @PathVariable Long id, ServerWebExchange exchange) {
         return super.downloadFile(action, id, exchange);
     }
+
 
     /**
      * 獲取文件的信息的 API 請求，根據文件 ID 獲取文件的信息
@@ -115,6 +129,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.deleteFile(id, exchange);
     }
 
+
     /**
      * 編輯文件的 Web 請求，根據文件 ID 編輯文件
      *
@@ -126,53 +141,6 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     @PutMapping("")
     public Mono<ResponseEntity<?>> editFile(@Validated @RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return super.editFile(fileEditDTO, exchange);
-    }
-
-
-    /**
-     * 上傳文件分塊的 Web 請求，根據文件 ID 上傳文件分塊
-     *
-     * @param exchange       請求對象
-     * @param uploadChunkDTO 上傳文件分塊的元數據
-     *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
-     */
-    @PostMapping("/upload-chunk")
-    public Mono<ResponseEntity<?>> uploadFile(ServerWebExchange exchange,
-                                              //@RequestPart(value = "transferTaskId", required = false) String transferTaskId,
-                                              //@RequestPart(value = "file", required = false) Mono<Part> filePart,
-                                              @RequestBody(required = false) UploadChunkDTO uploadChunkDTO) {
-        TransmissionEnum transmissionType = fileProperties.getUpload().getTransmissionType();
-        return handleChunkUpload(uploadChunkDTO, exchange);
-        //todo 未來支持其他傳輸類型
-    }
-
-    /**
-     * 此方法為分塊上傳的處理方法
-     *
-     * @param uploadChunkDTO 上傳文件分塊的元數據
-     * @param exchange       請求對象
-     *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
-     */
-    protected Mono<ResponseEntity<?>> handleChunkUpload(@RequestBody UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
-        return super.handleChunkUpload(uploadChunkDTO, exchange);
-    }
-
-
-    /**
-     * Multipart 上傳文件的 Web 請求
-     *
-     * @param transferTaskId 文件 ID
-     * @param filePart       文件分塊
-     * @param exchange       請求對象
-     *
-     * @return Mono<ResponseEntity < ?>> 返回上傳結果
-     */
-    // todo 暫不使用
-    public Mono<ResponseEntity<?>> handleMultipartUpload(
-            @RequestPart("transferTaskId") String transferTaskId, @RequestPart("file") Mono<Part> filePart, ServerWebExchange exchange) {
-        return super.handleMultipartUpload(transferTaskId, filePart, exchange);
     }
 
 
@@ -192,6 +160,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.getUserFileList(exchange, page, size, types);
     }
 
+
     /**
      * 將檔案移動到回收站的 Web 請求
      *
@@ -205,6 +174,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.removeFile(exchange, id, null);
     }
 
+
     /**
      * 還原檔案的 Web 請求
      *
@@ -217,6 +187,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
         return super.restoreFile(exchange, id, null);
     }
+
 
     /**
      * 搜索文件的 Web 請求
@@ -236,17 +207,17 @@ public class WebGeneralFileController extends BaseGeneralFileController {
      */
     @GetMapping("/search")
     public Mono<ResponseEntity<?>> search(ServerWebExchange exchange,
-                                        @RequestParam(value = "keyword", required = false) String keyword,
-                                        @RequestParam(value = "folder", required = false) Long folderId,
-                                        @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
-                                        @RequestParam(value = "size", required = false) Integer size,
-                                        @RequestParam(value = "type", required = false) List<String> types,
-                                        @RequestParam(value = "deleted", required = false) Boolean deleted,
-                                        @RequestParam(value = "shared", required = false) Boolean shared,
-                                        @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                        LocalDateTime startDate,
-                                        @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                        LocalDateTime endDate) {
+                                          @RequestParam(value = "keyword", required = false) String keyword,
+                                          @RequestParam(value = "folder", required = false) Long folderId,
+                                          @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+                                          @RequestParam(value = "size", required = false) Integer size,
+                                          @RequestParam(value = "type", required = false) List<String> types,
+                                          @RequestParam(value = "deleted", required = false) Boolean deleted,
+                                          @RequestParam(value = "shared", required = false) Boolean shared,
+                                          @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                              LocalDateTime startDate,
+                                          @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+                                              LocalDateTime endDate) {
         FileFilterDTO fileFilterDTO = new FileFilterDTO(keyword, folderId, getFileEnums(types), page, size, startDate, endDate, deleted, shared);
         return super.searchFile(exchange, fileFilterDTO);
     }

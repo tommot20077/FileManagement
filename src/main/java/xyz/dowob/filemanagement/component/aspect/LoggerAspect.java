@@ -52,6 +52,7 @@ public class LoggerAspect {
     public void serviceLayerPointcut() {
     }
 
+
     /**
      * 定義 Component 層切入點
      */
@@ -59,12 +60,14 @@ public class LoggerAspect {
     public void componentLayerPointcut() {
     }
 
+
     /**
      * 定義 Controller 層切入點
      */
     @Pointcut("within(xyz.dowob.filemanagement.controller..*)")
     public void controllerLayerPointcut() {
     }
+
 
     /**
      * 環繞通知，用於記錄 Component 和 ServiceInterface 層的日誌
@@ -117,6 +120,7 @@ public class LoggerAspect {
         }
     }
 
+
     /**
      * 根據方法的是否有額外的標記注釋，來判斷是否在日誌中的返回值是否進行處理
      *
@@ -151,6 +155,7 @@ public class LoggerAspect {
         return result.toString();
     }
 
+
     /**
      * 記錄操作信息
      *
@@ -169,7 +174,9 @@ public class LoggerAspect {
         if (error != null) {
             if (error instanceof ValidationException) {
                 log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
-                          usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
+                          usernameAndUserId[0],
+                          usernameAndUserId[1],
+                          usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
                           className,
                           methodName,
                           error.getMessage()
@@ -183,8 +190,14 @@ public class LoggerAspect {
 
 
                 log.error("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 傳入參數: {} | 錯誤訊息: {}",
-                          usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
-                          className, methodName, formattedArgs, error.getMessage(), error
+                          usernameAndUserId[0],
+                          usernameAndUserId[1],
+                          usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
+                          className,
+                          methodName,
+                          formattedArgs,
+                          error.getMessage(),
+                          error
                 );
             }
         } else {
@@ -193,13 +206,16 @@ public class LoggerAspect {
             }
 
             log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
-                      usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
+                      usernameAndUserId[0],
+                      usernameAndUserId[1],
+                      usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
                       className,
                       methodName,
                       result
             );
         }
     }
+
 
     /**
      * 此方法為處理一般狀況下的日誌輸出，因為無法直接獲取 ServerWebExchange 對象
@@ -219,6 +235,16 @@ public class LoggerAspect {
     }
 
 
+    /**
+     * 獲取請求ID、請求者名稱和用戶ID
+     * 當前請求如果為空，則其為伺服器端請求
+     * 如果請求者名稱為空，則其為尚未登錄的用戶請求
+     * 如果請求者名稱不為空，則其為用戶請求
+     *
+     * @param exchange ServerWebExchange 對象
+     *
+     * @return String[] 請求ID、請求者名稱和用戶ID
+     */
     private String[] getRequestIdAndUsernameAndUserId(ServerWebExchange exchange) {
         String requestId;
         String requestUsername;

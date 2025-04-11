@@ -65,6 +65,7 @@ public class BaseOnlineFileController extends BaseFileController {
         );
     }
 
+
     /**
      * 上傳文件的 API 請求
      * 根據文件元數據傳輸對象來上傳文件，並確保用戶有適當的權限。
@@ -91,6 +92,7 @@ public class BaseOnlineFileController extends BaseFileController {
             return parentFolderMono.then(responseEntityMono);
         }), exchange);
     }
+
 
     /**
      * 下載文件的 API 請求
@@ -131,6 +133,7 @@ public class BaseOnlineFileController extends BaseFileController {
         }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
     }
 
+
     /**
      * 刪除文件的 API 請求
      * 根據文件 ID 和用戶授權，刪除指定的在線文件。
@@ -153,6 +156,7 @@ public class BaseOnlineFileController extends BaseFileController {
                             .then(createResponseEntity(createResponse(exchange, "刪除成功", null))));
         }), exchange);
     }
+
 
     /**
      * 編輯文件的 API 請求
@@ -192,6 +196,7 @@ public class BaseOnlineFileController extends BaseFileController {
         }).then(createResponseEntity(createResponse(exchange, "編輯成功", null))), exchange);
     }
 
+
     /**
      * 獲取文件歷史資料的 API 請求
      * 根據文件 ID 和授權，返回文件的歷史版本記錄。
@@ -218,6 +223,7 @@ public class BaseOnlineFileController extends BaseFileController {
         return handleError(responseEntityMono, exchange);
     }
 
+
     /**
      * 將檔案移動到回收站的 API 請求
      * 根據檔案 ID 和授權，將檔案移動到回收站。
@@ -230,6 +236,7 @@ public class BaseOnlineFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> removeFile(ServerWebExchange exchange, String id) {
         return super.removeFile(exchange, id, null);
     }
+
 
     /**
      * 還原檔案的 API 請求

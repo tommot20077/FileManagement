@@ -39,6 +39,7 @@ public class R2dbcConfig {
         return new R2dbcCustomConversions(CustomConversions.StoreConversions.NONE, converters);
     }
 
+
     /**
      * 用於配置 ReactiveTransactionManager，用於事務管理
      *
