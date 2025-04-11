@@ -31,6 +31,7 @@ public class WebUserController extends BaseUserController {
         super(fileServiceStrategy, userService, securityProperties, validationService);
     }
 
+
     /**
      * 用戶登出的Web請求
      *
@@ -43,6 +44,7 @@ public class WebUserController extends BaseUserController {
         return super.logout(exchange, true);
     }
 
+
     /**
      * 獲取用戶信息的Web請求
      *
@@ -54,6 +56,7 @@ public class WebUserController extends BaseUserController {
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return super.getUserInfo(exchange);
     }
+
 
     /**
      * 搜索用戶信息的Web請求

@@ -81,6 +81,7 @@ public abstract class BaseUserController implements ResponseUnity {
         }))).switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));
     }
 
+
     /**
      * 獲取所有用戶信息的請求（管理員使用）
      * 該方法用於管理員查詢所有用戶的信息。
@@ -97,6 +98,7 @@ public abstract class BaseUserController implements ResponseUnity {
         }), exchange);
     }
 
+
     /**
      * 獲取當前用戶信息的請求
      * 該方法用於查詢當前認證用戶的詳細信息。
@@ -111,6 +113,7 @@ public abstract class BaseUserController implements ResponseUnity {
             return createResponseEntity(responseEntity);
         }), exchange);
     }
+
 
     /**
      * 查詢用戶信息的請求

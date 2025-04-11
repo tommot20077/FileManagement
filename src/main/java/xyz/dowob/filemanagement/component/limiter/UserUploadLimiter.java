@@ -25,14 +25,22 @@ public class UserUploadLimiter implements UserLimiter {
      * 每個用戶最大的並發上傳任務數量，此值從配置文件中獲取
      */
     private final int MAX_CONCURRENT_UPLOADS_PER_USER;
+
     /**
      * 用戶憑證映射，用於存儲用戶的可用的憑證
      */
     private final ConcurrentHashMap<Long, Semaphore> userSemaphoreMap = new ConcurrentHashMap<>();
 
+    /**
+     * 用戶上傳限流器構造方法
+     * 獲取配置文件中的最大上傳任務數量
+     *
+     * @param fileProperties 文件屬性配置類
+     */
     public UserUploadLimiter(FileProperties fileProperties) {
         this.MAX_CONCURRENT_UPLOADS_PER_USER = fileProperties.getUpload().getMaxUploadTaskLimit();
     }
+
 
     /**
      * 嘗試獲取用戶的限流器，根據設定的限制數量，判斷是否可以獲取
@@ -47,6 +55,7 @@ public class UserUploadLimiter implements UserLimiter {
         Semaphore semaphore = userSemaphoreMap.computeIfAbsent(userId, k -> new Semaphore(MAX_CONCURRENT_UPLOADS_PER_USER));
         return semaphore.tryAcquire();
     }
+
 
     /**
      * 釋放用戶的限流器

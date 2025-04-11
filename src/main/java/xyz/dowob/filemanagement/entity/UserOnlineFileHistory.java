@@ -91,6 +91,7 @@ public class UserOnlineFileHistory {
         return id.hashCode();
     }
 
+
     /**
      * 重寫equals方法，使用id作為判斷是否相等的依據
      *
@@ -109,6 +110,7 @@ public class UserOnlineFileHistory {
         UserOnlineFileHistory that = (UserOnlineFileHistory) o;
         return id.equals(that.id);
     }
+
 
     /**
      * 重寫toString方法，將文件元數據轉換為HashMap
@@ -129,6 +131,7 @@ public class UserOnlineFileHistory {
         map.put("modifiedBy", modifiedBy);
         return map.toString();
     }
+
 
     /**
      * 格式化字符串，如果字符串長度大於30，則截取前30個字符並添加省略號

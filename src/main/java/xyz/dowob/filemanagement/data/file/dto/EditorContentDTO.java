@@ -36,6 +36,7 @@ public class EditorContentDTO {
         return delta == null || delta.isEmpty();
     }
 
+
     /**
      * 編輯器內容的內容記錄數據傳輸對象，用於封裝編輯器內容的內容記錄數據
      */
@@ -52,6 +53,7 @@ public class EditorContentDTO {
         @JsonInclude(JsonInclude.Include.NON_NULL)
         private Map<String, Object> attributes;
     }
+
 
     /**
      * 重寫比較方法，判斷兩個對象是否相等
@@ -73,6 +75,7 @@ public class EditorContentDTO {
 
         return Objects.equals(delta, that.delta);
     }
+
 
     /**
      * 重寫哈希碼方法，返回對象的哈希碼

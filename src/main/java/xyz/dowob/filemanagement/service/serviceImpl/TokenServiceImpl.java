@@ -44,6 +44,7 @@ public class TokenServiceImpl implements TokenService {
         return tokenStrategy.getTokenProvider(tokenType).generateToken(user);
     }
 
+
     /**
      * 驗證憑證，並返回用戶ID
      * 此實現類中，直接調用JWT Token提供者的驗證憑證方法
@@ -59,6 +60,7 @@ public class TokenServiceImpl implements TokenService {
         return tokenStrategy.getTokenProvider(tokenType).validateToken(token, userId);
     }
 
+
     /**
      * 根據憑證類型刪除憑證
      *
@@ -70,6 +72,7 @@ public class TokenServiceImpl implements TokenService {
         return tokenStrategy.getTokenProvider(tokenType).revokeToken(userId);
     }
 
+
     /**
      * 創建一個新的實體
      *
@@ -79,6 +82,7 @@ public class TokenServiceImpl implements TokenService {
     public Mono<Token> create() {
         return Mono.empty();
     }
+
 
     /**
      * 根據ID獲取一個實體
@@ -92,6 +96,7 @@ public class TokenServiceImpl implements TokenService {
         return Mono.empty();
     }
 
+
     /**
      * 獲取所有實體
      */
@@ -99,6 +104,7 @@ public class TokenServiceImpl implements TokenService {
     public Flux<Token> getAll() {
         return Flux.empty();
     }
+
 
     /**
      * 獲取所有實體，根據參數進行過濾
@@ -113,6 +119,7 @@ public class TokenServiceImpl implements TokenService {
         return Flux.empty();
     }
 
+
     /**
      * 更新一個實體
      *
@@ -122,6 +129,7 @@ public class TokenServiceImpl implements TokenService {
     public Mono<Void> update(Token token) {
         return Mono.empty();
     }
+
 
     /**
      * 刪除一個實體

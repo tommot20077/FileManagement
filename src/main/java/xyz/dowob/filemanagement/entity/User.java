@@ -80,6 +80,7 @@ public class User {
         return id.hashCode();
     }
 
+
     /**
      * 重寫equals方法，用於判斷用戶是否相同
      *
@@ -99,6 +100,7 @@ public class User {
         return id.equals(user.id);
     }
 
+
     /**
      * 重寫toString方法，將用戶數據轉換為HashMap
      *
@@ -115,6 +117,7 @@ public class User {
         userMap.put("usedStorage", ByteEnum.toReadableSize(usedStorage));
         return userMap.toString();
     }
+
 
     /**
      * 獲取用戶的權限

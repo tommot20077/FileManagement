@@ -45,6 +45,7 @@ public interface FileTrashRecordRepository extends ReactiveCrudRepository<FileTr
                         .thenReturn(record));
     }
 
+
     /**
      * 插入檔案回收站記錄
      *
@@ -69,6 +70,7 @@ public interface FileTrashRecordRepository extends ReactiveCrudRepository<FileTr
                         .rowsUpdated()
                         .thenReturn(record));
     }
+
 
     /**
      * 查詢用戶過期的檔案回收站記錄

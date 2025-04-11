@@ -77,6 +77,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
         return Mono.empty();
     }
 
+
     /**
      * 根據用戶名和密碼進行授權
      * 當用戶名和密碼正確時，返回用戶對象
@@ -101,6 +102,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                 });
     }
 
+
     /**
      * 根據用戶名和密碼進行授權
      * 此方法為無請求對象的授權方法，不會將授權信息存入Session
@@ -114,6 +116,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
         return authenticate(authRequestDTO, null);
     }
+
 
     /**
      * 獲取CSRF Token

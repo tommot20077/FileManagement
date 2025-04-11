@@ -81,6 +81,7 @@ public class FolderListTreeManager implements ApplicationRunner {
         initializeTree();
     }
 
+
     /**
      * 初始化用戶的檔案列表樹，當用戶ID為空時，初始化所有用戶的檔案列表樹，否則初始化指定用戶的檔案列表樹
      *
@@ -106,6 +107,7 @@ public class FolderListTreeManager implements ApplicationRunner {
             });
         }).subscribe();
     }
+
 
     /**
      * 獲取所有用戶的檔案列表

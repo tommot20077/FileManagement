@@ -26,8 +26,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI customOpenApi() {
         return new OpenAPI().info(new Info()
-                                          .title("用戶檔案管理系統")
-                                          .version("1.0")
+                                          .title("用戶檔案管理系統").version("1.0.0")
                                           .description("用戶檔案管理系統 相關API")
                                           .termsOfService("http://swagger.io/terms/")
                                           .license(new License().name("Apache 2.0").url("http://springdoc.org")));

@@ -66,6 +66,7 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.NOT_FOUND.value());
     }
 
+
     /**
      * 處理錯誤的請求方法，當請求的方法不正確時，返回一個 405 錯誤
      *
@@ -89,6 +90,7 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.METHOD_NOT_ALLOWED.value());
     }
 
+
     /**
      * 處理不支持的媒體類型，當請求的媒體類型不正確時，返回一個 415 錯誤
      *
@@ -111,6 +113,7 @@ public class ExceptionController implements ResponseUnity {
 
         return createResponseEntity(apiResponseDTO, HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
     }
+
 
     /**
      * 處理參數轉換錯誤，當請求參數無法轉換時，返回一個 400 錯誤，並提示錯誤的參數
@@ -147,6 +150,7 @@ public class ExceptionController implements ResponseUnity {
 
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
+
 
     /**
      * 處理資料驗證錯誤，此錯誤是由 @Validated 或 @Valid 注解引起的
@@ -192,6 +196,7 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
 
+
     /**
      * 處理請求格式錯誤
      *
@@ -216,6 +221,7 @@ public class ExceptionController implements ResponseUnity {
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
 
+
     /**
      * 處理不支持的操作
      *
@@ -238,6 +244,7 @@ public class ExceptionController implements ResponseUnity {
 
         return createResponseEntity(apiResponseDTO, HttpStatus.BAD_REQUEST.value());
     }
+
 
     /**
      * 處理 R2dbc資料庫操作錯誤
@@ -262,6 +269,7 @@ public class ExceptionController implements ResponseUnity {
 
         return Mono.just(ResponseEntity.status(500).body(response));
     }
+
 
     /**
      * 處理資料庫操作錯誤
@@ -307,6 +315,7 @@ public class ExceptionController implements ResponseUnity {
         return handleUnknownException(ex, exchange);
     }
 
+
     /**
      * 處理重試次數過多的異常
      *
@@ -328,6 +337,7 @@ public class ExceptionController implements ResponseUnity {
 
         return Mono.just(ResponseEntity.status(429).body(response));
     }
+
 
     /**
      * 處理未知異常

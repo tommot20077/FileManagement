@@ -12,6 +12,10 @@ import xyz.dowob.filemanagement.unity.FileCrudService;
 
 /**
  * 文件業務邏輯接口，定義了文件業務邏輯的相關方法
+ * 繼承了 {@link FileCrudService} 和 {@link BaseFileService} 接口
+ * 這兩個接口分別定義了文件的基本操作和底層文件業務邏輯的規範
+ * 並且實現了 {@link RecoverableFile} 接口
+ * 該接口定義了文件的可恢復操作
  *
  * @author yuan
  * @program FileManagement
@@ -35,6 +39,7 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
         return Mono.empty();
     }
 
+
     /**
      * 上傳文件分塊的接口
      *
@@ -47,11 +52,12 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
         return Mono.empty();
     }
 
+
     /**
      * 下載文件的接口
      *
-     * @param file 文件
-     * @param user   用戶信息
+     * @param file     文件
+     * @param user     用戶信息
      * @param optional 其他可選參數
      *
      * @return 返回文件下載流
@@ -60,17 +66,19 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
         return Mono.empty();
     }
 
+
     /**
      * 刪除文件的接口
      *
      * @param file 文件
-     * @param user   用戶信息
+     * @param user 用戶信息
      *
      * @return 返回刪除結果
      */
     default Mono<Void> deleteFile(UserFileMetadata file, User user) {
         return Mono.empty();
     }
+
 
     /**
      * 編輯文件的接口

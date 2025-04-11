@@ -41,6 +41,7 @@ public class ApiGuestController extends BaseGuestController {
         super(authorizationService, userService, securityProperties);
     }
 
+
     /**
      * 訪客註冊 API
      *
@@ -52,6 +53,7 @@ public class ApiGuestController extends BaseGuestController {
     public Mono<ResponseEntity<?>> register(@RequestBody RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return super.register(registerUserDTO, exchange);
     }
+
 
     /**
      * 訪客登入 API
@@ -66,6 +68,7 @@ public class ApiGuestController extends BaseGuestController {
         return super.login(authRequestDTO, exchange, false);
     }
 
+
     /**
      * 訪客請求重置密碼驗證信 API
      *
@@ -78,6 +81,7 @@ public class ApiGuestController extends BaseGuestController {
         return super.sendResetPasswordMail(userMail, exchange);
     }
 
+
     /**
      * 訪客重置密碼 API
      *
@@ -89,6 +93,7 @@ public class ApiGuestController extends BaseGuestController {
     public Mono<ResponseEntity<?>> resetPassword(@RequestBody ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
         return super.resetPassword(resetPasswordDTO, exchange);
     }
+
 
     /**
      * 獲取 CSRF Token API
@@ -107,6 +112,7 @@ public class ApiGuestController extends BaseGuestController {
             return createResponseEntity(apiResponse);
         }), exchange);
     }
+
 
     /**
      * 確認當前用戶授權狀態，並返回用戶信息

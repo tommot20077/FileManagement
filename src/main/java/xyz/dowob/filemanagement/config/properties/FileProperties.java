@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.config.properties;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.unit.DataSize;
 import xyz.dowob.filemanagement.customenum.TransmissionEnum;
 
 /**
@@ -48,11 +49,18 @@ public class FileProperties {
         /**
          * 文件傳輸類型，默認為 CHUNK 進行文件傳輸
          */
-        private TransmissionEnum transmissionType = TransmissionEnum.CHUNK;
+        private TransmissionEnum defaultUploadType = TransmissionEnum.CHUNK;
+
+        /**
+         * 是否強制使用伺服器端的上傳設定，默認為 false
+         * 當設置為 true 時，用戶只能使用伺服器端的上傳模式 {@link #defaultUploadType}
+         * 當設置為 false 時，用戶可以使用其指定的上傳模式 {@link TransmissionEnum}
+         */
+        private boolean forceUseServerConfig = false;
 
         /**
          * Websocket最大允許分塊大小，單位為 MB，默認為 20MB
-         * 注意如果有設定nginx的client_max_body_size，這個值必須小於nginx的設定
+         * 注意如果有設定 nginx 的 client_max_body_size，這個值必須小於nginx的設定
          */
         private Integer payloadLength = 20;
 
@@ -73,7 +81,14 @@ public class FileProperties {
          * 建議此值設定為與 maxUploadTaskLimit 相同
          */
         private Integer combineProcessCountLimit = 3;
+
+        /**
+         * 上傳檔案的大小限制，單位為 Bytes，默認為 10GB
+         * 當設置值小於等於0時，則不限制上傳檔案的大小
+         */
+        private long maxUploadFileSize = DataSize.ofGigabytes(10).toBytes();
     }
+
 
     /**
      * 文件下載配置
@@ -102,6 +117,7 @@ public class FileProperties {
          */
         private int folderDownloadConcurrentLimit = 5;
     }
+
 
     /**
      * 全局配置

@@ -16,7 +16,6 @@ import xyz.dowob.filemanagement.config.properties.SecurityProperties;
  * @create 2025/3/6
  * @Version 1.0
  **/
-
 public abstract class AbstractServerCsrfTokenRepository implements CustomServerCsrfTokenRepository {
     /**
      * 安全相關設定
@@ -41,6 +40,7 @@ public abstract class AbstractServerCsrfTokenRepository implements CustomServerC
     public AbstractServerCsrfTokenRepository(SecurityProperties securityProperties) {
         this.securityProperties = securityProperties;
     }
+
 
     /**
      * 初始化屬性

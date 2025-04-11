@@ -16,10 +16,14 @@ import java.lang.annotation.Target;
  * @create 2025/2/3
  * @Version 1.0
  **/
-
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface RequirePermission {
+    /**
+     * 使用 PermissionEnum 來標記需要的權限
+     *
+     * @return PermissionEnum[]
+     */
     PermissionEnum[] value();
 }
 

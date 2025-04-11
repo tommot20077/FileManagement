@@ -60,11 +60,11 @@ public class ApiFolderController extends BaseFolderController {
               fileServiceStrategy,
               fileProperties,
               validationService,
-              folderService,
-              userLimiterStrategy, objectMapper, filePermissionRuleManager,
+              folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }
+
 
     /**
      * 獲取資料夾內的檔案列表
@@ -86,6 +86,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
     }
 
+
     /**
      * 獲取星標檔案列表
      *
@@ -103,6 +104,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.STAR_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
+
     /**
      * 獲取最近使用的檔案列表
      *
@@ -115,6 +117,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> getRecentlyFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
+
 
     /**
      * 獲取用戶分享的檔案列表
@@ -143,18 +146,6 @@ public class ApiFolderController extends BaseFolderController {
         return super.createFolder(fileEditDTO, exchange);
     }
 
-    /**
-     * 獲取資料夾的路徑，根據資料夾 ID 返回該資料夾的完整路徑信息。
-     *
-     * @param exchange 請求對象，包含請求上下文信息。
-     * @param id       資料夾 ID，用來查找資料夾路徑。
-     *
-     * @return 返回資料夾路徑信息，成功返回 OK，失敗返回 BAD_REQUEST。
-     */
-    @GetMapping("/path/{id}")
-    public Mono<ResponseEntity<?>> getFolderPath(@PathVariable Long id, ServerWebExchange exchange) {
-        return super.getFolderPath(exchange, id);
-    }
 
     /**
      * 刪除資料夾及其內容
@@ -169,6 +160,21 @@ public class ApiFolderController extends BaseFolderController {
         return super.deleteFolder(id, exchange);
     }
 
+
+    /**
+     * 獲取資料夾的路徑，根據資料夾 ID 返回該資料夾的完整路徑信息。
+     *
+     * @param exchange 請求對象，包含請求上下文信息。
+     * @param id       資料夾 ID，用來查找資料夾路徑。
+     *
+     * @return 返回資料夾路徑信息，成功返回 OK，失敗返回 BAD_REQUEST。
+     */
+    @GetMapping("/path/{id}")
+    public Mono<ResponseEntity<?>> getFolderPath(@PathVariable Long id, ServerWebExchange exchange) {
+        return super.getFolderPath(exchange, id);
+    }
+
+
     /**
      * 編輯資料夾
      *
@@ -181,6 +187,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> editFolder(@RequestBody @Validated FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return super.editFolder(fileEditDTO, exchange);
     }
+
 
     /**
      * 還原已刪除的資料夾
@@ -195,6 +202,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.restoreFile(exchange, id);
     }
 
+
     /**
      * 移動資料夾到回收站
      *
@@ -208,6 +216,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.removeFile(exchange, id);
     }
 
+
     /**
      * 建立用戶資料夾樹，根據系統配置和用戶資料夾結構建立資料夾樹。
      *
@@ -219,6 +228,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return super.buildTree(exchange);
     }
+
 
     /**
      * 下載資料夾，將資料夾及其內容打包下載。

@@ -35,6 +35,7 @@ public interface BaseFileService {
         return Mono.empty();
     }
 
+
     /**
      * 獲取用戶文件路徑的接口
      *
@@ -46,6 +47,7 @@ public interface BaseFileService {
     default Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(UserFileMetadata file, User user) {
         return Mono.empty();
     }
+
 
     /**
      * 獲取文件版本列表的接口
@@ -60,6 +62,7 @@ public interface BaseFileService {
     default Mono<PagedResponseDTO<FileVersionDTO>> getFileVersionList(User user, UserFileMetadata file, Integer page, Integer pageSize) {
         return Mono.empty();
     }
+
 
     /**
      * 搜索用戶文件的接口

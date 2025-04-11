@@ -55,6 +55,7 @@ public class FolderListTreeProvider {
         this.userFileListTree = new ConcurrentHashMap<>();
     }
 
+
     /**
      * 線程池執行器，用於執行線程池任務
      */
@@ -117,6 +118,7 @@ public class FolderListTreeProvider {
         return userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
     }
 
+
     /**
      * 獲取用戶的檔案列表樹
      *
@@ -127,6 +129,7 @@ public class FolderListTreeProvider {
     public FolderTree getFileTree(Long userId) {
         return userFileListTree.get(userId);
     }
+
 
     /**
      * 初始化用戶的檔案列表樹
@@ -142,6 +145,7 @@ public class FolderListTreeProvider {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
         folderTree.initializeTree(folderList, isLastPage);
     }
+
 
     /**
      * 更新資料夾的父資料夾
@@ -163,6 +167,7 @@ public class FolderListTreeProvider {
         }
     }
 
+
     /**
      * 刪除資料夾
      *
@@ -175,6 +180,7 @@ public class FolderListTreeProvider {
             folderTree.deleteFolder(folderMetadataId);
         }
     }
+
 
     /**
      * 獲取資料夾的路徑
@@ -192,6 +198,7 @@ public class FolderListTreeProvider {
         }
         return Collections.singletonList(new FolderNode(0L, "root"));
     }
+
 
     /**
      * 獲取資料夾的深度
@@ -272,6 +279,7 @@ public class FolderListTreeProvider {
             this.children = new ConcurrentHashMap<>();
         }
 
+
         /**
          * 更新最大子資料夾深度
          */
@@ -289,6 +297,7 @@ public class FolderListTreeProvider {
                     .orElse(0);
         }
     }
+
 
     /**
      * 子類: 資料夾樹
@@ -371,6 +380,7 @@ public class FolderListTreeProvider {
             }
         }
 
+
         /**
          * 更新資料夾樹
          *
@@ -429,6 +439,7 @@ public class FolderListTreeProvider {
             threadPoolExecutor.submit(() -> synchronizeTree(node));
         }
 
+
         /**
          * 刪除資料夾
          *
@@ -454,6 +465,7 @@ public class FolderListTreeProvider {
             });
         }
 
+
         /**
          * 移除子樹，將指定節點的子樹從資料夾映射中移除此操作用於批量刪除資料夾
          * 並清除連接的節點將指定的節點從父節點中移除並將父節點設置為空
@@ -475,6 +487,7 @@ public class FolderListTreeProvider {
             node.getChildren().clear();
             node.setParentFolder(null);
         }
+
 
         /**
          * 初始化資料夾樹，當用戶的資料夾樹不存在時，創建一個新的資料夾樹
@@ -505,6 +518,7 @@ public class FolderListTreeProvider {
             }
         }
 
+
         /**
          * 檢查是否存在循環引用
          *
@@ -528,6 +542,7 @@ public class FolderListTreeProvider {
             return false;
         }
 
+
         /**
          * 連接節點，將子節點連接到父節點中
          *
@@ -548,6 +563,7 @@ public class FolderListTreeProvider {
             folderMap.put(parent.getFolderId(), parent);
         }
 
+
         /**
          * 更新子資料夾的深度
          *
@@ -561,6 +577,7 @@ public class FolderListTreeProvider {
             node.updateMaxSubtreeDepth();
         }
 
+
         /**
          * 更新父節點的深度
          *
@@ -573,6 +590,7 @@ public class FolderListTreeProvider {
                 current = current.getParentFolder();
             }
         }
+
 
         /**
          * 檢查樹結構是否有效，當樹結構中存在無效的節點時，返回 false
@@ -588,6 +606,7 @@ public class FolderListTreeProvider {
             }
             return true;
         }
+
 
         /**
          * 同步樹，將資料夾樹同步到資料夾映射中

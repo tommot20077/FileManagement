@@ -57,6 +57,7 @@ public class FluxDataPO<T> {
         this.tFlux = tFlux;
     }
 
+
     /**
      * 無參構造方法
      */

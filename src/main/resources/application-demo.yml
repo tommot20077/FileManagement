@@ -2,6 +2,7 @@
 file:
   # 上傳相關設定
   upload:
+
     # Websocket最大允許分塊大小，單位為 MB，默認為 20MB
     # 注意如果有設定nginx的client_max_body_size，這個值必須小於nginx的設定
     payload-length: 20
@@ -17,6 +18,18 @@ file:
     # 單一位用戶合併檔案分塊的最大數量限制，默認為 3
     # 建議此值設定為與 maxUploadTaskLimit 相同
     combine-process-count-limit: 3
+
+    # 文件傳輸類型，默認為 CHUNK 進行文件傳輸
+    # 可以選擇的值可參考 TransmissionEnum
+    default-upload-type: chunk
+
+    # 是否啟用強制使用伺服器配置，默認為 false
+    # 當設置為 true 時，會強制使用伺服器指定 default-upload-type 進行文件傳輸
+    force-use-server-config: false
+
+    # 上傳檔案的最大大小，單位為 GB，默認為 10GB
+    # 當設置值小於等於0時，則不限制上傳檔案的大小
+    max-upload-file-size: 10
 
   # 下載相關設定
   download:

@@ -31,6 +31,7 @@ public class ProcessException extends Exception {
         this.errorCode = errorCode;
     }
 
+
     /**
      * 自定義錯誤類型，此為帶有異常原因的錯誤類型
      *
@@ -64,9 +65,9 @@ public class ProcessException extends Exception {
     public enum ErrorCode {
         /**
          * 錯誤碼: 1201
-         * 錯誤信息: 上傳任務不存在
+         * 錯誤信息: 創建檔案流失敗
          */
-        NOT_EXISTING_UPLOAD_TASK(1201, "上傳任務 ID: %s 不存在"),
+        CREATE_STREAM_FAILED(1218, "創建檔案流失敗"),
 
         /**
          * 錯誤碼: 1202
@@ -164,11 +165,6 @@ public class ProcessException extends Exception {
          */
         CONVERT_JSON_TO_TARGET_FAILED(1217, "轉換 JSON 到目標格式 %s 失敗"),
 
-        /**
-         * 錯誤碼: 1218
-         * 錯誤信息: 創建檔案流失敗
-         */
-        CREATE_STREAM_FAILED(1218, "創建檔案流失敗"),
         ;
 
 

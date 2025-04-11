@@ -60,6 +60,7 @@ public abstract class BaseGuestController implements ResponseUnity {
         this.securityProperties = securityProperties;
     }
 
+
     /**
      * 訪客註冊的請求
      * 當用戶進行註冊時，系統將接收用戶數據並創建新用戶。
@@ -77,6 +78,7 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(apiResponse, 201);
         })), exchange);
     }
+
 
     /**
      * 訪客登入的請求
@@ -106,6 +108,7 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(apiResponse);
         }), exchange);
     }
+
 
     /**
      * 確認當前用戶授權狀態，並返回用戶信息
@@ -138,6 +141,7 @@ public abstract class BaseGuestController implements ResponseUnity {
                 });
     }
 
+
     /**
      * 發送重置密碼郵件
      * 用戶請求重置密碼時，系統將發送包含重置鏈接的郵件至用戶郵箱。
@@ -153,6 +157,7 @@ public abstract class BaseGuestController implements ResponseUnity {
             return createResponseEntity(apiResponse);
         })), exchange);
     }
+
 
     /**
      * 重置密碼的請求

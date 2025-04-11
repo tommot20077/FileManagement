@@ -96,6 +96,7 @@ public interface ValidationService {
         });
     }
 
+
     /**
      * 自訂義檢測字段欄位的方法，部分字段有時可以為空，但是有時又不能為空
      * 這時可以使用這個方法來檢測指定的字段是否為空
@@ -138,6 +139,7 @@ public interface ValidationService {
         });
     }
 
+
     /**
      * 驗證字段長度是否合法，此為重載方法只驗證最大長度
      *
@@ -150,6 +152,7 @@ public interface ValidationService {
     default Mono<Void> validLength(Object object, Number maxLength, String... columns) {
         return validLength(object, -1, maxLength, columns);
     }
+
 
     /**
      * 驗證字段長度是否合法

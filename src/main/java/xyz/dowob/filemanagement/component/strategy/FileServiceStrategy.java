@@ -53,6 +53,7 @@ public class FileServiceStrategy {
         }
     }
 
+
     /**
      * 獲取默認的檔案處理方法
      *
@@ -62,6 +63,7 @@ public class FileServiceStrategy {
     public FileService getFileService() {
         return getFileService(null);
     }
+
 
     /**
      * 根據檔案類型獲取對應的檔案處理方法

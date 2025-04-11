@@ -69,6 +69,7 @@ public class Token {
         return Long.hashCode(id);
     }
 
+
     /**
      * 重寫 equals 方法，用於比較憑證是否相同
      *
@@ -88,6 +89,7 @@ public class Token {
         return id == token.id;
     }
 
+
     /**
      * 重寫 toString 方法，將憑證轉換為HashMap
      * @return String
@@ -99,6 +101,7 @@ public class Token {
         tokenMap.put("userId", userId);
         return tokenMap.toString();
     }
+
 
     /**
      * 生成JWT憑證版本

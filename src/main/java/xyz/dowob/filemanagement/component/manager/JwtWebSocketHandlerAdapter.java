@@ -56,6 +56,9 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
+    /**
+     * WebSocketFailHandler 用於處理 WebSocket 連接失敗的處理器
+     */
     private final WebSocketFailHandler webSocketFailHandler;
 
     /**
@@ -74,6 +77,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         super.setSessionAttributePredicate(attributeKey -> attributeKey.startsWith("X-WebSocket-Error"));
     }
 
+
     /**
      * 創建 WebSocket 請求處理策略
      * 這裡主要是設置最大帧载荷长度，用於限制文件上傳的大小
@@ -91,8 +95,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
             @NonNull
             public Mono<Void> upgrade(
                     @NonNull ServerWebExchange exchange,
-                    @NonNull WebSocketHandler handler,
-                    @Nullable String subProtocol, @NonNull Supplier<HandshakeInfo> handshakeInfoFactory) {
+                    @NonNull WebSocketHandler handler, @Nullable String subProtocol, @NonNull Supplier<HandshakeInfo> handshakeInfoFactory) {
                 List<String> protocols = exchange.getRequest().getHeaders().get("Sec-WebSocket-Protocol");
                 if (protocols != null && !protocols.isEmpty()) {
                     return super.upgrade(exchange, handler, protocols.getFirst(), handshakeInfoFactory);
@@ -101,6 +104,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
             }
         };
     }
+
 
     /**
      * 重寫 handleRequest 方法，用於處理 WebSocket 請求，當請求中包含 JWT 憑證時，進行驗證，並將用戶ID存入 ServerWebExchange 的屬性中
@@ -126,24 +130,26 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         });
     }
 
+
     /**
      * 從 WebSocket 請求標頭中提取 JWT Token
+     *
+     * @param exchange ServerWebExchange 用於處理請求的交換器
      */
     private String extractTokenFromProtocol(ServerWebExchange exchange) {
         List<String> protocols = exchange.getRequest().getHeaders().get("Sec-WebSocket-Protocol");
         if (protocols == null || protocols.isEmpty()) {
             return null;
         }
-        return protocols
-                .stream()
-                .filter(protocol -> protocol.startsWith("jwt."))
-                .map(protocol -> protocol.substring(4))
-                .findFirst()
-                .orElse(null);
+        return protocols.stream().filter(protocol -> protocol.startsWith("jwt.")).map(protocol -> protocol.substring(4)).findFirst().orElse(null);
     }
 
+
     /**
-     * 失敗時設置錯誤標頭，並使用 `failWebSocketHandler`
+     * 失敗時設置錯誤標頭，並使用 {@link WebSocketFailHandler} 處理請求
+     *
+     * @param exchange  ServerWebExchange 用於處理請求的交換器
+     * @param errorCode 錯誤代碼
      */
     private Mono<Void> failWithError(ServerWebExchange exchange, ValidationException.ErrorCode errorCode) {
         return exchange.getSession().flatMap(session -> {
@@ -152,8 +158,13 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         });
     }
 
+
     /**
      * 轉換 WebSocketSession，並交給 {@link FileUploadWebSocketHandler} 處理
+     *
+     * @param exchange ServerWebExchange 用於處理請求的交換器
+     * @param session  WebSocketSession 用於處理 WebSocket 請求的處理器
+     * @param userId   用戶ID
      */
     private Mono<Void> handleWebSocketSession(ServerWebExchange exchange, WebSocketSession session, Long userId) {
         if (session instanceof ReactorNettyWebSocketSession nettySession) {
@@ -166,9 +177,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
                 CustomWebSocketSession customSession = new CustomWebSocketSession(delegate,
                                                                                   nettySession.getHandshakeInfo(),
                                                                                   bufferFactory,
-                                                                                  fileProperties
-                                                                                          .getUpload()
-                                                                                          .getPayloadLength() * 1024 * 1024,
+                                                                                  fileProperties.getUpload().getPayloadLength() * 1024 * 1024,
                                                                                   userId.toString()
                 );
                 return fileUploadWebSocketHandler.handle(customSession);
@@ -180,4 +189,3 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
     }
 
 }
-//todo 前端垃圾桶清理

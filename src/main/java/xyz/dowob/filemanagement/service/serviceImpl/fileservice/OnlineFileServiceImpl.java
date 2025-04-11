@@ -78,6 +78,26 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      */
     private final String EMPTY_CONTENT = "{\"delta\":[]}";
 
+
+    /**
+     * 線上文件服務實現類，繼承 @see {@link AbstractFileService}
+     *
+     * @param userOnlineFileHistoryRepository 用戶在線檔案歷史數據庫操作介面
+     * @param serverFileMetaRepository        伺服器檔案元數據操作介面
+     * @param userFileMetaRepository          用戶檔案元數據操作介面
+     * @param redisProvider                   Redis提供者
+     * @param gridFsProvider                  GridFS���供者
+     * @param transfersTasksManager           傳輸任務管理器
+     * @param fileProperties                  檔案屬性配置
+     * @param circuitBreakerConfig            CircuitBreaker配置
+     * @param userRepository                  用戶操作介面
+     * @param userOnlineFileRepository        用戶在線檔案操作介面
+     * @param entityOperations                R2DBC實體操作介面
+     * @param fileTrashRecordRepository       檔案垃圾桶記錄操作介面
+     * @param transactionalOperator           事務操作介面
+     * @param rateLimiterConfig               RateLimiter配置
+     * @param userFIleShareRecordRepository   用戶檔案分享記錄操作介面
+     */
     public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
                                  @Nullable FolderListTreeProvider folderListTreeProvider) {
         super(serverFileMetaRepository,
@@ -101,6 +121,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         this.userOnlineFileRepository = userOnlineFileRepository;
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
     }
+
 
     /**
      * 下載指定文件。
@@ -140,6 +161,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
         });
     }
+
 
     /**
      * 上傳指定文件。
@@ -183,6 +205,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+
     /**
      * 刪除指定文件。
      * <p>
@@ -197,6 +220,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     public Mono<Void> deleteFile(UserFileMetadata fileMetadata, User user) {
         return super.deleteFile(fileMetadata, user);
     }
+
 
     /**
      * 編輯指定文件。
@@ -218,6 +242,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             case DELETE_HISTORY_RECORD -> deleteHistoryRecord(userOnlineFile, fileEditDTO.getVersion());
         });
     }
+
 
     /**
      * 獲取指定文件的版本列表。
@@ -274,6 +299,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)));
     }
 
+
     /**
      * 創建指定文件的初始歷史記錄。
      * <p>
@@ -297,6 +323,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         history.setNote(fileEditDTO.getNote());
         return userOnlineFileHistoryRepository.save(history);
     }
+
 
     /**
      * 保存編輯後的文件內容。
@@ -324,6 +351,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             });
         }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata())));
     }
+
 
     /**
      * 根據文件編輯內容創建新的歷史記錄。
@@ -400,6 +428,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                         }).then(Mono.when(updateUserFileMetadata(fileEditDTO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile))));
     }
 
+
     /**
      * 將指定的歷史紀錄轉換成完整的文件內容。
      * <p>
@@ -422,6 +451,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return formatJsonToEditorContentJsonDTO(baseContent).flatMap(editorContentDTO -> applyPatchToContent(editorContentDTO, historyChain));
         });
     }
+
 
     /**
      * 遞歸查找並構建歷史紀錄鏈。
@@ -449,6 +479,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 .flatMap(previousHistory -> findHistoryChainRecursive(previousHistory, chain));
     }
 
+
     /**
      * 將JSON格式的字符串轉換為EditorContentJsonDTO對象。
      * <p>
@@ -462,6 +493,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         return Mono.fromCallable(() -> objectMapper.readValue(json, EditorContentDTO.class))
                 .onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
     }
+
 
     /**
      * 計算兩個文件內容的差異。
@@ -505,6 +537,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         return DiffUtils.patch(contents, patch);
     }
 
+
     /**
      * 更新用戶文件元數據
      * 此方法用於更新用戶文件的元數據。它會更新 lastAccessTime 並將新的元數據保存到數據庫中。
@@ -519,6 +552,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return userFileMetaRepository.save(userFileMetadata);
         }).then().subscribeOn(Schedulers.boundedElastic());
     }
+
 
     /**
      * 格式化對象為JSON
@@ -536,6 +570,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }
     }
 
+
     /**
      * 將差異轉換為行
      *
@@ -552,6 +587,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
         }).toList();
     }
+
 
     /**
      * 還原歷史記錄
@@ -582,6 +618,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                     .flatMap(contentJson -> saveFileHistory(userOnlineFile, contentJson, user, targetHistory.getVersion()));
         }).then(Mono.when(updateUserFileMetadata(editDTO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile)));
     }
+
 
     /**
      * 格式化JSON為EditorContentJsonDTO
@@ -639,6 +676,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return userOnlineFileHistoryRepository.save(userOnlineFileHistory).then(userOnlineFileRepository.save(userOnlineFile));
         }).then();
     }
+
 
     /**
      * 刪除歷史記錄
@@ -748,6 +786,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return formatJsonToEditorContentJsonDTO(restoredContentList);
         }).onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.APPLY_PATCH_TO_CONTENT_FAILED, e));
     }
+
 
     /**
      * 刪除過多的歷史記錄

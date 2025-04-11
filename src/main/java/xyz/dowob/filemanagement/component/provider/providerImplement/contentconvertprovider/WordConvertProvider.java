@@ -57,6 +57,9 @@ public class WordConvertProvider implements ContentConvertProvider {
         this.config = config;
     }
 
+    /**
+     * Quill 中 JSON 斷言的分隔符
+     */
     private static final String SENTENCE_SPLIT_LABEL = "\n";
 
 
@@ -127,6 +130,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         String pendingTableCellText = null;
     }
 
+
     /**
      * 將 Quill 的 JSON 內容轉換為 Word 文檔並輸出為 InputStream
      *
@@ -163,6 +167,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         });
     }
 
+
     /**
      * 給定一個 XWPFDocument 對象，將其轉換為 ByteArrayOutputStream
      *
@@ -180,6 +185,7 @@ public class WordConvertProvider implements ContentConvertProvider {
             }
         });
     }
+
 
     /**
      * 將 Quill 的 JSON 內容轉換為 XWPFDocument 對象
@@ -201,6 +207,7 @@ public class WordConvertProvider implements ContentConvertProvider {
             });
         });
     }
+
 
     /**
      * 具體的轉換邏輯，分成幾個部分
@@ -392,6 +399,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         }).onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CONVERT_JSON_TO_TARGET_FAILED, e, "docx")));
     }
 
+
     /**
      * 清除段落的列表編號
      * 當前段落為空且當前段落的列表類型不為 null 時，則清除列表編號
@@ -410,6 +418,7 @@ public class WordConvertProvider implements ContentConvertProvider {
             }
         }
     }
+
 
     /**
      * 更新格式化狀態，當操作中帶有屬性時，則更新格式化狀態
@@ -461,6 +470,7 @@ public class WordConvertProvider implements ContentConvertProvider {
 
         }
     }
+
 
     /**
      * 應用段落格式化狀態，當屬性設定更新完成後，則應用段落格式化狀態
@@ -641,6 +651,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         }
     }
 
+
     /**
      * 解析段落對齊方式，將屬性轉換為段落對齊方式
      * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落對齊方式
@@ -659,6 +670,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         };
     }
 
+
     /**
      * 解析段落縮進級別，將屬性轉換為段落縮進級別
      * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落縮進級別
@@ -673,6 +685,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         }
         return 0;
     }
+
 
     /**
      * 解析標題級別，將屬性轉換為標題級別
@@ -689,6 +702,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         }
         return 0;
     }
+
 
     /**
      * 獲取或創建列表編號 ID，根據列表類型獲取或創建列表編號 ID
@@ -710,6 +724,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         return numbering.addNum(abstractNumIdToUse);
     }
 
+
     /**
      * 確保編號定義存在，根據列表類型確保編號定義存在
      * 根據列表類型進行檢查，如果當前的列表類型不為 null，則確保編號定義存在
@@ -730,6 +745,7 @@ public class WordConvertProvider implements ContentConvertProvider {
             createAbstractNumbering(numbering, config.getAbstractNumIdDecimal());
         }
     }
+
 
     /**
      * 創建抽象編號，根據列表類型創建抽象編號
@@ -763,6 +779,7 @@ public class WordConvertProvider implements ContentConvertProvider {
         XWPFAbstractNum abstractNum = new XWPFAbstractNum(cTAbstractNum, numbering);
         numbering.addAbstractNum(abstractNum);
     }
+
 
     /**
      * 確保十六進制顏色的安全性，將顏色轉換為十六進制顏色

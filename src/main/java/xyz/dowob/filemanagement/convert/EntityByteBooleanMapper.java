@@ -27,6 +27,7 @@ public class EntityByteBooleanMapper {
         }
     }
 
+
     /**
      * 將Boolean類型轉換為Byte類型的轉換器
      */

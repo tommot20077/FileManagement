@@ -17,5 +17,13 @@ import java.time.Duration;
  **/
 @FunctionalInterface
 public interface CacheRule<T> {
+    /**
+     * 應用緩存規則
+     *
+     * @param value  需要緩存的值
+     * @param expire 緩存過期時間
+     *
+     * @return Mono<Void> 返回一個 Mono<Void> 對象
+     */
     Mono<Void> apply(T value, Duration expire);
 }

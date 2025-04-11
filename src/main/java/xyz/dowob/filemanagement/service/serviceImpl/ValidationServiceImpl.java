@@ -60,6 +60,7 @@ public class ValidationServiceImpl implements ValidationService {
                 .then(validatePasswordStrength(registerDTO.getPassword()));
     }
 
+
     /**
      * 驗證重製密碼數據類ResetPasswordDTO中的數據是否合法
      * 調用此方法會檢查
@@ -76,6 +77,7 @@ public class ValidationServiceImpl implements ValidationService {
                 .then(validatePasswordStrength(resetPasswordDTO.getNewPassword()));
     }
 
+
     /**
      * 驗證文件元數據DTO中的數據是否合法
      *
@@ -86,6 +88,7 @@ public class ValidationServiceImpl implements ValidationService {
         return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFilename(), false))
                 .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
     }
+
 
     /**
      * 驗證文件編輯數據DTO中的數據是否合法
@@ -103,6 +106,7 @@ public class ValidationServiceImpl implements ValidationService {
             case REVERT_HISTORY_RECORD, DELETE_HISTORY_RECORD -> Mono.empty();
         }));
     }
+
 
     /**
      * 驗證檔案類型是否合法，當檔案類型不在指定的類型中時，拋出ValidationException
@@ -131,6 +135,7 @@ public class ValidationServiceImpl implements ValidationService {
 
         });
     }
+
 
     /**
      * 驗證文件過濾DTO中的數據是否合法
@@ -164,6 +169,7 @@ public class ValidationServiceImpl implements ValidationService {
         }));
     }
 
+
     /**
      * 驗證用戶搜索列表是否合法，當搜索列表為空或者搜索列表數量超過20時，拋出ValidationException
      *
@@ -179,6 +185,7 @@ public class ValidationServiceImpl implements ValidationService {
         }
         return Mono.empty();
     }
+
 
     /**
      * 驗證用戶密碼與確認密碼是否一致
@@ -196,6 +203,7 @@ public class ValidationServiceImpl implements ValidationService {
         });
     }
 
+
     /**
      * 檢查用戶名稱是否合法
      * 須符合以下條件：
@@ -212,6 +220,7 @@ public class ValidationServiceImpl implements ValidationService {
             return Mono.empty();
         }).then(alphanumericInspection(registerUserDTO.getUsername()));
     }
+
 
     /**
      * 檢查用戶信箱是否已存在
@@ -242,6 +251,7 @@ public class ValidationServiceImpl implements ValidationService {
         return palindromeInspection(password).then(upperLetterAndLowerLetterAndNumberInspection(password));
     }
 
+
     /**
      * 檢查是否為回文
      * 當檢測到回文時返回錯誤
@@ -259,6 +269,7 @@ public class ValidationServiceImpl implements ValidationService {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH));
         }).then();
     }
+
 
     /**
      * 檢查是否包含大寫字母、小寫字母和數字
@@ -294,6 +305,7 @@ public class ValidationServiceImpl implements ValidationService {
         });
     }
 
+
     /**
      * 檢查是否只包含字母和數字
      * 當檢測到非字母和數字時返回錯誤
@@ -308,6 +320,7 @@ public class ValidationServiceImpl implements ValidationService {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));
         });
     }
+
 
     /**
      * 驗證檔案名稱是否出現非法字符
@@ -331,6 +344,7 @@ public class ValidationServiceImpl implements ValidationService {
         }
         return Mono.empty();
     }
+
 
     /**
      * 檢查用戶是否有足夠的存儲空間來存儲文件，如果用戶的存儲限制為-1，則不進行檢查

@@ -18,10 +18,12 @@ public enum CacheProviderEnum {
      * 使用者緩存
      */
     USER_CACHE,
+
     /**
      * 檔案流緩存
      */
     FILE_STREAM_CACHE,
+
     /**
      * 檔案列表緩存
      */

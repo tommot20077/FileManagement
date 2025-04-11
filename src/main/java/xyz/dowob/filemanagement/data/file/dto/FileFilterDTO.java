@@ -76,6 +76,7 @@ public class FileFilterDTO {
         return keyword == null && folderId == null && types.isEmpty() && startTime == null && endTime == null;
     }
 
+
     /**
      * 全參數構造函數，對部分參數進行了空值處理
      *

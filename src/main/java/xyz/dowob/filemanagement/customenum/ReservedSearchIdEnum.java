@@ -55,6 +55,7 @@ public enum ReservedSearchIdEnum {
         this.id = id;
     }
 
+
     /**
      * 獲取預留的搜索 ID，此方法返回主要代表的 ID
      *
@@ -63,6 +64,7 @@ public enum ReservedSearchIdEnum {
     public Long getId() {
         return this.id[0];
     }
+
 
     /**
      * 判斷是否包含指定的 ID

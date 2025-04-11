@@ -129,6 +129,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
         });
     }
 
+
     /**
      * 批量查詢緩存列表 (返回一個 Map，內部為列表)
      *
@@ -204,6 +205,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
         return keyValues.entrySet().stream().map(entry -> set(entry.getKey(), entry.getValue(), expire)).reduce(Mono::then).orElse(Mono.empty());
     }
 
+
     /**
      * 獲取默認過期時間
      *
@@ -241,6 +243,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
             return Base64.getEncoder().encodeToString(outputStream.toByteArray());
         });
     }
+
 
     /**
      * 將base64格式的字符串轉換為流

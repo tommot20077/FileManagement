@@ -109,11 +109,19 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         allowCoreThreadTimeOut(true);
     }
 
+    /**
+     * 提交任務，並根據當前系統狀況自動調整線程池大小
+     *
+     * @param task 要執行的任務
+     *
+     * @return 返回 Future 對象
+     */
     @Override
     public Future<?> submit(@NotNull Runnable task) {
         adjustPoolSize();
         return super.submit(task);
     }
+
 
     /**
      * 執行任務，並根據當前系統狀況自動調整線程池大小
@@ -125,6 +133,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         adjustPoolSize();
         super.execute(command);
     }
+
 
     /**
      * 執行任務前的回調，記錄當前執行中的線程數
@@ -138,6 +147,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         super.beforeExecute(t, r);
     }
 
+
     /**
      * 執行任務後的回調，減少當前執行中的線程數
      *
@@ -149,6 +159,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         activeThreadCount.decrementAndGet();
         super.afterExecute(r, t);
     }
+
 
     /**
      * 調整線程池大小，根據當前系統資源與任務佇列進行自動擴展與縮減
@@ -203,6 +214,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         }
     }
 
+
     /**
      * 更新線程池的優先級與 CPU 使用率
      *
@@ -221,6 +233,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
             setMaximumPoolSize(Math.max(idealPoolSize * 2, minPoolSize));
         }
     }
+
 
     /**
      * 取得佇列的總容量

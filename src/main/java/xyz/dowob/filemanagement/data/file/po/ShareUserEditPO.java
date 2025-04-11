@@ -64,6 +64,7 @@ public class ShareUserEditPO {
         }
     }
 
+
     /**
      * 重寫toString方法
      *
@@ -76,6 +77,7 @@ public class ShareUserEditPO {
         map.put("editType", editType);
         return map.toString();
     }
+
 
     /**
      * 重寫equals方法
@@ -95,6 +97,7 @@ public class ShareUserEditPO {
         ShareUserEditPO that = (ShareUserEditPO) o;
         return userId.equals(that.userId);
     }
+
 
     /**
      * 重寫hashCode方法

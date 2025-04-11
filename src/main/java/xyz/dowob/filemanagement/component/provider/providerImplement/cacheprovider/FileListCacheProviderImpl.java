@@ -41,6 +41,12 @@ public class FileListCacheProviderImpl implements CacheProvider {
      */
     private final Duration DEFAULT_EXPIRE_TIME;
 
+    /**
+     * 構造方法
+     *
+     * @param redisProvider   Redis提供者
+     * @param cacheProperties 緩存配置
+     */
     public FileListCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         this.redisProvider = redisProvider;
         if (cacheProperties.getFileListCacheExpireTime() <= 0) {
@@ -63,6 +69,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
     public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
         return redisProvider.getList(key, clazz).collectList();
     }
+
 
     /**
      * 批量查詢緩存列表 (返回一個 Map，內部為列表)
@@ -123,6 +130,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
         }).then();
     }
 
+
     /**
      * 刪除單個緩存鍵
      *
@@ -135,6 +143,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
         return redisProvider.deleteList(key);
     }
 
+
     /**
      * 批量刪除緩存鍵
      *
@@ -146,6 +155,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
     public Mono<Void> deleteAll(Collection<String> keys) {
         return Flux.fromIterable(keys).flatMap(this::delete).then();
     }
+
 
     /**
      * 獲取緩存數據的默認過期時間

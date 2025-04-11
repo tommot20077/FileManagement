@@ -45,12 +45,14 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
      */
     @Override
     public Mono<Void> sendEmail(String sendToEmail, String subject, String content) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailProperties.getUsername());
-        message.setTo(sendToEmail);
-        message.setSubject(subject);
-        message.setText(content);
-        javaMailSender.send(message);
-        return Mono.empty();
+        return Mono.defer(() -> {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailProperties.getUsername());
+            message.setTo(sendToEmail);
+            message.setSubject(subject);
+            message.setText(content);
+            javaMailSender.send(message);
+            return Mono.empty();
+        });
     }
 }

@@ -63,6 +63,7 @@ public class FileTrashRecord {
         this.deleteTime = deleteTime;
     }
 
+
     /**
      * 重寫 toString 方法
      *
@@ -77,6 +78,7 @@ public class FileTrashRecord {
         map.put("deleteTime", deleteTime);
         return map.toString();
     }
+
 
     /**
      * 重寫 equals 方法

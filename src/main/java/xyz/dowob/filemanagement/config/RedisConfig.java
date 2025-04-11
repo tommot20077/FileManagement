@@ -56,6 +56,11 @@ public class RedisConfig {
         return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, serializationContext);
     }
 
+    /**
+     * 配置 ObjectMapper，註冊 JavaTimeModule 模組
+     *
+     * @return ObjectMapper
+     */
     @Bean
     public ObjectMapper objectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();

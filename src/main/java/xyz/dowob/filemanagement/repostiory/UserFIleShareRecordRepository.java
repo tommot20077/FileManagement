@@ -25,7 +25,7 @@ public interface UserFIleShareRecordRepository extends ReactiveCrudRepository<Us
      *
      * @param userId 用戶ID
      *
-     * @return 用戶檔案分享記錄
+     * @return 所有符合條件的用戶檔案分享記錄
      */
     Flux<UserFileShareRecord> findAllByUserId(Long userId);
 
@@ -33,8 +33,9 @@ public interface UserFIleShareRecordRepository extends ReactiveCrudRepository<Us
      * 根據用戶ID集合查詢用戶檔案分享記錄
      *
      * @param userIds 用戶ID集合
+     * @param fileId  檔案ID
      *
-     * @return 用戶檔案分享記錄
+     * @return 所有符合條件的用戶檔案分享記錄
      */
     Flux<UserFileShareRecord> findAllByUserIdInAndFileId(Collection<Long> userIds, Long fileId);
 
@@ -43,7 +44,7 @@ public interface UserFIleShareRecordRepository extends ReactiveCrudRepository<Us
      *
      * @param fileId 檔案ID
      *
-     * @return 用戶檔案分享記錄
+     * @return 所有符合條件的用戶檔案分享記錄
      */
     Flux<UserFileShareRecord> findAllByFileId(Long fileId);
 
@@ -52,7 +53,7 @@ public interface UserFIleShareRecordRepository extends ReactiveCrudRepository<Us
      *
      * @param fileIds 檔案ID集合
      *
-     * @return 用戶檔案分享記錄
+     * @return 所有符合條件的用戶檔案分享記錄
      */
     Flux<UserFileShareRecord> findAllByFileIdIn(Collection<Long> fileIds);
 

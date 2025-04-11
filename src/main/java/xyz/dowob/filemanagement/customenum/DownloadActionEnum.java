@@ -13,6 +13,7 @@ public enum DownloadActionEnum {
      * 預覽
      */
     PREVIEW,
+
     /**
      * 下載
      */

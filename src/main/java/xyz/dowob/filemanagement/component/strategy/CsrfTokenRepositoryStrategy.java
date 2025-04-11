@@ -44,6 +44,7 @@ public class CsrfTokenRepositoryStrategy {
         }).findFirst().orElseThrow(() -> new IllegalArgumentException("找不到對應的 CsrfTokenRepository"));
     }
 
+
     /**
      * 獲取 Csrf 憑證存儲庫
      *

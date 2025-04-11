@@ -1,9 +1,12 @@
 package xyz.dowob.filemanagement.data.file.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.Optional;
 
@@ -18,7 +21,6 @@ import java.util.Optional;
  * @Version 1.0
  **/
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 public class UploadChunkDTO {
     /**
@@ -41,6 +43,58 @@ public class UploadChunkDTO {
      * 分塊數據
      */
     private byte[] chunkData;
+
+    /**
+     * 分塊數據流
+     */
+    @JsonIgnore
+    private Flux<DataBuffer> chunkDataFlux;
+
+    /**
+     * 獲取分塊數據流，當 chunkDataFlux 不為空時，返回 chunkDataFlux
+     * 否則檢查 chunkData 是否為空，若不為空則將其包裝為 DataBuffer 並返回
+     * 否則返回空的 Flux
+     *
+     * @return 分塊數據流
+     */
+    public Flux<DataBuffer> getChunkDataFlux() {
+        if (chunkDataFlux != null) {
+            return chunkDataFlux;
+        } else if (chunkData != null) {
+            return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(chunkData));
+        }
+        return Flux.empty();
+    }
+
+    /**
+     * 構造函數
+     *
+     * @param transferTaskId 任務ID
+     * @param totalChunks    總分塊數
+     * @param chunkIndex     分塊索引
+     * @param chunkData      分塊數據
+     */
+    public UploadChunkDTO(String transferTaskId, int totalChunks, int chunkIndex, byte[] chunkData) {
+        this.transferTaskId = transferTaskId;
+        this.totalChunks = totalChunks;
+        this.chunkIndex = chunkIndex;
+        this.chunkData = chunkData;
+    }
+
+    /**
+     * 構造函數
+     *
+     * @param transferTaskId 任務ID
+     * @param totalChunks    總分塊數
+     * @param chunkIndex     分塊索引
+     * @param chunkDataFlux  分塊數據流
+     */
+    public UploadChunkDTO(String transferTaskId, int totalChunks, int chunkIndex, Flux<DataBuffer> chunkDataFlux) {
+        this.transferTaskId = transferTaskId;
+        this.totalChunks = totalChunks;
+        this.chunkIndex = chunkIndex;
+        this.chunkDataFlux = chunkDataFlux;
+    }
 
 
     /**

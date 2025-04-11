@@ -5,6 +5,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.customenum.FileEnum;
@@ -66,6 +67,7 @@ public class CronTaskManager {
      */
     private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
+
     /**
      * 清理過期的 JWT緩存憑證
      * 每 6 小時執行一次
@@ -79,13 +81,14 @@ public class CronTaskManager {
         });
     }
 
+
     /**
      * 檢查並更新用戶的存儲使用量
-     * 每 4 小時執行一次
+     * 每 6 小時執行一次
      */
     @Scheduled(cron = "0 30 */6 * * ?")
     public void checkUserStorageLimit() {
-        userRepository.findAll().flatMap(this::calculateUserStorageLimit).subscribe();
+        userRepository.findAll().flatMap(this::calculateUserStorageLimit).subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 
 
@@ -108,7 +111,7 @@ public class CronTaskManager {
                             }
                             return transactionalOperator.transactional(userFileMetaRepository.deleteAllById(fileIdList));
                         })
-                        .then(calculateUserStorageLimit(user)))
+                        .then(calculateUserStorageLimit(user))).subscribeOn(Schedulers.boundedElastic())
                 .subscribe();
     }
 
@@ -123,8 +126,7 @@ public class CronTaskManager {
     private Mono<User> calculateUserStorageLimit(User user) {
         return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMap(userFileMetaList -> {
             Map<String, Integer> serverFileIdMap = userFileMetaList
-                    .stream()
-                    .filter(metadata -> metadata.getFileType() != FileEnum.FOLDER).filter(metadata -> metadata.getServerFileId() != null)
+                    .stream().filter(metadata -> metadata.getFileType() != FileEnum.FOLDER).filter(metadata -> metadata.getServerFileId() != null)
                     .collect(Collectors.groupingBy(metadata -> metadata.getServerFileId().toString(),
                                                    Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
                     ));
@@ -146,12 +148,13 @@ public class CronTaskManager {
         });
     }
 
+
     /**
      * 清理過期的 CSRF 憑證
      * 每 1 小時執行一次
      */
-    @Scheduled(cron = "0 0 */1 * * ?")
+    @Scheduled(cron = "0 10 */1 * * ?")
     public void clearExpiredToken() {
-        csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(null).subscribe();
+        csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(null).subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 }

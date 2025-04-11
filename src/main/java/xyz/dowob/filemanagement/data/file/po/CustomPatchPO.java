@@ -17,7 +17,6 @@ import java.util.List;
  * @create 2025/2/12
  * @Version 1.0
  **/
-
 public class CustomPatchPO {
     @Data
     public static class Patch {
@@ -57,10 +56,12 @@ public class CustomPatchPO {
          * 差異類型
          */
         private String type;
+
         /**
          * 差異源
          */
         private Chunk source;
+
         /**
          * 差異目標
          */
@@ -105,14 +106,17 @@ public class CustomPatchPO {
          * 差異位置
          */
         private int position;
+
         /**
          * 更改位置
          */
         private List<Integer> changePosition;
+
         /**
          * 差異行
          */
         private List<String> lines;
+
 
         /**
          * 將 Chunk 對象轉換為自定義的 Chunk 對象
@@ -128,6 +132,7 @@ public class CustomPatchPO {
             chunkDTO.setChangePosition(chunk.getChangePosition());
             return chunkDTO;
         }
+
 
         /**
          * 將自定義的 Chunk 對象轉換為 Chunk 對象

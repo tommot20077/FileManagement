@@ -95,6 +95,7 @@ public class TransfersTask {
         return id.equals(that.id);
     }
 
+
     /**
      * 重寫hashCode方法，獲取對象的hashCode
      *
@@ -104,6 +105,7 @@ public class TransfersTask {
     public int hashCode() {
         return id.hashCode();
     }
+
 
     /**
      * 重寫toString方法，獲取對象的字符串表示
