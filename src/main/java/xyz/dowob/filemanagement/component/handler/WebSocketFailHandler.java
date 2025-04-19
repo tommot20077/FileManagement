@@ -9,6 +9,9 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
@@ -44,6 +47,7 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
      */
     @NotNull
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> handle(@NotNull WebSocketSession session) {
         return Mono.using(() -> session, webSocketSession -> {
             String errorMessage = webSocketSession.getAttributes().get("X-WebSocket-Error").toString();
@@ -65,6 +69,7 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
      *
      * @return ValidationException.ErrorCode 錯誤代碼
      */
+    @SkipRecord
     private ValidationException.ErrorCode getErrorCode(@Nullable String errorMessage) {
         if (errorMessage == null) {
             return ValidationException.ErrorCode.WEBSOCKET_CONNECTION_ERROR;

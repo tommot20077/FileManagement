@@ -7,6 +7,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 
 /**
  * 電子郵件提供者實現類，可以發送電子郵件
@@ -44,6 +47,8 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
      * @param content     郵件內容
      */
     @Override
+    @HideSensitive
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> sendEmail(String sendToEmail, String subject, String content) {
         return Mono.defer(() -> {
             SimpleMailMessage message = new SimpleMailMessage();

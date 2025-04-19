@@ -11,8 +11,10 @@ import org.springframework.data.mongodb.gridfs.ReactiveGridFsTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 
 import java.util.Collection;
 import java.util.Map;
@@ -141,6 +143,7 @@ public class GridFsProvider {
      *
      * @return 返回 Mono<Void>
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> deleteFileByFilename(String filename) {
         return gridFsTemplate.delete(Query.query(Criteria.where("filename").is(filename)));
     }
@@ -153,6 +156,7 @@ public class GridFsProvider {
      *
      * @return 返回 Mono<Void>
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> deleteFileById(ObjectId id) {
         return gridFsTemplate.delete(Query.query(Criteria.where("_id").is(id)));
     }

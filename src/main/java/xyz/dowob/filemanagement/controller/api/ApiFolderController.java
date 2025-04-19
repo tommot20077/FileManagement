@@ -10,15 +10,18 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFolderController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -38,6 +41,7 @@ import java.util.List;
  * 此類繼承自 {@link BaseFolderController}，並透過 RESTful API 提供對外的資料夾管理功能。
  */
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/api/v1/folders")
 public class ApiFolderController extends BaseFolderController {
     /**
@@ -59,8 +63,7 @@ public class ApiFolderController extends BaseFolderController {
               permissionService,
               fileServiceStrategy,
               fileProperties,
-              validationService,
-              folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
+              validationService, folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }
@@ -77,13 +80,18 @@ public class ApiFolderController extends BaseFolderController {
      *
      * @return 檔案列表
      */
-    @GetMapping("/{id}")
     @HideOverLength
+    @GetMapping("/{id}")
     public Mono<ResponseEntity<?>> getFolderFiles(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type, ServerWebExchange exchange) {
-        return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+        return handleError(Mono.defer(() -> {
+            if (id < 0) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.PATH_NOT_FOUND));
+            }
+            return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+        }), exchange);
     }
 
 
@@ -118,18 +126,55 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
 
-
     /**
-     * 獲取用戶分享的檔案列表
+     * 獲取回收站檔案列表
      *
      * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 回收站檔案列表
+     */
+    @GetMapping("/recycle")
+    public Mono<ResponseEntity<?>> getRecycleFiles(ServerWebExchange exchange,
+                                                   @RequestParam(required = false, defaultValue = "1") Integer page,
+                                                   @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.RECYCLE_FILE_ID.getId(), page, size, getFileEnums(type));
+    }
+
+    /**
+     * 獲取用戶所有檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 根目錄檔案列表
+     */
+    @GetMapping("/all")
+    public Mono<ResponseEntity<?>> getAllFiles(ServerWebExchange exchange,
+                                               @RequestParam(required = false, defaultValue = "1") Integer page,
+                                               @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, getFileEnums(type));
+    }
+
+    /**
+     * 獲取分享檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
      * @param type     過濾的檔案類型，可選
      *
      * @return 分享檔案列表
      */
     @GetMapping("/shared")
-    public Mono<ResponseEntity<?>> getSharedFiles(ServerWebExchange exchange, @RequestParam(required = false) List<String> type) {
-        return super.getUserFileList(exchange, ReservedSearchIdEnum.SHARE_FILE_ID.getId(), 1, null, getFileEnums(type));
+    public Mono<ResponseEntity<?>> getSharedFiles(ServerWebExchange exchange,
+                                                  @RequestParam(required = false, defaultValue = "1") Integer page,
+                                                  @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.SHARE_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
 

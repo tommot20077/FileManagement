@@ -4,7 +4,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -28,6 +30,7 @@ import java.util.HashMap;
  * @create 2024-09-17 00:23
  * @Version 1.0
  **/
+@RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseGuestController implements ResponseUnity {
     /**
      * 授權業務層對象

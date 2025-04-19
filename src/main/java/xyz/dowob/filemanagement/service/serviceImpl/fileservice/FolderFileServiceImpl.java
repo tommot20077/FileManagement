@@ -17,6 +17,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
@@ -29,6 +31,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.*;
@@ -63,6 +66,7 @@ import java.util.zip.ZipOutputStream;
  * @Version 1.0
  **/
 @Service
+@RecordLevel(LogLevelEnum.DEBUG)
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
     /**
@@ -695,6 +699,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      *
      * @return String
      */
+    @SkipRecord
     private String getTempZipFilename(UserFileMetadata folder) {
         return folder.getId() + "_" + folder.getFilename() + ".zip";
     }

@@ -205,7 +205,7 @@ public class ValidationException extends Exception {
          * HTTP狀態碼: 403
          * 錯誤信息: 權限不足
          */
-        FORBIDDEN(1125, HttpStatus.FORBIDDEN, "權限不足"),
+        FORBIDDEN(1125, HttpStatus.FORBIDDEN, "當前沒有權限執行此操作"),
 
         /**
          * 錯誤碼: 1126
@@ -381,6 +381,13 @@ public class ValidationException extends Exception {
          * 錯誤信息: 檔案大小超過限制
          */
         FILE_SIZE_LIMIT(1150, HttpStatus.BAD_REQUEST, "檔案大小超過限制，檔案大小: %s，限制大小: %s"),
+
+        /**
+         * 錯誤碼: 1151
+         * HTTP狀態碼: 404
+         * 錯誤信息: 路徑不存在
+         */
+        PATH_NOT_FOUND(1151, HttpStatus.NOT_FOUND, "請求路徑不存在"),
         ;
 
 

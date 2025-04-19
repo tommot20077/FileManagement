@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
@@ -30,7 +29,6 @@ import java.util.Objects;
  **/
 @Component
 @SuppressWarnings("unused")
-@SkipRecord
 public class RedisProvider {
     /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的
@@ -322,7 +320,8 @@ public class RedisProvider {
     public Mono<Object> incrementHashMap(String hashKey, String innerKey, long delta, Duration expireTime) {
         return redisTemplate
                 .opsForHash()
-                .increment(hashKey, innerKey, delta).flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
+                .increment(hashKey, innerKey, delta)
+                .flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
     }
 
 
@@ -790,10 +789,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteByPattern(String pattern) {
-        return redisTemplate.keys(pattern).collectList().flatMap(keys -> {
-            keys.forEach(redisTemplate::delete);
-            return Mono.empty();
-        });
+        return redisTemplate.keys(pattern).collectList().flatMap(keys -> redisTemplate.delete(keys.toArray(String[]::new)).then());
     }
 
 

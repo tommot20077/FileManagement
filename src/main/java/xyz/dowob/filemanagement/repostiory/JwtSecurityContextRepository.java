@@ -1,10 +1,13 @@
 package xyz.dowob.filemanagement.repostiory;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
@@ -12,7 +15,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.manager.JwtAuthenticationManager;
+import xyz.dowob.filemanagement.customenum.RoleEnum;
+import xyz.dowob.filemanagement.entity.User;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -46,6 +53,23 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
      * JWT 驗證管理器
      */
     private final JwtAuthenticationManager authenticationManager;
+
+    /**
+     * 遊客用戶對象
+     */
+    private static final User GUEST_USER = new User();
+
+    @PostConstruct
+    public void init() {
+        GUEST_USER.setId(0L);
+        GUEST_USER.setUsername("Guest");
+        GUEST_USER.setPassword("Guest");
+        GUEST_USER.setEmail("guest@example.com");
+        GUEST_USER.setRole(RoleEnum.VISITOR);
+        GUEST_USER.setStorageLimit(0L);
+        GUEST_USER.setUsedStorage(0L);
+    }
+
 
     /**
      * 此方法不支援，不需要保存 SecurityContext
@@ -90,9 +114,12 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
         if (token.get() != null) {
             Authentication auth = new UsernamePasswordAuthenticationToken(token.get(), token.get());
-            return authenticationManager.authenticate(auth).map(SecurityContextImpl::new);
+            return authenticationManager
+                    .authenticate(auth)
+                    .map(authentication -> (SecurityContext) new SecurityContextImpl(authentication))
+                    .switchIfEmpty(createGuestSecurityContext());
         }
-        return Mono.empty();
+        return createGuestSecurityContext();
     }
 
 
@@ -113,6 +140,17 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
             return Optional.of(matcher.group(1));
         }
         return Optional.empty();
+    }
+
+    /**
+     * 設置為遊客身分的用戶對象
+     *
+     * @return Mono<User> 返回遊客身分的用戶對象
+     */
+    private Mono<SecurityContext> createGuestSecurityContext() {
+        List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(RoleEnum.VISITOR.name()));
+        Authentication guestAuth = new UsernamePasswordAuthenticationToken(GUEST_USER.getId(), null, authorities);
+        return Mono.just(new SecurityContextImpl(guestAuth));
     }
 
     @Getter

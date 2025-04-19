@@ -11,19 +11,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
-import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
+import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
@@ -50,6 +51,7 @@ import static xyz.dowob.filemanagement.customenum.FileEnum.*;
  * @create 2025/3/6
  * @Version 1.0
  **/
+@RecordLevel(LogLevelEnum.INFO)
 @RequiredArgsConstructor
 public abstract class BaseFileController implements ResponseUnity {
     /**
@@ -126,12 +128,16 @@ public abstract class BaseFileController implements ResponseUnity {
 
                 Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, fileFilterDTO);
                 Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folder, user);
-                return validationService.validateFileType(folder, FOLDER).then(Mono.zip(fileListMono, filePathsMono).flatMap(tuple -> {
+                Mono<String> ownerMono = userService.getAllByParams(UserInfoTypeEnum.ID.name(), folder.getUserId()).next().map(User::getUsername);
+                if (user.getId().equals(0L) && folder.getUserId().equals(ReservedSearchIdEnum.ROOT_FOLDER_ID.getId())) {
+                    ownerMono = Mono.just("Guest");
+                }
+
+                return validationService.validateFileType(folder, FOLDER).then(Mono.zip(fileListMono, filePathsMono, ownerMono).flatMap(tuple -> {
                     HashMap<String, Object> result = new HashMap<>();
-                    result.put("userId", user.getId());
-                    result.put("username", user.getUsername());
                     result.put("files", tuple.getT1());
                     result.put("filePaths", tuple.getT2());
+                    result.put("owner", tuple.getT3());
                     return createResponseEntity(createResponse(exchange, "獲取用戶文件列表成功", result));
                 }));
             });
@@ -226,6 +232,7 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return 返回文件類型的枚舉列表。
      */
+    @SkipRecord
     protected List<FileEnum> getFileEnums(List<String> type) {
         return Optional.ofNullable(type).orElse(Collections.emptyList()).stream().map(t -> {
             try {
@@ -246,12 +253,16 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return HttpHeaders 返回 Http 標頭
      */
+    @SkipRecord
     protected HttpHeaders prepareHttpHeaders(DownloadActionEnum action, UserFileDataBO userFileDataBO, String rangeHeader, boolean enableCache) {
         HttpHeaders headers = getHttpHeaders(userFileDataBO, rangeHeader);
 
         if (action.equals(DownloadActionEnum.DOWNLOAD)) {
-            String encodedFilename = URLEncoder.encode(userFileDataBO.getFilename(), StandardCharsets.UTF_8);
-            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + encodedFilename);
+            String filename = userFileDataBO.getFilename();
+            String sanitizedFilename = filename.replace("\"", "");
+            String encodedFilename = URLEncoder.encode(sanitizedFilename, StandardCharsets.UTF_8).replace("+", "%20");
+
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizedFilename + "\"; filename*=UTF-8''" + encodedFilename);
             headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
         } else {
             headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
@@ -274,6 +285,7 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return HttpHeaders 返回 Http 標頭
      */
+    @SkipRecord
     private HttpHeaders getHttpHeaders(UserFileDataBO userFileDataBO, String rangeHeader) {
         HttpHeaders headers = new HttpHeaders();
         long fileSize = userFileDataBO.getFileSize();
@@ -303,8 +315,8 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
      */
-    protected Mono<ResponseEntity<Flux<DataBuffer>>> handleValidationError(ValidationException e, ServerWebExchange exchange) {
-        String errorMessage = String.format("下载失败: %s", e.getMessage());
+    public Mono<ResponseEntity<Flux<DataBuffer>>> handleDownloadValidationError(ValidationException e, ServerWebExchange exchange) {
+        String errorMessage = String.format("下載失敗: %s", e.getMessage());
         ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
 
         try {

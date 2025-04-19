@@ -18,10 +18,9 @@ import java.util.List;
  * @create 2024-10-03 22:38
  * @Version 1.0
  **/
-
-@ConfigurationProperties(prefix = "security")
-@Configuration
 @Data
+@Configuration
+@ConfigurationProperties(prefix = "security")
 public class SecurityProperties {
 
     /**

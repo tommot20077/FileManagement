@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
@@ -16,6 +17,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
@@ -40,6 +42,7 @@ import java.util.*;
  * @create 2025/2/11
  * @Version 1.0
  */
+@RecordLevel(LogLevelEnum.INFO)
 public class BaseOnlineFileController extends BaseFileController {
 
     /**
@@ -130,7 +133,7 @@ public class BaseOnlineFileController extends BaseFileController {
                             }
                         }));
             });
-        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
+        }).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 
 

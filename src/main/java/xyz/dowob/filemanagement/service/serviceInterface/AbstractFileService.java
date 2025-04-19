@@ -23,6 +23,7 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
@@ -58,6 +59,7 @@ import java.util.stream.Stream;
  * 檔案服務的抽象類，包含共通的上傳、下載邏輯
  */
 @RequiredArgsConstructor
+@RecordLevel(LogLevelEnum.DEBUG)
 public abstract class AbstractFileService implements FileService {
 
     /**
@@ -156,6 +158,16 @@ public abstract class AbstractFileService implements FileService {
     protected Long CHUNK_SIZE;
 
     /**
+     * 用戶文件列表根目錄的緩存鍵格式
+     */
+    private static final String ROOT_PAGE_KEY_FORMAT = "fileList_folder:0_user:%s";
+
+    /**
+     * 用戶文件列表的緩存鍵格式
+     */
+    private static final String GENERAL_PAGE_KEY_FORMAT = "fileList_folder:%s";
+
+    /**
      * 初始化方法，獲取文件配置中的分塊大小
      */
     @PostConstruct
@@ -200,15 +212,22 @@ public abstract class AbstractFileService implements FileService {
 
     /**
      * 獲取用戶文件列表的緩存鍵
+     * 如果搜索ID為空，則使用根文件夾ID
+     * 當搜索ID為根文件夾ID時，使用用戶ID作為緩存鍵名 {@code fileList_folder:0_user:%s}
+     * 否則使用搜索ID作為緩存鍵名 {@code fileList_folder:%s}
      *
      * @param userId   用戶ID
      * @param searchId 搜索ID
      *
      * @return 緩存鍵名
      */
+    @SkipRecord
     protected String getUserFileListBaseKey(Long userId, Long searchId) {
-        String PAGE_KEY_FORMAT = "fileList_user:%s_folder:%s";
-        return String.format(PAGE_KEY_FORMAT, userId, Objects.requireNonNullElse(searchId, 0L));
+        Long chooseId = Objects.requireNonNullElse(searchId, ReservedSearchIdEnum.ROOT_FOLDER_ID.getId());
+        if (chooseId.equals(ReservedSearchIdEnum.ROOT_FOLDER_ID.getId())) {
+            return String.format(ROOT_PAGE_KEY_FORMAT, userId);
+        }
+        return String.format(GENERAL_PAGE_KEY_FORMAT, searchId);
     }
 
 
@@ -217,7 +236,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @param uploadChunkDTO 上傳文件數據
      *
-     * @return Mono<UploadResponseDTO>
+     * @return Mono<UploadResponseDTO> 上傳響應數據
      */
     public Mono<UploadResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO) {
         String transferTaskId = uploadChunkDTO.getTransferTaskId();
@@ -264,8 +283,12 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<List < FolderListTreeProvider.FolderNode>> 用戶文件路徑節點
      */
-    @SkipRecord
     public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(UserFileMetadata file, User user) {
+        if (!Objects.equals(file.getUserId(), user.getId())) {
+            List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
+            return Mono.just(list);
+        }
+
         return Mono.just(file).flatMap(userFileMetadata -> {
             if (folderListTreeProvider != null) {
                 List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), file.getId());
@@ -415,7 +438,6 @@ public abstract class AbstractFileService implements FileService {
 
                 return resultList;
             })).flatMap(Flux::fromIterable);
-
         }));
     }
 
@@ -451,6 +473,31 @@ public abstract class AbstractFileService implements FileService {
             case null ->
                     userFileMetaRepository.findAllByParentFolderIdInAndIsDeleted(Collections.singletonList(fatherFolderId), false, entityOperations);
         };
+    }
+
+
+    /**
+     * 過濾所需的檔案元素並分頁
+     *
+     * @param flux<UserFileListDTO> 檔案列表流
+     * @param fileFilterDTO         文件過濾DTO
+     *
+     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
+     */
+    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
+        List<FileEnum> type = fileFilterDTO.getTypes();
+        int currentPage = fileFilterDTO.getPage();
+        int pageSize = fileFilterDTO.getPageSize();
+        if (type != null && !type.isEmpty()) {
+            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
+        }
+        return flux.collectList().map(list -> {
+            int size = list.size();
+            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
+            int end = Math.min(start + pageSize, size);
+            List<UserFileListDTO> subList = list.subList(start, end);
+            return Tuples.of(size, subList);
+        });
     }
 
 
@@ -499,43 +546,6 @@ public abstract class AbstractFileService implements FileService {
                         return userFileDataBO;
                     });
         });
-    }
-
-
-    /**
-     * 過濾所需的檔案元素並分頁
-     *
-     * @param flux<UserFileListDTO> 檔案列表流
-     * @param fileFilterDTO         文件過濾DTO
-     *
-     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
-     */
-    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
-        List<FileEnum> type = fileFilterDTO.getTypes();
-        int currentPage = fileFilterDTO.getPage();
-        int pageSize = fileFilterDTO.getPageSize();
-        if (type != null && !type.isEmpty()) {
-            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
-        }
-        return flux.collectList().map(list -> {
-            int size = list.size();
-            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
-            int end = Math.min(start + pageSize, size);
-            List<UserFileListDTO> subList = list.subList(start, end);
-            return Tuples.of(size, subList);
-        });
-    }
-
-
-    /**
-     * 獲取總分塊數的共通實現
-     *
-     * @param fileSize 文件大小
-     *
-     * @return 總分塊數
-     */
-    protected int getTotalChunks(long fileSize) {
-        return (int) Math.ceil((double) fileSize / CHUNK_SIZE);
     }
 
 
@@ -620,6 +630,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<byte [ ]>
      */
+    @SkipRecord
     protected Mono<byte[]> combineBytes(List<byte[]> byteArrays) {
         return Mono.fromCallable(() -> {
             int totalLength = byteArrays.stream().mapToInt(bytes -> bytes.length).sum();
@@ -676,6 +687,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return Mono<UserFileMetadata>
      */
+    @SkipRecord
     protected Mono<UserFileMetadata> associateUserFile(ServerFileMetadata serverFileMetadata, FileMetadataDTO fileMetadataDTO) {
         UserFileMetadata userFileMetadata = new UserFileMetadata();
         userFileMetadata.setUserId(fileMetadataDTO.getUser().getId());
@@ -712,20 +724,19 @@ public abstract class AbstractFileService implements FileService {
                 Mono<ChunkData> chunkOperation = this.gridFsProvider
                         .findFileByFileName(transferTaskId + "_chunk_" + index)
                         .flatMap(this.gridFsProvider::getResource)
-                        .flatMap(resource -> DataBufferUtils
-                                .join(resource.getDownloadStream())
-                                .onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM, e,
-                                                                                    transferTaskId + "_chunk_" + index
-                                )))
-                                .map(dataBuffer -> {
-                                    try {
-                                        byte[] bytes = new byte[dataBuffer.readableByteCount()];
-                                        dataBuffer.read(bytes);
-                                        return new ChunkData(index, bytes);
-                                    } finally {
-                                        DataBufferUtils.release(dataBuffer);
-                                    }
-                                }));
+                        .flatMap(resource -> DataBufferUtils.join(resource.getDownloadStream()).onErrorResume(e -> {
+                            String taskId = transferTaskId + "_chunk_" + index;
+                            return Mono.error(new ProcessException(ProcessException.ErrorCode.CANNOT_GET_FILE_STREAM, e, taskId));
+                        }))
+                        .map(dataBuffer -> {
+                            try {
+                                byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                                dataBuffer.read(bytes);
+                                return new ChunkData(index, bytes);
+                            } finally {
+                                DataBufferUtils.release(dataBuffer);
+                            }
+                        });
 
                 return Mono
                         .defer(() -> {
@@ -876,58 +887,6 @@ public abstract class AbstractFileService implements FileService {
 
 
     /**
-     * 更新用戶儲存空間使用量，此方法會根據文件ID列表計算文件大小
-     * 此為重載方法、計算刪除的文件大小
-     *
-     * @param user          用戶信息
-     * @param serverFileIds 服務器文件ID列表
-     *
-     * @return Mono<Void>
-     */
-    protected Mono<Void> calculateFileSize(User user, List<Long> serverFileIds) {
-        if (serverFileIds.isEmpty()) {
-            return Mono.empty();
-        }
-        Map<Long, Long> serverFileIdMap = new ConcurrentHashMap<>();
-        serverFileIds.forEach(serverFileId -> serverFileIdMap.put(serverFileId, serverFileIdMap.getOrDefault(serverFileId, 0L) + 1));
-
-        return serverFileMetaRepository
-                .findAllByIdIn(serverFileIdMap.keySet())
-                .map(serverFileMetadata -> serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId()))
-                .reduce(0L, Long::sum)
-                .flatMap(totalSize -> handleUserStorage(user, totalSize, true));
-    }
-
-
-    /**
-     * 更新用戶儲存空間使用量，此方法會根據文件大小計算用戶儲存空間使用量
-     *
-     * @param user     用戶信息
-     * @param fileSize 要更新的文件大小
-     * @param isDelete 是否為刪除操作
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> handleUserStorage(User user, long fileSize, boolean isDelete) {
-        return Mono.defer(() -> userRepository.findById(user.getId()).flatMap(userEntity -> {
-            long newStorageUsed = isDelete ? Math.max(userEntity.getUsedStorage() - fileSize, 0) : userEntity.getUsedStorage() + fileSize;
-            if (user.getStorageLimit() != -1 && newStorageUsed > user.getStorageLimit()) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
-                                                          ByteEnum.toReadableSize(user.getStorageLimit()),
-                                                          ByteEnum.toReadableSize(user.getUsedStorage()),
-                                                          ByteEnum.toReadableSize(fileSize)
-                ));
-            }
-            userEntity.setUsedStorage(newStorageUsed);
-
-            List<String> keys = Arrays.asList(user.getId().toString(), userEntity.getUsername());
-            Mono<Void> cleanCache = cacheManager.deleteCaches(keys, CacheProviderEnum.USER_CACHE);
-            return userRepository.save(userEntity).then(cleanCache);
-        }));
-    }
-
-
-    /**
      * 初始化上傳任務，若需要則返回Mono<String> taskId
      *
      * @param fileMetadataDTO 檔案元數據
@@ -959,7 +918,7 @@ public abstract class AbstractFileService implements FileService {
         }));
     }
 
-    
+
     /**
      * 處理文件分塊的共通實現
      *
@@ -1175,6 +1134,58 @@ public abstract class AbstractFileService implements FileService {
 
 
     /**
+     * 更新用戶儲存空間使用量，此方法會根據文件ID列表計算文件大小
+     * 此為重載方法、計算刪除的文件大小
+     *
+     * @param user          用戶信息
+     * @param serverFileIds 服務器文件ID列表
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> calculateFileSize(User user, List<Long> serverFileIds) {
+        if (serverFileIds.isEmpty()) {
+            return Mono.empty();
+        }
+        Map<Long, Long> serverFileIdMap = new ConcurrentHashMap<>();
+        serverFileIds.forEach(serverFileId -> serverFileIdMap.put(serverFileId, serverFileIdMap.getOrDefault(serverFileId, 0L) + 1));
+
+        return serverFileMetaRepository
+                .findAllByIdIn(serverFileIdMap.keySet())
+                .map(serverFileMetadata -> serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId()))
+                .reduce(0L, Long::sum)
+                .flatMap(totalSize -> handleUserStorage(user, totalSize, true));
+    }
+
+
+    /**
+     * 更新用戶儲存空間使用量，此方法會根據文件大小計算用戶儲存空間使用量
+     *
+     * @param user     用戶信息
+     * @param fileSize 要更新的文件大小
+     * @param isDelete 是否為刪除操作
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> handleUserStorage(User user, long fileSize, boolean isDelete) {
+        return Mono.defer(() -> userRepository.findById(user.getId()).flatMap(userEntity -> {
+            long newStorageUsed = isDelete ? Math.max(userEntity.getUsedStorage() - fileSize, 0) : userEntity.getUsedStorage() + fileSize;
+            if (user.getStorageLimit() != -1 && newStorageUsed > user.getStorageLimit()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
+                                                          ByteEnum.toReadableSize(user.getStorageLimit()),
+                                                          ByteEnum.toReadableSize(user.getUsedStorage()),
+                                                          ByteEnum.toReadableSize(fileSize)
+                ));
+            }
+            userEntity.setUsedStorage(newStorageUsed);
+
+            List<String> keys = Arrays.asList(user.getId().toString(), userEntity.getUsername());
+            Mono<Void> cleanCache = cacheManager.deleteCaches(keys, CacheProviderEnum.USER_CACHE);
+            return userRepository.save(userEntity).then(cleanCache);
+        }));
+    }
+
+
+    /**
      * 格式化用戶文件元數據為列表DTO
      * 此方法會批量獲取服務器文件元數據並將其與用戶文件元數據進行合併成UserFileListDTO
      *
@@ -1256,6 +1267,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return 返回範圍數組
      */
+    @SkipRecord
     private long[] getRangeFromHeader(String rangeHeader, long fileSize) {
         long start = 0;
         long end = -1;
@@ -1280,6 +1292,7 @@ public abstract class AbstractFileService implements FileService {
      *
      * @return 返回數據流
      */
+    @SkipRecord
     protected Flux<DataBuffer> streamFileFromGridFS(Flux<DataBuffer> dataBufferFlux, long start, long end) {
         return Flux.defer(() -> {
             Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferFlux, start);
@@ -1288,6 +1301,19 @@ public abstract class AbstractFileService implements FileService {
             }
             return DataBufferUtils.takeUntilByteCount(skippedFlux, end - start + 1);
         });
+    }
+
+
+    /**
+     * 獲取總分塊數的共通實現
+     *
+     * @param fileSize 文件大小
+     *
+     * @return 總分塊數
+     */
+    @SkipRecord
+    protected int getTotalChunks(long fileSize) {
+        return (int) Math.ceil((double) fileSize / CHUNK_SIZE);
     }
 
 

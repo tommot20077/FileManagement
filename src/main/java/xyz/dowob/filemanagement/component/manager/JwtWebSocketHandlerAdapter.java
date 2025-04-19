@@ -15,11 +15,13 @@ import org.springframework.web.reactive.socket.server.upgrade.ReactorNettyReques
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.server.WebsocketServerSpec;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.handler.CustomWebSocketSession;
 import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
 import xyz.dowob.filemanagement.component.handler.WebSocketFailHandler;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
@@ -116,6 +118,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     @Override
     @NonNull
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> handleRequest(@NonNull ServerWebExchange exchange, @NonNull WebSocketHandler wsHandler) {
         return Mono.defer(() -> {
             String token = extractTokenFromProtocol(exchange);
@@ -166,6 +169,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param session  WebSocketSession 用於處理 WebSocket 請求的處理器
      * @param userId   用戶ID
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     private Mono<Void> handleWebSocketSession(ServerWebExchange exchange, WebSocketSession session, Long userId) {
         if (session instanceof ReactorNettyWebSocketSession nettySession) {
             try {
@@ -187,5 +191,4 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         }
         return fileUploadWebSocketHandler.handle(session);
     }
-
 }

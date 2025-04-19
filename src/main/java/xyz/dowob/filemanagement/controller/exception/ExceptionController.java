@@ -14,7 +14,11 @@ import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.*;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.controller.base.BaseFileController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.time.LocalDateTime;
@@ -39,7 +43,33 @@ import java.util.regex.Pattern;
  **/
 @Log4j2
 @RestControllerAdvice
+@RecordLevel(LogLevelEnum.ERROR)
 public class ExceptionController implements ResponseUnity {
+    /**
+     * 處理驗證異常，在控制器中已經有進行捕獲驗證的方法 {@link ResponseUnity#handleError} 以及 下載的處理 {@link BaseFileController#handleDownloadValidationError}
+     * 此處為捕獲權限AOP的驗證異常，因為當權限驗證時還尚未進到方法中。所以在此處進行捕獲
+     * 當驗證失敗時，返回一個 400 錯誤，並提示錯誤的參數
+     *
+     * @param ex       ValidationException 驗證異常
+     * @param exchange ServerWebExchange 服務器 Web的請求
+     *
+     * @return Mono<ResponseEntity> 回應實體
+     */
+    @RecordLevel(LogLevelEnum.DEBUG)
+    @ExceptionHandler({ValidationException.class})
+    public Mono<ResponseEntity<?>> handleValidationException(ValidationException ex, ServerWebExchange exchange) {
+        ApiResponseDTO<Void> apiResponseDTO = ApiResponseDTO
+                .<Void>builder()
+                .timestamp(LocalDateTime.now())
+                .status(ex.getErrorCode().getCode())
+                .path(exchange.getRequest().getURI().getPath())
+                .message(ex.getErrorCode().getMessage())
+                .data(null)
+                .build();
+
+        return createResponseEntity(apiResponseDTO, ex.getErrorCode().getHttpStatus().value());
+    }
+
 
     /**
      * 處理 404 錯誤，當請求的位置不存在時，返回一個 404 錯誤
@@ -49,6 +79,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler({NoResourceFoundException.class, ResponseStatusException.class})
     public Mono<ResponseEntity<?>> handleNotFound(Exception ex, ServerWebExchange exchange) {
         String requestUrl = exchange.getRequest().getURI().getPath();
@@ -75,6 +106,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler(MethodNotAllowedException.class)
     public Mono<ResponseEntity<?>> handleHttpRequestMethodNotSupportedException(MethodNotAllowedException ex, ServerWebExchange exchange) {
         log.debug("不支持的請求方法: {}", ex.getMessage());
@@ -99,6 +131,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler(UnsupportedMediaTypeStatusException.class)
     public Mono<ResponseEntity<?>> handleUnsupportedMediaTypeStatusException(UnsupportedMediaTypeStatusException ex, ServerWebExchange exchange) {
         log.debug("不支持的媒體類型: {}", ex.getMessage());
@@ -123,6 +156,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler(ConversionFailedException.class)
     public Mono<ResponseEntity<?>> handleConversionFailException(ConversionFailedException ex, ServerWebExchange exchange) {
         log.debug("轉換類型時發生錯誤: {}", ex.getMessage());
@@ -161,6 +195,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler({WebExchangeBindException.class, MissingRequestValueException.class})
     public Mono<ResponseEntity<?>> handleValidationExceptions(Exception ex, ServerWebExchange exchange) {
         Map<String, String> errors = new HashMap<>();
@@ -205,6 +240,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler(ServerWebInputException.class)
     public Mono<ResponseEntity<?>> handleInvalidJsonException(ServerWebInputException ex, ServerWebExchange exchange) {
         log.debug("用戶輸入的JSON 格式錯誤，錯誤: {}", ex.getMessage());
@@ -230,6 +266,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     @ExceptionHandler(UnsupportedOperationException.class)
     public Mono<ResponseEntity<?>> handleUnsupportedOperationException(UnsupportedOperationException ex, ServerWebExchange exchange) {
         log.debug("不支持的操作: {}", ex.getMessage());
@@ -255,6 +292,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.ERROR)
     @ExceptionHandler(R2dbcException.class)
     public Mono<ResponseEntity<?>> handleR2dbcException(R2dbcException ex, ServerWebExchange exchange) {
         log.error("R2dbc 錯誤: ", ex);
@@ -280,6 +318,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.ERROR)
     @ExceptionHandler(NonTransientDataAccessResourceException.class)
     private Mono<ResponseEntity<?>> handleDatabaseException(Throwable ex, ServerWebExchange exchange) {
         log.error("資料庫操作錯誤: ", ex);
@@ -307,6 +346,7 @@ public class ExceptionController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity> 回應實體
      */
+    @RecordLevel(LogLevelEnum.ERROR)
     @ExceptionHandler(Throwable.class)
     public Mono<ResponseEntity<?>> handleException(Throwable ex, ServerWebExchange exchange) {
         if (Exceptions.isRetryExhausted(ex)) {
@@ -354,7 +394,8 @@ public class ExceptionController implements ResponseUnity {
                 .<Void>builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .path(exchange.getRequest().getURI().getPath()).message("伺服器內部處理錯誤，請聯繫管理員並附上此ID: " + requestId)
+                .path(exchange.getRequest().getURI().getPath())
+                .message("伺服器內部處理錯誤，請聯繫管理員並附上此ID: " + requestId)
                 .data(null)
                 .build();
 

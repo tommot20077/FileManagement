@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
@@ -16,6 +17,7 @@ import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -43,6 +45,7 @@ import java.util.concurrent.CompletableFuture;
  * @create 2024-09-30 16:00
  * @Version 1.0
  **/
+@RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseFolderController extends BaseFileController {
 
     /**
@@ -254,6 +257,6 @@ public abstract class BaseFolderController extends BaseFileController {
                                 HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null, false);
                                 return ResponseEntity.status(HttpStatus.OK).headers(headers).body(userFileDataBO.getDataBufferFlux());
                             })));
-        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
+        }).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 }

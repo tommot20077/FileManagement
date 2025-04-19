@@ -5,20 +5,19 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 import xyz.dowob.filemanagement.repostiory.TokenRepository;
 
 import javax.crypto.SecretKey;
@@ -27,7 +26,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -42,8 +40,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Version 1.0
  **/
 @Component
+@RecordLevel(LogLevelEnum.DEBUG)
 @RequiredArgsConstructor
-@Log4j2
 public class JwtTokenProviderImpl implements TokenProvider {
     /**
      * TokenRepository 用於操作 Token 實體的數據庫操作類
@@ -103,8 +101,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
             Date expirationDate = new Date(now.getTime() + expirationMs);
             String jwtToken = Jwts
                     .builder()
-                    .subject(String.valueOf(user.getId()))
-                    .issuedAt(now).claim("role", role).claim("username", user.getUsername())
+                    .subject(String.valueOf(user.getId())).issuedAt(now).claim("role", role).claim("username", user.getUsername())
                     .claim("version", tokenVersion)
                     .expiration(expirationDate)
                     .signWith(key)
@@ -135,14 +132,11 @@ public class JwtTokenProviderImpl implements TokenProvider {
      * @return 用戶 ID
      */
     @Override
-    @SkipRecord
     public Mono<Long> validateToken(String token, Long userIdUseLess) {
         return Mono.defer(() -> {
             TokenCacheEntity cacheEntity = cacheTokenMap.get(token);
 
-            return getClaimsFromToken(token)
-                    .flatMap(claims -> validateTokenWithClaims(token, claims, cacheEntity).map(userId -> Tuples.of(userId, claims)))
-                    .flatMap(tuple -> updateExchangeAttributes(tuple.getT1(), tuple.getT2()))
+            return getClaimsFromToken(token).flatMap(claims -> validateTokenWithClaims(token, claims, cacheEntity))
                     .retryWhen(Retry.backoff(1, Duration.ofSeconds(3)).filter(e -> !(e instanceof ValidationException)));
         });
     }
@@ -222,27 +216,6 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 將用戶 ID 和用戶名存入 ServerWebExchange 的屬性中，方便後續操作時提取資訊
-     *
-     * @param userId 用戶 ID
-     * @param claims JWT 憑證中的 Claims
-     *
-     * @return 用戶 ID
-     */
-    private Mono<Long> updateExchangeAttributes(Long userId, Claims claims) {
-        return CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
-            String role = claims.get("role", String.class);
-            String requestId = UUID.randomUUID().toString();
-
-            exchange.getAttributes().put("userId", userId);
-            exchange.getAttributes().put("username", claims.get("username", String.class));
-            exchange.getAttributes().put("role", RoleEnum.valueOf(role));
-            exchange.getAttributes().put("requestId", requestId);
-        }).thenReturn(userId);
-    }
-
-
-    /**
      * 驗證快取中的 JWT 憑證是否有效
      * 分成幾種情況：
      * 1. 快取中無 JWT 憑證，返回 false
@@ -259,6 +232,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
      *
      * @throws ValidationException 驗證失敗時傳出 JWT_TOKEN_INVALID 錯誤
      */
+    @SkipRecord
     private boolean isValidCache(TokenCacheEntity cacheEntity, String version, String token) throws ValidationException {
         if (cacheEntity == null) {
             return false;
@@ -283,6 +257,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
      * @param tokenEntity Token 實體
      * @param userId      用戶 ID
      */
+    @SkipRecord
     private void updateCache(String token, Token tokenEntity, Long userId) {
         Date expireTime = tokenEntity.getJwtTokenExpireTime() != null ? Date.from(tokenEntity
                                                                                           .getJwtTokenExpireTime()
@@ -298,7 +273,13 @@ public class JwtTokenProviderImpl implements TokenProvider {
     public record TokenCacheEntity(String version, Long userId, Date expireTime) {
     }
 
+    /**
+     * 獲取快取中的 JWT 憑證記錄
+     *
+     * @return 快取中的 JWT 憑證記錄
+     */
     @HideSensitive
+    @SkipRecord
     public ConcurrentHashMap<String, TokenCacheEntity> getCacheTokenMap() {
         return cacheTokenMap;
     }

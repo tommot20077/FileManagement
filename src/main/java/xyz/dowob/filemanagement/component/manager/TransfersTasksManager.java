@@ -3,7 +3,9 @@ package xyz.dowob.filemanagement.component.manager;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.TransfersTask;
@@ -68,6 +70,7 @@ public class TransfersTasksManager {
      *
      * @return Mono<Void>
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> registerUploadTask(FileMetadataDTO fileMetadataDTO, String transferTaskId) {
         return Mono.defer(() -> {
             String md5 = fileMetadataDTO.getMd5();
@@ -137,6 +140,7 @@ public class TransfersTasksManager {
      *
      * @return Mono<Void> 返回一個 Mono 對象
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> finishTransfersTask(String md5, String transfersTaskId, String gridFsId) {
         return updateTransfersTask(md5,
                                    transfersTaskId,
@@ -160,6 +164,7 @@ public class TransfersTasksManager {
      *
      * @return Mono<Void> 返回一個 Mono 對象
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
         TransfersTask transfersTask = activeTransfersTask.get(md5).get(transfersTaskId);
         if (transfersTask == null) {

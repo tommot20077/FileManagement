@@ -11,15 +11,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
-import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
-import xyz.dowob.filemanagement.customenum.PermissionEnum;
-import xyz.dowob.filemanagement.customenum.TokenEnum;
-import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
+import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -52,6 +50,7 @@ import java.util.stream.Stream;
  * @Version 1.0
  **/
 @Service
+@RecordLevel(LogLevelEnum.INFO)
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     /**
@@ -104,6 +103,8 @@ public class UserServiceImpl implements UserService {
      */
     private CacheRule<User> USERNAME_CACHE_RULE;
 
+    private final User GUEST_USER = new User();
+
     /**
      * 初始化緩存規則
      */
@@ -111,6 +112,15 @@ public class UserServiceImpl implements UserService {
     public void init() {
         USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
         USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
+
+        GUEST_USER.setId(0L);
+        GUEST_USER.setUsername("Guest");
+        GUEST_USER.setPassword("Guest");
+        GUEST_USER.setEmail("guest@example.com");
+        GUEST_USER.setRole(RoleEnum.VISITOR);
+        GUEST_USER.setStorageLimit(0L);
+        GUEST_USER.setUsedStorage(0L);
+
     }
 
 
@@ -251,39 +261,43 @@ public class UserServiceImpl implements UserService {
      * 用於獲取用戶的方法，根據請求對象獲取用戶對象
      * 先從Session中獲取用戶ID，如果Session中沒有則從SecurityContext中獲取
      * 當其中一個獲取到用戶ID時，則根據用戶ID獲取用戶對象
-     * 如果都沒有獲取到用戶ID，則返回空
+     * 如果都沒有獲取到用戶ID，則返回遊客身分的用戶對象
      *
      * @param exchange 請求對象
      *
      * @return Mono<User> 返回用戶對象
      */
     @Override
-    @SkipRecord
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getUser(ServerWebExchange exchange) {
-        final Object[] userId = new Object[1];
-        return Mono.defer(() -> {
-            userId[0] = exchange.getAttributes().getOrDefault("userId", null);
-            if (userId[0] == null) {
-                return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication).flatMap(authentication -> {
-                    if (authentication != null && authentication.isAuthenticated()) {
-                        userId[0] = Long.valueOf(authentication.getPrincipal().toString());
-                        return cacheManager.runAndSetCache(userId[0].toString(),
-                                                           User.class,
-                                                           CacheProviderEnum.USER_CACHE,
-                                                           userRepository.findById((Long) userId[0]),
-                                                           List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
-                        );
+        return Mono.defer(() -> ReactiveSecurityContextHolder
+                .getContext()
+                .map(SecurityContext::getAuthentication)
+                .map(auth -> (Long) auth.getPrincipal())
+                .flatMap(userId -> {
+                    if (Objects.equals(userId, 0L)) {
+                        return Mono.just(GUEST_USER);
                     }
-                    return Mono.empty();
-                });
-            }
-            return cacheManager.runAndSetCache(userId[0].toString(),
-                                               User.class,
-                                               CacheProviderEnum.USER_CACHE,
-                                               userRepository.findById((Long) userId[0]),
-                                               List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
-            );
-        }).switchIfEmpty(Mono.empty());
+                    return getUserFromCache(userId);
+                }));
+    }
+
+
+    /**
+     * 根據用戶ID獲取緩存中的用戶對象
+     *
+     * @param userId 用戶ID
+     *
+     * @return Mono<User> 返回用戶對象
+     */
+    @SkipRecord
+    private Mono<User> getUserFromCache(Long userId) {
+        return cacheManager.runAndSetCache(userId.toString(),
+                                           User.class,
+                                           CacheProviderEnum.USER_CACHE,
+                                           this.getById(userId),
+                                           List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
+        );
     }
 
 
@@ -307,6 +321,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回一個Optional對象
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getById(Long userId) {
         return userRepository.findById(userId);
     }
@@ -317,6 +332,7 @@ public class UserServiceImpl implements UserService {
      */
 
     @Override
+    @RecordLevel(LogLevelEnum.WARN)
     @RequirePermission(PermissionEnum.MANAGE)
     public Flux<User> getAll() {
         return userRepository.findAll();
@@ -331,6 +347,7 @@ public class UserServiceImpl implements UserService {
      * @return 返回所有實體
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Flux<User> getAllByParams(String type, Object... args) {
         if (args.length == 0) {
             return Flux.empty();
@@ -342,6 +359,7 @@ public class UserServiceImpl implements UserService {
         Stream.of(args).forEach(arg -> {
             userInfoList.add(arg.toString());
         });
+
         Flux<User> cacheUserFlux = cacheManager.getCachesAsConcat(userInfoList, User.class, CacheProviderEnum.USER_CACHE).doOnNext(user -> {
             Object userType = isId ? user.getId().toString() : user.getUsername();
             userInfoList.remove(userType);
@@ -391,6 +409,8 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
+    @RecordLevel(LogLevelEnum.WARN)
+    @RequirePermission(PermissionEnum.MANAGE)
     public Mono<Void> delete(User entity) {
         return Mono.empty();
     }

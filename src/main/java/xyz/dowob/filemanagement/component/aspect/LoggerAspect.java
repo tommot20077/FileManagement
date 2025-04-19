@@ -14,13 +14,16 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.controller.exception.ExceptionController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -92,8 +95,8 @@ public class LoggerAspect {
                 return ((Mono<?>) result).transformDeferredContextual((momo, context) -> {
                     ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
                     return momo.doOnNext(resp -> {
-                        String value = processMethodSignature(method, resp);
-                        logOperation(exchange, joinPoint, value, null);
+                        LogInfo info = processMethodSignature(method, resp);
+                        logOperation(exchange, joinPoint, info, null);
                     }).doOnError(e -> {
                         logOperation(exchange, joinPoint, null, e);
                     });
@@ -106,12 +109,13 @@ public class LoggerAspect {
                         String value = String.format("Flux<%s> 內元素數量: %d", method.getReturnType().getSimpleName(), count.get());
                         logOperation(exchange, joinPoint, processMethodSignature(method, value), null);
                     }).doOnError(error -> {
-                        logOperation(exchange, joinPoint, "Flux 內處理失敗，已處理元素數量: " + count.get(), error);
+                        LogInfo info = new LogInfo(LogLevelEnum.ERROR, "Flux 內處理失敗，已處理元素數量: " + count.get());
+                        logOperation(exchange, joinPoint, info, error);
                     });
                 });
             } else {
-                String value = processMethodSignature(method, result);
-                logWithExchange(joinPoint, value, null);
+                LogInfo info = processMethodSignature(method, result);
+                logWithExchange(joinPoint, info, null);
                 return result;
             }
         } catch (Throwable e) {
@@ -123,99 +127,141 @@ public class LoggerAspect {
 
     /**
      * 根據方法的是否有額外的標記注釋，來判斷是否在日誌中的返回值是否進行處理
+     * 處理標記的順序如下:
+     * 1. 獲取是否具有日誌級別的標記 {@link RecordLevel}，如果有則取代預設值 {@link LogLevelEnum#TRACE}
+     * - 會檢查獲取到的日誌級別是否包含在當前日誌級別中，如果不符合則直接返回 null
+     * 2. 是否有 {@link SkipRecord} 標記，並檢查是否有與當前日誌級別相同的跳過標記，此為第一優先處理，會覆蓋其他標記
+     * - 優先處理方法的標記
+     * - 其次處理類的標記
+     * 3. 返回值為 null 時，則返回無返回值的訊息
+     * 4. 是否有 {@link HideSensitive} 標記，隱藏敏感訊息
+     * 5. 是否有 {@link HideOverLength} 標記，自動截斷過長的訊息
+     * - 會將訊息截斷為300個字元，並在最後加上省略號
+     * 最後返回處理後的日誌訊息
      *
      * @param method 方法
      * @param result 方法的返回值
      *
      * @return String 處理後的日誌顯示的返回值
      */
-    private String processMethodSignature(Method method, Object result) {
+    private LogInfo processMethodSignature(Method method, Object result) {
         Class<?> declaringClass = method.getDeclaringClass();
+        LogLevelEnum logLevelEnum = LogLevelEnum.TRACE;
 
-        boolean isSkip = method.isAnnotationPresent(SkipRecord.class) || declaringClass.isAnnotationPresent(SkipRecord.class);
-        boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
-        boolean isOverLength = method.isAnnotationPresent(HideOverLength.class) || declaringClass.isAnnotationPresent(HideOverLength.class);
-        if (isSkip) {
+        if (method.isAnnotationPresent(RecordLevel.class)) {
+            logLevelEnum = method.getAnnotation(RecordLevel.class).value();
+        } else if (declaringClass.isAnnotationPresent(RecordLevel.class)) {
+            logLevelEnum = declaringClass.getAnnotation(RecordLevel.class).value();
+        }
+
+        if (!log.isEnabled(logLevelEnum.getLevel())) {
             return null;
         }
 
-        if (isSensitive) {
-            return "[隱藏敏感訊息]";
+        LogLevelEnum[] skipRecordLevel = null;
+        if (method.isAnnotationPresent(SkipRecord.class)) {
+            skipRecordLevel = method.getAnnotation(SkipRecord.class).value();
+        } else if (declaringClass.isAnnotationPresent(SkipRecord.class)) {
+            skipRecordLevel = declaringClass.getAnnotation(SkipRecord.class).value();
+        }
+
+        if (skipRecordLevel != null) {
+            for (LogLevelEnum skipLevel : skipRecordLevel) {
+                if (logLevelEnum == skipLevel) {
+                    return null;
+                }
+            }
         }
 
         if (result == null) {
-            return "無返回值";
+            return new LogInfo(logLevelEnum, "無返回值");
         }
-        if (isOverLength) {
-            if (result.toString().length() > 300) {
-                return result.toString().substring(0, 300) + "...";
-            }
-            return result.toString();
+
+        boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
+        boolean isOverLength = method.isAnnotationPresent(HideOverLength.class) || declaringClass.isAnnotationPresent(HideOverLength.class);
+
+        if (isSensitive) {
+            return new LogInfo(logLevelEnum, "[隱藏敏感訊息]");
         }
-        return result.toString();
+
+        if (isOverLength && result.toString().length() > 300) {
+            return new LogInfo(logLevelEnum, result.toString().substring(0, 300) + "...");
+        }
+        return new LogInfo(logLevelEnum, result.toString());
     }
 
 
     /**
-     * 記錄操作信息
+     * 記錄操作信息，包括請求ID、請求者名稱、所屬類、使用方法、返回值等信息
+     * 若處理結果有發生異常，則記錄錯誤訊息
+     * 並依照照日誌紀錄 {@link LogInfo} 的級別進行日誌輸出
      *
      * @param exchange   伺服器交換協議對象
      * @param className  類名
      * @param methodName 方法名
-     * @param result     返回值
+     * @param info       日誌紀錄訊息
      * @param error      錯誤
      */
-    private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, Object result, Throwable error) {
+    private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, LogInfo info, Throwable error) {
         String[] usernameAndUserId = getRequestIdAndUsernameAndUserId(exchange);
-
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
 
         if (error != null) {
-            if (error instanceof ValidationException) {
-                log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 警告訊息: {}",
-                          usernameAndUserId[0],
-                          usernameAndUserId[1],
-                          usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
-                          className,
-                          methodName,
-                          error.getMessage()
-                );
-            } else {
+            boolean isValidationException = error instanceof ValidationException;
+            if (isValidationException && log.isDebugEnabled()) {
+                String format = "[請求ID: %s] 請求者: %s %s| 所屬類: %s | 使用方法: %s | 警告訊息: %s";
+                Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, error.getMessage()};
+
+                log.debug(String.format(format, args));
+            } else if (!isValidationException && log.isErrorEnabled()) {
                 String formattedArgs = Arrays
                         .stream(joinPoint.getArgs())
                         .map(arg -> arg != null ? arg.toString() : "null")
                         .map(argStr -> argStr.length() > 500 ? argStr.substring(0, 500) + "..." : argStr)
                         .collect(Collectors.joining(", "));
 
+                String format = "[請求ID: %s] 請求者: %s %s| 所屬類: %s | 使用方法: %s | 傳入參數: %s | 錯誤訊息: %s";
+                Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, formattedArgs, error.getMessage(), error};
 
-                log.error("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 傳入參數: {} | 錯誤訊息: {}",
-                          usernameAndUserId[0],
-                          usernameAndUserId[1],
-                          usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
-                          className,
-                          methodName,
-                          formattedArgs,
-                          error.getMessage(),
-                          error
-                );
+                log.error(String.format(format, args));
             }
         } else {
-            if (result == null) {
+            if (info == null) {
                 return;
             }
+            String format = "請求ID: %s 請求者: %s %s| 所屬類: %s | 使用方法: %s | 返回值: %s";
+            Object[] args = new Object[]{usernameAndUserId[0], usernameAndUserId[1], usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "", className, methodName, info.message()};
 
-            log.debug("[請求ID: {}] 請求者: {} {}| 所屬類: {} | 使用方法: {} | 返回值: {}",
-                      usernameAndUserId[0],
-                      usernameAndUserId[1],
-                      usernameAndUserId[2] != null ? "(ID:" + usernameAndUserId[2] + ") " : "",
-                      className,
-                      methodName,
-                      result
-            );
+            switch (info.logLevel()) {
+                case TRACE -> {
+                    if (log.isTraceEnabled()) {
+                        log.trace(String.format(format, args));
+                    }
+                }
+                case DEBUG -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug(String.format(format, args));
+                    }
+                }
+                case INFO -> {
+                    if (log.isInfoEnabled()) {
+                        log.info(String.format(format, args));
+                    }
+                }
+                case WARN -> {
+                    if (log.isWarnEnabled()) {
+                        log.warn(String.format(format, args));
+                    }
+                }
+                case ERROR -> {
+                    if (log.isErrorEnabled()) {
+                        log.error(String.format(format, args));
+                    }
+                }
+            }
         }
     }
-
 
     /**
      * 此方法為處理一般狀況下的日誌輸出，因為無法直接獲取 ServerWebExchange 對象
@@ -225,7 +271,7 @@ public class LoggerAspect {
      * @param result    返回值
      * @param error     錯誤
      */
-    private void logWithExchange(ProceedingJoinPoint joinPoint, Object result, Throwable error) {
+    private void logWithExchange(ProceedingJoinPoint joinPoint, LogInfo result, Throwable error) {
         CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
             logOperation(exchange, joinPoint, result, error);
         }).switchIfEmpty(Mono.defer(() -> {
@@ -254,16 +300,26 @@ public class LoggerAspect {
             requestId = "無";
             requestUsername = "server";
             requsetUserId = null;
-
-        } else if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null) {
-            requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
-            requestUsername = "IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
-            requsetUserId = null;
         } else {
-            requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
-            requestUsername = (String) exchange.getAttribute("username");
-            requsetUserId = ((Long) exchange.getAttribute("userId")).toString();
+            boolean isVisitorRequest = Objects.equals(exchange.getAttribute("userId"), "0");
+
+            if (exchange.getAttribute("username") == null || exchange.getAttribute("userId") == null || isVisitorRequest) {
+                requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
+                requestUsername = "IP: " + exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+                requsetUserId = null;
+            } else {
+                requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId").toString() : "無";
+                requestUsername = (String) exchange.getAttribute("username");
+                requsetUserId = ((Long) exchange.getAttribute("userId")).toString();
+            }
         }
         return new String[]{requestId, requestUsername, requsetUserId};
+    }
+
+
+    /**
+     * 日誌信息類，用於存儲日誌級別和日誌訊息
+     */
+    record LogInfo(LogLevelEnum logLevel, String message) {
     }
 }

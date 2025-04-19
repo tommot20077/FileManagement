@@ -7,7 +7,9 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
@@ -28,6 +30,7 @@ import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 安全配置類，用於配置安全相關的設置。
@@ -105,15 +108,11 @@ public class SecurityConfig {
                         .contentSecurityPolicy(contentSecurityPolicySpec -> {
                             contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                         }))
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .authorizeExchange(exchange -> exchange
-                        .pathMatchers("/web/v1/guest/**", "/api/v1/guest/**", "/docs/**", "/ws/**", "/actuator/health")
-                        .permitAll()
-                        .anyExchange()
-                        .authenticated())
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable).authorizeExchange(pathSecurity())
                 .securityContextRepository(securityContextRepository)
+                .addFilterBefore(traceIdFilter(), SecurityWebFiltersOrder.HTTP_HEADERS_WRITER)
+                .addFilterBefore(contextWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .addFilterAt(csrfTokenResponseFilter, SecurityWebFiltersOrder.CSRF)
-                .addFilterAt(contextWebFilter, SecurityWebFiltersOrder.EXCEPTION_TRANSLATION)
                 .exceptionHandling(exceptionHandlingSpec -> exceptionHandlingSpec
                         .authenticationEntryPoint((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.UNAUTHORIZED))
                         .accessDeniedHandler((exchange, e) -> writeJsonResponse(exchange, ValidationException.ErrorCode.FORBIDDEN)))
@@ -197,5 +196,62 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * 生成唯一的請求 ID
+     * 用於追蹤請求的唯一標識符
+     *
+     * @return WebFilter 請求 ID 過濾器
+     */
+    @Bean
+    public WebFilter traceIdFilter() {
+        return (exchange, chain) -> {
+            String traceId = exchange.getAttribute("requestId");
+            if (traceId == null) {
+                traceId = UUID.randomUUID().toString();
+                exchange.getAttributes().put("requestId", traceId);
+            }
+            return chain.filter(exchange);
+        };
+    }
+
+
+    /**
+     * 獲取允許訪客訪問的路徑
+     *
+     * @return 允許訪問的路徑
+     */
+    private String[] allowGuestPath() {
+        return new String[]{"/docs/**", "/api/v1/user/info", "/web/v1/user/info", "/api/v1/folders/*", "/web/v1/folders/*", "/api/v1/folders/*/download", "/web/v1/folders/*/download", "/api/v1/files/*", "/web/v1/files/*", "/api/v1/files/*/info", "/web/v1/files/*/info", "/api/v1/docs/*", "/web/v1/docs/*", "/api/v1/docs/history/*", "/web/v1/docs/history/*",};
+    }
+
+
+    /**
+     * 獲取禁止訪客訪問的路徑
+     *
+     * @return 禁止訪問的路徑
+     */
+    private String[] denyGuestPath() {
+        return new String[]{"/api/v1/folders/star", "/web/v1/folders/star", "/api/v1/folders/recently", "/web/v1/folders/recently", "/api/v1/folders/recycle", "/web/v1/folders/recycle", "/api/v1/folders/shared", "/web/v1/folders/shared", "/api/v1/folders/all", "/web/v1/folders/all", "/api/v1/folders/path/*", "/web/v1/folders/path/*", "/api/v1/files/user-file-list", "/web/v1/files/user-file-list", "/api/v1/files/search", "/web/v1/files/search",};
+    }
+
+    /**
+     * 獲取訪問權限的路徑
+     *
+     * @return 訪問權限的路徑
+     */
+    private Customizer<ServerHttpSecurity.AuthorizeExchangeSpec> pathSecurity() {
+        return exchange -> exchange
+                .pathMatchers(denyGuestPath())
+                .hasAnyAuthority("USER", "ADVANCE_USER", "ADMIN")
+                .pathMatchers(HttpMethod.GET, allowGuestPath())
+                .permitAll()
+                .pathMatchers("/api/v1/guest/**", "/web/v1/guest/**", "/actuator/health")
+                .permitAll()
+                .pathMatchers("/actuator/**")
+                .hasAnyAuthority("ADMIN")
+                .anyExchange()
+                .hasAnyAuthority("USER", "ADVANCE_USER", "ADMIN");
     }
 }

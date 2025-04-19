@@ -8,10 +8,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
@@ -87,6 +89,7 @@ public class FolderListTreeManager implements ApplicationRunner {
      *
      * @param userIds 用戶ID
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public void initializeTree(Long... userIds) {
         Flux<User> userFlux = userIds.length == 0 ? userRepository.findAll() : userRepository.findAllById(Flux.fromArray(userIds));
 
@@ -116,6 +119,7 @@ public class FolderListTreeManager implements ApplicationRunner {
      *
      * @return 返回所有用戶的檔案列表
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     private Flux<PagedResponseDTO<UserFileListDTO>> fetchAllUserFiles(User user) {
         int pageSize = fileProperties.getGlobal().getPageSize();
         FileFilterDTO fileFilterDTO = FileFilterDTO

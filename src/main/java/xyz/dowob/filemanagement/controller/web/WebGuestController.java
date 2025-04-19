@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -25,6 +28,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.UserService;
  * @Version 1.0
  **/
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/web/v1/guest")
 public class WebGuestController extends BaseGuestController {
     /**
@@ -105,6 +109,7 @@ public class WebGuestController extends BaseGuestController {
      *
      * @return Mono<ResponseEntity < ?>> 返回用戶授權狀態的結果
      */
+    @SkipRecord
     @GetMapping("/checkAuthenticationStatus")
     public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
         return super.checkAuthenticationStatus(exchange);

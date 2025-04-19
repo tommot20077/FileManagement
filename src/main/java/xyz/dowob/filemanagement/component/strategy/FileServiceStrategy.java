@@ -3,7 +3,6 @@ package xyz.dowob.filemanagement.component.strategy;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 
@@ -22,7 +21,6 @@ import java.util.Optional;
  * @create 2024-09-26 22:10
  * @Version 1.0
  **/
-
 @Component
 public class FileServiceStrategy {
     /**
@@ -59,7 +57,6 @@ public class FileServiceStrategy {
      *
      * @return 返回默認的檔案處理方法
      */
-    @SkipRecord
     public FileService getFileService() {
         return getFileService(null);
     }
@@ -72,7 +69,6 @@ public class FileServiceStrategy {
      *
      * @return 返回對應的檔案處理方法
      */
-    @SkipRecord
     public FileService getFileService(FileEnum fileEnum) {
         if (fileEnum != null) {
             FileService fileService = fileStrategies.get(fileEnum);

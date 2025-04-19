@@ -5,7 +5,9 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
@@ -23,6 +25,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
  * @Version 1.0
  **/
 @Service
+@RecordLevel(LogLevelEnum.DEBUG)
 @RequiredArgsConstructor
 public class TokenServiceImpl implements TokenService {
     /**
@@ -40,6 +43,7 @@ public class TokenServiceImpl implements TokenService {
      */
     @Override
     @HideSensitive
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<String> generateToken(User user, TokenEnum tokenType) {
         return tokenStrategy.getTokenProvider(tokenType).generateToken(user);
     }
@@ -68,6 +72,7 @@ public class TokenServiceImpl implements TokenService {
      * @param tokenType 憑證類型
      */
     @Override
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> revokeToken(Long userId, TokenEnum tokenType) {
         return tokenStrategy.getTokenProvider(tokenType).revokeToken(userId);
     }

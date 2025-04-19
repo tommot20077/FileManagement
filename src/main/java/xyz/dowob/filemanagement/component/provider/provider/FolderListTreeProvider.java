@@ -5,9 +5,11 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -34,6 +36,7 @@ import java.util.concurrent.TimeUnit;
  **/
 @Getter
 @Component
+@RecordLevel(LogLevelEnum.DEBUG)
 @ConditionalOnProperty(name = {"file.global.enable-user-folder-list-tree"}, havingValue = "true", matchIfMissing = true)
 public class FolderListTreeProvider {
     /**
@@ -141,6 +144,7 @@ public class FolderListTreeProvider {
      * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
      * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public void initializeTree(Long userId, List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException, ValidationException {
         FolderTree folderTree = userFileListTree.computeIfAbsent(userId, k -> new FolderTree(maxFolderDepth));
         folderTree.initializeTree(folderList, isLastPage);
@@ -190,7 +194,6 @@ public class FolderListTreeProvider {
      *
      * @return 資料夾的路徑列表
      */
-    @SkipRecord
     public List<FolderNode> getPath(Long userId, Long folderId) {
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
@@ -347,6 +350,7 @@ public class FolderListTreeProvider {
          * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
          * @throws ProcessException    當資料夾樹存在循環引用時，拋出此異常
          */
+
         private void addFolder(Boolean isFolder, Long folderId, Long parentFolderId, String filename) throws ValidationException, ProcessException {
             if (!isFolder) {
                 return;
@@ -498,6 +502,7 @@ public class FolderListTreeProvider {
          * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
          * @throws ProcessException    初始化資料夾樹失敗，當父資料夾不存在時，拋出此異常
          */
+        @RecordLevel(LogLevelEnum.INFO)
         private void initializeTree(List<UserFileListDTO> folderList, boolean isLastPage) throws ProcessException, ValidationException {
             for (UserFileListDTO folder : folderList) {
                 if (folder.getFileType() == FileEnum.FOLDER) {
@@ -549,6 +554,7 @@ public class FolderListTreeProvider {
          * @param parent 父資料夾節點
          * @param child  子資料夾節點
          */
+        @SkipRecord
         private void linkNodes(FolderNode parent, FolderNode child) {
             child.setParentFolder(parent);
             child.setCurrentDepth(parent.getCurrentDepth() + 1);
