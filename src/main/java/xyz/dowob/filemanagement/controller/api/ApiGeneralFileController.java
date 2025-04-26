@@ -10,11 +10,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGeneralFileController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
@@ -39,8 +41,22 @@ import java.util.List;
  * @Version 1.0
  **/
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/api/v1/files")
 public class ApiGeneralFileController extends BaseGeneralFileController {
+
+    /**
+     * 構造函數，初始化基本的業務層服務
+     *
+     * @param userService               用戶服務層對象
+     * @param fileServiceStrategy       文件服務策略對象，用於選擇適當的文件服務
+     * @param fileProperties            文件屬性設置
+     * @param validationService         驗證服務對象
+     * @param permissionService         用戶文件元數據授權服務
+     * @param userLimiterStrategy       用戶限制策略
+     * @param objectMapper              用於處理對象映射的工具
+     * @param filePermissionRuleManager 文件權限規則管理器
+     */
     public ApiGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, UserLimiterStrategy userLimiterStrategy, ValidationService validationService, FileProperties fileProperties, ObjectMapper objectMapper, PermissionService<UserFileMetadata> permissionService, FilePermissionRuleManager filePermissionRuleManager) {
         super(userService,
               fileServiceStrategy,

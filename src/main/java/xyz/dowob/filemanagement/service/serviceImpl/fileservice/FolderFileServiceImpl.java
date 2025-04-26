@@ -12,11 +12,14 @@ import org.springframework.data.mongodb.gridfs.ReactiveGridFsResource;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.util.Assert;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
@@ -29,6 +32,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.*;
@@ -63,6 +67,7 @@ import java.util.zip.ZipOutputStream;
  * @Version 1.0
  **/
 @Service
+@RecordLevel(LogLevelEnum.DEBUG)
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
     /**
@@ -119,8 +124,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
               objectMapper,
               cacheManager
         );
-        int maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
-        this.maxConcurrentLimit = maxConcurrentLimit > 0 ? maxConcurrentLimit : 5;
+        Assert.isTrue(fileProperties.getDownload().getFolderDownloadConcurrentLimit() > 0, "資料夾下載併發限制必須大於0");
+        this.maxConcurrentLimit = fileProperties.getDownload().getFolderDownloadConcurrentLimit();
 
         String tempDownloadPath = fileProperties.getDownload().getFolderTempDownloadPath();
         if (!tempDownloadPath.endsWith("/")) {
@@ -134,7 +139,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         }
 
 
-        int bs = fileProperties.getDownload().getZipBufferSize();
+        int bs = (int) fileProperties.getDownload().getZipBufferSize().toBytes();
         if (bs <= 0) {
             bs = 4096;
         }
@@ -380,7 +385,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                 return Mono.just(false);
             }
             return Mono.defer(() -> {
-                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime());
+                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
                 FileTrashRecord fileTrashRecord = new FileTrashRecord(childFolderList.getFirst(), deleteTime);
                 childFolderList.forEach(userFile -> userFile.setIsDeleted(true));
                 Mono<Boolean> result = fileTrashRecordRepository
@@ -695,6 +700,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      *
      * @return String
      */
+    @SkipRecord
     private String getTempZipFilename(UserFileMetadata folder) {
         return folder.getId() + "_" + folder.getFilename() + ".zip";
     }

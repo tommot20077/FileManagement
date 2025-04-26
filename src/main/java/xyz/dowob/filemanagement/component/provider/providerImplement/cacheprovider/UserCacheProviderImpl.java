@@ -1,11 +1,11 @@
 package xyz.dowob.filemanagement.component.provider.providerImplement.cacheprovider;
 
+import io.jsonwebtoken.lang.Assert;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.CacheProviderType;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
 import xyz.dowob.filemanagement.config.properties.CacheProperties;
@@ -32,7 +32,6 @@ import java.util.Objects;
  * @Version 1.0
  **/
 @Component
-@SkipRecord
 @CacheProviderType(CacheProviderEnum.USER_CACHE)
 @ConditionalOnProperty(prefix = "cache", name = "enable-user-info-cache", havingValue = "true", matchIfMissing = true)
 public class UserCacheProviderImpl implements CacheProvider {
@@ -57,12 +56,11 @@ public class UserCacheProviderImpl implements CacheProvider {
      * @param redisProvider Redis操作提供者
      */
     public UserCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
+        Assert.isTrue(cacheProperties.getUserInfoCacheExpireTime().isPositive(), "用戶資訊緩存過期時間必須大於0");
+
         this.redisProvider = redisProvider;
         this.CACHE_PREFIX = cacheProperties.getUserInfoCachePrefix();
-        if (cacheProperties.getUserInfoCacheExpireTime() <= 0) {
-            throw new IllegalArgumentException("用戶資訊緩存過期時間必須大於0");
-        }
-        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getUserInfoCacheExpireTime());
+        this.DEFAULT_EXPIRE_TIME = cacheProperties.getUserInfoCacheExpireTime();
     }
 
 
@@ -166,7 +164,6 @@ public class UserCacheProviderImpl implements CacheProvider {
      * @return Duration
      */
     @Override
-    @SkipRecord
     public Duration getDefaultExpire() {
         return DEFAULT_EXPIRE_TIME;
     }

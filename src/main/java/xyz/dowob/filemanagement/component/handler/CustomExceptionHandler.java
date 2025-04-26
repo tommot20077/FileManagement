@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.component.handler;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.autoconfigure.web.WebProperties;
 import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler;
 import org.springframework.boot.web.reactive.error.ErrorAttributes;
@@ -11,6 +12,8 @@ import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
@@ -66,6 +69,8 @@ public class CustomExceptionHandler extends AbstractErrorWebExceptionHandler {
      *
      * @return Mono<ServerResponse> 服務器響應
      */
+    @NotNull
+    @RecordLevel(LogLevelEnum.ERROR)
     private Mono<ServerResponse> handleException(ServerRequest request) {
         Throwable error = getError(request);
         ApiResponseDTO<Void> apiResponseDTO = new ApiResponseDTO<>(LocalDateTime.now(),

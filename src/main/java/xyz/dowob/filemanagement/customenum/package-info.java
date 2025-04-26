@@ -8,14 +8,15 @@
  * 6. EditTypeEnum: 用於定義文件編輯類型 {@link xyz.dowob.filemanagement.customenum.EditTypeEnum}
  * 7. FileEnum: 用於定義文件類型 {@link xyz.dowob.filemanagement.customenum.FileEnum}
  * 8. FileShareType: 用於定義文件分享類型 {@link xyz.dowob.filemanagement.customenum.FileShareTypeEnum}
- * 9. PermissionEnum: 用於定義權限 {@link xyz.dowob.filemanagement.customenum.PermissionEnum}
- * 10. ReservedSearchIdEnum: 用於定義預留的搜索 ID {@link xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum}
- * 11. RoleEnum: 用於定義角色 {@link xyz.dowob.filemanagement.customenum.RoleEnum}
- * 12. TokenEnum: 用於定義憑證 {@link xyz.dowob.filemanagement.customenum.TokenEnum}
- * 13. TransfersStatusEnum: 用於定義文件傳輸狀態 {@link xyz.dowob.filemanagement.customenum.TransfersStatusEnum}
- * 14. TransmissionEnum: 用於定義文件傳輸類型 {@link xyz.dowob.filemanagement.customenum.TransmissionEnum}
- * 15. UserFileListOrderEnum: 用於定義用戶文件列表排序類型 {@link xyz.dowob.filemanagement.customenum.UserFileListOrderEnum}
- * 16. UserInfoTypeEnum: 用於定義用戶信息類型 {@link xyz.dowob.filemanagement.customenum.UserInfoTypeEnum}
- * 17. UserLimiterEnum: 用於定義用戶限流器類型 {@link xyz.dowob.filemanagement.customenum.UserLimiterEnum}
+ * 9. LogLevelEnum: 用於定義日誌級別 {@link xyz.dowob.filemanagement.customenum.LogLevelEnum}
+ * 10. PermissionEnum: 用於定義權限 {@link xyz.dowob.filemanagement.customenum.PermissionEnum}
+ * 11. ReservedSearchIdEnum: 用於定義預留的搜索 ID {@link xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum}
+ * 12. RoleEnum: 用於定義角色 {@link xyz.dowob.filemanagement.customenum.RoleEnum}
+ * 13. TokenEnum: 用於定義憑證 {@link xyz.dowob.filemanagement.customenum.TokenEnum}
+ * 14. TransfersStatusEnum: 用於定義文件傳輸狀態 {@link xyz.dowob.filemanagement.customenum.TransfersStatusEnum}
+ * 15. TransmissionEnum: 用於定義文件傳輸類型 {@link xyz.dowob.filemanagement.customenum.TransmissionEnum}
+ * 16. UserFileListOrderEnum: 用於定義用戶文件列表排序類型 {@link xyz.dowob.filemanagement.customenum.UserFileListOrderEnum}
+ * 17. UserInfoTypeEnum: 用於定義用戶信息類型 {@link xyz.dowob.filemanagement.customenum.UserInfoTypeEnum}
+ * 18. UserLimiterEnum: 用於定義用戶限流器類型 {@link xyz.dowob.filemanagement.customenum.UserLimiterEnum}
  */
 package xyz.dowob.filemanagement.customenum;

@@ -16,6 +16,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
@@ -28,6 +30,7 @@ import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.OnlineHistoryCountAndOldestDAO;
@@ -61,6 +64,7 @@ import java.util.Stack;
  * @Version 1.0
  **/
 @Service
+@RecordLevel(LogLevelEnum.DEBUG)
 @FileHandlerType(FileEnum.ONLINE_DOCUMENT)
 public class OnlineFileServiceImpl extends AbstractFileService {
     /**
@@ -562,6 +566,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @return JSON
      */
+    @SkipRecord
     private Mono<String> formatObjectToJson(Object content) {
         try {
             return Mono.just(objectMapper.writeValueAsString(content));
@@ -578,6 +583,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @return 行
      */
+    @SkipRecord
     private List<String> convertDeltaToLines(EditorContentDTO content) {
         return content.getDelta().stream().map(delta -> {
             try {

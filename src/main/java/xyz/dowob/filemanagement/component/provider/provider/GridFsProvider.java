@@ -11,8 +11,10 @@ import org.springframework.data.mongodb.gridfs.ReactiveGridFsTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 
 import java.util.Collection;
 import java.util.Map;
@@ -38,10 +40,10 @@ public class GridFsProvider {
     /**
      * GridFSUploadOptions 用於設置 GridFS 上傳的選項
      * chunkSizeBytes 用於設置每個分塊的大小，默認為 255KB
-     * 此處設置為 1022KB，因為元數據需要空間儲存，故略小於1MB
+     * 此處設置為 1020KB，因為元數據需要空間儲存，故略小於1MB
      * 並從設定類中獲取設定大小
      *
-     * @see GridFSUploadOptions
+     * @see GridFSUploadOptions GridFS上傳選項
      */
     private final GridFSUploadOptions uploadOptions;
 
@@ -53,7 +55,7 @@ public class GridFsProvider {
      */
     public GridFsProvider(ReactiveGridFsTemplate gridFsTemplate, FileProperties fileProperties) {
         this.gridFsTemplate = gridFsTemplate;
-        this.uploadOptions = new GridFSUploadOptions().chunkSizeBytes(1022 * 1024 * fileProperties.getUpload().getPayloadLength());
+        this.uploadOptions = new GridFSUploadOptions().chunkSizeBytes((int) (fileProperties.getUpload().getPayloadLength().toKilobytes() * 1020));
     }
 
 
@@ -141,6 +143,7 @@ public class GridFsProvider {
      *
      * @return 返回 Mono<Void>
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> deleteFileByFilename(String filename) {
         return gridFsTemplate.delete(Query.query(Criteria.where("filename").is(filename)));
     }
@@ -153,6 +156,7 @@ public class GridFsProvider {
      *
      * @return 返回 Mono<Void>
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> deleteFileById(ObjectId id) {
         return gridFsTemplate.delete(Query.query(Criteria.where("_id").is(id)));
     }

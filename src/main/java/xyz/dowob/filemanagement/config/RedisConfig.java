@@ -6,14 +6,24 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.SocketOptions;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.time.Duration;
 
 /**
  * Redis 配置類，用於配置 Redis 相關的配置
@@ -28,6 +38,12 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 @RequiredArgsConstructor
 public class RedisConfig {
+
+    /**
+     * RedisProperties 用於獲取 Redis 的配置
+     */
+    private final RedisProperties redisProperties;
+
     /**
      * 配置 ReactiveRedisTemplate，定義序列化方式，統一使用 GenericJackson2JsonRedisSerializer 進行序列化
      *
@@ -49,8 +65,10 @@ public class RedisConfig {
 
         RedisSerializationContext<String, Object> serializationContext = RedisSerializationContext
                 .<String, Object>newSerializationContext()
-                .key(StringRedisSerializer.UTF_8).value(serializer)
-                .hashKey(StringRedisSerializer.UTF_8).hashValue(serializer)
+                .key(StringRedisSerializer.UTF_8)
+                .value(serializer)
+                .hashKey(StringRedisSerializer.UTF_8)
+                .hashValue(serializer)
                 .string(StringRedisSerializer.UTF_8)
                 .build();
         return new ReactiveRedisTemplate<>(reactiveRedisConnectionFactory, serializationContext);
@@ -68,4 +86,63 @@ public class RedisConfig {
         return objectMapper;
     }
 
+
+    /**
+     * 配置 RedisClient，設置連接池
+     * 這裡使用 Lettuce 作為 Redis 客戶端
+     * 這邊的配置主要是針對 Redis 的連接池進行配置
+     * 啟用了自動重連、SocketOptions、PublishOnScheduler 等選項
+     *
+     * @return RedisClient
+     */
+    @Bean(destroyMethod = "shutdown")
+    public RedisClient redisClient() {
+        RedisURI redisUri = RedisURI
+                .builder()
+                .withHost(redisProperties.getHost())
+                .withPort(redisProperties.getPort())
+                .withPassword(redisProperties.getPassword().toCharArray())
+                .withDatabase(redisProperties.getDatabase())
+                .build();
+
+        RedisClient redisClient = RedisClient.create(redisUri);
+        redisClient.setOptions(ClientOptions
+                                       .builder()
+                                       .autoReconnect(true)
+                                       .publishOnScheduler(true)
+                                       .socketOptions(SocketOptions.builder().keepAlive(true).tcpNoDelay(true).build())
+                                       .build());
+        return redisClient;
+    }
+
+
+    /**
+     * 配置 LettuceConnectionFactory，啟用連接池
+     * 這裡使用 Lettuce 作為 Redis 客戶端
+     * 設定了 Redis 的主機、端口、數據庫、密碼等配置
+     */
+    @Bean
+    public ReactiveRedisConnectionFactory reactiveRedisConnectionFactory() {
+        RedisStandaloneConfiguration redisConfiguration = new RedisStandaloneConfiguration();
+        redisConfiguration.setHostName(redisProperties.getHost());
+        redisConfiguration.setPort(redisProperties.getPort());
+        redisConfiguration.setDatabase(redisProperties.getDatabase());
+        redisConfiguration.setPassword(redisProperties.getPassword());
+        redisConfiguration.setUsername(redisProperties.getUsername());
+
+        LettucePoolingClientConfiguration clientConfig = LettucePoolingClientConfiguration
+                .builder()
+                .poolConfig(new org.apache.commons.pool2.impl.GenericObjectPoolConfig<>())
+                .commandTimeout(Duration.ofSeconds(redisProperties.getTimeout().getSeconds()))
+                .clientOptions(ClientOptions
+                                       .builder()
+                                       .autoReconnect(true)
+                                       .publishOnScheduler(true)
+                                       .disconnectedBehavior(ClientOptions.DisconnectedBehavior.DEFAULT)
+                                       .build())
+                .build();
+
+
+        return new LettuceConnectionFactory(redisConfiguration, clientConfig);
+    }
 }

@@ -10,8 +10,10 @@ import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.po.QuillContentPO;
 import xyz.dowob.filemanagement.exception.ProcessException;
 
@@ -139,6 +141,7 @@ public class WordConvertProvider implements ContentConvertProvider {
      * @return Mono<InputStream> 包含轉換後的 Word 文檔的 InputStream
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<InputStream> convertToInputStream(String content) {
         return convertToDataBuffer(content).flatMap(record -> record
                 .dataBuffer()
@@ -156,6 +159,7 @@ public class WordConvertProvider implements ContentConvertProvider {
      * @return Flux<DataBuffer> 包含轉換後的 Word 文檔的 DataBuffer
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<DataBufferRecord> convertToDataBuffer(String content) {
         return formatToDocument(content).flatMap(this::convertToOutputStream).flatMap(outputStream -> {
             byte[] bytes = outputStream.toByteArray();

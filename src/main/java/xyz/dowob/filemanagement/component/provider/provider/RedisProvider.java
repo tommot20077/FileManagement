@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
@@ -30,7 +29,6 @@ import java.util.Objects;
  **/
 @Component
 @SuppressWarnings("unused")
-@SkipRecord
 public class RedisProvider {
     /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的
@@ -46,8 +44,7 @@ public class RedisProvider {
     /**
      * 隨機緩存過期時間比例
      */
-    @SuppressWarnings("FieldCanBeLocal")
-    private final Float RANDOM_CACHE_EXPIRE_TIME_RATIO = 0.2f;
+    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 0.2f;
 
     /**
      * 通過構造方法注入 RedisTemplate 和 ObjectMapper
@@ -143,10 +140,24 @@ public class RedisProvider {
      * @param key   鍵
      * @param delta 自增的數值
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Mono<Long> 增加後的值
      */
-    public Mono<Void> incrementDelta(String key, long delta) {
-        return redisTemplate.opsForValue().increment(key, delta).then();
+    public Mono<Long> incrementDelta(String key, long delta) {
+        return redisTemplate.opsForValue().increment(key, delta);
+    }
+
+
+    /**
+     * 對數據進行自增操作，並設置過期時間
+     *
+     * @param key        鍵
+     * @param delta      自增的數值
+     * @param expireTime 過期時間
+     *
+     * @return 返回 Mono<Long> 增加後的值
+     */
+    public Mono<Long> incrementDelta(String key, long delta, Duration expireTime) {
+        return incrementDelta(key, delta).flatMap(incrementResult -> setExpire(key, expireTime).thenReturn(incrementResult));
     }
 
 
@@ -302,10 +313,10 @@ public class RedisProvider {
      * @param innerKey Hash 內部的鍵
      * @param delta    自增的數值
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Mono<Long> 增加後的值
      */
-    public Mono<Void> incrementHashMap(String hashKey, String innerKey, long delta) {
-        return redisTemplate.opsForHash().increment(hashKey, innerKey, delta).then();
+    public Mono<Long> incrementHashMap(String hashKey, String innerKey, long delta) {
+        return redisTemplate.opsForHash().increment(hashKey, innerKey, delta);
     }
 
 
@@ -317,12 +328,13 @@ public class RedisProvider {
      * @param delta      自增的數值
      * @param expireTime 過期時間
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Mono<Long> 增加後的值
      */
-    public Mono<Object> incrementHashMap(String hashKey, String innerKey, long delta, Duration expireTime) {
+    public Mono<Long> incrementHashMap(String hashKey, String innerKey, long delta, Duration expireTime) {
         return redisTemplate
                 .opsForHash()
-                .increment(hashKey, innerKey, delta).flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
+                .increment(hashKey, innerKey, delta)
+                .flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
     }
 
 
@@ -695,11 +707,13 @@ public class RedisProvider {
 
 
     /**
-     * 獲取 Zset 中的數據
+     * 獲取 Zset 中的數據並轉換成分頁響應
      *
-     * @param key 鍵
+     * @param key   鍵
+     * @param page  頁數
+     * @param clazz 類型
      *
-     * @return 返回 Mono<Object> 對象
+     * @return 返回 Mono<PagedResponseDTO<T>> 對象
      */
     @HideOverLength
     public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromZset(String key, int page, Class<T> clazz) {
@@ -716,7 +730,7 @@ public class RedisProvider {
 
 
     /**
-     * 獲取 Zset 中的數據
+     * 獲取 Zset 中的數據，並轉換成列表
      *
      * @param key   鍵
      * @param page  頁數
@@ -790,10 +804,7 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     public Mono<Void> deleteByPattern(String pattern) {
-        return redisTemplate.keys(pattern).collectList().flatMap(keys -> {
-            keys.forEach(redisTemplate::delete);
-            return Mono.empty();
-        });
+        return redisTemplate.keys(pattern).collectList().flatMap(keys -> redisTemplate.delete(keys.toArray(String[]::new)).then());
     }
 
 

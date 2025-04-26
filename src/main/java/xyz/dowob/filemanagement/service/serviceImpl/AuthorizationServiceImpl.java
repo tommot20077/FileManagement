@@ -7,11 +7,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
-import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
@@ -53,32 +53,6 @@ public class AuthorizationServiceImpl implements AuthorizationService {
     private final CsrfTokenRepositoryStrategy csrfTokenRepository;
 
     /**
-     * 根據用戶請求頭中的JWT憑證進行授權
-     * 當憑證合法時，返回用戶對象
-     * 否則返回空
-     *
-     * @param jwtToken 需要驗證的JWT憑證
-     * @param request  請求對象
-     */
-    public Mono<Void> tokenAuthorize(String jwtToken, ServerWebExchange request) {
-        if (jwtToken != null && jwtToken.startsWith("Bearer ")) {
-            jwtToken = jwtToken.substring(7);
-            Mono<Long> userId = tokenService.validateToken(jwtToken, null, TokenEnum.JWT_AUTHORIZATION_TOKEN);
-            if (userId != null) {
-                Mono<User> optionalUser = userRepository.findById(userId);
-                return optionalUser.flatMap(user -> {
-                    if (user != null) {
-                        return setAuthorization(request, user);
-                    }
-                    return Mono.empty();
-                });
-            }
-        }
-        return Mono.empty();
-    }
-
-
-    /**
      * 根據用戶名和密碼進行授權
      * 當用戶名和密碼正確時，返回用戶對象
      * 當用戶名或密碼錯誤時，返回錯誤信息
@@ -89,14 +63,14 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      */
     @Override
     @HideSensitive
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<String> authenticate(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
         return userRepository
                 .findByUsername(authRequestDTO.getUsername())
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_OR_PASSWORD_ERROR)))
                 .flatMap(user -> {
                     if (passwordEncoder.matches(authRequestDTO.getPassword(), user.getPassword())) {
-                        Mono<Void> sessionMono = request != null ? setAuthorization(request, user) : Mono.empty();
-                        return sessionMono.then(tokenService.generateToken(user, TokenEnum.JWT_AUTHORIZATION_TOKEN));
+                        return tokenService.generateToken(user, TokenEnum.JWT_AUTHORIZATION_TOKEN);
                     }
                     return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_OR_PASSWORD_ERROR));
                 });
@@ -113,6 +87,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      *
      * @return 返回用戶對象
      */
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
         return authenticate(authRequestDTO, null);
     }
@@ -126,7 +101,7 @@ public class AuthorizationServiceImpl implements AuthorizationService {
      * @return 返回CSRF Token
      */
     @Override
-    @SkipRecord
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<CsrfToken> getCSRFToken(ServerWebExchange request) {
         return csrfTokenRepository.getCsrfTokenRepository().generateToken(request);
     }

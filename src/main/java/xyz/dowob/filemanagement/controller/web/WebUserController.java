@@ -4,9 +4,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
@@ -25,8 +27,18 @@ import java.util.Set;
  * @Version 1.0
  **/
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/web/v1/user")
 public class WebUserController extends BaseUserController {
+
+    /**
+     * 構造函數，初始化用戶控制器。
+     *
+     * @param fileServiceStrategy 文件服務策略
+     * @param userService         用戶服務
+     * @param securityProperties  安全屬性配置
+     * @param validationService   驗證服務
+     */
     public WebUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
         super(fileServiceStrategy, userService, securityProperties, validationService);
     }
@@ -74,6 +86,4 @@ public class WebUserController extends BaseUserController {
         String formatType = UserInfoTypeEnum.getUserInfoType(type).name();
         return super.searchUserInfo(exchange, userInfos, formatType);
     }
-
-
 }

@@ -1,7 +1,6 @@
 package xyz.dowob.filemanagement.component.provider.factory;
 
 import jakarta.annotation.Nullable;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
 import xyz.dowob.filemanagement.component.provider.providerImplement.contentconvertprovider.WordConvertProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
@@ -18,7 +17,6 @@ import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
  * @create 2025/4/8
  * @Version 1.0
  **/
-@SkipRecord
 public class ContentConvertProviderFactory {
     /**
      * 根據 {@link ConvertProviderEnum} 的類型來創建對應的轉換器

@@ -48,9 +48,6 @@ public interface AuthorizationService {
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
         Context securityContext = ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl(authentication)));
         request.getAttributes().put(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
-        request.getAttributes().put("username", user.getUsername());
-        request.getAttributes().put("userId", user.getId());
-        request.getAttributes().put("role", user.getRole());
         return Mono.empty();
     }
 

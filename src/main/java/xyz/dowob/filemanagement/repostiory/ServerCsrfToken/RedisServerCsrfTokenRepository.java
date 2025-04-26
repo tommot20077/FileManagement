@@ -55,7 +55,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<CsrfToken> generateToken(ServerWebExchange exchange) {
         String uuid = java.util.UUID.randomUUID().toString();
         CsrfToken csrfToken = new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, uuid);
-        long expireTime = Instant.now().plus(EXPIRE_TIME, ChronoUnit.MINUTES).getEpochSecond();
+        long expireTime = Instant.now().plus(EXPIRE_TIME.toMillis(), ChronoUnit.MILLIS).getEpochSecond();
         return redisProvider.setHashMap(CSRF_TOKEN_HEADER, uuid, expireTime, Duration.ofMinutes(expireTime)).thenReturn(csrfToken);
     }
 

@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
  * @Version 1.0
  **/
 @Component
+@RecordLevel(LogLevelEnum.DEBUG)
 @RequiredArgsConstructor
 public class PasswordResetTokenProviderImpl implements TokenProvider {
     /**
@@ -60,7 +63,7 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
 
         return tokenMono.flatMap(token -> {
             token.setResetVerificationCode(verificationCode);
-            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(securityProperties.getResetPasswordToken().getExpiration());
+            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(securityProperties.getResetPasswordToken().getExpiration().toMinutes());
             token.setResetVerificationCodeExpireTime(expireTime);
             return tokenRepository.save(token).thenReturn(verificationCode);
         });

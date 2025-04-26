@@ -81,9 +81,6 @@ public interface UserService extends CrudService<User, Long> {
 
     /**
      * 用於獲取用戶的方法，根據請求對象獲取用戶對象
-     * 先從Session中獲取用戶ID，如果Session中沒有則從SecurityContext中獲取
-     * 當其中一個獲取到用戶ID時，則根據用戶ID獲取用戶對象
-     * 如果都沒有獲取到用戶ID，則返回空
      *
      * @param exchange 請求對象
      *

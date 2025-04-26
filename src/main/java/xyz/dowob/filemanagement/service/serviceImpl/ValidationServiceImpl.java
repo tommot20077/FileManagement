@@ -3,8 +3,10 @@ package xyz.dowob.filemanagement.service.serviceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.customenum.ByteEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
@@ -52,6 +54,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param registerDTO 用戶註冊數據傳輸對象
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateRegisterDTO(RegisterDTO registerDTO) {
         return validateNotNull(registerDTO)
                 .then(validatePasswordsMatch(registerDTO.getPassword(), registerDTO.getConfirmPassword()))
@@ -71,6 +74,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param resetPasswordDTO 重置密碼數據傳輸對象
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateResetPasswordDTO(ResetPasswordDTO resetPasswordDTO) {
         return validateNotNull(resetPasswordDTO)
                 .then(validatePasswordsMatch(resetPasswordDTO.getNewPassword(), resetPasswordDTO.getConfirmPassword()))
@@ -84,6 +88,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param fileMetadataDTO 文件元數據DTO
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
         return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFilename(), false))
                 .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
@@ -97,6 +102,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param isFolder    是否為文件夾
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
         return validateNotNull(fileEditDTO).then(Mono.defer(() -> switch (fileEditDTO.getEditType()) {
             case EDIT_METADATA -> validFileName(fileEditDTO.getFilename(), isFolder);
@@ -118,6 +124,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @return Mono<UserFileMetadata>
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<UserFileMetadata> validateFileType(UserFileMetadata file, FileEnum... fileType) {
         if (file == null) {
             return Mono.empty();
@@ -143,6 +150,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param fileFilterDTO 文件過濾DTO
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateFileFilterDTO(FileFilterDTO fileFilterDTO) {
         return validateNotNull(fileFilterDTO).then(Mono.defer(() -> {
             if (fileFilterDTO.isFilterEmpty()) {
@@ -176,6 +184,7 @@ public class ValidationServiceImpl implements ValidationService {
      * @param searchList 搜索列表
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateUserSearchList(Collection<String> searchList) {
         if (searchList == null || searchList.isEmpty()) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.SEARCH_CRITERIA_EMPTY));

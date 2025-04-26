@@ -10,15 +10,18 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFolderController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.FolderService;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
@@ -38,20 +41,22 @@ import java.util.List;
  * 此類繼承自 {@link BaseFolderController}，並透過 RESTful API 提供對外的資料夾管理功能。
  */
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/web/v1/folders")
 public class WebFolderController extends BaseFolderController {
     /**
      * 依賴注入的構造方法，用於初始化資料夾控制器。
      *
-     * @param userService           用戶服務，負責用戶相關操作。
-     * @param permissionService     權限服務，處理用戶操作的權限校驗。
-     * @param fileServiceStrategy   文件服務策略，根據不同的文件操作提供相應的文件服務。
-     * @param fileProperties        文件屬性配置，用於加載系統層級的文件屬性配置。
-     * @param validationService     驗證服務，對請求參數進行校驗。
-     * @param folderService         資料夾業務層服務。
-     * @param userLimiterStrategy   用戶限額策略，控制用戶的操作限制。
-     * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
-     * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param userService               用戶服務，負責用戶相關操作。
+     * @param permissionService         權限服務，處理用戶操作的權限校驗。
+     * @param fileServiceStrategy       文件服務策略，根據不同的文件操作提供相應的文件服務。
+     * @param fileProperties            文件屬性配置，用於加載系統層級的文件屬性配置。
+     * @param validationService         驗證服務，對請求參數進行校驗。
+     * @param folderService             資料夾業務層服務。
+     * @param userLimiterStrategy       用戶限額策略，控制用戶的操作限制。
+     * @param objectMapper              對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
+     * @param folderListTreeManager     資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param filePermissionRuleManager 文件權限規則管理器，處理文件的權限規則。
      */
     public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                @Nullable FolderListTreeManager folderListTreeManager) {
@@ -59,9 +64,7 @@ public class WebFolderController extends BaseFolderController {
               permissionService,
               fileServiceStrategy,
               fileProperties,
-              validationService,
-              folderService,
-              userLimiterStrategy, objectMapper, filePermissionRuleManager,
+              validationService, folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }
@@ -84,7 +87,12 @@ public class WebFolderController extends BaseFolderController {
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type, ServerWebExchange exchange) {
-        return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+        return handleError(Mono.defer(() -> {
+            if (id < 0) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.PATH_NOT_FOUND));
+            }
+            return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+        }), exchange);
     }
 
 
@@ -119,6 +127,59 @@ public class WebFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
 
+
+    /**
+     * 獲取回收站檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 回收站檔案列表
+     */
+    @GetMapping("/recycle")
+    public Mono<ResponseEntity<?>> getRecycleFiles(ServerWebExchange exchange,
+                                                   @RequestParam(required = false, defaultValue = "1") Integer page,
+                                                   @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.RECYCLE_FILE_ID.getId(), page, size, getFileEnums(type));
+    }
+
+
+    /**
+     * 獲取所有檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 所有檔案列表
+     */
+    @GetMapping("/all")
+    public Mono<ResponseEntity<?>> getAllFiles(ServerWebExchange exchange,
+                                               @RequestParam(required = false, defaultValue = "1") Integer page,
+                                               @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, getFileEnums(type));
+    }
+
+
+    /**
+     * 獲取分享的檔案列表
+     *
+     * @param exchange WebFlux 請求上下文
+     * @param page     分頁頁碼，預設為 1
+     * @param size     每頁大小，可選
+     * @param type     過濾的檔案類型，可選
+     *
+     * @return 分享檔案列表
+     */
+    @GetMapping("/shared")
+    public Mono<ResponseEntity<?>> getSharedFiles(ServerWebExchange exchange,
+                                                  @RequestParam(required = false, defaultValue = "1") Integer page,
+                                                  @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
+        return super.getUserFileList(exchange, ReservedSearchIdEnum.SHARE_FILE_ID.getId(), page, size, getFileEnums(type));
+    }
 
     /**
      * 創建資料夾

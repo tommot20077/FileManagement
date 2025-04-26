@@ -5,10 +5,11 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 import xyz.dowob.filemanagement.annotation.CacheProviderType;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvider;
 import xyz.dowob.filemanagement.config.properties.CacheProperties;
@@ -19,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 文件流緩存提供者實現類，用於提供文件流緩存的操作
@@ -34,7 +36,6 @@ import java.util.*;
  * @Version 1.0
  **/
 @Component
-@SkipRecord
 @CacheProviderType(CacheProviderEnum.FILE_STREAM_CACHE)
 @ConditionalOnProperty(prefix = "cache", name = "enable-file-download-stream-cache", havingValue = "true", matchIfMissing = true)
 public class StreamCacheProviderImpl implements CacheProvider {
@@ -64,17 +65,12 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @param redisProvider Redis操作提供者
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
+        Assert.isTrue(cacheProperties.getChunkSize().toBytes() > 0, "下載流緩存塊大小必須大於0");
+        Assert.isTrue(cacheProperties.getDownloadCacheExpireTime().isPositive(), "下載流緩存過期時間必須大於0");
         this.redisProvider = redisProvider;
         this.CACHE_PREFIX = cacheProperties.getDownloadCachePrefix();
-
-        if (cacheProperties.getChunkSize() <= 0) {
-            throw new IllegalArgumentException("下載流緩存塊大小必須大於0");
-        }
-        this.CHUNK_SIZE = cacheProperties.getChunkSize();
-        if (cacheProperties.getDownloadCacheExpireTime() <= 0) {
-            throw new IllegalArgumentException("下載流緩存過期時間必須大於0");
-        }
-        this.DEFAULT_EXPIRE_TIME = Duration.ofMinutes(cacheProperties.getDownloadCacheExpireTime());
+        this.CHUNK_SIZE = (int) cacheProperties.getChunkSize().toBytes();
+        this.DEFAULT_EXPIRE_TIME = cacheProperties.getDownloadCacheExpireTime();
     }
 
 
@@ -147,7 +143,9 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 設定單個緩存值
+     * 設定單個緩存值，這邊加入額外的處理
+     * 因為這類緩存通常大小比較大，因此需要將其分割成多個小的緩存塊並且加入緩存完整檢查
+     * 當某個緩存塊寫入失敗時，則刪除其他所有的緩存塊避免緩存數據缺失
      *
      * @param key    查詢key
      * @param value  存儲value
@@ -174,20 +172,26 @@ public class StreamCacheProviderImpl implements CacheProvider {
             });
         }
         return formatStreamToBase64(dataBufferFlux).flatMapMany(base64 -> {
-
-            List<Mono<Void>> saveOperations = new ArrayList<>();
             int totalChunks = (int) Math.ceil((double) base64.length() / CHUNK_SIZE);
+            AtomicBoolean errorOccurred = new AtomicBoolean(false);
 
-            for (int i = 0; i < totalChunks; i++) {
+            return Flux.range(0, totalChunks).flatMap(i -> {
+                if (errorOccurred.get()) {
+                    return Mono.empty();
+                }
+
                 String chunkKey = key + "_" + (i + 1);
                 int start = i * CHUNK_SIZE;
                 int end = Math.min(start + CHUNK_SIZE, base64.length());
-
                 String chunkData = base64.substring(start, end);
 
-                saveOperations.add(redisProvider.setHashMap(CACHE_PREFIX, chunkKey, chunkData, chooseTime));
-            }
-            return Flux.merge(saveOperations);
+                return redisProvider.setHashMap(CACHE_PREFIX, chunkKey, chunkData, chooseTime).onErrorResume(e -> {
+                    if (errorOccurred.compareAndSet(false, true)) {
+                        return deleteUnCompletedCache(key, totalChunks);
+                    }
+                    return Mono.empty();
+                });
+            });
         }).then();
     }
 
@@ -212,7 +216,6 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @return 默認過期時間
      */
     @Override
-    @SkipRecord
     public Duration getDefaultExpire() {
         return DEFAULT_EXPIRE_TIME;
     }
@@ -257,4 +260,20 @@ public class StreamCacheProviderImpl implements CacheProvider {
         return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes));
     }
 
+
+    /**
+     * 刪除未完成的緩存
+     *
+     * @param key         緩存鍵
+     * @param totalChunks 總塊數
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> deleteUnCompletedCache(String key, int totalChunks) {
+        List<String> keysToDelete = new ArrayList<>();
+        for (int i = 1; i <= totalChunks; i++) {
+            keysToDelete.add(key + "_" + i);
+        }
+        return redisProvider.deleteHash(CACHE_PREFIX, keysToDelete).retryWhen(Retry.backoff(3, Duration.ofMinutes(1)));
+    }
 }

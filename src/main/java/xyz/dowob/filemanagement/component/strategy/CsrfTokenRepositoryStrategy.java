@@ -1,9 +1,9 @@
 package xyz.dowob.filemanagement.component.strategy;
 
+import lombok.Getter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.CsrfRepositoryType;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.repostiory.ServerCsrfToken.CustomServerCsrfTokenRepository;
 
@@ -22,10 +22,13 @@ import java.util.List;
  * @create 2025/3/6
  * @Version 1.0
  **/
+@Getter
 @Component
 public class CsrfTokenRepositoryStrategy {
     /**
      * 選定的 CsrfTokenRepository，根據 {@link SecurityProperties} 中的設定
+     * -- GETTER --
+     * 獲取 Csrf 憑證存儲庫
      */
     private final CustomServerCsrfTokenRepository csrfTokenRepository;
 
@@ -45,13 +48,4 @@ public class CsrfTokenRepositoryStrategy {
     }
 
 
-    /**
-     * 獲取 Csrf 憑證存儲庫
-     *
-     * @return CsrfTokenRepository
-     */
-    @SkipRecord
-    public CustomServerCsrfTokenRepository getCsrfTokenRepository() {
-        return csrfTokenRepository;
-    }
 }

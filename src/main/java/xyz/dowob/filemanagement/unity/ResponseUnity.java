@@ -1,11 +1,20 @@
 package xyz.dowob.filemanagement.unity;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.LimitationException;
+import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.LocalDateTime;
@@ -161,5 +170,77 @@ public interface ResponseUnity {
             ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
             return createResponseEntity(apiResponse, e.getErrorCode().getHttpStatus().value());
         });
+    }
+
+
+    /**
+     * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息並寫入響應
+     * 此方法用於處理 LimitationException 錯誤
+     *
+     * @param exchange     請求交換對象
+     * @param objectMapper 用於將 ApiResponseDTO 轉換為 JSON 的 ObjectMapper
+     * @param error        錯誤信息
+     * @param errorMessage 錯誤消息
+     *
+     * @return Mono<Void>
+     */
+    default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, LimitationException.ErrorCode error, String errorMessage) {
+        return sendErrorResponse(exchange, objectMapper, errorMessage, error.getCode(), error.getHttpStatus());
+    }
+
+
+    /**
+     * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息並寫入響應
+     * 此為重寫方法，用於處理 ValidationException
+     *
+     * @param exchange     請求交換對象
+     * @param objectMapper 用於將 ApiResponseDTO 轉換為 JSON 的 ObjectMapper
+     * @param error        錯誤信息
+     * @param args         錯誤消息的參數
+     *
+     * @return Mono<Void>
+     */
+    default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, ValidationException.ErrorCode error, Object... args) {
+        return sendErrorResponse(exchange, objectMapper, String.format(error.getMessage(), args), error.getCode(), error.getHttpStatus());
+    }
+
+
+    /**
+     * 給定一個錯誤的狀態碼、錯誤消息和請求對象將其轉換成自定義的 ApiResponseDTO
+     * 並將 JSON 格式的響應消息並寫入請求交換對象
+     *
+     * @param exchange     請求交換對象
+     * @param objectMapper 用於將 ApiResponseDTO 轉換為 JSON 的 ObjectMapper
+     * @param errorMessage 錯誤消息
+     * @param errorCode    錯誤碼
+     * @param httpStatus   HTTP 狀態碼
+     *
+     * @return Mono<Void>
+     */
+    default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, String errorMessage, int errorCode, HttpStatus httpStatus) {
+        ServerHttpResponse response = exchange.getResponse();
+        if (response.isCommitted()) {
+            LogUnity.warn(exchange, "響應已提交，無法再次設置狀態碼或頭部，錯誤碼: %s, 訊息: %s", errorCode, errorMessage);
+            return Mono.empty();
+        }
+
+        try {
+            ApiResponseDTO<?> apiResponseDTO = ApiResponseDTO
+                    .builder()
+                    .timestamp(LocalDateTime.now())
+                    .path(exchange.getRequest().getPath().value())
+                    .message(errorMessage)
+                    .status(errorCode)
+                    .build();
+
+            response.getHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+            response.setStatusCode(httpStatus);
+
+            Mono<DataBuffer> responseBody = Mono.just(exchange.getResponse().bufferFactory().wrap(objectMapper.writeValueAsBytes(apiResponseDTO)));
+
+            return response.writeWith(responseBody);
+        } catch (JsonProcessingException ex) {
+            return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, ex));
+        }
     }
 }

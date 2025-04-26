@@ -10,9 +10,12 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
@@ -44,6 +47,7 @@ import java.util.concurrent.ScheduledExecutorService;
  **/
 @Component
 @RequiredArgsConstructor
+@RecordLevel(LogLevelEnum.DEBUG)
 public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUnity {
     /**
      * 當前用戶與 WebSocket 會話的映射
@@ -101,8 +105,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      *
      * @return Mono<Void>
      */
-    @Override
     @NonNull
+    @Override
     public Mono<Void> handle(@NonNull WebSocketSession session) {
         CustomWebSocketSession customSession = (CustomWebSocketSession) session;
         return session.receive().flatMap(webSocketMessage -> {
@@ -190,6 +194,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      *
      * @return Optional<T>
      */
+    @SkipRecord
     private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
         try {
             return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
@@ -291,6 +296,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      *
      * @return Optional<T>
      */
+    @SkipRecord
     private <T> Optional<T> convertJsonToObject(String json, Class<T> clazz) {
         try {
             return Optional.ofNullable(objectMapper.readValue(json, clazz));
@@ -305,6 +311,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      *
      * @return Map<String, Class < ?>>
      */
+    @SkipRecord
     private Map<String, Class<?>> initParameterNames() {
         Map<String, Class<?>> map = new HashMap<>();
         map.put("userId", String.class);

@@ -2,9 +2,9 @@ package xyz.dowob.filemanagement.component.manager;
 
 import jakarta.annotation.Nullable;
 import lombok.NonNull;
-import lombok.extern.log4j.Log4j2;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.reactive.socket.HandshakeInfo;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -15,11 +15,13 @@ import org.springframework.web.reactive.socket.server.upgrade.ReactorNettyReques
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.server.WebsocketServerSpec;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.handler.CustomWebSocketSession;
 import xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler;
 import xyz.dowob.filemanagement.component.handler.WebSocketFailHandler;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
@@ -39,7 +41,6 @@ import java.util.function.Supplier;
  * @Version 1.0
  **/
 @Component
-@Log4j2
 public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implements ResponseUnity {
     /**
      * JwtTokenProviderImpl 用於 JWT 憑證相關操作的實現類
@@ -81,15 +82,15 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
     /**
      * 創建 WebSocket 請求處理策略
      * 這裡主要是設置最大帧载荷长度，用於限制文件上傳的大小
-     * 這裡的最大帧载荷长度是在配置文件中配置的，單位是 MB，所以這裡需要乘以 1024 * 1024
+     * 這裡的最大帧载荷长度是在配置文件中配置的
      * 這裡還重寫了 upgrade 方法，用於處理 Sec-WebSocket-Protocol 請求頭中的協議
      *
      * @param maxFramePayloadLength 最大帧载荷长度
      *
      * @return ReactorNettyRequestUpgradeStrategy 返回 WebSocket 升級策略
      */
-    private static ReactorNettyRequestUpgradeStrategy createUpgradeStrategy(int maxFramePayloadLength) {
-        WebsocketServerSpec.Builder builder = WebsocketServerSpec.builder().maxFramePayloadLength(maxFramePayloadLength * 1024 * 1024);
+    private static ReactorNettyRequestUpgradeStrategy createUpgradeStrategy(DataSize maxFramePayloadLength) {
+        WebsocketServerSpec.Builder builder = WebsocketServerSpec.builder().maxFramePayloadLength((int) maxFramePayloadLength.toBytes());
         return new ReactorNettyRequestUpgradeStrategy(builder) {
             @Override
             @NonNull
@@ -116,6 +117,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      */
     @Override
     @NonNull
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> handleRequest(@NonNull ServerWebExchange exchange, @NonNull WebSocketHandler wsHandler) {
         return Mono.defer(() -> {
             String token = extractTokenFromProtocol(exchange);
@@ -166,6 +168,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param session  WebSocketSession 用於處理 WebSocket 請求的處理器
      * @param userId   用戶ID
      */
+    @RecordLevel(LogLevelEnum.DEBUG)
     private Mono<Void> handleWebSocketSession(ServerWebExchange exchange, WebSocketSession session, Long userId) {
         if (session instanceof ReactorNettyWebSocketSession nettySession) {
             try {
@@ -177,7 +180,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
                 CustomWebSocketSession customSession = new CustomWebSocketSession(delegate,
                                                                                   nettySession.getHandshakeInfo(),
                                                                                   bufferFactory,
-                                                                                  fileProperties.getUpload().getPayloadLength() * 1024 * 1024,
+                                                                                  (int) fileProperties.getUpload().getPayloadLength().toBytes(),
                                                                                   userId.toString()
                 );
                 return fileUploadWebSocketHandler.handle(customSession);
@@ -187,5 +190,4 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         }
         return fileUploadWebSocketHandler.handle(session);
     }
-
 }

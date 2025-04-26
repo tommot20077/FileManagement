@@ -5,8 +5,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
@@ -27,6 +30,7 @@ import java.util.HashMap;
  * @since 2024-09-14
  */
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/api/v1/guest")
 public class ApiGuestController extends BaseGuestController {
 
@@ -101,7 +105,9 @@ public class ApiGuestController extends BaseGuestController {
      * @param exchange 當前請求對象
      * @return Mono<ResponseEntity < ?>> 返回 CSRF Token
      */
+    @HideSensitive
     @GetMapping("/csrf/token")
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<ResponseEntity<?>> getCSRFToken(ServerWebExchange exchange) {
         return handleError(authorizationService.getCSRFToken(exchange).flatMap(csrfToken -> {
             HashMap<String, Object> data = new HashMap<>();
@@ -123,6 +129,7 @@ public class ApiGuestController extends BaseGuestController {
      *
      * @return Mono<ResponseEntity < ?>> 返回用戶授權狀態的結果
      */
+    @SkipRecord
     @GetMapping("/checkAuthenticationStatus")
     public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
         return super.checkAuthenticationStatus(exchange);

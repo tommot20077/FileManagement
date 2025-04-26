@@ -33,7 +33,6 @@ import java.util.function.Function;
  * @Version 1.1
  **/
 @Component
-@SkipRecord
 @SuppressWarnings("unused")
 public class CacheManager {
     /**

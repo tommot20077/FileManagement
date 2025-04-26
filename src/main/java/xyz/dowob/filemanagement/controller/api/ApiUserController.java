@@ -4,9 +4,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseUserController;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
@@ -25,6 +29,7 @@ import java.util.Set;
  * @Version 1.0
  **/
 @RestController
+@RecordLevel(LogLevelEnum.INFO)
 @RequestMapping("/api/v1/user")
 public class ApiUserController extends BaseUserController {
     public ApiUserController(FileServiceStrategy fileServiceStrategy, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
@@ -39,8 +44,6 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回登出結果
      */
-
-
     @PostMapping("/logout")
     public Mono<ResponseEntity<?>> logout(ServerWebExchange exchange, boolean isWeb) {
         return super.logout(exchange, false);
@@ -54,9 +57,9 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
-
-
+    @RecordLevel(LogLevelEnum.WARN)
     @GetMapping("/getAllUserInfo")
+    @RequirePermission(PermissionEnum.MANAGE)
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
     }
@@ -69,7 +72,6 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
-
     @GetMapping("/info")
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return super.getUserInfo(exchange);

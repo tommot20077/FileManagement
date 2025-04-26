@@ -1,8 +1,10 @@
 package xyz.dowob.filemanagement.customenum;
 
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.tika.Tika;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -75,6 +77,11 @@ public enum FileEnum {
      * 文件類型與擴展名的映射
      */
     private static final Map<FileEnum, Map<String, String>> FILE_ENUM_MAP = new HashMap<>();
+
+    /**
+     * Tika 實例
+     */
+    private static final Tika TIKA = new Tika();
 
     static {
         // 圖片類型
@@ -169,41 +176,25 @@ public enum FileEnum {
 
 
     /**
-     * 根據文件名獲取文件類型，如果找不到對應的文件類型，則返回其他類型
+     * 根據文件名獲取文件類型，如果找不到對應的文件類型
+     * 則檢查是否有對應的 Tika 類型，然後返回對應的文件類型
+     * 若果都找不到，則返回默認的文件類型
      *
      * @param fileEnum 文件類型
      * @param filename 文件名
      *
      * @return 返回文件類型
      */
-    public static String getMediaType(FileEnum fileEnum, String... filename) {
-
+    public static String getMediaType(@NonNull FileEnum fileEnum, String filename) {
         Map<String, String> extensionMap = FILE_ENUM_MAP.get(fileEnum);
-        if (extensionMap != null && filename.length > 0) {
-            String extension = FilenameUtils.getExtension(filename[0]).toLowerCase();
-            return extensionMap.getOrDefault(extension, getDefaultMediaType(fileEnum));
+        if (extensionMap != null) {
+            String extension = FilenameUtils.getExtension(filename).toLowerCase();
+            String mimeType = extensionMap.get(extension);
+
+            if (mimeType != null && !mimeType.isEmpty()) {
+                return mimeType;
+            }
         }
-        return getDefaultMediaType(fileEnum);
+        return TIKA.detect(filename);
     }
-
-
-    /**
-     * 獲取默認的 MIME 類型
-     *
-     * @param fileEnum 文件類型
-     *
-     * @return 返回默認的 MIME 類型
-     */
-    private static String getDefaultMediaType(FileEnum fileEnum) {
-        return switch (fileEnum) {
-            case IMAGE -> "image/jpeg";
-            case VIDEO -> "video/mp4";
-            case MUSIC -> "audio/mp3";
-            case DOCUMENT -> "application/pdf";
-            case ZIP -> "application/zip";
-            case ONLINE_DOCUMENT -> "application/json";
-            default -> "application/octet-stream";
-        };
-    }
-
 }

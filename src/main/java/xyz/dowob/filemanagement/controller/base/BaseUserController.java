@@ -5,9 +5,11 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
 import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
@@ -35,6 +37,7 @@ import java.util.function.Function;
  * @Version 1.0
  */
 @RequiredArgsConstructor
+@RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseUserController implements ResponseUnity {
 
     /**
@@ -52,6 +55,9 @@ public abstract class BaseUserController implements ResponseUnity {
      */
     protected final SecurityProperties securityProperties;
 
+    /**
+     * 驗證服務，用於驗證用戶的請求
+     */
     protected final ValidationService validationService;
 
     /**
@@ -90,6 +96,7 @@ public abstract class BaseUserController implements ResponseUnity {
      *
      * @return Mono<ResponseEntity < ?>> 返回所有用戶的信息，若成功則返回用戶信息列表
      */
+    @RecordLevel(LogLevelEnum.WARN)
     @RequirePermission(PermissionEnum.MANAGE)
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return handleError(userService.getAll().collectList().flatMap(userList -> {

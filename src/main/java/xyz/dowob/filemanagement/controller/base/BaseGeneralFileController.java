@@ -14,6 +14,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
@@ -47,22 +49,43 @@ import java.util.*;
  * @create 2025/1/14
  * @Version 1.0
  **/
+@RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseGeneralFileController extends BaseFileController {
+
+    /**
+     * 是否強制使用伺服器配置
+     */
     private final boolean isForceUseServerConfig;
+
+    /**
+     * 預設的上傳類型
+     */
     private final TransmissionEnum defaultUploadType;
 
+    /**
+     * 用戶限額策略，用於控制用戶的操作限制。
+     */
+    private final UserLimiterStrategy userLimiterStrategy;
+
+
+    /**
+     * 構造函數，初始化基本的業務層服務
+     *
+     * @param userService               用戶服務層對象
+     * @param fileServiceStrategy       文件服務策略對象，用於選擇適當的文件服務
+     * @param fileProperties            文件屬性設置
+     * @param validationService         驗證服務對象
+     * @param permissionService         用戶文件元數據授權服務
+     * @param objectMapper              用於處理對象映射的工具
+     * @param filePermissionRuleManager 文件權限規則管理器
+     * @param userLimiterStrategy       用戶限制策略
+     */
     public BaseGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
-        super(userService,
-              fileServiceStrategy,
-              fileProperties,
-              validationService,
-              permissionService,
-              userLimiterStrategy,
-              objectMapper,
-              filePermissionRuleManager
-        );
+        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
+
         this.isForceUseServerConfig = fileProperties.getUpload().isForceUseServerConfig();
         this.defaultUploadType = fileProperties.getUpload().getDefaultUploadType();
+        this.userLimiterStrategy = userLimiterStrategy;
     }
 
 
@@ -124,9 +147,8 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         return userService.getUser(exchange).flatMap(user -> {
             String rangeHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.RANGE);
             return processFileDownload(actionEnum, id, user, rangeHeader);
-        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
+        });
     }
-
 
     /**
      * 處理文件下載的方法
@@ -137,6 +159,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
      */
+    @SkipRecord
     private Mono<ResponseEntity<Flux<DataBuffer>>> processFileDownload(DownloadActionEnum action, Long id, User user, String rangeHeader) {
         return permissionService
                 .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
@@ -155,6 +178,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
      */
+    @SkipRecord
     private Mono<ResponseEntity<Flux<DataBuffer>>> downloadAndPrepareResponse(UserFileMetadata file, User user, DownloadActionEnum action, String rangeHeader) {
         return fileServiceStrategy.getFileService().downloadFile(file, user, rangeHeader).map(userFileDataBO -> {
             HttpHeaders headers = prepareHttpHeaders(action, userFileDataBO, rangeHeader, true);
@@ -305,7 +329,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         });
     }
 
-    
+
     /**
      * 此方法為分塊上傳的處理方法
      *
@@ -353,7 +377,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         });
     }
 
-    
+
     /**
      * 此方法為Multipart上傳的處理方法
      *
@@ -410,6 +434,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      *
      * @return TransmissionEnum 返回上傳方式
      */
+    @SkipRecord
     protected TransmissionEnum getChooseTransmissionType(String uploadType) {
         if (isForceUseServerConfig) {
             return defaultUploadType;

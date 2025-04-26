@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
@@ -16,6 +17,7 @@ import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -43,6 +45,7 @@ import java.util.concurrent.CompletableFuture;
  * @create 2024-09-30 16:00
  * @Version 1.0
  **/
+@RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseFolderController extends BaseFileController {
 
     /**
@@ -59,27 +62,20 @@ public abstract class BaseFolderController extends BaseFileController {
     /**
      * 依賴注入的構造方法，用於初始化資料夾控制器。
      *
-     * @param userService           用戶服務，負責用戶相關操作。
-     * @param permissionService     權限服務，處理用戶操作的權限校驗。
-     * @param fileServiceStrategy   文件服務策略，根據不同的文件操作提供相應的文件服務。
-     * @param fileProperties        文件屬性配置，用於加載系統層級的文件屬性配置。
-     * @param validationService     驗證服務，對請求參數進行校驗。
-     * @param folderService         資料夾業務層服務。
-     * @param userLimiterStrategy   用戶限額策略，控制用戶的操作限制。
-     * @param objectMapper          對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
-     * @param folderListTreeManager 資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param userService               用戶服務，負責用戶相關操作。
+     * @param permissionService         權限服務，處理用戶操作的權限校驗。
+     * @param fileServiceStrategy       文件服務策略，根據不同的文件操作提供相應的文件服務。
+     * @param fileProperties            文件屬性配置，用於加載系統層級的文件屬性配置。
+     * @param validationService         驗證服務，對請求參數進行校驗。
+     * @param folderService             資料夾業務層服務。
+     * @param userLimiterStrategy       用戶限額策略，控制用戶的操作限制。
+     * @param objectMapper              對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
+     * @param folderListTreeManager     資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
+     * @param filePermissionRuleManager 文件權限規則管理器，處理文件的權限規則。
      */
     public BaseFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                 @Nullable FolderListTreeManager folderListTreeManager) {
-        super(userService,
-              fileServiceStrategy,
-              fileProperties,
-              validationService,
-              permissionService,
-              userLimiterStrategy,
-              objectMapper,
-              filePermissionRuleManager
-        );
+        super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
         this.folderListTreeManager = folderListTreeManager;
         this.folderService = folderService;
     }
@@ -254,6 +250,6 @@ public abstract class BaseFolderController extends BaseFileController {
                                 HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null, false);
                                 return ResponseEntity.status(HttpStatus.OK).headers(headers).body(userFileDataBO.getDataBufferFlux());
                             })));
-        }).onErrorResume(ValidationException.class, e -> handleValidationError(e, exchange));
+        }).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 }

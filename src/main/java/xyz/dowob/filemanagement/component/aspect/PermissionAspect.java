@@ -1,8 +1,10 @@
 package xyz.dowob.filemanagement.component.aspect;
 
+import lombok.extern.log4j.Log4j2;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -11,6 +13,8 @@ import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.RoleEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
+
+import java.util.Optional;
 
 /**
  * 權限切面AOP，用於檢測用戶是否有權限訪問某個方法
@@ -23,9 +27,10 @@ import xyz.dowob.filemanagement.exception.ValidationException;
  * @create 2025/2/3
  * @Version 1.0
  **/
-@SuppressWarnings("all")
+@Log4j2
 @Aspect
 @Component
+@SuppressWarnings("all")
 public class PermissionAspect {
 
     /**
@@ -47,12 +52,12 @@ public class PermissionAspect {
             if (result instanceof Mono<?> monoResult) {
                 return monoResult.transformDeferredContextual((mono, context) -> {
                     ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
-                    return Mono.defer(() -> checkUserPermission(exchange, requiredPermissions)).then(mono);
+                    return Mono.defer(() -> checkUserPermission(requiredPermissions)).then(mono);
                 });
             } else if (result instanceof Flux<?> fluxResult) {
                 return fluxResult.transformDeferredContextual((flux, context) -> {
                     ServerWebExchange exchange = context.getOrDefault(ServerWebExchange.class, null);
-                    return Mono.defer(() -> checkUserPermission(exchange, requiredPermissions)).thenMany(flux);
+                    return Mono.defer(() -> checkUserPermission(requiredPermissions)).thenMany(flux);
                 });
             } else {
                 throw new UnsupportedOperationException("RequirePermission 只支援 Mono 或 Flux");
@@ -61,7 +66,6 @@ public class PermissionAspect {
             throw new RuntimeException("權限檢查失敗", e);
         }
     }
-
 
     /**
      * 檢查用戶的權限
@@ -72,19 +76,22 @@ public class PermissionAspect {
      *
      * @return Mono<Void>
      */
-    private Mono<Void> checkUserPermission(ServerWebExchange exchange, PermissionEnum[] requiredPermissions) {
-        if (exchange == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED));
-        }
-
-        return Mono
-                .justOrEmpty(((RoleEnum) exchange.getAttribute("role")))
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
-                .flatMap(role -> {
-                    if (role.hasPermissions(requiredPermissions)) {
-                        return Mono.empty();
-                    }
-                    return Mono.error(new ValidationException(ValidationException.ErrorCode.FORBIDDEN));
-                });
+    private Mono<Void> checkUserPermission(PermissionEnum[] requiredPermissions) {
+        return ReactiveSecurityContextHolder.getContext().map(securityContext -> {
+            Optional<String> roleNameOptional = securityContext
+                    .getAuthentication()
+                    .getAuthorities()
+                    .stream()
+                    .map(grantedAuthority -> grantedAuthority.getAuthority())
+                    .findFirst();
+            return roleNameOptional.map(roleName -> {
+                return RoleEnum.valueOf(roleName);
+            }).orElse(RoleEnum.VISITOR);
+        }).flatMap(roleEnum -> {
+            if (roleEnum.hasPermissions(requiredPermissions)) {
+                return Mono.empty();
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.FORBIDDEN));
+        });
     }
 }

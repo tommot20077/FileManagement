@@ -101,8 +101,8 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     /**
      * 查詢所有星標檔案
      *
-     * @param userId 用戶ID
-     * @param isStar 是否為星標檔案
+     * @param userId    用戶ID
+     * @param isStar    是否為星標檔案
      * @param isDeleted 是否為刪除檔案
      *
      * @return Flux<UserFileMetadata> 返回所有星標檔案元數據
@@ -164,7 +164,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     /**
      * 根據用戶ID查詢所有位於回收站的檔案元數據，並轉換查詢為UserFileMetadata結果，並按照是否為資料夾和檔案名稱排序
      *
-     * @param userId 用戶ID
+     * @param userId                用戶ID
      * @param r2dbcEntityOperations R2dbc實體操作
      *
      * @return Flux<UserFileMetadata> 返回查詢結果
@@ -196,6 +196,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @return Flux<UserFileMetadata>
      */
     default Flux<UserFileMetadata> findAllByShareWithUserId(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+
         return r2dbcEntityOperations
                 .select(UserFileShareRecord.class)
                 .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("user_id").is(userId)))
@@ -206,13 +207,10 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                     if (fileIds.isEmpty()) {
                         return Flux.empty();
                     }
+                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.PRIVATE);
                     return r2dbcEntityOperations
                             .select(UserFileMetadata.class)
-                            .matching(org.springframework.data.relational.core.query.Query.query(Criteria
-                                                                                                         .where("id")
-                                                                                                         .in(fileIds)
-                                                                                                         .and("is_deleted")
-                                                                                                         .is(false)))
+                            .matching(org.springframework.data.relational.core.query.Query.query(criteria))
                             .all();
                 });
     }

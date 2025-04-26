@@ -6,9 +6,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.repostiory.FileTrashRecordRepository;
 import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
  * @Version 1.0
  **/
 @Component
+@RecordLevel(LogLevelEnum.INFO)
 @RequiredArgsConstructor
 public class CronTaskManager {
     /**
