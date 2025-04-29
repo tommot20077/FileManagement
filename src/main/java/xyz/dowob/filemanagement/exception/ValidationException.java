@@ -395,6 +395,14 @@ public class ValidationException extends Exception {
          * 錯誤信息: IP 地址已被禁止訪問
          */
         ALREADY_BAN_IP(1152, HttpStatus.FORBIDDEN, "此 IP 地址已被暫時禁止訪問"),
+
+
+        /**
+         * 錯誤碼: 1153
+         * HTTP狀態碼: 400
+         * 錯誤信息: 檔案包含病毒，已經被刪除
+         */
+        FILE_VIRUS_DETECTED(1153, HttpStatus.BAD_REQUEST, "檔案包含病毒，任務ID: %s"),
         ;
 
 

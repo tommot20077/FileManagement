@@ -551,7 +551,6 @@ public class CacheManager {
                 if (!lock.tryLock()) {
                     releaseLock(lockedKeys);
                     return Mono.empty();
-
                 }
                 lockedKeys.add(lockKey);
             }

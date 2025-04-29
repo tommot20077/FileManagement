@@ -9,16 +9,16 @@ import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
+import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.entity.User;
-import xyz.dowob.filemanagement.repostiory.FileTrashRecordRepository;
-import xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
-import xyz.dowob.filemanagement.repostiory.UserRepository;
+import xyz.dowob.filemanagement.repostiory.*;
 
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -70,6 +70,21 @@ public class CronTaskManager {
      */
     private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
+    /**
+     * 檔案傳輸任務管理器
+     */
+    private final TransfersTasksManager transfersTasksManager;
+
+    /**
+     * 檔案傳輸任務資料庫操作類
+     */
+    private final TransfersTasksRepository transfersTasksRepository;
+
+    /**
+     * 檔案配置類
+     */
+    private final FileProperties fileProperties;
+
 
     /**
      * 清理過期的 JWT緩存憑證
@@ -113,8 +128,7 @@ public class CronTaskManager {
                                 return Mono.empty();
                             }
                             return transactionalOperator.transactional(userFileMetaRepository.deleteAllById(fileIdList));
-                        })
-                        .then(calculateUserStorageLimit(user))).subscribeOn(Schedulers.boundedElastic())
+                        }).then(calculateUserStorageLimit(user))).subscribeOn(Schedulers.boundedElastic())
                 .subscribe();
     }
 
@@ -129,7 +143,9 @@ public class CronTaskManager {
     private Mono<User> calculateUserStorageLimit(User user) {
         return userFileMetaRepository.findAllByUserId(user.getId()).collectList().flatMap(userFileMetaList -> {
             Map<String, Integer> serverFileIdMap = userFileMetaList
-                    .stream().filter(metadata -> metadata.getFileType() != FileEnum.FOLDER).filter(metadata -> metadata.getServerFileId() != null)
+                    .stream()
+                    .filter(metadata -> metadata.getFileType() != FileEnum.FOLDER)
+                    .filter(metadata -> metadata.getServerFileId() != null)
                     .collect(Collectors.groupingBy(metadata -> metadata.getServerFileId().toString(),
                                                    Collectors.collectingAndThen(Collectors.counting(), Long::intValue)
                     ));
@@ -159,5 +175,27 @@ public class CronTaskManager {
     @Scheduled(cron = "0 10 */1 * * ?")
     public void clearExpiredToken() {
         csrfTokenRepositoryStrategy.getCsrfTokenRepository().deleteToken(null).subscribeOn(Schedulers.boundedElastic()).subscribe();
+    }
+
+
+    /**
+     * 清理過期的檔案傳輸任務
+     * 每 4 小時執行一次
+     */
+    @Scheduled(cron = "0 0 */4 * * ?")
+    public void cleanExpireTransferTask() {
+        List<TransfersStatusEnum> status = List.of(TransfersStatusEnum.UPLOADING, TransfersStatusEnum.DOWNLOADING);
+        LocalDateTime expiredTime = LocalDateTime.now().minusMinutes(fileProperties.getUpload().getMaxUploadDuration().toMinutes());
+        transfersTasksRepository
+                .findAllByStatusInAndStartTimeBefore(status, expiredTime)
+                .flatMap(transfersTask -> transfersTasksManager.updateTransfersTask(transfersTask.getMd5(),
+                                                                                    transfersTask.getTransferTaskId(),
+                                                                                    TransfersStatusEnum.FAILED,
+                                                                                    "上傳超時",
+                                                                                    null,
+                                                                                    true
+                ))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
     }
 }

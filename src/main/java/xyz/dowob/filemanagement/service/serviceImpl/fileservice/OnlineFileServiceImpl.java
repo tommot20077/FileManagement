@@ -26,6 +26,7 @@ import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvid
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
+import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
@@ -103,13 +104,13 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * @param userFIleShareRecordRepository   用戶檔案分享記錄操作介面
      */
     public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
-                                 @Nullable FolderListTreeProvider folderListTreeProvider) {
+                                 @Nullable FolderListTreeProvider folderListTreeProvider, @Nullable FileScanProvider fileScanProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
               userRepository,
               redisProvider,
-              gridFsProvider,
+              gridFsProvider, fileScanProvider,
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,

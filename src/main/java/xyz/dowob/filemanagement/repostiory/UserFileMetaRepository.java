@@ -53,6 +53,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserIdAndIsDeleted(Long userId, Boolean isDeleted);
 
+
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
@@ -98,6 +99,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL AND is_deleted = 0")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
 
+
     /**
      * 查詢所有星標檔案
      *
@@ -108,6 +110,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @return Flux<UserFileMetadata> 返回所有星標檔案元數據
      */
     Flux<UserFileMetadata> findAllByUserIdAndIsStarAndIsDeleted(Long userId, Boolean isStar, Boolean isDeleted);
+
 
     /**
      * 根據用戶ID和最後訪問時間查詢檔案元數據

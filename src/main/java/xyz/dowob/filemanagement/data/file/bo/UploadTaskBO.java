@@ -6,6 +6,8 @@ import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.User;
 
+import java.util.HashMap;
+
 /**
  * 文件傳輸任務的數據傳輸對象，用於規範文件傳輸任務的數據傳輸對象，紀錄文件傳輸任務的數據
  *
@@ -77,5 +79,25 @@ public class UploadTaskBO {
         fileMetadataDTO.setFileSize(this.fileSize);
         fileMetadataDTO.setUser(this.user);
         return fileMetadataDTO;
+    }
+
+
+    /**
+     * 重寫toString方法，將文件傳輸任務對象轉換為字符串
+     *
+     * @return 字符串
+     */
+    @Override
+    public String toString() {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("transferTaskId", transferTaskId);
+        map.put("parentFolderId", parentFolderId);
+        map.put("filename", filename);
+        map.put("fileType", fileType);
+        map.put("fileSize", fileSize);
+        map.put("md5", md5);
+        map.put("user", user);
+        map.put("message", message);
+        return map.toString();
     }
 }

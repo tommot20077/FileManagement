@@ -175,7 +175,19 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1219
          * 錯誤信息: 發送郵件失敗
          */
-        SEND_MAIL_FAILED(1219, "發送郵件失敗")
+        SEND_MAIL_FAILED(1219, "發送郵件失敗"),
+
+        /**
+         * 錯誤碼: 1220
+         * 錯誤信息: 解析掃描結果失敗
+         */
+        RESOLVE_SCAN_FAILED(1220, "解析掃描結果失敗 %s"),
+
+        /**
+         * 錯誤碼: 1221
+         * 錯誤信息: 連接掃描服務器失敗
+         */
+        CONNECT_SCAN_SERVER_FAILED(1221, "連接掃描服務器失敗 %s"),
 
         ;
 

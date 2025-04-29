@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
+import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
@@ -46,6 +49,7 @@ import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.CacheRule;
 import xyz.dowob.filemanagement.repostiory.*;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -61,7 +65,6 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 @RecordLevel(LogLevelEnum.DEBUG)
 public abstract class AbstractFileService implements FileService {
-
     /**
      * 服務器文件元數據庫操作對象
      */
@@ -91,6 +94,11 @@ public abstract class AbstractFileService implements FileService {
      * GridFs操作對象
      */
     protected final GridFsProvider gridFsProvider;
+
+    /**
+     * 檔案掃描操作對象
+     */
+    protected final FileScanProvider fileScanProvider;
 
     /**
      * 文件上傳任務管理器
@@ -172,7 +180,16 @@ public abstract class AbstractFileService implements FileService {
      */
     @PostConstruct
     public void init() {
+        if (fileProperties.getUpload().getChunkSize().toBytes() <= 0) {
+            throw new IllegalArgumentException("分塊大小必須大於0");
+        }
         CHUNK_SIZE = fileProperties.getUpload().getChunkSize().toBytes();
+
+        if (!fileProperties.getUpload().getMaxUploadDuration().isPositive()) {
+            throw new IllegalArgumentException("單次最久上傳時間必須大於0");
+        }
+
+
     }
 
 
@@ -266,7 +283,7 @@ public abstract class AbstractFileService implements FileService {
                                 .build();
 
                         if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
-                            combineChunks(transferTaskId, uploadChunkDTO.getTotalChunks()).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                            fileCheck(transferTaskId, uploadChunkDTO.getTotalChunks()).subscribeOn(Schedulers.boundedElastic()).subscribe();
                             responseDTO.setIsFinished(true);
                         }
                         return Mono.just(responseDTO);
@@ -637,6 +654,8 @@ public abstract class AbstractFileService implements FileService {
             ByteBuffer buffer = ByteBuffer.allocate(totalLength);
             byteArrays.forEach(buffer::put);
             return buffer.array();
+        }).doFinally(signalType -> {
+            byteArrays.clear();
         });
     }
 
@@ -707,17 +726,16 @@ public abstract class AbstractFileService implements FileService {
      * @param transferTaskId 任務ID
      * @param totalChunks    總分塊數
      *
-     * @return Mono<ObjectId>
+     * @return Mono<byte [ ]> 合併後的數據
      */
-    protected Mono<ObjectId> combineChunks(String transferTaskId, int totalChunks) {
+    protected Mono<byte[]> combineChunks(String transferTaskId, int totalChunks) {
         record ChunkData(int index, byte[] data) {
             static Comparator<ChunkData> comparator() {
                 return Comparator.comparingInt(ChunkData::index);
             }
         }
 
-        String key = "upload_task:" + transferTaskId;
-        return redisProvider.getHashMap(key, "DTO", UploadTaskBO.class).flatMap(uploadTaskBO -> {
+        return Mono.defer(() -> {
             RateLimiter rateLimiter = RateLimiter.of("combineChunk", this.rateLimiterConfig);
             Flux<ChunkData> chunkFiles = Flux.range(1, totalChunks).flatMapSequential(index -> {
 
@@ -754,20 +772,45 @@ public abstract class AbstractFileService implements FileService {
                                            .jitter(0.3));
             });
 
-            return chunkFiles.sort(ChunkData.comparator()).map(ChunkData::data)
-                    .collectList()
-                    .flatMap(this::combineBytes)
-                    .flatMap(combinedBytes -> checkFileStatus(combinedBytes, uploadTaskBO).then(Mono.defer(() -> {
-                        uploadTaskBO.setFileType(detectFileType(combinedBytes));
-                        processFileAfterFileCheck(uploadTaskBO, combinedBytes).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                        return Mono.just(new ObjectId());
-                    })));
+            return chunkFiles.sort(ChunkData.comparator()).map(ChunkData::data).collectList().flatMap(this::combineBytes);
         });
     }
 
 
     /**
+     * 檢查文件的狀態和安全性
+     * 根據傳入的數據和任務信息，檢查文件的大小和MD5值是否匹配
+     * 如果不匹配，則更新傳輸任務的狀態為失敗並返回錯誤
+     * 若果匹配，則返回空的Mono對象
+     * <p>
+     * 當發生錯誤時，會刪除暫存數據
+     *
+     * @param transferTaskId 任務ID
+     * @param totalChunks    總分塊數
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> fileCheck(String transferTaskId, int totalChunks) {
+        String key = "upload_task:" + transferTaskId;
+        return redisProvider
+                .getHashMap(key, "DTO", UploadTaskBO.class)
+                .flatMap(uploadTaskBO -> combineChunks(transferTaskId, totalChunks).flatMap(combinedBytes -> {
+                    Mono<Void> checkFileStatusMono = checkFileStatus(combinedBytes, uploadTaskBO);
+                    Mono<Void> scanFileMono = checkFileSecurity(combinedBytes, uploadTaskBO);
+
+                    return Mono.when(checkFileStatusMono, scanFileMono).then(Mono.defer(() -> {
+                        uploadTaskBO.setFileType(detectFileType(combinedBytes));
+                        return processFileAfterFileCheck(uploadTaskBO, combinedBytes);
+                    })).onErrorResume(e -> removeTempData(uploadTaskBO).subscribeOn(Schedulers.boundedElastic()));
+                }));
+    }
+
+
+    /**
      * 檢查文件的狀態的共通實現
+     * 根據傳入的數據和任務信息，檢查文件的大小和MD5值是否匹配
+     * 如果不匹配，則更新傳輸任務的狀態為失敗並返回錯誤
+     * 若果匹配，則返回空的Mono對象
      *
      * @param combinedBytes 合併後的數據
      * @param uploadTaskBO  任務
@@ -777,34 +820,68 @@ public abstract class AbstractFileService implements FileService {
     protected Mono<Void> checkFileStatus(byte[] combinedBytes, UploadTaskBO uploadTaskBO) {
         return Mono.defer(() -> {
             if (combinedBytes.length != uploadTaskBO.getFileSize()) {
-                transfersTasksManager
+                return transfersTasksManager
                         .updateTransfersTask(uploadTaskBO.getMd5(),
                                              uploadTaskBO.getTransferTaskId(),
                                              TransfersStatusEnum.FAILED,
                                              "文件大小不匹配",
-                                             null,
-                                             false
+                                             null, true
                         )
                         .subscribeOn(Schedulers.boundedElastic())
-                        .subscribe();
-                return Mono.defer(() -> removeTempData(uploadTaskBO).then(Mono.error(new ProcessException(ProcessException.ErrorCode.FILE_SIZE_NOT_MATCH))));
+                        .then(Mono.error(new ProcessException(ProcessException.ErrorCode.FILE_SIZE_NOT_MATCH)));
             }
 
             String computedChunkMd5 = DigestUtils.md5Hex(combinedBytes);
             if (!uploadTaskBO.getMd5().equals(computedChunkMd5)) {
-                transfersTasksManager
+                return transfersTasksManager
                         .updateTransfersTask(uploadTaskBO.getMd5(),
                                              uploadTaskBO.getTransferTaskId(),
                                              TransfersStatusEnum.FAILED,
                                              "MD5校驗失敗",
-                                             null,
-                                             false
+                                             null, true
                         )
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .subscribe();
-                return Mono.defer(() -> removeTempData(uploadTaskBO).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH))));
+                        .subscribeOn(Schedulers.boundedElastic()).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH)));
             }
             return Mono.empty();
+        });
+    }
+
+
+    /**
+     * 檢查文件的安全性的共通實現
+     * 根據傳入的數據和任務信息，檢查文件是否存在病毒
+     * 如果檢測到病毒，則更新傳輸任務的狀態為失敗並返回錯誤
+     * 若果沒有檢測到病毒，則返回空的Mono對象
+     *
+     * @param combinedBytes 合併後的數據
+     * @param uploadTaskBO  任務
+     *
+     * @return Mono<Void>
+     */
+    protected Mono<Void> checkFileSecurity(byte[] combinedBytes, UploadTaskBO uploadTaskBO) {
+        return Mono.defer(() -> {
+            if (fileScanProvider == null) {
+                return Mono.empty();
+            }
+            ByteBuf byteBuf = Unpooled.wrappedBuffer(combinedBytes);
+            return fileScanProvider.scanByteBuf(Flux.just(byteBuf), combinedBytes.length).flatMap(result -> {
+                if (result.isSafe()) {
+                    return Mono.empty();
+                }
+                LogUnity.warn(null, "上傳任務中的檔案檢測到病毒，上傳任務ID: %s", uploadTaskBO.getTransferTaskId());
+                return transfersTasksManager
+                        .updateTransfersTask(uploadTaskBO.getMd5(),
+                                             uploadTaskBO.getTransferTaskId(),
+                                             TransfersStatusEnum.FAILED,
+                                             "檔案檢測到病毒，已刪除",
+                                             null,
+                                             true
+                        )
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .then(Mono.error(new ValidationException(ValidationException.ErrorCode.FILE_VIRUS_DETECTED,
+                                                                 uploadTaskBO.getTransferTaskId()
+                        )));
+            });
         });
     }
 
@@ -823,29 +900,34 @@ public abstract class AbstractFileService implements FileService {
                            String.format("%s_output", uploadTaskBO.getTransferTaskId())
                 )
                 .flatMap(fileGridFsId -> {
+                    String gridFsId = fileGridFsId.toHexString();
+
                     ServerFileMetadata serverFileMetadata = new ServerFileMetadata();
                     serverFileMetadata.setFileSize(uploadTaskBO.getFileSize());
                     serverFileMetadata.setFileType(uploadTaskBO.getFileType());
                     serverFileMetadata.setMd5(uploadTaskBO.getMd5());
-                    serverFileMetadata.setGridFsId(fileGridFsId.toHexString());
+                    serverFileMetadata.setGridFsId(gridFsId);
                     serverFileMetadata.setUploadTime(LocalDateTime.now());
                     serverFileMetadata.setLastAccessTime(LocalDateTime.now());
                     serverFileMetadata.getOwners().add(uploadTaskBO.getUser().getId());
-                    transfersTasksManager
-                            .finishTransfersTask(uploadTaskBO.getMd5(), uploadTaskBO.getTransferTaskId(), fileGridFsId.toHexString())
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe();
 
-                    Mono<Void> result = handleUserStorage(uploadTaskBO.getUser(), uploadTaskBO.getFileSize(), false);
-                    return result
-                            .then(serverFileMetaRepository
-                                          .save(serverFileMetadata)
-                                          .flatMap(serverFile -> associateUserFile(serverFile, uploadTaskBO.formatToFileMetadata()))
-                                          .flatMap(userFileMetadata -> userFileMetaRepository
-                                                  .save(userFileMetadata)
-                                                  .then(cleanUserListCache(userFileMetadata.getUserId(), userFileMetadata.getParentFolderId()))))
-                            .then(removeTempData(uploadTaskBO))
-                            .then();
+                    Mono<Void> calculateStorage = handleUserStorage(uploadTaskBO.getUser(), uploadTaskBO.getFileSize(), false);
+                    Mono<Void> removeTempData = removeTempData(uploadTaskBO);
+                    Mono<Void> cleanUserListCache = cleanUserListCache(uploadTaskBO.getUser().getId(), uploadTaskBO.getParentFolderId());
+                    Mono<Void> updateTask = transfersTasksManager
+                            .updateTransfersTask(uploadTaskBO.getMd5(),
+                                                 uploadTaskBO.getTransferTaskId(),
+                                                 TransfersStatusEnum.COMPLETED,
+                                                 "檔案處理成功",
+                                                 gridFsId,
+                                                 true
+                            )
+                            .subscribeOn(Schedulers.boundedElastic());
+                    return serverFileMetaRepository
+                            .save(serverFileMetadata)
+                            .flatMap(serverFile -> associateUserFile(serverFile, uploadTaskBO.formatToFileMetadata()))
+                            .flatMap(userFileMetaRepository::save)
+                            .then(Mono.when(calculateStorage, removeTempData, cleanUserListCache, updateTask));
                 });
     }
 
@@ -903,9 +985,9 @@ public abstract class AbstractFileService implements FileService {
             int totalChunks = getTotalChunks(fileMetadataDTO.getFileSize());
 
             return redisProvider
-                    .setHashMap(key, "DTO", task, Duration.ofHours(6))
-                    .then(redisProvider.setHashMap(key, "uploaded_count", 0, Duration.ofHours(6)))
-                    .then(redisProvider.setHashMap(key, "total_chunks", totalChunks, Duration.ofHours(6)))
+                    .setHashMap(key, "DTO", task, fileProperties.getUpload().getMaxUploadDuration())
+                    .then(redisProvider.setHashMap(key, "uploaded_count", 0, fileProperties.getUpload().getMaxUploadDuration()))
+                    .then(redisProvider.setHashMap(key, "total_chunks", totalChunks, fileProperties.getUpload().getMaxUploadDuration()))
                     .then(redisProvider.generateChunkSet(key + ":pending_chunks", totalChunks))
                     .thenReturn(UploadResponseDTO
                                         .builder()
@@ -942,10 +1024,9 @@ public abstract class AbstractFileService implements FileService {
         return redisProvider
                 .deleteSet(pendingChunkKey, chunkIndex)
                 .then(gridFsProvider.storeFile(chunkData, transferTaskId + "_chunk_" + chunkIndex))
-                .then(redisProvider.incrementHashMap(key, "uploaded_count", 1, Duration.ofHours(1)))
+                .then(redisProvider.incrementHashMap(key, "uploaded_count", 1, fileProperties.getUpload().getMaxUploadDuration()))
                 .flatMap(uploadCount -> {
-                    Long uploadCountLong = (Long) uploadCount;
-                    double progress = (uploadCountLong.doubleValue() / totalChunks) * 100.0;
+                    double progress = (uploadCount.doubleValue() / totalChunks) * 100.0;
                     String message = String.format("文件分塊: %d 上傳成功", chunkIndex);
 
                     UploadResponseDTO responseDTO = UploadResponseDTO
@@ -959,8 +1040,8 @@ public abstract class AbstractFileService implements FileService {
                             .totalChunks(totalChunks)
                             .build();
 
-                    if (uploadCountLong.intValue() == totalChunks) {
-                        combineChunks(transferTaskId, totalChunks).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    if (uploadCount.intValue() == totalChunks) {
+                        fileCheck(transferTaskId, totalChunks).subscribeOn(Schedulers.boundedElastic()).subscribe();
                         responseDTO.setIsFinished(true);
                     }
                     return Mono.just(responseDTO);

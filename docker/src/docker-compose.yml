@@ -108,6 +108,26 @@ services:
       retries: 5
       start_period: 20s
 
+  # ClamAV 服務
+  clamav:
+    image: clamav/c-debian:1.4.2
+    container_name: filemanager_clamav
+    restart: always
+    ports:
+      # 這邊的 10895 是你要對外的 port，請確認這邊的 port 沒有被佔用
+      # 3310 是 clamav 的預設 port 此參數不建議更動
+      # 如果需要外部連線的話，可以將前面的 127.0.0.1 去掉或是使用反向代理
+      - "127.0.0.1:10895:3310"
+    networks:
+      - my_network
+    environment:
+      - CLAMD_STARTUP=true
+    healthcheck:
+      test: [ "CMD", "clamdscan", "--version" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 #  前端服務，如果需要的話可以將這段註解取消
 #  filemanager_front:
 #    build:

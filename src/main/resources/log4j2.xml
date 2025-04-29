@@ -31,7 +31,7 @@
         </RollingFile>
 
         <RollingFile name="ErrorLogger" fileName="logs/error/error.log"
-                     filePattern="logs/error-%d{yyyy-MM-dd}.log.gz">
+                     filePattern="logs/error/error-%d{yyyy-MM-dd}.log.gz">
             <PatternLayout>
                 <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} | %5p | %15.15t | %-40.40c{1.} | %m%n</pattern>
             </PatternLayout>

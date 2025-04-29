@@ -132,27 +132,6 @@ public class TransfersTasksManager {
 
 
     /**
-     * 用於完成一個傳輸任務時，更新任務的狀態
-     *
-     * @param md5             檔案的 MD5 值
-     * @param transfersTaskId 任務ID
-     * @param gridFsId        GridFS 檔案ID
-     *
-     * @return Mono<Void> 返回一個 Mono 對象
-     */
-    @RecordLevel(LogLevelEnum.DEBUG)
-    public Mono<Void> finishTransfersTask(String md5, String transfersTaskId, String gridFsId) {
-        return updateTransfersTask(md5,
-                                   transfersTaskId,
-                                   TransfersStatusEnum.COMPLETED,
-                                   "檔案處理成功",
-                                   gridFsId,
-                                   true
-        ).doOnSuccess(aVoid -> activeTransfersTask.remove(md5));
-    }
-
-
-    /**
      * 用於更新一個傳輸任務的狀態
      *
      * @param md5             檔案的 MD5 值
@@ -180,7 +159,12 @@ public class TransfersTasksManager {
         if (gridFsId != null) {
             transfersTask.setGridFsId(gridFsId);
         }
-        return transfersTasksRepository.save(transfersTask).then();
+        return transfersTasksRepository.save(transfersTask).flatMap(task -> {
+            if (isFinished) {
+                activeTransfersTask.remove(md5);
+            }
+            return Mono.empty();
+        });
     }
 
 
@@ -229,11 +213,12 @@ public class TransfersTasksManager {
      * @return Mono<Void> 返回一個 Mono 對象
      */
     @PreDestroy
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> destroy() {
         List<TransfersStatusEnum> status = new ArrayList<>();
-        status.add(TransfersStatusEnum.COMPLETED);
-        status.add(TransfersStatusEnum.FAILED);
-        return transfersTasksRepository.findAllByStatusNotIn(status).collectList().flatMap(unfinishedTasks -> {
+        status.add(TransfersStatusEnum.UPLOADING);
+        status.add(TransfersStatusEnum.DOWNLOADING);
+        return transfersTasksRepository.findAllByStatusIn(status).collectList().flatMap(unfinishedTasks -> {
             if (unfinishedTasks.isEmpty()) {
                 return Mono.empty();
             }

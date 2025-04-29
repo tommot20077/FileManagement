@@ -31,6 +31,10 @@ file:
     # 當設置值小於等於0時，則不限制上傳檔案的大小
     max-upload-file-size: 10GB
 
+    # 上傳檔案最大的時間限制，默認為 6 小時
+    # 當超過這個時間限制時，會自動終止上傳檔案的請求
+    max-upload-duration: 6h
+
   # 下載相關設定
   download:
     # 設定瀏覽器緩存的過期時間，默認為 1 小時
@@ -71,6 +75,28 @@ file:
 
     # 回收桶文件保留時間，默認為 30 天
     retention-time: 30d
+
+  # 檔案安全性相關設定
+  security:
+    # 是否啟用檔案安全性檢查，默認為 true
+    enable-security-check: true
+
+    # 檔案掃描服務的網址，默認為 localhost
+    host: localhost
+
+    # 檔案掃描服務的端口，默認為 3310
+    port: 3310
+
+    # 掃描檔案的最大大小，默認為 10GB
+    # 當設置值小於等於0時，則不限制掃描檔案的大小
+    max-file-size:
+
+    # 掃描檔案的最小大小，默認為 1KB
+    # 當設置值小於等於0時，則不限制掃描檔案的大小
+    min-file-size:
+
+    # 掃描檔案的連接超時時間，默認為 30 秒
+    timeout:
 
 # 安全性相關設定
 security:
@@ -229,6 +255,20 @@ global:
 
     # 轉發的 IP 地址的標頭名稱，默認為 X-Forwarded-For
     XForwarded-header: X-Forwarded-For
+
+  # netty 線程池的配置
+  netty-pool:
+    # netty 線程池的最大線程數量，默認為 10
+    max-connections: 10
+
+    # netty 線程池的閒置時間，默認為 1 分鐘
+    max-idle-time: 1m
+
+    # netty 線程池的生命週期，默認為 1 小時
+    max-life-time: 1h
+
+    # netty 線程池的請求佇列的最長等待時間，默認為 30 秒
+    pending-acquire-timeout: 30s
 
 
 # Spring 相關設定
