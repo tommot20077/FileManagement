@@ -12,6 +12,7 @@ import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -89,6 +90,36 @@ public class RedisProvider {
 
 
     /**
+     * 僅在鍵不存在的情況下設置值
+     *
+     * @param key   鍵
+     * @param value 值
+     *
+     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     */
+    public Mono<Boolean> setValueIfAbsent(String key, Object value) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value);
+    }
+
+
+    /**
+     * 僅在鍵不存在的情況下設置值，並設置過期時間
+     *
+     * @param key        鍵
+     * @param value      值
+     * @param expireTime 過期時間
+     *
+     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     */
+    public Mono<Boolean> setValueIfAbsent(String key, Object value, Duration expireTime) {
+        if (expireTime == null || expireTime.isNegative()) {
+            return setValueIfAbsent(key, value);
+        }
+        return redisTemplate.opsForValue().setIfAbsent(key, value).flatMap(result -> setExpire(key, expireTime).thenReturn(result));
+    }
+
+
+    /**
      * 根據鍵獲取數據
      *
      * @param key 鍵
@@ -109,9 +140,46 @@ public class RedisProvider {
 
 
     /**
-     * 根據鍵獲取數據
+     * 依照鍵刪除儲存類型為 Value 的數據
      *
      * @param key 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(String key) {
+        return redisTemplate.delete(key).then();
+    }
+
+
+    /**
+     * 依照鍵刪除儲存類型為 Value 的數據
+     *
+     * @param keys 鍵的集合
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(Collection<String> keys) {
+        return redisTemplate.delete(keys.toArray(new String[0])).then();
+    }
+
+
+    /**
+     * 依照鍵刪除儲存類型為 Value 的數據
+     *
+     * @param keys 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(String... keys) {
+        return redisTemplate.delete(keys).then();
+    }
+
+
+    /**
+     * 獲取值並轉換為分頁響應
+     *
+     * @param key   鍵
+     * @param clazz 類型
      */
     @HideOverLength
     public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromValue(String key, Class<T> clazz) {
@@ -125,7 +193,8 @@ public class RedisProvider {
     /**
      * 獲取數據列表
      *
-     * @param key 鍵
+     * @param key   鍵
+     * @param clazz 類型
      *
      * @return 返回 Flux<Object> 對象
      */
@@ -158,18 +227,6 @@ public class RedisProvider {
      */
     public Mono<Long> incrementDelta(String key, long delta, Duration expireTime) {
         return incrementDelta(key, delta).flatMap(incrementResult -> setExpire(key, expireTime).thenReturn(incrementResult));
-    }
-
-
-    /**
-     * 刪除 Redis 中的數據
-     *
-     * @param key 鍵
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    public Mono<Void> delete(String key) {
-        return redisTemplate.delete(key).then();
     }
 
 
@@ -617,9 +674,8 @@ public class RedisProvider {
     public Mono<Void> insertList(String key, Object value, Boolean isLeft) {
         if (isLeft) {
             return redisTemplate.opsForList().leftPush(key, value).then();
-        } else {
-            return redisTemplate.opsForList().rightPush(key, value).then();
         }
+        return redisTemplate.opsForList().rightPush(key, value).then();
     }
 
 
@@ -793,6 +849,18 @@ public class RedisProvider {
      */
     public Mono<Void> generateChunkSet(String key, int totalChunks) {
         return Flux.range(1, totalChunks).flatMap(index -> setSet(key, index)).then();
+    }
+
+
+    /**
+     * 刪除 Redis 中的數據，此刪除方法會檢查所有的數據類型找出對應的鍵並刪除
+     *
+     * @param key 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> delete(String key) {
+        return redisTemplate.delete(key).then();
     }
 
 

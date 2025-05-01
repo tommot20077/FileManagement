@@ -550,7 +550,7 @@ public class CacheConcurrentHashMap<K, V> {
      */
     public Runnable getCleanupTask() {
         return () -> {
-            LogUnity.debug(null, "清理過期緩存資料");
+            LogUnity.debug("清理過期緩存資料");
             synchronized (cacheMap) {
                 long currentTime = System.currentTimeMillis();
                 Set<K> expiredKeys = cacheMap

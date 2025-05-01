@@ -110,7 +110,7 @@ services:
 
   # ClamAV 服務
   clamav:
-    image: clamav/c-debian:1.4.2
+    image: clamav/clamav-debian:latest
     container_name: filemanager_clamav
     restart: always
     ports:

@@ -654,9 +654,7 @@ public abstract class AbstractFileService implements FileService {
             ByteBuffer buffer = ByteBuffer.allocate(totalLength);
             byteArrays.forEach(buffer::put);
             return buffer.array();
-        }).doFinally(signalType -> {
-            byteArrays.clear();
-        });
+        }).doFinally(signalType -> byteArrays.clear());
     }
 
 
@@ -801,7 +799,17 @@ public abstract class AbstractFileService implements FileService {
                     return Mono.when(checkFileStatusMono, scanFileMono).then(Mono.defer(() -> {
                         uploadTaskBO.setFileType(detectFileType(combinedBytes));
                         return processFileAfterFileCheck(uploadTaskBO, combinedBytes);
-                    })).onErrorResume(e -> removeTempData(uploadTaskBO).subscribeOn(Schedulers.boundedElastic()));
+                    })).onErrorResume(e -> {
+                        LogUnity.warn("檔案檢查失敗，將刪除暫存數據，上傳任務ID: %s ，錯誤原因", transferTaskId, e.getMessage());
+                        Mono<Void> updateTask = transfersTasksManager.updateTransfersTask(uploadTaskBO.getMd5(),
+                                                                                          uploadTaskBO.getTransferTaskId(),
+                                                                                          TransfersStatusEnum.FAILED,
+                                                                                          "檔案檢查失敗",
+                                                                                          null,
+                                                                                          true
+                        );
+                        return Mono.when(removeTempData(uploadTaskBO), updateTask);
+                    });
                 }));
     }
 
@@ -824,8 +832,7 @@ public abstract class AbstractFileService implements FileService {
                         .updateTransfersTask(uploadTaskBO.getMd5(),
                                              uploadTaskBO.getTransferTaskId(),
                                              TransfersStatusEnum.FAILED,
-                                             "文件大小不匹配",
-                                             null, true
+                                             "文件大小不匹配", null, true
                         )
                         .subscribeOn(Schedulers.boundedElastic())
                         .then(Mono.error(new ProcessException(ProcessException.ErrorCode.FILE_SIZE_NOT_MATCH)));
@@ -837,10 +844,8 @@ public abstract class AbstractFileService implements FileService {
                         .updateTransfersTask(uploadTaskBO.getMd5(),
                                              uploadTaskBO.getTransferTaskId(),
                                              TransfersStatusEnum.FAILED,
-                                             "MD5校驗失敗",
-                                             null, true
-                        )
-                        .subscribeOn(Schedulers.boundedElastic()).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH)));
+                                             "MD5校驗失敗", null, true
+                        ).subscribeOn(Schedulers.boundedElastic()).then(Mono.error(new ProcessException(ProcessException.ErrorCode.MD5_NOT_MATCH)));
             }
             return Mono.empty();
         });
@@ -868,7 +873,7 @@ public abstract class AbstractFileService implements FileService {
                 if (result.isSafe()) {
                     return Mono.empty();
                 }
-                LogUnity.warn(null, "上傳任務中的檔案檢測到病毒，上傳任務ID: %s", uploadTaskBO.getTransferTaskId());
+                LogUnity.warn("上傳任務中的檔案檢測到病毒，上傳任務ID: %s", uploadTaskBO.getTransferTaskId());
                 return transfersTasksManager
                         .updateTransfersTask(uploadTaskBO.getMd5(),
                                              uploadTaskBO.getTransferTaskId(),

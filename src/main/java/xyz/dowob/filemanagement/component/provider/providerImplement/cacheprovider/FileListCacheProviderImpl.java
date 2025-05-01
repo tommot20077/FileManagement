@@ -11,6 +11,7 @@ import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvid
 import xyz.dowob.filemanagement.config.properties.CacheProperties;
 import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.time.Duration;
 import java.util.*;
@@ -137,6 +138,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
      */
     @Override
     public Mono<Void> delete(String key) {
+        LogUnity.warn("刪除緩存鍵: " + key);
         return redisProvider.deleteList(key);
     }
 

@@ -92,3 +92,9 @@ file:
     # 這邊需要依照需求修改，設置越大請求的次數會越少但記憶體的使用量會越大
     chunk-size: 2MB
 
+  security:
+    # 這邊的設定是用來檢查上傳的檔案是否有病毒，請確認這邊的服務名稱、端口是否跟 docker-compose.yml 一致
+    host: filemanager_clamav
+    port: 3310
+
+

@@ -38,6 +38,33 @@ public class LogUnity {
 
     /**
      * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 TRACE 級別的日誌
      *
      * @param exchange  ServerWebExchange 對象
      * @param message   日誌訊息
@@ -64,6 +91,33 @@ public class LogUnity {
      */
     public static void debug(ServerWebExchange exchange, @NotNull String message, Object... args) {
         debug(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
     }
 
 
@@ -100,6 +154,33 @@ public class LogUnity {
 
     /**
      * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 INFO 級別的日誌
      *
      * @param exchange  ServerWebExchange 對象
      * @param message   日誌訊息
@@ -126,6 +207,33 @@ public class LogUnity {
      */
     public static void warn(ServerWebExchange exchange, @NotNull String message, Object... args) {
         warn(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
     }
 
 
@@ -162,6 +270,33 @@ public class LogUnity {
 
     /**
      * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 ERROR 級別的日誌
      *
      * @param exchange  ServerWebExchange 對象
      * @param message   日誌訊息
@@ -188,6 +323,33 @@ public class LogUnity {
      */
     public static void fatal(ServerWebExchange exchange, @NotNull String message, Object... args) {
         fatal(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Object... args) {
+        trace(null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Throwable throwable, Object... args) {
+        trace(null, message, throwable, args);
     }
 
 

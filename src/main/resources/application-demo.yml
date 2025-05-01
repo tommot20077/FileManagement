@@ -82,21 +82,21 @@ file:
     enable-security-check: true
 
     # 檔案掃描服務的網址，默認為 localhost
-    host: localhost
+    host: your_scan_service_host
 
     # 檔案掃描服務的端口，默認為 3310
     port: 3310
 
     # 掃描檔案的最大大小，默認為 10GB
     # 當設置值小於等於0時，則不限制掃描檔案的大小
-    max-file-size:
+    max-file-size: 10GB
 
-    # 掃描檔案的最小大小，默認為 1KB
+    # 掃描檔案的最小大小，默認為 0
     # 當設置值小於等於0時，則不限制掃描檔案的大小
-    min-file-size:
+    min-file-size: 0
 
     # 掃描檔案的連接超時時間，默認為 30 秒
-    timeout:
+    timeout: 30s
 
 # 安全性相關設定
 security:

@@ -73,7 +73,7 @@ public class FolderListTreeManager implements ApplicationRunner {
      */
     @Override
     public void run(ApplicationArguments args) {
-        LogUnity.info(null, "初始化用戶的檔案列表樹");
+        LogUnity.info("初始化用戶的檔案列表樹");
         dynamicThreadPoolExecutor = new DynamicThreadPoolExecutor(2, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(1));
         initializeTree();
     }
@@ -98,7 +98,7 @@ public class FolderListTreeManager implements ApplicationRunner {
                         boolean isLastPage = pageList.getCurrentPage() == pageList.getTotalPages();
                         folderListTreeProvider.initializeTree(user.getId(), pageList.getData(), isLastPage);
                     } catch (Exception e) {
-                        LogUnity.error(null, "初始化用戶 %s 的檔案列表樹失敗", e, user.getId());
+                        LogUnity.error("初始化用戶 %s 的檔案列表樹失敗", e, user.getId());
                     }
                 });
                 return Mono.just(user);

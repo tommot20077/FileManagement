@@ -200,11 +200,11 @@ public class FileProperties {
         private Duration timeout = Duration.ofSeconds(30);
 
         /**
-         * 安全性檢查的最小檔案大小，默認為 1KB
+         * 安全性檢查的最小檔案大小，默認為 0
          * 當檔案大小小於此值時，則不進行安全性檢查
          * 若設置值小於等於0時，則不限制檔案大小
          */
-        private DataSize minFileSize = DataSize.ofKilobytes(1);
+        private DataSize minFileSize = DataSize.ofBytes(0);
 
         /**
          * 安全性檢查的最大檔案大小，默認為 10GB
