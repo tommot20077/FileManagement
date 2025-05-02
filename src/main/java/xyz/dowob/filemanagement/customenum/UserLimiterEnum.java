@@ -17,7 +17,12 @@ public enum UserLimiterEnum {
     /**
      * 用戶上傳限流器
      */
-    USER_UPLOAD_LIMITER("用戶上傳限流器", "當前已經達到最大上傳數量限制");
+    USER_UPLOAD_LIMITER("用戶上傳限流器", "當前已經達到最大上傳數量限制"),
+
+    /**
+     * 用戶登錄限流器
+     */
+    USER_LOGIN_LIMITER("用戶登錄限流器", "當前已經達到最大登錄次數限制");
 
     /**
      * 限流器描述

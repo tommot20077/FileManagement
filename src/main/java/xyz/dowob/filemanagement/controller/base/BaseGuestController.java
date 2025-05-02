@@ -12,6 +12,7 @@ import xyz.dowob.filemanagement.data.user.dto.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
@@ -39,6 +40,12 @@ public abstract class BaseGuestController implements ResponseUnity {
     protected final AuthorizationService authorizationService;
 
     /**
+     * 驗證業務層對象
+     * 用於處理數據驗證的業務邏輯，例如驗證用戶註冊數據、重置密碼數據等
+     */
+    protected final ValidationService validationService;
+
+    /**
      * 用戶業務層對象
      * 用於處理與用戶相關的業務邏輯，例如註冊、登入、密碼重置等
      */
@@ -57,8 +64,9 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @param userService          用戶業務層對象
      * @param securityProperties   安全屬性配置
      */
-    protected BaseGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties) {
+    protected BaseGuestController(AuthorizationService authorizationService, ValidationService validationService, UserService userService, SecurityProperties securityProperties) {
         this.authorizationService = authorizationService;
+        this.validationService = validationService;
         this.userService = userService;
         this.securityProperties = securityProperties;
     }
@@ -75,11 +83,11 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @return Mono<ResponseEntity < ?>> 返回註冊結果的Mono對象，封裝了響應數據
      */
     public Mono<ResponseEntity<?>> register(RegisterDTO registerUserDTO, ServerWebExchange exchange) {
-        return handleError(userService.register(registerUserDTO).then(Mono.defer(() -> {
+        return handleError(validationService.validateRegisterDTO(registerUserDTO).then(userService.register(registerUserDTO).then(Mono.defer(() -> {
             HashMap<String, Object> data = new HashMap<>();
             ApiResponseDTO<?> apiResponse = createResponse(exchange, 201, "註冊成功", data);
             return createResponseEntity(apiResponse, 201);
-        })), exchange);
+        }))), exchange);
     }
 
 
@@ -95,12 +103,13 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @return Mono<ResponseEntity < ?>> 返回登入結果的Mono對象
      */
     public Mono<ResponseEntity<?>> login(AuthRequestDTO authRequestDTO, ServerWebExchange exchange, boolean isWeb) {
-        return handleError(userService.login(authRequestDTO, exchange).flatMap(token -> {
+        return handleError(validationService.validateNotNull(authRequestDTO).then(userService.login(authRequestDTO, exchange).flatMap(token -> {
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
                         .from("jwtToken", token)
                         .httpOnly(securityProperties.getCookie().isHttpOnly())
-                        .secure(securityProperties.getCookie().isSecure()).maxAge(securityProperties.getJwtToken().getExpiration().toSeconds())
+                        .secure(securityProperties.getCookie().isSecure())
+                        .maxAge(securityProperties.getJwtToken().getExpiration().toSeconds())
                         .sameSite(securityProperties.getCookie().getSameSite())
                         .path("/")
                         .build();
@@ -108,7 +117,7 @@ public abstract class BaseGuestController implements ResponseUnity {
             }
             ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
             return createResponseEntity(apiResponse);
-        }), exchange);
+        })), exchange);
     }
 
 
@@ -148,16 +157,18 @@ public abstract class BaseGuestController implements ResponseUnity {
      * 發送重置密碼郵件
      * 用戶請求重置密碼時，系統將發送包含重置鏈接的郵件至用戶郵箱。
      *
-     * @param userMail 用戶郵箱數據傳輸對象
-     * @param exchange 請求對象
+     * @param userEmailDTO 用戶郵箱數據傳輸對象
+     * @param exchange     請求對象
      *
      * @return Mono<ResponseEntity < ?>> 返回發送結果
      */
-    public Mono<ResponseEntity<?>> sendResetPasswordMail(UserEmailDTO userMail, ServerWebExchange exchange) {
-        return handleError(userService.sendResetPasswordMail(userMail).then(Mono.defer(() -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
-            return createResponseEntity(apiResponse);
-        })), exchange);
+    public Mono<ResponseEntity<?>> sendResetPasswordMail(UserEmailDTO userEmailDTO, ServerWebExchange exchange) {
+        return handleError(validationService
+                                   .validateNotNull(userEmailDTO)
+                                   .then(userService.sendResetPasswordMail(userEmailDTO).then(Mono.defer(() -> {
+                                       ApiResponseDTO<?> apiResponse = createResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
+                                       return createResponseEntity(apiResponse);
+                                   }))), exchange);
     }
 
 
@@ -171,10 +182,12 @@ public abstract class BaseGuestController implements ResponseUnity {
      * @return Mono<ResponseEntity < ?>> 返回重置密碼結果
      */
     public Mono<ResponseEntity<?>> resetPassword(ResetPasswordDTO resetPasswordDTO, ServerWebExchange exchange) {
-        return handleError(userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "密碼重置成功", null);
-            return createResponseEntity(apiResponse);
-        })), exchange);
+        return handleError(validationService
+                                   .validateResetPasswordDTO(resetPasswordDTO)
+                                   .then(userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
+                                       ApiResponseDTO<?> apiResponse = createResponse(exchange, "密碼重置成功", null);
+                                       return createResponseEntity(apiResponse);
+                                   }))), exchange);
     }
 }
 

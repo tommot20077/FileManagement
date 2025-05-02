@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -17,6 +18,7 @@ import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.util.HashMap;
 
@@ -41,8 +43,8 @@ public class ApiGuestController extends BaseGuestController {
      * @param userService          用戶服務
      * @param securityProperties   安全屬性配置
      */
-    protected ApiGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties) {
-        super(authorizationService, userService, securityProperties);
+    protected ApiGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
+        super(authorizationService, validationService, userService, securityProperties);
     }
 
 
@@ -51,6 +53,7 @@ public class ApiGuestController extends BaseGuestController {
      *
      * @param registerUserDTO 註冊用戶的數據傳輸對象
      * @param exchange        當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 註冊結果
      */
     @PostMapping("/register")
@@ -64,11 +67,12 @@ public class ApiGuestController extends BaseGuestController {
      *
      * @param authRequestDTO 登入請求數據
      * @param exchange       當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 登入結果
      */
     @HideSensitive
     @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login(@RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
         return super.login(authRequestDTO, exchange, false);
     }
 
@@ -78,6 +82,7 @@ public class ApiGuestController extends BaseGuestController {
      *
      * @param userMail 用戶電子郵件
      * @param exchange 當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 發送驗證信結果
      */
     @PostMapping("/sendResetPasswordMail")
@@ -91,6 +96,7 @@ public class ApiGuestController extends BaseGuestController {
      *
      * @param resetPasswordDTO 重置密碼請求數據
      * @param exchange         當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 重置密碼結果
      */
     @PutMapping("/resetPassword")
@@ -103,6 +109,7 @@ public class ApiGuestController extends BaseGuestController {
      * 獲取 CSRF Token API
      *
      * @param exchange 當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 返回 CSRF Token
      */
     @HideSensitive

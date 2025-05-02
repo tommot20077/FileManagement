@@ -191,7 +191,7 @@ public class localRequestLimiterFilter implements WebFilter, ResponseUnity {
             LogUnity.info(exchange, "IP: %s 請求超過限制值: %s", ip, limit);
             if (isEnableBanIp) {
                 AtomicBoolean isBanned = new AtomicBoolean(false);
-                banIpMap.computeIfPresentOrInit(key, 0L, banDuration, (k, currentValue) -> {
+                banIpMap.computeIfPresentOrDefault(key, 0L, banDuration, (k, currentValue) -> {
                     long newValue = currentValue == null ? 1L : currentValue + 1;
                     if (newValue >= failureCount) {
                         isBanned.set(true);

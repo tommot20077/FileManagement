@@ -10,6 +10,7 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
@@ -153,27 +154,31 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                         .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userId.toString())))
                         .flatMap(user -> {
                             UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-                            if (!userLimiter.tryAcquire(user.getId())) {
-                                return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                                          UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                                ));
-                            }
-                            return validationService
-                                    .validateFileMetadataDTO(fileMetadata, user)
-                                    .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
-                                    .flatMap(transferResponseDTO -> {
-                                        ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
-                                                                                    null,
-                                                                                    transferResponseDTO
-                                        );
-                                        if (transferResponseDTO.getIsFinished()) {
-                                            response.setMessage("上傳任務完成");
-                                        } else {
-                                            response.setMessage("初始化上傳任務成功");
-                                        }
-                                        return sendMessage(session, response);
-                                    })
-                                    .doFinally(signalType -> userLimiter.release(user.getId()));
+
+                            return userLimiter.tryAcquire(user.getId()).flatMap(acquired -> {
+                                if (!acquired) {
+                                    return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                                              UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                                    ));
+                                }
+                                return validationService
+                                        .validateFileMetadataDTO(fileMetadata, user)
+                                        .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
+                                        .flatMap(transferResponseDTO -> {
+                                            ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
+                                                                                        null,
+                                                                                        transferResponseDTO
+                                            );
+                                            if (transferResponseDTO.getIsFinished()) {
+                                                response.setMessage("上傳任務完成");
+                                            } else {
+                                                response.setMessage("初始化上傳任務成功");
+                                            }
+                                            return sendMessage(session, response);
+                                        })
+                                        .publishOn(Schedulers.boundedElastic())
+                                        .doFinally(signalType -> userLimiter.release(user.getId()).subscribe());
+                            });
                         }))
                 .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
                 .onErrorResume(ValidationException.class, e -> {

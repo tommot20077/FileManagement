@@ -59,6 +59,11 @@ public class SecurityProperties {
      */
     private GuestUser guestUser = new GuestUser();
 
+    /**
+     * 登錄配置
+     */
+    private Login login = new Login();
+
 
     /**
      * 驗證 JWT 密鑰是否配置
@@ -217,5 +222,34 @@ public class SecurityProperties {
          * 是否啟用訪客用戶，默認為 true
          */
         private boolean enable = true;
+    }
+
+    @Data
+    public static class Login {
+        /**
+         * 登錄失敗的限流器提供者，默認為 redis
+         * 可選值為 redis、local 和 none
+         * none 表示不使用限流器
+         */
+        private LimiterProviderType limiterProvider = LimiterProviderType.local;
+
+        /**
+         * 登錄失敗的最大次數，默認為 5 次
+         * 當用戶登錄失敗次數達到此值時，將會鎖定用戶，若用戶登錄成功，則會清除用戶的登錄失敗次數
+         * 若設定小於等於0，則會產生 illegalArgumentException 錯誤
+         */
+        private int maxFailure = 5;
+
+        /**
+         * 登錄失敗的鎖定時間，默認為 30 分鐘
+         * 若時間設定小於等於0，則會產生 illegalArgumentException 錯誤
+         */
+        private Duration lockTime = Duration.ofMinutes(30);
+    }
+
+    private enum LimiterProviderType {
+        redis,
+        local,
+        none
     }
 }

@@ -1,6 +1,8 @@
 package xyz.dowob.filemanagement.component.limiter;
 
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.UserLimiterType;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
@@ -46,14 +48,15 @@ public class UserUploadLimiter implements UserLimiter {
      * 嘗試獲取用戶的限流器，根據設定的限制數量，判斷是否可以獲取
      * 當用戶的憑證不存在時，創建一個新的憑證
      *
-     * @param userId 用戶ID
+     * @param key 用戶辨識值
      *
-     * @return 是否獲取成功
+     * @return Mono<Boolean> 是否獲取成功
      */
     @Override
-    public boolean tryAcquire(Long userId) {
+    public Mono<Boolean> tryAcquire(Object key) {
+        Long userId = (Long) key;
         Semaphore semaphore = userSemaphoreMap.computeIfAbsent(userId, k -> new Semaphore(MAX_CONCURRENT_UPLOADS_PER_USER));
-        return semaphore.tryAcquire();
+        return Mono.just(semaphore.tryAcquire());
     }
 
 
@@ -61,10 +64,11 @@ public class UserUploadLimiter implements UserLimiter {
      * 釋放用戶的限流器
      * 當用戶的憑證可用憑證數量等於最大憑證數量時，刪除用戶的憑證
      *
-     * @param userId 用戶ID
+     * @param key 用戶辨識值
      */
     @Override
-    public void release(Long userId) {
+    public Mono<Void> release(Object key) {
+        Long userId = (Long) key;
         Semaphore semaphore = userSemaphoreMap.get(userId);
         if (semaphore != null) {
             semaphore.release();
@@ -72,5 +76,16 @@ public class UserUploadLimiter implements UserLimiter {
                 userSemaphoreMap.remove(userId);
             }
         }
+        return Mono.empty();
+    }
+
+
+    /**
+     * 銷毀方法，清除用戶的憑證映射
+     * 當應用程序關閉時，清除用戶的憑證映射
+     */
+    @PreDestroy
+    public void destroy() {
+        userSemaphoreMap.clear();
     }
 }

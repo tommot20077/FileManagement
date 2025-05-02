@@ -12,10 +12,7 @@ import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 
 import java.time.Duration;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 此類用於提供 Redis 的操作方法，透過自定義方法操作 RedisTemplate 來對數據進行操作
@@ -43,9 +40,9 @@ public class RedisProvider {
     private final ObjectMapper objectMapper;
 
     /**
-     * 隨機緩存過期時間比例
+     * 隨機緩存過期時間比例上限，將會隨機生成一個過期時間，範圍為 [expireTime, expireTime * RANDOM_CACHE_EXPIRE_TIME_RATIO]
      */
-    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 0.2f;
+    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 1.2f;
 
     /**
      * 通過構造方法注入 RedisTemplate 和 ObjectMapper
@@ -898,7 +895,9 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     private Mono<Void> setExpire(String key, Duration expireTime) {
-        Duration randomExpireTime = Duration.ofSeconds(Math.round(expireTime.getSeconds() * RANDOM_CACHE_EXPIRE_TIME_RATIO));
+        Random random = new Random();
+        float randomRatio = 1.0f + random.nextFloat() * (RANDOM_CACHE_EXPIRE_TIME_RATIO - 1.0f);
+        Duration randomExpireTime = Duration.ofSeconds((long) (expireTime.getSeconds() * randomRatio));
         return redisTemplate.expire(key, randomExpireTime).then();
     }
 

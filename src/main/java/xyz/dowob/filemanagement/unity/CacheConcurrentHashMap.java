@@ -420,6 +420,22 @@ public class CacheConcurrentHashMap<K, V> {
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
+     * 此為重寫方法，使用預設的過期時間。
+     *
+     * @param key             鍵
+     * @param initValue       初始化值（當鍵不存在或過期時使用）
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresentOrDefault(K key, V initValue, BiFunction<? super K, ? super V, V> computeFunction) {
+        return computeIfPresentOrDefault(key, initValue, expireTime, computeFunction);
+    }
+
+
+    /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
      * 使用細粒度鎖確保操作的原子性。
      *
      * @param key             鍵
@@ -431,7 +447,7 @@ public class CacheConcurrentHashMap<K, V> {
      *
      * @throws IllegalArgumentException 如果鍵為 null 或過期時間無效
      */
-    public V computeIfPresentOrInit(K key, V initValue, Duration expire, BiFunction<K, V, V> computeFunction) {
+    public V computeIfPresentOrDefault(K key, V initValue, Duration expire, BiFunction<? super K, ? super V, V> computeFunction) {
         if (key == null) {
             throw new IllegalArgumentException("鍵不能為null");
         }
@@ -458,6 +474,52 @@ public class CacheConcurrentHashMap<K, V> {
             lock.unlock();
             cleanupLock(key, lock);
         }
+    }
+
+
+    /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
+     * 此為重寫方法，使用預設的過期時間。
+     *
+     * @param key             鍵
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, V> computeFunction) {
+        return computeIfPresent(key, expireTime, computeFunction);
+    }
+
+
+    /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
+     *
+     * @param key             鍵
+     * @param expire          過期時間
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresent(K key, Duration expire, BiFunction<? super K, ? super V, V> computeFunction) {
+        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            CacheInfo<V> cacheInfo = cacheMap.get(key);
+            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
+                cacheMap.remove(key);
+                return null;
+            }
+            V newValue = computeFunction.apply(key, cacheInfo.getValue());
+            long expireTimeMillis = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            cacheMap.put(key, new CacheInfo<>(newValue, expireTimeMillis));
+            return newValue;
+        } finally {
+            lock.unlock();
+            cleanupLock(key, lock);
+        }
+
     }
 
 

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
@@ -101,31 +102,35 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> uploadFile(FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-            if (!userLimiter.tryAcquire(user.getId())) {
-                return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                          UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                ));
-            }
-            List<Long> fileIds = new ArrayList<>();
-            if (fileMetadataDTO.getParentFolderId() != null) {
-                fileIds.add(fileMetadataDTO.getParentFolderId());
-            }
+            return userLimiter.tryAcquire(user.getId()).flatMap(acquire -> {
+                if (!acquire) {
+                    return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                              UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                    ));
+                }
 
-            return validationService
-                    .validateFileMetadataDTO(fileMetadataDTO, user)
-                    .thenMany(permissionService
-                                      .validateUserPermission(user, fileIds)
-                                      .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
-                    .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
-                        ApiResponseDTO<?> apiResponse;
-                        if (transferResponseDTO.getIsFinished()) {
-                            apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                        } else {
-                            apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                        }
-                        return createResponseEntity(apiResponse);
-                    }))
-                    .doFinally(signalType -> userLimiter.release(user.getId()));
+                List<Long> fileIds = new ArrayList<>();
+                if (fileMetadataDTO.getParentFolderId() != null) {
+                    fileIds.add(fileMetadataDTO.getParentFolderId());
+                }
+
+                return validationService
+                        .validateFileMetadataDTO(fileMetadataDTO, user)
+                        .thenMany(permissionService
+                                          .validateUserPermission(user, fileIds)
+                                          .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
+                        .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
+                            ApiResponseDTO<?> apiResponse;
+                            if (transferResponseDTO.getIsFinished()) {
+                                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                            } else {
+                                apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                            }
+                            return createResponseEntity(apiResponse);
+                        }))
+                        .publishOn(Schedulers.boundedElastic())
+                        .doFinally(signalType -> userLimiter.release(user.getId()).subscribe());
+            });
         });
         return handleError(action, exchange);
     }

@@ -35,3 +35,8 @@ build/
 /docker-compose.yml
 /Dockerfile
 /logs/
+/wait-init.sh
+/mongo/
+/mysql/
+/redis/
+/config/

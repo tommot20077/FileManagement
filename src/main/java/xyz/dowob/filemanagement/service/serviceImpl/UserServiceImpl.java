@@ -10,12 +10,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
+import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
@@ -23,13 +26,13 @@ import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.CacheRule;
 import xyz.dowob.filemanagement.repostiory.UserRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
-import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -57,11 +60,6 @@ public class UserServiceImpl implements UserService {
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
-
-    /**
-     * 驗證服務
-     */
-    private final ValidationService validationService;
 
     /**
      * 授權服務
@@ -94,6 +92,11 @@ public class UserServiceImpl implements UserService {
     private final CacheManager cacheManager;
 
     /**
+     * 用戶限流器策略模式
+     */
+    private final UserLimiterStrategy userLimiterStrategy;
+
+    /**
      * 用戶ID緩存規則
      */
     private CacheRule<User> USER_ID_CACHE_RULE;
@@ -103,6 +106,10 @@ public class UserServiceImpl implements UserService {
      */
     private CacheRule<User> USERNAME_CACHE_RULE;
 
+    /**
+     * 遊客用戶對象
+     * 用於處理遊客的請求
+     */
     private final User GUEST_USER = new User();
 
     /**
@@ -134,13 +141,13 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<Void> register(RegisterDTO registerUserDTO) {
-        return validationService.validateRegisterDTO(registerUserDTO).then(Mono.defer(() -> {
+        return Mono.defer(() -> {
             User user = new User();
             user.setUsername(registerUserDTO.getUsername());
             user.setPassword(passwordEncoder.encode(registerUserDTO.getPassword()));
             user.setEmail(registerUserDTO.getEmail());
             return userRepository.save(user).then();
-        }));
+        });
     }
 
 
@@ -155,7 +162,17 @@ public class UserServiceImpl implements UserService {
     @Override
     @HideSensitive
     public Mono<String> login(AuthRequestDTO authRequestDTO, ServerWebExchange request) {
-        return validationService.validateNotNull(authRequestDTO).then(authorizationService.authenticate(authRequestDTO, request));
+        return Mono.defer(() -> {
+            UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_LOGIN_LIMITER);
+            return userLimiter.tryAcquire(authRequestDTO.getUsername()).flatMap(acquired -> {
+                if (acquired) {
+                    return authorizationService.authenticate(authRequestDTO, request).doOnSuccess(token -> {
+                        userLimiter.release(authRequestDTO.getUsername()).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    });
+                }
+                return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT, "嘗試登入次數過多，請稍後再試"));
+            });
+        });
     }
 
 
@@ -214,17 +231,16 @@ public class UserServiceImpl implements UserService {
     @Override
     public Mono<Void> sendResetPasswordMail(UserEmailDTO userEmailDTO) {
         return emailProvider.map(provider -> {
-            return validationService
-                    .validateNotNull(userEmailDTO)
-                    .then(Mono.defer(() -> userRepository
-                            .findByEmail(userEmailDTO.getEmail())
-                            .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
-                            .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
-                                String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
-                                                               token, securityProperties.getResetPasswordToken().getExpiration().toMinutes()
-                                );
-                                return provider.sendEmail(user.getEmail(), "重置密碼", content);
-                            }))));
+            return Mono.defer(() -> userRepository
+                    .findByEmail(userEmailDTO.getEmail())
+                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userEmailDTO.getEmail())))
+                    .flatMap(user -> tokenService.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN).flatMap(token -> {
+                        String content = String.format("重置密碼的憑證為：%s\n請於%s分鐘內重置密碼",
+                                                       token,
+                                                       securityProperties.getResetPasswordToken().getExpiration().toMinutes()
+                        );
+                        return provider.sendEmail(user.getEmail(), "重置密碼", content);
+                    })));
         }).orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.UNSUPPORTED_OPERATION)));
     }
 
@@ -238,21 +254,15 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<Void> resetPassword(ResetPasswordDTO resetPasswordDTO) {
-        return validationService
-                .validateResetPasswordDTO(resetPasswordDTO)
-                .then(userRepository
-                              .findByEmail(resetPasswordDTO.getEmail())
-                              .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND,
-                                                                                resetPasswordDTO.getEmail()
-                              )))
-                              .flatMap(user -> tokenService
-                                      .validateToken(resetPasswordDTO.getVerificationCode(), user.getId(), TokenEnum.RESET_PASSWORD_TOKEN)
-                                      .then(Mono.defer(() -> {
-                                          user.setPassword(passwordEncoder.encode(resetPasswordDTO.getNewPassword()));
-                                          return userRepository
-                                                  .save(user)
-                                                  .then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
-                                      }))));
+        return userRepository
+                .findByEmail(resetPasswordDTO.getEmail())
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, resetPasswordDTO.getEmail())))
+                .flatMap(user -> tokenService
+                        .validateToken(resetPasswordDTO.getVerificationCode(), user.getId(), TokenEnum.RESET_PASSWORD_TOKEN)
+                        .then(Mono.defer(() -> {
+                            user.setPassword(passwordEncoder.encode(resetPasswordDTO.getNewPassword()));
+                            return userRepository.save(user).then(tokenService.revokeToken(user.getId(), TokenEnum.RESET_PASSWORD_TOKEN));
+                        })));
     }
 
 
@@ -270,7 +280,8 @@ public class UserServiceImpl implements UserService {
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getUser(ServerWebExchange exchange) {
         return Mono.defer(() -> ReactiveSecurityContextHolder
-                .getContext().switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
+                .getContext()
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
                 .map(SecurityContext::getAuthentication)
                 .map(auth -> (Long) auth.getPrincipal())
                 .flatMap(userId -> {

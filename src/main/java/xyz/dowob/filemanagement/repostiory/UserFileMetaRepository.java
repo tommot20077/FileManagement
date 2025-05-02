@@ -210,10 +210,12 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                     if (fileIds.isEmpty()) {
                         return Flux.empty();
                     }
-                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.PRIVATE);
+                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.NONE);
                     return r2dbcEntityOperations
-                            .select(UserFileMetadata.class).matching(org.springframework.data.relational.core.query.Query.query(criteria))
-                            .all();
+                            .select(UserFileMetadata.class)
+                            .matching(org.springframework.data.relational.core.query.Query.query(criteria))
+                            .all()
+                            .doOnNext(System.out::println);
                 });
     }
 

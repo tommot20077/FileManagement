@@ -46,6 +46,11 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     private static final String TOKEN_PREFIX = "Bearer ";
 
     /**
+     * 登錄請求的 URL
+     */
+    private static final String LOGIN_URL = "/guest/login";
+
+    /**
      * JWT 憑證的正則表達式
      */
     private static final Pattern JWT_PATTERN = Pattern.compile("jwtToken=([^;]+)");
@@ -106,6 +111,10 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
      */
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
+        if (exchange.getRequest().getPath().value().contains(LOGIN_URL)) {
+            return Mono.empty();
+        }
+
         AtomicReference<String> token = new AtomicReference<>();
         RequestType requestType = RequestType.getRequestType(exchange);
 
@@ -123,7 +132,8 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
             Authentication auth = new UsernamePasswordAuthenticationToken(token.get(), token.get());
             return authenticationManager
                     .authenticate(auth)
-                    .map(authentication -> (SecurityContext) new SecurityContextImpl(authentication)).switchIfEmpty(Mono.defer(() -> {
+                    .map(authentication -> (SecurityContext) new SecurityContextImpl(authentication))
+                    .switchIfEmpty(Mono.defer(() -> {
                         if (securityProperties.getGuestUser().isEnable()) {
                             return createGuestSecurityContext();
                         }

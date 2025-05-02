@@ -178,6 +178,24 @@ security:
     # 預載 HSTS 頭部，默認為 true
     preload: true
 
+  # 訪客用戶相關設定
+  guest-user:
+    # 是否啟用允許訪客用戶，默認為 true
+    enable: true
+
+  # 登錄安全性相關設定
+  login:
+    # 登錄請求限制的類型，默認為 redis
+    # 可選值為 local 、 redis 或 none
+    # 當設置值為 none 時，則不限制登錄請求
+    limiter-provider: redis
+
+    # 登錄鎖定時間，默認為 1 分鐘
+    lock-time: 1m
+
+    # 登錄請求的最大失敗次數，默認為 5
+    max-failure: 5
+
 #緩存相關設定
 cache:
   # 是否開啟檔案下載流緩存，默認為 true
