@@ -120,6 +120,7 @@ public class RedisProvider {
      * 根據鍵獲取數據
      *
      * @param key 鍵
+     * @return 查詢到的數據對象
      */
     public Mono<Object> getValue(String key) {
         return redisTemplate.opsForValue().get(key);
@@ -130,6 +131,8 @@ public class RedisProvider {
      * 根據鍵獲取數據
      *
      * @param key 鍵
+     * @param clazz 類型
+     * @return 查詢到的數據對象
      */
     public <T> Mono<T> getValue(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key).cast(clazz);
@@ -177,6 +180,7 @@ public class RedisProvider {
      *
      * @param key   鍵
      * @param clazz 類型
+     * @return 返回 分頁回應傳輸對象
      */
     @HideOverLength
     public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromValue(String key, Class<T> clazz) {
@@ -193,7 +197,7 @@ public class RedisProvider {
      * @param key   鍵
      * @param clazz 類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getValueList(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
@@ -306,8 +310,9 @@ public class RedisProvider {
      *
      * @param hashKey  Hash 的鍵
      * @param innerKey Hash 內部的鍵
+     * @param clazz   類型
      *
-     * @return 返回 Mono<Object> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
         return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
@@ -319,8 +324,9 @@ public class RedisProvider {
      *
      * @param hashKey   Hash 的鍵
      * @param innerKeys Hash 內部的鍵的集合
+     * @param clazz     類型
      *
-     * @return 返回 Mono<Object> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Flux<T> getHashMapList(String hashKey, List<String> innerKeys, Class<T> clazz) {
         List<Object> innerKeyList = innerKeys.stream().map(innerKey -> (Object) innerKey).toList();
@@ -346,7 +352,7 @@ public class RedisProvider {
      * @param KeyClass   Key 的類型
      * @param ValueClass Value 的類型
      *
-     * @return 返回 Flux<Map.Entry<Object, Object>> 對象
+     * @return 返回 Flux<Map.Entry<K, V>> 對象
      */
     public <K, V> Flux<Map.Entry<K, V>> getAllHashMap(String hashKey, Class<K> KeyClass, Class<V> ValueClass) {
         return redisTemplate.opsForHash().entries(hashKey).map(entry -> {
@@ -408,8 +414,9 @@ public class RedisProvider {
      * 獲取 HashMap 中的查詢Key的所有數據
      *
      * @param hashKey Hash 的鍵
+     * @param clazz   類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getHashMapAll(String hashKey, Class<T> clazz) {
         return redisTemplate.opsForHash().values(hashKey).cast(clazz);
@@ -528,8 +535,9 @@ public class RedisProvider {
      * 取得 Set 中的數據
      *
      * @param key 鍵
+     * @param clazz 類型
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Flux<T> getSet(String key, Class<T> clazz) {
         return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
@@ -621,8 +629,9 @@ public class RedisProvider {
      * 獲取 List 中的數據
      *
      * @param key 鍵
+     * @param clazz 類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getList(String key, Class<T> clazz) {
         return getList(key).cast(clazz);
@@ -633,8 +642,11 @@ public class RedisProvider {
      * 獲取 List 中的數據
      *
      * @param key 鍵
+     * @param start 起始序號
+     * @param end   結束序號
+     * @param clazz 類型
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getListContent(String key, long start, long end, Class<T> clazz) {
         return redisTemplate.opsForList().range(key, start, end).flatMap(object -> convertObjectList(object, clazz)).switchIfEmpty(Flux.empty());

@@ -268,12 +268,6 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * TokenCacheEntity 用於記錄 JWT 憑證的版本、用戶 ID 和過期時間
-     */
-    public record TokenCacheEntity(String version, Long userId, Date expireTime) {
-    }
-
-    /**
      * 獲取快取中的 JWT 憑證記錄
      *
      * @return 快取中的 JWT 憑證記錄
@@ -282,5 +276,12 @@ public class JwtTokenProviderImpl implements TokenProvider {
     @SkipRecord
     public ConcurrentHashMap<String, TokenCacheEntity> getCacheTokenMap() {
         return cacheTokenMap;
+    }
+
+
+    /**
+     * TokenCacheEntity 用於記錄 JWT 憑證的版本、用戶 ID 和過期時間
+     */
+    public record TokenCacheEntity(String version, Long userId, Date expireTime) {
     }
 }

@@ -46,6 +46,12 @@ public class ServerFileMetadata {
     private FileEnum fileType;
 
     /**
+     * 文件的MIME類型
+     */
+    @Column("mime_type")
+    private String mimeType;
+
+    /**
      * 文件上傳時間
      */
     @Column("upload_time")
@@ -115,6 +121,7 @@ public class ServerFileMetadata {
         fileMap.put("id", id);
         fileMap.put("fileSize", fileSize);
         fileMap.put("fileType", fileType);
+        fileMap.put("mimeType", mimeType);
         fileMap.put("uploadTime", uploadTime);
         fileMap.put("lastAccessTime", lastAccessTime);
         fileMap.put("gridFsId", gridFsId);

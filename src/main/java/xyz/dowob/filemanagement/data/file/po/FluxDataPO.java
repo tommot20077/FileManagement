@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import reactor.core.publisher.Flux;
+import xyz.dowob.filemanagement.data.datainterface.FluxContainer;
 
 /**
  * 用於映射並包裝Flux對象的成一個PO類
@@ -20,7 +21,7 @@ import reactor.core.publisher.Flux;
 
 @Getter
 @Setter
-public class FluxDataPO<T> {
+public class FluxDataPO<T> implements FluxContainer {
     /**
      * Flux對象
      */
@@ -63,6 +64,17 @@ public class FluxDataPO<T> {
      */
     public FluxDataPO() {
         this.tFlux = Flux.empty();
+    }
+
+
+    /**
+     * 獲取Flux對象
+     *
+     * @return Flux<?> 未指定類型的Flux對象
+     */
+    @Override
+    public Flux<?> getFlux() {
+        return tFlux;
     }
 }
 

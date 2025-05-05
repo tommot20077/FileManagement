@@ -58,6 +58,7 @@ public class FileScanProviderImpl implements FileScanProvider {
      * 檔案掃描提供者實現類的構造函數
      *
      * @param fileProperties FileProperties 用於操作檔案上傳相關配置的類
+     * @param connectionProvider ConnectionProvider 用於提供連接的類
      */
     public FileScanProviderImpl(FileProperties fileProperties, ConnectionProvider connectionProvider) {
         this.fileProperties = fileProperties;

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS server_file_metadata
 (
     id               BIGINT AUTO_INCREMENT PRIMARY KEY,
     file_size        BIGINT              NOT NULL,
+    mime_type        VARCHAR(255)        NULL,
     file_type        VARCHAR(30)         NOT NULL,
     upload_time      DATETIME            NOT NULL,
     last_access_time DATETIME            NOT NULL,

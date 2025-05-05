@@ -46,9 +46,6 @@ file:
     # 下載資料夾的壓縮檔案暫存路徑，默認為 ./temp/folder-zip
     folder-temp-download-path: ./temp/folder-zip
 
-    # 單次資料夾下載的最大併發數量限制，默認為 5
-    folder-download-concurrent-limit: 5
-
   # 全局設定
   global:
     # 是否啟用用戶文件列表樹，默認為 true

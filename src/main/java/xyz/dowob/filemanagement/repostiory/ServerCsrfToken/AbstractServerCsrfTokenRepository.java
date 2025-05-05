@@ -1,6 +1,5 @@
 package xyz.dowob.filemanagement.repostiory.ServerCsrfToken;
 
-import jakarta.annotation.PostConstruct;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 
 import java.time.Duration;
@@ -20,37 +19,23 @@ import java.time.Duration;
  **/
 public abstract class AbstractServerCsrfTokenRepository implements CustomServerCsrfTokenRepository {
     /**
-     * 安全相關設定
-     */
-    private final SecurityProperties securityProperties;
-
-    /**
      * CSRF Token 的 Header 名稱
      */
-    protected String CSRF_TOKEN_HEADER;
+    protected final String csrfTokenHeader;
 
     /**
      * CSRF Token 的參數名稱
      */
-    protected String CSRF_TOKEN_PARAMETER;
+    protected final String csrfTokenParameter;
 
     /**
      * CSRF Token 過期時間
      */
-    protected Duration EXPIRE_TIME;
+    protected final Duration expireTime;
 
     public AbstractServerCsrfTokenRepository(SecurityProperties securityProperties) {
-        this.securityProperties = securityProperties;
-    }
-
-
-    /**
-     * 初始化屬性
-     */
-    @PostConstruct
-    public void init() {
-        CSRF_TOKEN_HEADER = securityProperties.getCsrf().getHeaderName();
-        CSRF_TOKEN_PARAMETER = securityProperties.getCsrf().getParameterName();
-        EXPIRE_TIME = securityProperties.getCsrf().getExpiration();
+        csrfTokenHeader = securityProperties.getCsrf().getHeaderName();
+        csrfTokenParameter = securityProperties.getCsrf().getParameterName();
+        expireTime = securityProperties.getCsrf().getExpiration();
     }
 }

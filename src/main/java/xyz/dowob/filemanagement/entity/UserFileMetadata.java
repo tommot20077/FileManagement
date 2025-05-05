@@ -128,9 +128,9 @@ public class UserFileMetadata {
 
 
     /**
-     * 重寫toString方法，將文件元數據轉換為HashMap
+     * 重寫toString方法，將文件元數據轉換為HashMap並輸出字串
      *
-     * @return 文件元數據HashMap
+     * @return 文件元數據的字串表示
      */
     @Override
     public String toString() {

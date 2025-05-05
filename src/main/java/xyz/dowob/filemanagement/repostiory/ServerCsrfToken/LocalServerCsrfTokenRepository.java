@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.repostiory.ServerCsrfToken;
 
+import jakarta.annotation.PreDestroy;
 import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.security.web.server.csrf.DefaultCsrfToken;
 import org.springframework.stereotype.Component;
@@ -9,10 +10,7 @@ import xyz.dowob.filemanagement.annotation.CsrfRepositoryType;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.CsrfTokenRepositoryEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.concurrent.ConcurrentHashMap;
+import xyz.dowob.filemanagement.unity.CacheConcurrentHashMap;
 
 /**
  * 本地 CsrfTokenRepository，使用 ConcurrentHashMap 保存 CsrfToken
@@ -30,19 +28,19 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @CsrfRepositoryType(CsrfTokenRepositoryEnum.LOCAL)
 public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepository {
+    /**
+     * 保存 CsrfToken 的 Map
+     */
+    private final CacheConcurrentHashMap<String, CsrfToken> csrfTokenMap;
+
 
     /**
      * 初始化屬性
      */
     public LocalServerCsrfTokenRepository(SecurityProperties securityProperties) {
         super(securityProperties);
+        this.csrfTokenMap = new CacheConcurrentHashMap<>(64, super.expireTime, false);
     }
-
-
-    /**
-     * 保存 CsrfToken 的 Map
-     */
-    private final ConcurrentHashMap<String, Long> csrfTokenMap = new ConcurrentHashMap<>();
 
 
     /**
@@ -55,9 +53,8 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     @Override
     public Mono<CsrfToken> generateToken(ServerWebExchange exchange) {
         String uuid = java.util.UUID.randomUUID().toString();
-        CsrfToken csrfToken = new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, uuid);
-        long expireTime = Instant.now().plus(EXPIRE_TIME.toMillis(), ChronoUnit.MILLIS).getEpochSecond();
-        csrfTokenMap.put(uuid, expireTime);
+        CsrfToken csrfToken = new DefaultCsrfToken(csrfTokenHeader, csrfTokenParameter, uuid);
+        csrfTokenMap.set(uuid, csrfToken);
         return Mono.just(csrfToken);
     }
 
@@ -86,19 +83,23 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
      */
     @Override
     public Mono<CsrfToken> loadToken(ServerWebExchange exchange) {
-        String userToken = exchange.getRequest().getHeaders().getFirst(CSRF_TOKEN_HEADER);
+        String userToken = exchange.getRequest().getHeaders().getFirst(csrfTokenHeader);
         if (userToken == null) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.MISSING_CSRF_TOKEN));
         }
-        if (csrfTokenMap.containsKey(userToken) && csrfTokenMap.get(userToken) > Instant.now().getEpochSecond()) {
-            return Mono.just(new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, userToken));
+
+        CsrfToken csrfToken = csrfTokenMap.get(userToken);
+        if (csrfToken != null) {
+            return Mono.just(csrfToken);
         }
         return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN));
     }
 
 
     /**
-     * 刪除不需要的憑證
+     * 刪除憑證
+     * 當傳入的 token 不為空時，則刪除指定的憑證
+     * 否則，則刪除所有過期的憑證
      *
      * @param token CsrfToken 憑證，如果為空，則刪除過期的憑證
      */
@@ -109,10 +110,17 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
                 csrfTokenMap.remove(token.getToken());
                 return;
             }
-            Long expireTime = Instant.now().getEpochSecond();
-            csrfTokenMap.entrySet().removeIf(entry -> entry.getValue() < expireTime);
+            csrfTokenMap.getCleanupTask().run();
         });
     }
 
-    //todo 更改為 CacheConcurrentHashMap
+
+    /**
+     * 銷毀 CSRF Token 存儲庫
+     * 在應用程序關閉時調用
+     */
+    @PreDestroy
+    public void destroy() {
+        csrfTokenMap.destroy();
+    }
 }

@@ -108,9 +108,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
-              userRepository,
-              redisProvider,
-              gridFsProvider, fileScanProvider,
+              userRepository, redisProvider, gridFsProvider, fileScanProvider,
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,
@@ -142,6 +140,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     @Override
     public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
         return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+            userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
             if (Objects.equals(optional[0], DownloadActionEnum.DOWNLOAD.name())) {
                 ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
                 return convertProvider.convertToDataBuffer(userOnlineFile.getContent()).flatMap(dataBufferSize -> {
@@ -158,8 +159,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
             try {
                 EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
-                userFileMetadata.setLastAccessTime(LocalDateTime.now());
-                userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
                 return Mono.just(new UserFileDataBO(userOnlineFile, userFileMetadata, content));
             } catch (JsonProcessingException e) {
                 return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
@@ -354,7 +353,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 userOnlineFile.setContent(contentJson);
                 return Mono.just(userOnlineFile);
             });
-        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata())));
+        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata()))).then();
     }
 
 
@@ -378,7 +377,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 userOnlineFile.setCurrentSnapshotCount(0);
                 userOnlineFile.setLastModifiedBy(user.getId());
                 return createInitialHistory(userOnlineFile, fileEditDTO, newContent);
-            }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata())));
+            }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata()))).then();
         }
 
         Mono<EditorContentDTO> lastContentJsonDTOMono;
@@ -551,11 +550,11 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @return 操作已完成的 Mono
      */
-    public Mono<Void> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
+    public Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
         return Mono.defer(() -> {
             userFileMetadata.setLastAccessTime(LocalDateTime.now());
             return userFileMetaRepository.save(userFileMetadata);
-        }).then().subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
 

@@ -54,9 +54,9 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     @Override
     public Mono<CsrfToken> generateToken(ServerWebExchange exchange) {
         String uuid = java.util.UUID.randomUUID().toString();
-        CsrfToken csrfToken = new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, uuid);
-        long expireTime = Instant.now().plus(EXPIRE_TIME.toMillis(), ChronoUnit.MILLIS).getEpochSecond();
-        return redisProvider.setHashMap(CSRF_TOKEN_HEADER, uuid, expireTime, Duration.ofMinutes(expireTime)).thenReturn(csrfToken);
+        CsrfToken csrfToken = new DefaultCsrfToken(csrfTokenHeader, csrfTokenParameter, uuid);
+        long expireTime = Instant.now().plus(this.expireTime.toMillis(), ChronoUnit.MILLIS).getEpochSecond();
+        return redisProvider.setHashMap(csrfTokenHeader, uuid, expireTime, Duration.ofMinutes(expireTime)).thenReturn(csrfToken);
     }
 
 
@@ -84,18 +84,17 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
      */
     @Override
     public Mono<CsrfToken> loadToken(ServerWebExchange exchange) {
-        String userToken = exchange.getRequest().getHeaders().getFirst(CSRF_TOKEN_HEADER);
+        String userToken = exchange.getRequest().getHeaders().getFirst(csrfTokenHeader);
         if (userToken == null) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.MISSING_CSRF_TOKEN));
         }
-        return redisProvider
-                .getHashMap(CSRF_TOKEN_HEADER, userToken, Integer.class)
+        return redisProvider.getHashMap(csrfTokenHeader, userToken, Integer.class)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN)))
                 .flatMap(time -> {
                     if (time < Instant.now().getEpochSecond()) {
                         return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN));
                     }
-                    return Mono.just(new DefaultCsrfToken(CSRF_TOKEN_HEADER, CSRF_TOKEN_PARAMETER, userToken));
+                    return Mono.just(new DefaultCsrfToken(csrfTokenHeader, csrfTokenParameter, userToken));
                 });
     }
 
@@ -107,14 +106,12 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<Void> deleteToken(CsrfToken token) {
         Long expireTime = Instant.now().getEpochSecond();
         if (token != null && token.getToken() != null) {
-            return redisProvider.deleteHash(CSRF_TOKEN_HEADER, token.getToken());
+            return redisProvider.deleteHash(csrfTokenHeader, token.getToken());
         }
 
-        return redisProvider
-                .getAllHashMap(CSRF_TOKEN_HEADER, String.class, Long.class)
+        return redisProvider.getAllHashMap(csrfTokenHeader, String.class, Long.class)
                 .filter(entry -> entry.getValue() < expireTime)
                 .map(Map.Entry::getKey)
-                .collectList()
-                .flatMap(expireTokens -> redisProvider.deleteHash(CSRF_TOKEN_HEADER, expireTokens));
+                .collectList().flatMap(expireTokens -> redisProvider.deleteHash(csrfTokenHeader, expireTokens));
     }
 }

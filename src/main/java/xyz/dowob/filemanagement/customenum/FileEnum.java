@@ -5,7 +5,15 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.tika.Tika;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -82,6 +90,8 @@ public enum FileEnum {
      * Tika 實例
      */
     private static final Tika TIKA = new Tika();
+
+    private static final String MICROSOFT_GENERIC = "application/x-tika-ooxml";
 
     static {
         // 圖片類型
@@ -191,10 +201,65 @@ public enum FileEnum {
             String extension = FilenameUtils.getExtension(filename).toLowerCase();
             String mimeType = extensionMap.get(extension);
 
-            if (mimeType != null && !mimeType.isEmpty()) {
+            if (StringUtils.hasText(mimeType)) {
                 return mimeType;
             }
         }
         return TIKA.detect(filename);
+    }
+
+    /**
+     * 獲取檔案的 MIME 類型
+     * 這邊使用 byte[] 來獲取檔案的 MIME 類型
+     * 當檢測到的 MIME 類型為 application/x-tika-ooxml 時，則使用檔案名稱來檢測
+     *
+     * @param bytes 檔案的 byte[]
+     *
+     * @return 返回檔案的 MIME 類型
+     */
+    public static String getMediaType(byte[] bytes, String filename) {
+        String mimeType = TIKA.detect(bytes);
+        if (MICROSOFT_GENERIC.equals(mimeType)) {
+            return TIKA.detect(filename);
+        }
+        return mimeType;
+    }
+
+
+    /**
+     * 獲取檔案的 MIME 類型
+     * 這邊使用 Flux<DataBuffer> 來獲取檔案的 MIME 類型
+     * 當檢測到的 MIME 類型為 application/x-tika-ooxml 時，則使用檔案名稱來檢測
+     *
+     * @param dataBufferFlux 檔案的 Flux<DataBuffer>
+     * @param filename       檔案的名稱
+     *
+     * @return 返回檔案的 MIME 類型
+     */
+    public static Mono<detectRecord> getMediaType(Flux<DataBuffer> dataBufferFlux, String filename) {
+        return DataBufferUtils.join(dataBufferFlux).map(dataBuffer -> {
+            try (InputStream is = dataBuffer.asInputStream()) {
+                String mimeType = TIKA.detect(is, filename);
+                if (MICROSOFT_GENERIC.equals(mimeType)) {
+                    mimeType = TIKA.detect(filename);
+                }
+                return new detectRecord(mimeType, dataBufferFlux);
+            } catch (IOException e) {
+                return new detectRecord(MediaType.APPLICATION_OCTET_STREAM_VALUE, dataBufferFlux);
+            } finally {
+                DataBufferUtils.release(dataBuffer);
+            }
+        }).defaultIfEmpty(new detectRecord(MediaType.APPLICATION_OCTET_STREAM_VALUE, dataBufferFlux));
+    }
+
+
+    /**
+     * 檢測類型紀錄類
+     * 將 Flux<DataBuffer> 與 MIME 類型進行綁定
+     *
+     * @param mimeType       MIME 類型
+     * @param dataBufferFlux 數據流
+     */
+    public record detectRecord(String mimeType, Flux<DataBuffer> dataBufferFlux) {
     }
 }

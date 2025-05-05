@@ -36,7 +36,6 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
 
     /**
      * 郵件配置，這裡使用了 Spring Boot 提供的 MailProperties
-     * 1. 獲取郵件發送的郵箱
      */
     private final MailProperties mailProperties;
 

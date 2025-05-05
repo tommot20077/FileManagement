@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.unity;
 
 import lombok.Data;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 
 import java.time.Duration;
@@ -528,7 +529,7 @@ public class CacheConcurrentHashMap<K, V> {
      *
      * @param key 鍵
      */
-    public void remove(K key) {
+    public void remove(@NonNull K key) {
         ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
         lock.lock();
         try {

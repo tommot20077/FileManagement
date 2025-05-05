@@ -50,8 +50,8 @@ public class GridFsProvider {
     /**
      * 通過構造方法注入 GridFsTemplate 和 FileProperties
      *
-     * @param gridFsTemplate GridFsTemplate
-     * @param fileProperties FileProperties
+     * @param gridFsTemplate GridFs 的操作模板
+     * @param fileProperties  檔案的屬性配置類
      */
     public GridFsProvider(ReactiveGridFsTemplate gridFsTemplate, FileProperties fileProperties) {
         this.gridFsTemplate = gridFsTemplate;

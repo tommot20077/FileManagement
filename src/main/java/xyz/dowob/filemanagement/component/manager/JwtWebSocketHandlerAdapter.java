@@ -68,6 +68,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param jwtTokenProvider           JwtTokenProviderImpl 用於 JWT 憑證相關操作的實現類
      * @param fileProperties             FileProperties 用於操作文件上傳相關配置的類
      * @param fileUploadWebSocketHandler FileUploadWebSocketHandler 用於處理文件上傳的 WebSocketHandler
+     * @param webSocketFailHandler       WebSocketFailHandler 用於處理 WebSocket 連接失敗的處理器
      */
     public JwtWebSocketHandlerAdapter(JwtTokenProviderImpl jwtTokenProvider, FileProperties fileProperties, FileUploadWebSocketHandler fileUploadWebSocketHandler, WebSocketFailHandler webSocketFailHandler) {
         super(createUpgradeStrategy(fileProperties.getUpload().getPayloadLength()));
@@ -113,7 +114,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param exchange  ServerWebExchange 用於處理請求的交換器
      * @param wsHandler WebSocketHandler 用於處理 WebSocket 請求的處理器
      *
-     * @return Mono<Void> 返回一個 Mono 對象
+     * @return Mono<Void>
      */
     @Override
     @NonNull
@@ -137,6 +138,8 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * 從 WebSocket 請求標頭中提取 JWT Token
      *
      * @param exchange ServerWebExchange 用於處理請求的交換器
+     *
+     * @return 提取到的 JWT Token
      */
     private String extractTokenFromProtocol(ServerWebExchange exchange) {
         List<String> protocols = exchange.getRequest().getHeaders().get("Sec-WebSocket-Protocol");
@@ -152,6 +155,8 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      *
      * @param exchange  ServerWebExchange 用於處理請求的交換器
      * @param errorCode 錯誤代碼
+     *
+     * @return Mono<Void>
      */
     private Mono<Void> failWithError(ServerWebExchange exchange, ValidationException.ErrorCode errorCode) {
         return exchange.getSession().flatMap(session -> {
@@ -167,6 +172,8 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
      * @param exchange ServerWebExchange 用於處理請求的交換器
      * @param session  WebSocketSession 用於處理 WebSocket 請求的處理器
      * @param userId   用戶ID
+     *
+     * @return Mono<Void>
      */
     @RecordLevel(LogLevelEnum.DEBUG)
     private Mono<Void> handleWebSocketSession(ServerWebExchange exchange, WebSocketSession session, Long userId) {

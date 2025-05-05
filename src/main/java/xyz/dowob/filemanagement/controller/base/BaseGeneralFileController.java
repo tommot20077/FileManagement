@@ -202,24 +202,18 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回文件信息
      */
     public Mono<ResponseEntity<?>> getFileType(Long id, ServerWebExchange exchange) {
-        Mono<ResponseEntity<?>> result = userService
-                .getUser(exchange)
-                .flatMap(user -> permissionService
-                        .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
-                        .flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE))
-                        .flatMap(file -> fileServiceStrategy
-                                .getFileService()
-                                .getByServerFileMetadataId(file.getServerFileId())
-                                .flatMap(serverFileMetadata -> {
-                                    String fileType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
-                                    long fileSize = serverFileMetadata.getFileSize();
-                                    ApiResponseDTO<?> apiResponse = createResponse(exchange,
-                                                                                   "獲取文件類型成功",
-                                                                                   Map.of("X-File-Content-Type", fileType, "X-File-Size", fileSize)
-                                    );
-                                    return createResponseEntity(apiResponse);
-                                })));
-
+        Mono<ResponseEntity<?>> result = userService.getUser(exchange).flatMap(user -> {
+            Collection<Permission<UserFileMetadata>> rules = FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager);
+            return permissionService.validateUserPermission(user, id, rules);
+        }).flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE)).flatMap(file -> {
+            return fileServiceStrategy.getFileService().getByServerFileMetadataId(file.getServerFileId()).flatMap(serverFileMetadata -> {
+                String mediaType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
+                long fileSize = serverFileMetadata.getFileSize();
+                Map<String, Object> data = Map.of("X-File-Content-Type", mediaType, "X-File-Size", fileSize);
+                ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取文件類型成功", data);
+                return createResponseEntity(apiResponse);
+            });
+        });
         return handleError(result, exchange);
     }
 

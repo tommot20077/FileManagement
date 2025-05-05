@@ -53,32 +53,24 @@ public class FilePermissionRuleManager {
 
     /**
      * 允許擁有者訪問的權限規則
-     * -- GETTER --
-     *  獲取默認的允許擁有者訪問的權限規則
      */
     @Getter
     private Permission<UserFileMetadata> allowOwner;
 
     /**
      * 允許共享者訪問的權限規則
-     * -- GETTER --
-     *  獲取默認的允許共享者訪問的權限規則
      */
     @Getter
     private Permission<UserFileMetadata> allowShared;
 
     /**
      * 阻止保留搜索ID的權限規則
-     * -- GETTER --
-     *  獲取默認的阻止保留搜索ID的權限規則
      */
     @Getter
     private Permission<UserFileMetadata> blockNotSearchOperation;
 
     /**
      * 阻止已刪除的文件的權限規則
-     * -- GETTER --
-     *  獲取默認的阻止已刪除的文件的權限規則
      */
     @Getter
     private Permission<UserFileMetadata> blockDeleted;

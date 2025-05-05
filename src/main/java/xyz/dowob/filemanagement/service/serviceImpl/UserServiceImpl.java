@@ -408,7 +408,7 @@ public class UserServiceImpl implements UserService {
      * @param entity 實體對象
      */
     @Override
-    public Mono<Void> update(User entity) {
+    public Mono<User> update(User entity) {
         return Mono.empty();
     }
 

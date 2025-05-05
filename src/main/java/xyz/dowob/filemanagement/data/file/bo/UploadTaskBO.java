@@ -2,7 +2,6 @@ package xyz.dowob.filemanagement.data.file.bo;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -36,11 +35,6 @@ public class UploadTaskBO {
      */
     @NotBlank(message = "檔案名稱不能為空")
     private String filename;
-
-    /**
-     * 檔案類型
-     */
-    private FileEnum fileType = FileEnum.OTHER;
 
     /**
      * 檔案大小
@@ -93,7 +87,6 @@ public class UploadTaskBO {
         map.put("transferTaskId", transferTaskId);
         map.put("parentFolderId", parentFolderId);
         map.put("filename", filename);
-        map.put("fileType", fileType);
         map.put("fileSize", fileSize);
         map.put("md5", md5);
         map.put("user", user);

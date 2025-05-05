@@ -58,7 +58,7 @@ public interface CrudService<T, ID> {
      *
      * @param entity 實體對象
      */
-    Mono<Void> update(T entity);
+    Mono<T> update(T entity);
 
     /**
      * 刪除一個實體

@@ -108,7 +108,6 @@ public abstract class BaseFileController implements ResponseUnity {
      *
      * @return 返回用戶文件列表，包含文件基本信息及文件路徑。
      */
-    //todo 處理分享用戶名稱顯示當前用戶
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page, Integer size, List<FileEnum> types) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
@@ -260,7 +259,7 @@ public abstract class BaseFileController implements ResponseUnity {
             headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizedFilename + "\"; filename*=UTF-8''" + encodedFilename);
             headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE);
         } else {
-            headers.add(HttpHeaders.CONTENT_TYPE, FileEnum.getMediaType(userFileDataBO.getFileType(), userFileDataBO.getFilename()));
+            headers.add(HttpHeaders.CONTENT_TYPE, Objects.requireNonNullElse(userFileDataBO.getMimeType(), MediaType.APPLICATION_OCTET_STREAM_VALUE));
         }
 
         if (enableCache) {

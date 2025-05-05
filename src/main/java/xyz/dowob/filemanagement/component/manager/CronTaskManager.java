@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 定時任務管理器，統一將伺服器上的定時任務放在這裡
+ * 定時任務管理器，將伺服器上的定時任務放在這裡
  *
  * @author yuan
  * @program FileManagement

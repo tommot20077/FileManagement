@@ -28,7 +28,7 @@ public interface CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<T>
+     * @return Mono<T> 緩存的值
      */
     default <T> Mono<T> get(String key, Class<T> clazz) {
         return Mono.empty();
@@ -42,7 +42,7 @@ public interface CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<List < T>>
+     * @return Mono<List < T>> 返回緩存的列表
      */
     default <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
         return Mono.empty();
@@ -56,7 +56,7 @@ public interface CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<Map < String, T>>
+     * @return Mono<Map < String, T>> 返回緩存的 Map
      */
     default <T> Mono<Map<String, T>> getAllAsMap(Collection<String> keys, Class<T> clazz) {
         return Mono.empty();
@@ -70,7 +70,7 @@ public interface CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<Map < String, List < T>>>
+     * @return Mono<Map < String, List < T>>> 返回緩存的 Map
      */
     default <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
         return Mono.empty();

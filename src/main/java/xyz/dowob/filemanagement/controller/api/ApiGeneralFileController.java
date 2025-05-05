@@ -21,6 +21,7 @@ import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
@@ -128,7 +129,7 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(
             @RequestParam(value = "action", defaultValue = "preview", required = false) String action,
             @PathVariable Long id, ServerWebExchange exchange) {
-        return super.downloadFile(action, id, exchange);
+        return super.downloadFile(action, id, exchange).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 
 

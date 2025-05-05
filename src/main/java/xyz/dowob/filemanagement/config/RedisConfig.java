@@ -77,7 +77,7 @@ public class RedisConfig {
     /**
      * 配置 ObjectMapper，註冊 JavaTimeModule 模組
      *
-     * @return ObjectMapper
+     * @return ObjectMapper 物件映射器
      */
     @Bean
     public ObjectMapper objectMapper() {

@@ -79,6 +79,7 @@ public class SecurityConfig implements ResponseUnity {
      * @param securityContextRepository JwtSecurityContextRepository 用於操作安全上下文的數據庫操作類
      * @param mapper                    ObjectMapper 用於對象與 JSON 之間的轉換
      * @param securityProperties        SecurityProperties 用於配置安全相關的參數
+     * @param csrfTokenRepositoryStrategy CSRF Token 儲存庫策略
      */
     public SecurityConfig(JwtSecurityContextRepository securityContextRepository, ObjectMapper mapper, SecurityProperties securityProperties, CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy) {
         this.securityContextRepository = securityContextRepository;

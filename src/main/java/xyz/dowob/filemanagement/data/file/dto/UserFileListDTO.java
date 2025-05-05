@@ -108,7 +108,7 @@ public class UserFileListDTO {
         this.createTime = userFileMetadata.getUploadTime();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.fileSize = serverFileMetadata.getFileSize();
-        this.fileType = serverFileMetadata.getFileType();
+        this.fileType = userFileMetadata.getFileType();
         this.gridFsId = serverFileMetadata.getGridFsId();
         this.md5 = serverFileMetadata.getMd5();
         this.isStar = userFileMetadata.getIsStar();

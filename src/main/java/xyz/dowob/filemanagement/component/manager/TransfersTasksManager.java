@@ -52,6 +52,7 @@ public class TransfersTasksManager {
      * 用於構造 TransfersTasksManager 對象
      *
      * @param transfersTasksRepository TransfersTasksRepository 用於操作傳輸任務的數據庫操作接口
+     * @param fileProperties             FileProperties 用於操作文件上傳相關配置的類
      */
     public TransfersTasksManager(TransfersTasksRepository transfersTasksRepository, FileProperties fileProperties) {
         this.transfersTasksRepository = transfersTasksRepository;
@@ -115,7 +116,7 @@ public class TransfersTasksManager {
      * @param message         任務消息
      * @param status          任務狀態
      *
-     * @return Mono<Void> 返回一個 Mono 對象
+     * @return Mono<Void>
      */
     public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, String gridFsId, String message, TransfersStatusEnum status) {
         TransfersTask transfersTask = new TransfersTask();
@@ -141,7 +142,7 @@ public class TransfersTasksManager {
      * @param gridFsId        GridFS 檔案ID
      * @param isFinished      是否完成
      *
-     * @return Mono<Void> 返回一個 Mono 對象
+     * @return Mono<Void>
      */
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {

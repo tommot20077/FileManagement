@@ -197,7 +197,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @param clazz 類型
      * @param <T>   類型
      *
-     * @return Optional<T>
+     * @return Optional<T> 轉換後的 Optional 物件
      */
     @SkipRecord
     private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
@@ -249,6 +249,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * 傳送訊息給所有連線的用戶
      *
      * @param message 訊息內容
+     *
+     * @return Mono<Void>
      */
     public Mono<Void> broadcast(Object message) {
         return Flux.fromIterable(USER_SESSION_MAP.values()).filter(WebSocketSession::isOpen).flatMap(session -> sendMessage(session, message)).then();
@@ -259,6 +261,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * 移除用戶 ID 對應的 WebSocket 會話
      *
      * @param userId 用戶 ID
+     *
+     * @return Mono<Void>
      */
     public Mono<Void> removeSession(String userId) {
         WebSocketSession session = USER_SESSION_MAP.remove(Long.parseLong(userId));
@@ -299,7 +303,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @param clazz 類型
      * @param <T>   類型
      *
-     * @return Optional<T>
+     * @return Optional<T> 轉換後的 Optional 物件
      */
     @SkipRecord
     private <T> Optional<T> convertJsonToObject(String json, Class<T> clazz) {
@@ -314,7 +318,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     /**
      * 初始化參數名稱
      *
-     * @return Map<String, Class < ?>>
+     * @return Map<String, Class < ?>> 參數名稱與類型的映射
      */
     @SkipRecord
     private Map<String, Class<?>> initParameterNames() {

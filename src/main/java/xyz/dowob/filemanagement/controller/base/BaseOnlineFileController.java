@@ -22,6 +22,7 @@ import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
+import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
@@ -121,7 +122,7 @@ public class BaseOnlineFileController extends BaseFileController {
                                 HttpHeaders headers = prepareHttpHeaders(DownloadActionEnum.DOWNLOAD, userFileDataBO, null, false);
                                 return Mono.just(ResponseEntity.status(200).headers(headers).body(userFileDataBO.getDataBufferFlux()));
                             } catch (JsonProcessingException ex) {
-                                return Mono.error(new RuntimeException(ex));
+                                return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, ex));
                             }
                         }));
             });

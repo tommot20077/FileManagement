@@ -24,7 +24,7 @@ public class MongoConfig {
      * @param reactiveMongoDatabaseFactory ReactiveMongoDatabaseFactory 用於創建 ReactiveMongoTemplate
      * @param mappingMongoConverter        MappingMongoConverter 用於對 Mongo 數據進行映射
      *
-     * @return ReactiveGridFsTemplate
+     * @return ReactiveGridFsTemplate 返回一個 ReactiveGridFsTemplate 對象
      */
     @Bean
     public ReactiveMongoTemplate reactiveMongoTemplate(ReactiveMongoDatabaseFactory reactiveMongoDatabaseFactory, MappingMongoConverter mappingMongoConverter) {

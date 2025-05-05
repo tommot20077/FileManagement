@@ -114,7 +114,7 @@ public class ApiFolderController extends BaseFolderController {
 
 
     /**
-     * 獲取最近使用的檔案列表
+     * 獲取用戶最近使用的檔案列表
      *
      * @param exchange WebFlux 請求上下文
      * @param type     過濾的檔案類型，可選

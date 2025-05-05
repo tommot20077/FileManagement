@@ -42,7 +42,7 @@ public class WebSocketConfig {
     /**
      * 配置 WebSocket 映射，將 WebSocket 請求映射到對應的處理器
      *
-     * @return HandlerMapping
+     * @return HandlerMapping 映射處理對象
      */
     @Bean
     public HandlerMapping webSocketMapping() {
@@ -59,7 +59,7 @@ public class WebSocketConfig {
     /**
      * 配置 WebSocket 處理器適配器
      *
-     * @return WebSocketHandlerAdapter
+     * @return WebSocketHandlerAdapter WebSocket 處理器適配器
      */
     @Bean
     public WebSocketHandlerAdapter handlerAdapter() {

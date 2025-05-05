@@ -63,6 +63,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * 文件流緩存提供者實現類的構造方法
      *
      * @param redisProvider Redis操作提供者
+     * @param cacheProperties 緩存配置
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         Assert.isTrue(cacheProperties.getChunkSize().toBytes() > 0, "下載流緩存塊大小必須大於0");
@@ -81,7 +82,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<T>
+     * @return Mono<T> 返回緩存的值
      */
     public <T> Mono<T> get(String key, Class<T> clazz) {
         return redisProvider.getHashMapByPattern(CACHE_PREFIX, key + "_*", String.class).collectList().flatMap(list -> {
@@ -108,7 +109,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<List < T>>
+     * @return Mono<List < T>> 返回緩存的列表
      */
     @Override
     public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
@@ -133,7 +134,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<Map < String, List < T>>>
+     * @return Mono<Map < String, List < T>>> 返回緩存的 Map
      */
     @Override
     public <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
@@ -226,7 +227,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      *
      * @param dataBufferFlux 數據流
      *
-     * @return Mono<String>
+     * @return Mono<String> 轉換後的base64字符串
      */
     private Mono<String> formatStreamToBase64(Flux<DataBuffer> dataBufferFlux) {
         return dataBufferFlux.map(dataBuffer -> {
@@ -253,7 +254,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
      *
      * @param base64 base64字符串
      *
-     * @return Flux<DataBuffer>
+     * @return Flux<DataBuffer> 轉換後的數據流
      */
     private Flux<DataBuffer> formatBase64ToStream(String base64) {
         byte[] bytes = Base64.getDecoder().decode(base64);
