@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.controller.base.BaseFileController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.LogUnity;
 import xyz.dowob.filemanagement.unity.ResponseUnity;

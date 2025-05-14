@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.data.api;
+package xyz.dowob.filemanagement.data.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

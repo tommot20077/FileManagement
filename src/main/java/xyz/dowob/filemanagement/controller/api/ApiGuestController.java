@@ -11,7 +11,7 @@ import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.controller.base.BaseGuestController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
@@ -121,7 +121,7 @@ public class ApiGuestController extends BaseGuestController {
             data.put("token", csrfToken.getToken());
             data.put("headerName", csrfToken.getHeaderName());
             data.put("parameterName", csrfToken.getParameterName());
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "獲取 CSRF Token 成功", data);
+            ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "獲取 CSRF Token 成功", data);
             return createResponseEntity(apiResponse);
         }), exchange);
     }

@@ -32,7 +32,6 @@ import java.util.Optional;
 @Component
 @SuppressWarnings("all")
 public class PermissionAspect {
-
     /**
      * 定義切入點，當方法上有 @RequirePermission 註解時進行攔截
      * 若此方法為Mono或Flux，則會在返回結果之前檢查用戶的權限
@@ -87,7 +86,7 @@ public class PermissionAspect {
             return roleNameOptional.map(roleName -> {
                 return RoleEnum.valueOf(roleName);
             }).orElse(RoleEnum.VISITOR);
-        }).flatMap(roleEnum -> {
+        }).switchIfEmpty(Mono.just(RoleEnum.VISITOR)).flatMap(roleEnum -> {
             if (roleEnum.hasPermissions(requiredPermissions)) {
                 return Mono.empty();
             }

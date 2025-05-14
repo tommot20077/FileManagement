@@ -61,6 +61,12 @@ public enum RoleEnum {
      * 訪客的存儲限制為 0GB
      */
     VISITOR(Set.of(PermissionEnum.READ), 0L),
+
+    /**
+     * 匿名用戶所擁有的權限: 無
+     * 匿名用戶的存儲限制為 0GB
+     */
+    ANONYMOUS(Set.of(), 0L)
     ;
 
     /**
@@ -80,7 +86,7 @@ public enum RoleEnum {
      *
      * @return 是否擁有權限
      */
-    public boolean hasPermissions(PermissionEnum[] requiredPermissions) {
+    public boolean hasPermissions(PermissionEnum... requiredPermissions) {
         for (PermissionEnum requiredPermission : requiredPermissions) {
             if (!permissions.contains(requiredPermission)) {
                 return false;

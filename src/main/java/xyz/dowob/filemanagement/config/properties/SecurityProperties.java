@@ -2,12 +2,20 @@ package xyz.dowob.filemanagement.config.properties;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import xyz.dowob.filemanagement.customenum.CsrfTokenRepositoryEnum;
+import xyz.dowob.filemanagement.customenum.RoleEnum;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.time.Duration;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 安全配置文件，用於配置安全相關的參數，在 application 中配置 security
@@ -64,15 +72,27 @@ public class SecurityProperties {
      */
     private Login login = new Login();
 
+    /**
+     * 路徑規則配置
+     */
+    private Paths paths = new Paths();
+
 
     /**
-     * 驗證 JWT 密鑰是否配置
+     * 進行初始化操作
+     * 1. 檢查 JWT 密鑰是否配置
+     * 2. 設定使用的路徑規則
      */
     @PostConstruct
-    public void validateJwtSecret() {
+    public void init() {
         if (jwtToken.getSecret() == null || jwtToken.getSecret().trim().isEmpty()) {
             throw new IllegalArgumentException("JWT 密鑰需要配置，請在 application 中配置 security.jwt-token.secret");
         }
+
+        if (this.paths != null) {
+            this.paths.getEffectiveRules();
+        }
+
     }
 
 
@@ -90,6 +110,11 @@ public class SecurityProperties {
          * JWT 令牌過期時間，默認為 1 天
          */
         private Duration expiration = Duration.ofDays(1);
+
+        /**
+         * WebSocket 連線的 JWT 令牌前綴，默認為 jwt.
+         */
+        private String webSocketTokenPrefix = "jwt.";
     }
 
 
@@ -125,6 +150,11 @@ public class SecurityProperties {
          * Cookie 憑證的 SameSite 屬性，默認為 Lax
          */
         private String sameSite = "Lax";
+
+        /**
+         * Cookie 憑證的名稱，默認為 jwtToken
+         */
+        private String tokenName = "jwtToken";
     }
 
     @Data
@@ -245,11 +275,217 @@ public class SecurityProperties {
          * 若時間設定小於等於0，則會產生 illegalArgumentException 錯誤
          */
         private Duration lockTime = Duration.ofMinutes(30);
+
+        /**
+         * 限制器提供者的類型
+         */
+        private enum LimiterProviderType {
+            /**
+             * Redis 限制器提供者
+             */
+            redis,
+
+            /**
+             * 本地限制器提供者
+             */
+            local,
+
+            /**
+             * 不使用限制器
+             */
+            none
+        }
     }
 
-    private enum LimiterProviderType {
-        redis,
-        local,
-        none
+
+    /**
+     * 路徑規則配置
+     * 若有需要覆蓋的路徑規則，可以在 application.yml 中配置
+     * 假設我要更改 WebSocket 的規則成所有人都可以使用Get方法則可以這樣配置:
+     * security:
+     *   paths:
+     *     rules:
+     *       websocket:
+     *         pattern: /ws/**
+     *         method: GET
+     *         role: anonymous
+     * 若要設定 userInfoApi 成只有進階用戶可以使用並允許所有方式的話則可以這樣配置:
+     * security:
+     *   paths:
+     *     rules:
+     *       user-info-api:
+     *       pattern: /api/v1/user/info
+     *       role: advanced_user
+     * 需特別注意設定的鍵值名稱必須與預設的路徑規則名稱一致，否則不會生效
+     */
+    @Getter
+    public static class Paths {
+        /**
+         * 預設路徑規則配置，此處不提供 setter 方法，因此在 YML 中即使設定了也不會覆蓋
+         * key: 規則名稱
+         * value: 規則配置
+         */
+        private final Map<String, PathRuleConfig> defaultRules = new LinkedHashMap<>();
+
+        /**
+         * 自定義路徑規則配置
+         * key: 規則名稱
+         * value: 規則配置
+         */
+        @Setter
+        private Map<String, PathRuleConfig> rules = new LinkedHashMap<>();
+
+        /**
+         * 用於存儲最終生效的路徑規則配置，使用 transient 關鍵字避免序列化
+         * key: 規則名稱
+         * value: 規則配置
+         */
+        private transient Collection<PathRuleConfig> effectiveRulesCache;
+
+        /**
+         * Paths 的建構子，將會初始化預設路徑規則
+         */
+        public Paths() {
+            initializeDefaultPathRules();
+        }
+
+        /**
+         * 初始化預設路徑規則
+         * 此方法會將預設路徑規則添加到 defaultRules 中
+         */
+        private void initializeDefaultPathRules() {
+            Map<String, PathRuleConfig> dr = this.defaultRules;
+
+            // 所有人都可以訪問 (ANONYMOUS)，即使沒有開啟訪客用戶功能
+            dr.put("api-guest", new PathRuleConfig("/api/v1/guest/**", null, RoleEnum.ANONYMOUS));
+            dr.put("web-guest", new PathRuleConfig("/web/v1/guest/**", null, RoleEnum.ANONYMOUS));
+            dr.put("actuator-health", new PathRuleConfig("/actuator/health", null, RoleEnum.ANONYMOUS));
+            dr.put("swagger-docs", new PathRuleConfig("/docs/**", null, RoleEnum.ANONYMOUS));
+            dr.put("websocket", new PathRuleConfig("/ws/**", null, RoleEnum.ANONYMOUS));
+
+
+            // 訪客用戶 (VISITOR)，當前訪客用戶功能開啟時，這些路徑規則會生效，若關閉則調用預設的 User 規則
+            dr.put("user-info-api", new PathRuleConfig("/api/v1/user/info", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("user-info-web", new PathRuleConfig("/web/v1/user/info", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("folders-api-get-item", new PathRuleConfig("/api/v1/folders/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("folders-web-get-item", new PathRuleConfig("/web/v1/folders/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("folder-download-api", new PathRuleConfig("/api/v1/folders/*/download", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("folder-download-web", new PathRuleConfig("/web/v1/folders/*/download", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("files-api-get-item", new PathRuleConfig("/api/v1/files/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("files-web-get-item", new PathRuleConfig("/web/v1/files/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("file-info-api", new PathRuleConfig("/api/v1/files/*/info", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("file-info-web", new PathRuleConfig("/web/v1/files/*/info", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("api-v1-docs-get-item", new PathRuleConfig("/api/v1/docs/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("web-v1-docs-get-item", new PathRuleConfig("/web/v1/docs/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("api-v1-docs-history", new PathRuleConfig("/api/v1/docs/history/*", HttpMethod.GET, RoleEnum.VISITOR));
+            dr.put("web-v1-docs-history", new PathRuleConfig("/web/v1/docs/history/*", HttpMethod.GET, RoleEnum.VISITOR));
+
+
+            // 一般用戶 (USER)，此處開始都需要進行登入後才能訪問
+            dr.put("folders-star-api", new PathRuleConfig("/api/v1/folders/star", null, RoleEnum.USER));
+            dr.put("folders-star-web", new PathRuleConfig("/web/v1/folders/star", null, RoleEnum.USER));
+            dr.put("folders-recently-api", new PathRuleConfig("/api/v1/folders/recently", null, RoleEnum.USER));
+            dr.put("folders-recently-web", new PathRuleConfig("/web/v1/folders/recently", null, RoleEnum.USER));
+            dr.put("folders-recycle-api", new PathRuleConfig("/api/v1/folders/recycle", null, RoleEnum.USER));
+            dr.put("folders-recycle-web", new PathRuleConfig("/web/v1/folders/recycle", null, RoleEnum.USER));
+            dr.put("folders-shared-api", new PathRuleConfig("/api/v1/folders/shared", null, RoleEnum.USER));
+            dr.put("folders-shared-web", new PathRuleConfig("/web/v1/folders/shared", null, RoleEnum.USER));
+            dr.put("folders-all-api", new PathRuleConfig("/api/v1/folders/all", null, RoleEnum.USER));
+            dr.put("folders-all-web", new PathRuleConfig("/web/v1/folders/all", null, RoleEnum.USER));
+            dr.put("folders-path-api", new PathRuleConfig("/api/v1/folders/path/*", null, RoleEnum.USER));
+            dr.put("folders-path-web", new PathRuleConfig("/web/v1/folders/path/*", null, RoleEnum.USER));
+            dr.put("user-file-list-api", new PathRuleConfig("/api/v1/files/user-file-list", null, RoleEnum.USER));
+            dr.put("user-file-list-web", new PathRuleConfig("/web/v1/files/user-file-list", null, RoleEnum.USER));
+            dr.put("files-search-api", new PathRuleConfig("/api/v1/files/search", null, RoleEnum.USER));
+            dr.put("files-search-web", new PathRuleConfig("/web/v1/files/search", null, RoleEnum.USER));
+
+
+            // ADVANCED_USER 進階用戶
+
+
+            // 管理員 (ADMIN)，僅限管理員使用
+            dr.put("actuator-admin", new PathRuleConfig("/actuator/**", null, RoleEnum.ADMIN));
+            dr.put("all-user-info", new PathRuleConfig("/api/v1/user/info/all", null, RoleEnum.ADMIN));
+        }
+
+
+        /**
+         * 獲取最終生效的路徑規則配置
+         * 此方法會合併預設路徑規則和自定義路徑規則，並返回最終生效的路徑規則配置
+         * 當檢測到不在預設路徑規則中的自定義路徑規則時，會將其添加到預設路徑規則中
+         *
+         * @return 最終生效的路徑規則配置
+         */
+        public Collection<PathRuleConfig> getEffectiveRules() {
+            if (effectiveRulesCache == null) {
+                Map<String, PathRuleConfig> merged = new LinkedHashMap<>(this.defaultRules);
+                LogUnity.trace("預設路徑規則: " + merged);
+                this.rules.forEach((key, customRule) -> {
+                    LogUnity.trace("自定義路徑規則: " + key + " -> " + customRule);
+                    PathRuleConfig ruleToUpdate = merged.get(key);
+                    if (ruleToUpdate != null) {
+                        if (customRule.getPattern() != null) {
+                            ruleToUpdate.setPattern(customRule.getPattern());
+                        }
+                        if (customRule.getMethod() != null) {
+                            ruleToUpdate.setMethod(customRule.getMethod());
+                        }
+                        if (customRule.getRole() != null) {
+                            ruleToUpdate.setRole(customRule.getRole());
+                        }
+                    } else {
+                        LogUnity.trace("自定義路徑規則不在預設路徑規則中，設定 Key: " + key + " -> " + customRule);
+                        merged.put(key, customRule);
+                    }
+                });
+                effectiveRulesCache = merged.values();
+            }
+            return effectiveRulesCache;
+        }
+
+
+        /**
+         * 路徑規則配置
+         * pattern: 路徑模式
+         * method: 請求方法
+         * role: 角色基準
+         */
+        @Data
+        public static class PathRuleConfig {
+            /**
+             * 路徑模式
+             */
+            private String pattern;
+
+            /**
+             * 請求方法，當為 null 時表示所有方法
+             */
+            private HttpMethod method;
+
+            /**
+             * 角色基準，當為 null 時表示所有人，此處設定的角色為一個基準值，會自動設定具有更高權限的角色也可以訪問
+             * 角色基準值的優先級為：ANONYMOUS < VISITOR < USER < ADVANCED_USER < ADMIN
+             */
+            private RoleEnum role;
+
+            /**
+             * PathRuleConfig 的建構子
+             */
+            public PathRuleConfig() {
+            }
+
+            /**
+             * PathRuleConfig 的建構子
+             *
+             * @param pattern 路徑模式
+             * @param method  請求方法
+             * @param role    角色基準
+             */
+            public PathRuleConfig(String pattern, HttpMethod method, RoleEnum role) {
+                this.pattern = pattern;
+                this.method = method;
+                this.role = role;
+            }
+        }
     }
 }

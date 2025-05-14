@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.data.api;
+package xyz.dowob.filemanagement.data.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
@@ -22,12 +22,11 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 @AllArgsConstructor
-public class ApiResponseDTO <T> {
+public class ApiResponseDTO<T> {
     /**
      * 返回的時間戳
      */
-    @JsonFormat(shape = JsonFormat.Shape.STRING,
-                pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
     private LocalDateTime timestamp;
 
     /**

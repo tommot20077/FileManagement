@@ -14,10 +14,7 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.TransfersTasksRepository;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -52,7 +49,7 @@ public class TransfersTasksManager {
      * 用於構造 TransfersTasksManager 對象
      *
      * @param transfersTasksRepository TransfersTasksRepository 用於操作傳輸任務的數據庫操作接口
-     * @param fileProperties             FileProperties 用於操作文件上傳相關配置的類
+     * @param fileProperties           FileProperties 用於操作文件上傳相關配置的類
      */
     public TransfersTasksManager(TransfersTasksRepository transfersTasksRepository, FileProperties fileProperties) {
         this.transfersTasksRepository = transfersTasksRepository;
@@ -146,7 +143,7 @@ public class TransfersTasksManager {
      */
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
-        TransfersTask transfersTask = activeTransfersTask.get(md5).get(transfersTaskId);
+        TransfersTask transfersTask = Optional.ofNullable(activeTransfersTask.get(md5)).map(map -> map.get(transfersTaskId)).orElse(null);
         if (transfersTask == null) {
             return Mono.error(new ProcessException(ProcessException.ErrorCode.NOT_EXISTING_MD5_TRANSFERS_TASK, md5));
         }

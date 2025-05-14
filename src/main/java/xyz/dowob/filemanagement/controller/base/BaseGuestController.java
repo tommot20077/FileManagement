@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.user.dto.*;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
@@ -85,7 +85,7 @@ public abstract class BaseGuestController implements ResponseUnity {
     public Mono<ResponseEntity<?>> register(RegisterDTO registerUserDTO, ServerWebExchange exchange) {
         return handleError(validationService.validateRegisterDTO(registerUserDTO).then(userService.register(registerUserDTO).then(Mono.defer(() -> {
             HashMap<String, Object> data = new HashMap<>();
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, 201, "註冊成功", data);
+            ApiResponseDTO<?> apiResponse = createApiResponse(exchange, 201, "註冊成功", data);
             return createResponseEntity(apiResponse, 201);
         }))), exchange);
     }
@@ -106,7 +106,7 @@ public abstract class BaseGuestController implements ResponseUnity {
         return handleError(validationService.validateNotNull(authRequestDTO).then(userService.login(authRequestDTO, exchange).flatMap(token -> {
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
-                        .from("jwtToken", token)
+                        .from(securityProperties.getCookie().getTokenName(), token)
                         .httpOnly(securityProperties.getCookie().isHttpOnly())
                         .secure(securityProperties.getCookie().isSecure())
                         .maxAge(securityProperties.getJwtToken().getExpiration().toSeconds())
@@ -115,7 +115,7 @@ public abstract class BaseGuestController implements ResponseUnity {
                         .build();
                 exchange.getResponse().addCookie(cookie);
             }
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, "登入成功", new AuthResponseDTO(token));
+            ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "登入成功", new AuthResponseDTO(token));
             return createResponseEntity(apiResponse);
         })), exchange);
     }
@@ -142,12 +142,12 @@ public abstract class BaseGuestController implements ResponseUnity {
                     userMap.put("userRole", user.getRole());
                     data.put("user", userMap);
                     data.put("isAuthenticated", true);
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, "用戶已授權", data);
+                    ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "用戶已授權", data);
                     return createResponseEntity(apiResponse);
                 })
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
                 .onErrorResume(ValidationException.class, e -> {
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, 401, "用戶未授權", null);
+                    ApiResponseDTO<?> apiResponse = createApiResponse(exchange, 401, "用戶未授權", null);
                     return createResponseEntity(apiResponse);
                 });
     }
@@ -166,7 +166,7 @@ public abstract class BaseGuestController implements ResponseUnity {
         return handleError(validationService
                                    .validateNotNull(userEmailDTO)
                                    .then(userService.sendResetPasswordMail(userEmailDTO).then(Mono.defer(() -> {
-                                       ApiResponseDTO<?> apiResponse = createResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
+                                       ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "重置密碼郵件已發送，請到信箱查收驗證信", null);
                                        return createResponseEntity(apiResponse);
                                    }))), exchange);
     }
@@ -185,7 +185,7 @@ public abstract class BaseGuestController implements ResponseUnity {
         return handleError(validationService
                                    .validateResetPasswordDTO(resetPasswordDTO)
                                    .then(userService.resetPassword(resetPasswordDTO).then(Mono.defer(() -> {
-                                       ApiResponseDTO<?> apiResponse = createResponse(exchange, "密碼重置成功", null);
+                                       ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "密碼重置成功", null);
                                        return createResponseEntity(apiResponse);
                                    }))), exchange);
     }

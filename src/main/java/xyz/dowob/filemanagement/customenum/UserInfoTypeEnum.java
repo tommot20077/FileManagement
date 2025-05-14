@@ -33,7 +33,7 @@ public enum UserInfoTypeEnum {
      * @return 查詢類型枚舉對象
      */
     @JsonCreator
-    public static UserInfoTypeEnum getUserInfoType(String value) {
+    public static UserInfoTypeEnum fromString(String value) {
         for (UserInfoTypeEnum type : UserInfoTypeEnum.values()) {
             if (type.name().equalsIgnoreCase(value)) {
                 return type;

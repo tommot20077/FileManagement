@@ -40,3 +40,4 @@ build/
 /mysql/
 /redis/
 /config/
+/.xcodemap/config/xcodemap-class-filter.yaml

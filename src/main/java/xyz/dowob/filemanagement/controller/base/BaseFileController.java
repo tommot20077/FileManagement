@@ -18,11 +18,11 @@ import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvid
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -132,7 +132,7 @@ public abstract class BaseFileController implements ResponseUnity {
                     result.put("files", tuple.getT1());
                     result.put("filePaths", tuple.getT2());
                     result.put("owner", tuple.getT3());
-                    return createResponseEntity(createResponse(exchange, "獲取用戶文件列表成功", result));
+                    return createResponseEntity(createApiResponse(exchange, "獲取用戶文件列表成功", result));
                 }));
             });
         }), exchange);
@@ -157,7 +157,7 @@ public abstract class BaseFileController implements ResponseUnity {
                 result.put("username", user.getUsername());
                 result.put("files", files);
                 result.put("filePaths", Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root")));
-                return createResponseEntity(createResponse(exchange, "搜索文件成功", result));
+                return createResponseEntity(createApiResponse(exchange, "搜索文件成功", result));
             }));
         }), exchange);
     }
@@ -184,7 +184,7 @@ public abstract class BaseFileController implements ResponseUnity {
                 .flatMap(result -> {
                     String message = result ? "回收檔案成功" : "回收檔案失敗";
                     int status = result ? HttpStatus.OK.value() : HttpStatus.BAD_REQUEST.value();
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, status, message, null);
+                    ApiResponseDTO<?> apiResponse = createApiResponse(exchange, status, message, null);
                     return createResponseEntity(apiResponse);
                 })), exchange);
     }
@@ -212,7 +212,7 @@ public abstract class BaseFileController implements ResponseUnity {
                                 .validateFileType(file, fileType)
                                 .then(fileServiceStrategy.getFileService(type).restoreFile(file, user))))
                 .then(Mono.defer(() -> {
-                    ApiResponseDTO<?> apiResponse = createResponse(exchange, "還原檔案成功", null);
+                    ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "還原檔案成功", null);
                     return createResponseEntity(apiResponse);
                 }))), exchange);
     }
@@ -311,7 +311,7 @@ public abstract class BaseFileController implements ResponseUnity {
      */
     public Mono<ResponseEntity<Flux<DataBuffer>>> handleDownloadValidationError(ValidationException e, ServerWebExchange exchange) {
         String errorMessage = String.format("下載失敗: %s", e.getMessage());
-        ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
+        ApiResponseDTO<?> apiResponse = createApiResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
 
         try {
             byte[] responseBytes = objectMapper.writeValueAsString(apiResponse).getBytes();

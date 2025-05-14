@@ -64,6 +64,7 @@ public class LocalUserLoginLimiter implements UserLimiter {
         this.MAX_FAILURE_COUNT = securityProperties.getLogin().getMaxFailure();
         this.LOCK_TIME = securityProperties.getLogin().getLockTime();
         this.userLoginCountMap = new CacheConcurrentHashMap<>(64, LOCK_TIME, false);
+        this.userLoginCountMap.setTag("用戶登錄限流器緩存表");
     }
 
     /**

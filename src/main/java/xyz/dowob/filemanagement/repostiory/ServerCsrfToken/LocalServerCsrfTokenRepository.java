@@ -40,6 +40,7 @@ public class LocalServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public LocalServerCsrfTokenRepository(SecurityProperties securityProperties) {
         super(securityProperties);
         this.csrfTokenMap = new CacheConcurrentHashMap<>(64, super.expireTime, false);
+        this.csrfTokenMap.setTag("Csrf 本地憑證緩存表");
     }
 
 

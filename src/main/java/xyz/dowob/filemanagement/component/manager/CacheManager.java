@@ -448,7 +448,7 @@ public class CacheManager {
      */
     public <R> Flux<R> runAndSetCache(Collection<String> keys, Class<R> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends R> source, List<CacheRule<R>> cacheRules, Duration expire) {
         return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> provider.getAllAsMap(keys, clazz).flatMapMany(map -> {
-            if (map.values().size() == keys.size()) {
+            if (map.size() == keys.size()) {
                 return Flux.fromIterable(map.values());
             }
             return Flux.defer(() -> source.collectList().flatMapMany(valueList -> {

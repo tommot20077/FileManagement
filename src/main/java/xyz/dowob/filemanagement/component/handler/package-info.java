@@ -4,6 +4,7 @@
  * 1. CustomExceptionHandler: 自定義錯誤處理器 {@link xyz.dowob.filemanagement.component.handler.CustomExceptionHandler}
  * 2. CustomWebSocketHandler: 自定義WebSocket Session {@link xyz.dowob.filemanagement.component.handler.CustomWebSocketSession}
  * 3. FileUploadWebSocketHandler: 用於檔案上傳的WebSocket處理器 {@link xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler}
- * 4. WebSocketFailHandler: 用於處理WebSocket連接失敗的處理器 {@link xyz.dowob.filemanagement.component.handler.WebSocketFailHandler}
+ * 4. OnlineFileWebSocketHandler: 用於線上編輯的WebSocket處理器 {@link xyz.dowob.filemanagement.component.handler.OnlineFileWebSocketHandler}
+ * 5. WebSocketFailHandler: 用於處理WebSocket連接失敗的處理器 {@link xyz.dowob.filemanagement.component.handler.WebSocketFailHandler}
  */
 package xyz.dowob.filemanagement.component.handler;

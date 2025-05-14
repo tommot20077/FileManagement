@@ -1,20 +1,24 @@
 package xyz.dowob.filemanagement.component.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
+import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.customenum.WebsocketResponseType;
+import xyz.dowob.filemanagement.data.response.WebSocketResponse;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.unity.LogUnity;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
+
+import java.util.Optional;
 
 /**
  * 用於處理WebSocket連接失敗的處理器，當WebSocket連接失敗時將無法使用原本的連線返回錯誤內容
@@ -33,6 +37,11 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 @RequiredArgsConstructor
 public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
     /**
+     * Websocket連接失敗時的錯誤屬性名稱
+     */
+    private static final String WEBSOCKET_ERROR_ATTRIBUTE = "X-WebSocket-Error";
+
+    /**
      * ObjectMapper 用於將對象轉換為JSON格式的工具
      */
     private final ObjectMapper objectMapper;
@@ -47,33 +56,25 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
      */
     @NotNull
     @Override
-    @RecordLevel(LogLevelEnum.DEBUG)
+    @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> handle(@NotNull WebSocketSession session) {
-        return Mono.using(() -> session, webSocketSession -> {
-            String errorMessage = webSocketSession.getAttributes().get("X-WebSocket-Error").toString();
-            ValidationException.ErrorCode errorCode = getErrorCode(errorMessage);
-            ApiResponseDTO<Object> response = createResponse(webSocketSession, errorCode.getCode(), errorCode.getMessage(), null);
+        ValidationException.ErrorCode errorCode = Optional
+                .ofNullable(session.getAttributes().get(WEBSOCKET_ERROR_ATTRIBUTE))
+                .map(errorName -> ValidationException.ErrorCode.fromName(errorName.toString()))
+                .orElse(ValidationException.ErrorCode.WEBSOCKET_CONNECTION_ERROR);
 
-            return Mono
-                    .fromCallable(() -> objectMapper.writeValueAsString(response))
-                    .flatMap(jsonString -> webSocketSession.send(Flux.just(webSocketSession.textMessage(jsonString))));
-        }, WebSocketSession::close, true).onErrorResume(e -> Mono.error(new RuntimeException("WebSocket處理連線時發生錯誤")));
-    }
+        WebSocketResponse<?> response = createWebSocketResponse(WebsocketResponseType.CONNECTION_ERROR, errorCode.getMessage(), null);
 
-
-    /**
-     * 獲取錯誤代碼，利用錯誤訊息來獲取對應的錯誤代碼
-     * 當錯誤訊息為null時，返回預設的WebSocket連線錯誤代碼
-     *
-     * @param errorMessage 錯誤訊息
-     *
-     * @return ValidationException.ErrorCode 錯誤代碼
-     */
-    @SkipRecord
-    private ValidationException.ErrorCode getErrorCode(@Nullable String errorMessage) {
-        if (errorMessage == null) {
-            return ValidationException.ErrorCode.WEBSOCKET_CONNECTION_ERROR;
-        }
-        return ValidationException.ErrorCode.valueOf(errorMessage);
+        return Mono
+                .fromCallable(() -> objectMapper.writeValueAsString(response))
+                .doOnNext(s -> LogUnity.info(session, "用戶WebSocket連接失敗，關閉連線，session: %s", session))
+                .flatMap(jsonString -> session.send(Mono.just(session.textMessage(jsonString))).then().onErrorResume(e -> {
+                    LogUnity.error(session, "處理WebSocket連線失敗時發生意外的錯誤", e);
+                    return Mono.empty();
+                }))
+                .doFinally(signalType -> {
+                    CloseStatus status = (signalType == SignalType.ON_ERROR || signalType == SignalType.CANCEL) ? CloseStatus.SERVER_ERROR : CloseStatus.NORMAL;
+                    session.close(status).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                });
     }
 }

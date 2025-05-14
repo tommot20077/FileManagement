@@ -139,7 +139,7 @@
 
 6. 補充:
     - 如果需要安裝前端頁面的話可以將 `docker-compose.yml` 中的 `frontend`
-      註釋移除，並下載前端 [Dockerfile](https://github.com/tommot20077/FileManagementWeb/blob/master/docker/Dockerfile)
+      註釋移除，並下載前端 [Dockerfile](https://github.com/tommot20077/FileManagementWeb/blob/master/docker/Dockerfile-front)
       放入當前目錄下，然後執行以下指令
         ```bash
         docker-compose up -d filemanager_front

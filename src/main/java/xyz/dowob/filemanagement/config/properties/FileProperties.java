@@ -67,6 +67,17 @@ public class FileProperties {
         private boolean forceUseServerConfig = false;
 
         /**
+         * WebSocket上傳檔案的路徑，默認為 /file/upload
+         */
+        private String uploadWebSocketPath = "/file/upload";
+
+        /**
+         * WebSocket編輯線上檔案的路徑
+         * 默認為 /file/editing
+         */
+        private String editOnlineFileWebSocketPath = "/file/editing";
+
+        /**
          * Websocket最大允許分塊大小，默認為 20MB
          * 注意如果有設定 nginx 的 client_max_body_size，這個值必須小於nginx的設定
          */
@@ -154,7 +165,6 @@ public class FileProperties {
          * 此參數用於用戶查詢最近使用的檔案所顯示的數量
          */
         private Integer showRecentFileCount = 20;
-
     }
 
     @Data

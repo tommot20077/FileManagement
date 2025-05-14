@@ -3,8 +3,10 @@ package xyz.dowob.filemanagement.component.limiter;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.UserLimiterType;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,11 +55,13 @@ public class UserUploadLimiter implements UserLimiter {
      * @return Mono<Boolean> 是否獲取成功
      */
     @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Boolean> tryAcquire(Object key) {
         Long userId = (Long) key;
         Semaphore semaphore = userSemaphoreMap.computeIfAbsent(userId, k -> new Semaphore(MAX_CONCURRENT_UPLOADS_PER_USER));
         return Mono.just(semaphore.tryAcquire());
     }
+    //todo userSemaphoreMap改為cacheConcurrentHashMap
 
 
     /**

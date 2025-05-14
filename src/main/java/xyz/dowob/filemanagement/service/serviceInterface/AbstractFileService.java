@@ -35,13 +35,14 @@ import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDAO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.data.file.po.FluxDataPO;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 import xyz.dowob.filemanagement.entity.*;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
@@ -598,13 +599,14 @@ public abstract class AbstractFileService implements FileService {
      * 編輯文件的共通實現
      * 處理文件名、父文件夾ID、共享用戶ID的更新
      *
-     * @param fileEditDTO 文件編輯傳輸類
-     * @param user        用戶信息
+     * @param fileEditBO 文件編輯傳輸類
+     * @param user       用戶信息
      *
      * @return Mono<Void>
      */
-    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
-        UserFileMetadata userFileMetadata = fileEditDTO.getUserFileMetadata();
+    public Mono<Void> editFile(FileEditBO fileEditBO, User user) {
+        FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
+        UserFileMetadata userFileMetadata = fileEditBO.getUserFileMetadata();
         Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
         Mono<UserFileMetadata> processFileMono = cacheManager
                 .deleteCache(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()), CacheProviderEnum.USER_FILE_LIST_CACHE)
@@ -812,7 +814,7 @@ public abstract class AbstractFileService implements FileService {
                             .when(checkFileStatusMono, scanFileMono)
                             .then(processFileAfterFileCheck(uploadTaskBO, combinedBytes))
                             .onErrorResume(e -> {
-                                LogUnity.warn("檔案檢查失敗，將刪除暫存數據，上傳任務ID: %s ，錯誤原因", transferTaskId, e.getMessage());
+                                LogUnity.warn("檔案檢查失敗，將刪除暫存數據，上傳任務ID: %s ，錯誤原因", e, transferTaskId);
                                 Mono<Void> removeTempDataMono = removeTempData(uploadTaskBO);
                                 Mono<Void> updateTask = transfersTasksManager.updateTransfersTask(uploadTaskBO.getMd5(),
                                                                                                   uploadTaskBO.getTransferTaskId(),
@@ -1386,6 +1388,7 @@ public abstract class AbstractFileService implements FileService {
             return DataBufferUtils.takeUntilByteCount(skippedFlux, end - start + 1);
         });
     }
+
 
     /**
      * 更新用戶文件元數據的MimeType

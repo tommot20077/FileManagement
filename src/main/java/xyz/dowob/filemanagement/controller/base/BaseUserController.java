@@ -12,7 +12,7 @@ import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.UserInfoTypeEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
@@ -74,7 +74,7 @@ public abstract class BaseUserController implements ResponseUnity {
         return userService.getUser(exchange).flatMap(user -> userService.logout(user.getId(), exchange).then(Mono.defer(() -> {
             if (isWeb) {
                 ResponseCookie cookie = ResponseCookie
-                        .from("jwtToken", "")
+                        .from(securityProperties.getCookie().getTokenName(), "")
                         .httpOnly(securityProperties.getCookie().isHttpOnly())
                         .secure(securityProperties.getCookie().isSecure())
                         .maxAge(0)
@@ -83,8 +83,8 @@ public abstract class BaseUserController implements ResponseUnity {
                         .build();
                 exchange.getResponse().addCookie(cookie);
             }
-            return createResponseEntity(createResponse(exchange, "登出成功", null));
-        }))).switchIfEmpty(createResponseEntity(createResponse(exchange, 401, "未認證", null)));
+            return createResponseEntity(createApiResponse(exchange, "登出成功", null));
+        }))).switchIfEmpty(createResponseEntity(createApiResponse(exchange, 401, "未認證", null)));
     }
 
 
@@ -100,7 +100,7 @@ public abstract class BaseUserController implements ResponseUnity {
     @RequirePermission(PermissionEnum.MANAGE)
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return handleError(userService.getAll().collectList().flatMap(userList -> {
-            ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", userList);
+            ApiResponseDTO<?> responseEntity = createApiResponse(exchange, "獲取用户信息成功", userList);
             return createResponseEntity(responseEntity);
         }), exchange);
     }
@@ -116,7 +116,7 @@ public abstract class BaseUserController implements ResponseUnity {
      */
     public Mono<ResponseEntity<?>> getUserInfo(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", user);
+            ApiResponseDTO<?> responseEntity = createApiResponse(exchange, "獲取用户信息成功", user);
             return createResponseEntity(responseEntity);
         }), exchange);
     }
@@ -148,7 +148,7 @@ public abstract class BaseUserController implements ResponseUnity {
                     Map<String, Object> result = new HashMap<>();
                     result.put("foundUser", userMap);
                     result.put("notFoundUser", inValidUser);
-                    ApiResponseDTO<?> responseEntity = createResponse(exchange, "獲取用户信息成功", result);
+                    ApiResponseDTO<?> responseEntity = createApiResponse(exchange, "獲取用户信息成功", result);
                     return createResponseEntity(responseEntity);
                 }));
         return handleError(entityMono, exchange);

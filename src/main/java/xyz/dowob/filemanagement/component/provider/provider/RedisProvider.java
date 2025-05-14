@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 
 import java.time.Duration;
 import java.util.*;

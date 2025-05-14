@@ -34,6 +34,7 @@ import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.*;
@@ -179,17 +180,18 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     /**
      * 編輯文件夾的實現
      *
-     * @param fileEditDTO 文件編輯數據
-     * @param user        用戶信息
+     * @param fileEditBO 文件編輯數據
+     * @param user       用戶信息
      *
      * @return Mono<Void>
      */
     @Override
-    public Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
+    public Mono<Void> editFolder(FileEditBO fileEditBO, User user) {
+        FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
         Long oldParentFolderId = fileEditDTO.getParentFolderId();
         return Mono.defer(() -> {
-            if (fileEditDTO.getParentFolderFileMetadata() != null) {
-                return getUserFilePaths(fileEditDTO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
+            if (fileEditBO.getParentFolderFileMetadata() != null) {
+                return getUserFilePaths(fileEditBO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
                     if (nodeList
                             .stream()
                             .filter(node -> Objects.nonNull(node.getFolderId()))
@@ -199,10 +201,10 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                                                                   fileEditDTO.getParentFolderId()
                         ));
                     }
-                    return Mono.just(fileEditDTO.getUserFileMetadata());
+                    return Mono.just(fileEditBO.getUserFileMetadata());
                 });
             }
-            return Mono.just(fileEditDTO.getUserFileMetadata());
+            return Mono.just(fileEditBO.getUserFileMetadata());
         }).flatMap(userFileMetadata -> {
             if (folderListTreeProvider != null) {
                 try {
@@ -529,7 +531,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         throw Exceptions.propagate(e);
                     }
                 }).subscribeOn(Schedulers.boundedElastic()).then();
-
                 return createFolderEntry.then(processFolder(zipOutputStream, subFolder, uniqueFolderPath, zipEntryNameCountMap, user));
             }).then();
             return filesProcessing.then(foldersProcessing);

@@ -189,6 +189,12 @@ public class ProcessException extends Exception {
          */
         CONNECT_SCAN_SERVER_FAILED(1221, "連接掃描服務器失敗 %s"),
 
+        /**
+         * 錯誤碼: 1222
+         * 錯誤信息: 處理WebSocket連線失敗
+         */
+        HANDLE_WEBSOCKET_FAILED(1222, "處理WebSocket連線失敗 %s"),
+
         ;
 
 

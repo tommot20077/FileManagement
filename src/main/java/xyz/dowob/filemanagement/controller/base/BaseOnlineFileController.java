@@ -10,17 +10,19 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.component.event.EventSink;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.event.FileEditedMessage;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -45,6 +47,7 @@ import java.util.*;
  */
 @RecordLevel(LogLevelEnum.INFO)
 public class BaseOnlineFileController extends BaseFileController {
+    private final EventSink<FileEditedMessage> eventSink;
 
     /**
      * 构造函數，用於初始化基本的業務層服務
@@ -56,9 +59,11 @@ public class BaseOnlineFileController extends BaseFileController {
      * @param permissionService         用戶文件元數據授權服務
      * @param objectMapper              用於處理對象映射的工具
      * @param filePermissionRuleManager 文件權限規則管理器
+     * @param eventSink                 文件事件發送器
      */
-    public BaseOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
+    public BaseOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager, EventSink<FileEditedMessage> eventSink) {
         super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
+        this.eventSink = eventSink;
     }
 
 
@@ -72,7 +77,7 @@ public class BaseOnlineFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回異步處理的結果
      */
     public Mono<ResponseEntity<?>> uploadFile(FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
+        Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             Mono<UserFileMetadata> parentFolderMono = Mono.empty();
             if (fileMetadataDTO.getParentFolderId() != null) {
                 parentFolderMono = permissionService
@@ -83,10 +88,12 @@ public class BaseOnlineFileController extends BaseFileController {
             Mono<ResponseEntity<?>> responseEntityMono = fileServiceStrategy
                     .getFileService(FileEnum.ONLINE_DOCUMENT)
                     .uploadFile(fileMetadataDTO, user)
-                    .flatMap(uploadResponseDTO -> createResponseEntity(createResponse(exchange, "上傳成功", uploadResponseDTO)));
+                    .flatMap(uploadResponseDTO -> createResponseEntity(createApiResponse(exchange, "上傳成功", uploadResponseDTO)));
 
             return parentFolderMono.then(responseEntityMono);
-        }), exchange);
+        });
+
+        return handleError(action, exchange);
     }
 
 
@@ -113,7 +120,7 @@ public class BaseOnlineFileController extends BaseFileController {
                                     Map<String, Object> data = new HashMap<>();
                                     data.put("content", userFileDataBO.getContent());
                                     data.put("filename", userFileDataBO.getFilename());
-                                    ApiResponseDTO<?> apiResponse = createResponse(exchange, "下載成功", data);
+                                    ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "下載成功", data);
                                     byte[] responseBytes = objectMapper.writeValueAsString(apiResponse).getBytes();
                                     DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(responseBytes);
                                     return Mono.just(ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(Flux.just(buffer)));
@@ -140,7 +147,7 @@ public class BaseOnlineFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回異步處理的結果，表示文件刪除成功
      */
     public Mono<ResponseEntity<?>> deleteFile(String id, ServerWebExchange exchange) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
+        Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowOwner(),
                                                                                filePermissionRuleManager.getBlockNotSearchOperation()
             ));
@@ -149,8 +156,10 @@ public class BaseOnlineFileController extends BaseFileController {
                     .flatMap(file -> validationService
                             .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
                             .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).deleteFile(file, user))
-                            .then(createResponseEntity(createResponse(exchange, "刪除成功", null))));
-        }), exchange);
+                            .then(createResponseEntity(createApiResponse(exchange, "刪除成功", null))));
+        });
+
+        return handleError(action, exchange);
     }
 
 
@@ -164,32 +173,44 @@ public class BaseOnlineFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回異步處理的結果，表示文件編輯成功
      */
     public Mono<ResponseEntity<?>> editFile(FileEditDTO fileEditDTO, ServerWebExchange exchange) {
-        return handleError(validationService.validateEditFileDTO(fileEditDTO, false).then(userService.getUser(exchange)).flatMap(user -> {
-            List<Long> fileIds = new ArrayList<>();
-            List<Permission<UserFileMetadata>> rules = new ArrayList<>();
-            fileIds.add(Long.parseLong(fileEditDTO.getFileId()));
-            if (fileEditDTO.getParentFolderId() != null && fileEditDTO.getEditType() == EditTypeEnum.EDIT_METADATA) {
-                fileIds.add(fileEditDTO.getParentFolderId());
-                rules.add(filePermissionRuleManager.getAllowOwner());
-            }
-            if (fileEditDTO.getEditType() != EditTypeEnum.EDIT_METADATA) {
-                rules.add(filePermissionRuleManager.getAllowShared());
-            }
+        Mono<ResponseEntity<?>> action = validationService
+                .validateEditFileDTO(fileEditDTO, false)
+                .then(userService.getUser(exchange))
+                .flatMap(user -> {
+                    List<Long> fileIds = new ArrayList<>();
+                    List<Permission<UserFileMetadata>> rules = new ArrayList<>();
 
-            return permissionService.validateUserPermission(user, fileIds, rules).collectList().flatMap(files -> {
-                files.forEach(file -> {
-                    if (file.getId().equals(fileEditDTO.getParentFolderId())) {
-                        fileEditDTO.setParentFolderFileMetadata(file);
-                    } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
-                        fileEditDTO.setUserFileMetadata(file);
+                    Long fileId = Long.parseLong(fileEditDTO.getFileId());
+                    fileIds.add(fileId);
+                    if (fileEditDTO.getParentFolderId() != null && fileEditDTO.getEditType() == EditTypeEnum.EDIT_METADATA) {
+                        fileIds.add(fileEditDTO.getParentFolderId());
+                        rules.add(filePermissionRuleManager.getAllowOwner());
                     }
-                });
-                return validationService
-                        .validateFileType(fileEditDTO.getUserFileMetadata(), FileEnum.ONLINE_DOCUMENT)
-                        .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(), FileEnum.FOLDER))
-                        .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).editFile(fileEditDTO, user));
-            });
-        }).then(createResponseEntity(createResponse(exchange, "編輯成功", null))), exchange);
+                    if (fileEditDTO.getEditType() != EditTypeEnum.EDIT_METADATA) {
+                        rules.add(filePermissionRuleManager.getAllowShared());
+                    }
+
+                    FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
+                    return permissionService.validateUserPermission(user, fileIds, rules).collectList().flatMap(files -> {
+                        files.forEach(file -> {
+                            if (file.getId().equals(fileEditDTO.getParentFolderId())) {
+                                fileEditBO.setParentFolderFileMetadata(file);
+                            } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
+                                fileEditBO.setUserFileMetadata(file);
+                            }
+                        });
+                        return validationService
+                                .validateFileType(fileEditBO.getUserFileMetadata(), FileEnum.ONLINE_DOCUMENT)
+                                .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
+                                .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).editFile(fileEditBO, user))
+                                .doOnSuccess(v -> {
+                                    eventSink.emit(FileEditedMessage.of(fileEditBO.getUserFileMetadata(), user, fileEditDTO.getEditType()));
+                                });
+                    });
+                })
+                .then(createResponseEntity(createApiResponse(exchange, "編輯成功", null)));
+
+        return handleError(action, exchange);
     }
 
 
@@ -214,7 +235,7 @@ public class BaseOnlineFileController extends BaseFileController {
                     .flatMap(file -> validationService
                             .validateFileType(file, FileEnum.ONLINE_DOCUMENT)
                             .then(fileServiceStrategy.getFileService(FileEnum.ONLINE_DOCUMENT).getFileVersionList(user, file, page, pageSize))
-                            .flatMap(history -> createResponseEntity(createResponse(exchange, "獲取歷程記錄成功", history))));
+                            .flatMap(history -> createResponseEntity(createApiResponse(exchange, "獲取歷程記錄成功", history))));
         });
         return handleError(responseEntityMono, exchange);
     }

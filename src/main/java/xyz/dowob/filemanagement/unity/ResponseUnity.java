@@ -12,7 +12,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.WebSocketResponse;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -75,22 +76,6 @@ public interface ResponseUnity {
 
 
     /**
-     * 用於創建返回ApiResponseDTO的方法，根據請求的結果創建對應的ApiResponseDTO
-     *
-     * @param request 請求對象
-     * @param status  狀態碼
-     * @param message 返回消息
-     * @param data    返回數據
-     * @param <T>     泛型
-     *
-     * @return ApiResponseDTO 返回對應的ApiResponseDTO
-     */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, int status, String message, T data) {
-        return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
-    }
-
-
-    /**
      * 用於創建返回ApiResponseDTO的方法，此為重載方法
      * 適用指定路徑的請求
      *
@@ -101,7 +86,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(String path, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createApiResponse(String path, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, path, message, data);
     }
 
@@ -118,7 +103,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(WebSocketSession session, int status, String message, T data) {
+    default <T> ApiResponseDTO<T> createApiResponse(WebSocketSession session, int status, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), status, session.getHandshakeInfo().getUri().getPath(), message, data);
     }
 
@@ -133,7 +118,7 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(ServerWebExchange request, String message, T data) {
+    default <T> ApiResponseDTO<T> createApiResponse(ServerWebExchange request, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, request.getRequest().getURI().getPath(), message, data);
     }
 
@@ -147,8 +132,35 @@ public interface ResponseUnity {
      *
      * @return ApiResponseDTO 返回對應的ApiResponseDTO
      */
-    default <T> ApiResponseDTO<T> createResponse(String path, String message, T data) {
+    default <T> ApiResponseDTO<T> createApiResponse(String path, String message, T data) {
         return new ApiResponseDTO<>(LocalDateTime.now(), 200, path, message, data);
+    }
+
+
+    /**
+     * 用於創建返回WebSocketResponse的方法
+     *
+     * @param <T>     訊息類型
+     * @param message 返回消息
+     * @param data    返回數據
+     *
+     * @return ApiResponseDTO 返回對應的WebSocketResponse
+     */
+    default <T> WebSocketResponse<T> createWebSocketResponse(T type, String message, Object data) {
+        return new WebSocketResponse<>(LocalDateTime.now(), type, message, data);
+    }
+
+
+    /**
+     * 用於創建返回WebSocketResponse的方法，此為重載方法，無傳輸資料，適用WebSocket請求
+     *
+     * @param <T>     訊息類型
+     * @param message 返回消息
+     *
+     * @return ApiResponseDTO 返回對應的WebSocketResponse
+     */
+    default <T> WebSocketResponse<T> createWebSocketResponse(T type, String message) {
+        return new WebSocketResponse<>(LocalDateTime.now(), type, message, null);
     }
 
 
@@ -161,15 +173,33 @@ public interface ResponseUnity {
      * @return 處理後的 ResponseEntity
      */
     default Mono<ResponseEntity<?>> handleError(Mono<ResponseEntity<?>> operation, ServerWebExchange exchange) {
-        return operation.onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("處理失敗: %s", e.getMessage());
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-            return createResponseEntity(apiResponse, e.getErrorCode().getHttpStatus().value());
-        }).onErrorResume(LimitationException.class, e -> {
-            String errorMessage = String.format("限制錯誤: %s", e.getMessage());
-            ApiResponseDTO<?> apiResponse = createResponse(exchange, e.getErrorCode().getCode(), errorMessage, null);
-            return createResponseEntity(apiResponse, e.getErrorCode().getHttpStatus().value());
-        });
+        return operation.onErrorResume(ValidationException.class, validationException -> {
+                                           String errorMessage = String.format("處理失敗: %s", validationException.getMessage());
+                                           ApiResponseDTO<?> apiResponse = createApiResponse(exchange, validationException.getErrorCode().getCode(), errorMessage, null);
+                                           return createResponseEntity(apiResponse, validationException.getErrorCode().getHttpStatus().value());
+                                       }
+        ).onErrorResume(LimitationException.class, limitationException -> {
+                            String errorMessage = String.format("限制錯誤: %s", limitationException.getMessage());
+                            ApiResponseDTO<?> apiResponse = createApiResponse(exchange, limitationException.getErrorCode().getCode(), errorMessage, null);
+                            return createResponseEntity(apiResponse, limitationException.getErrorCode().getHttpStatus().value());
+                        }
+        );
+    }
+
+
+    /**
+     * 用於創建返回ApiResponseDTO的方法，根據請求的結果創建對應的ApiResponseDTO
+     *
+     * @param request 請求對象
+     * @param status  狀態碼
+     * @param message 返回消息
+     * @param data    返回數據
+     * @param <T>     泛型
+     *
+     * @return ApiResponseDTO 返回對應的ApiResponseDTO
+     */
+    default <T> ApiResponseDTO<T> createApiResponse(ServerWebExchange request, int status, String message, T data) {
+        return new ApiResponseDTO<>(LocalDateTime.now(), status, request.getRequest().getURI().getPath(), message, data);
     }
 
 
@@ -237,9 +267,9 @@ public interface ResponseUnity {
             response.setStatusCode(httpStatus);
 
             Mono<DataBuffer> responseBody = Mono.just(exchange.getResponse().bufferFactory().wrap(objectMapper.writeValueAsBytes(apiResponseDTO)));
-
             return response.writeWith(responseBody);
         } catch (JsonProcessingException ex) {
+            LogUnity.error(exchange, "資料轉換 JSON 格式失敗", ex);
             return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, ex));
         }
     }

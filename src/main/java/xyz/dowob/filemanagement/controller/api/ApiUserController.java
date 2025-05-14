@@ -57,8 +57,8 @@ public class ApiUserController extends BaseUserController {
      *
      * @return Mono<ResponseEntity> 返回用戶信息
      */
+    @GetMapping("/info/all")
     @RecordLevel(LogLevelEnum.WARN)
-    @GetMapping("/getAllUserInfo")
     @RequirePermission(PermissionEnum.MANAGE)
     public Mono<ResponseEntity<?>> getAllUserInfo(ServerWebExchange exchange) {
         return super.getAllUserInfo(exchange);
@@ -91,7 +91,7 @@ public class ApiUserController extends BaseUserController {
     public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange,
                                                   @RequestParam Set<String> userInfos,
                                                   @RequestParam(required = false, defaultValue = "name") String type) {
-        String formatType = UserInfoTypeEnum.getUserInfoType(type).name();
+        String formatType = UserInfoTypeEnum.fromString(type).name();
         return super.searchUserInfo(exchange, userInfos, formatType);
     }
 }

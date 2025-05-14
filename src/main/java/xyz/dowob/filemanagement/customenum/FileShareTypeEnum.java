@@ -49,7 +49,7 @@ public enum FileShareTypeEnum {
      * @return 文件分享類型
      */
     @JsonCreator
-    public static FileShareTypeEnum format(String type) {
+    public static FileShareTypeEnum fromString(String type) {
         for (FileShareTypeEnum fileType : FileShareTypeEnum.values()) {
             if (fileType.name().equalsIgnoreCase(type)) {
                 return fileType;

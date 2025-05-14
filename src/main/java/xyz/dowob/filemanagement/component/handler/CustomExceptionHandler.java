@@ -14,7 +14,7 @@ import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.LocalDateTime;

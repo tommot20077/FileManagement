@@ -20,10 +20,7 @@ import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileShareRecord;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -111,7 +108,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                 Map<Long, UserFileShareRecord> shareRecordMap = tuple2.getT2();
 
                 filesList.forEach(file -> {
-                    if (file.getFileType() == FileEnum.FOLDER) {
+                    if (file.getFileType() == FileEnum.FOLDER || Objects.equals(file.getUserId(), user.getId())) {
                         allowFiles.add(file);
                         return;
                     }

@@ -14,7 +14,6 @@ import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.RequirePermission;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider;
@@ -110,7 +109,7 @@ public class UserServiceImpl implements UserService {
      * 遊客用戶對象
      * 用於處理遊客的請求
      */
-    private final User GUEST_USER = new User();
+    private final User guestUser = new User();
 
     /**
      * 初始化緩存規則
@@ -120,13 +119,13 @@ public class UserServiceImpl implements UserService {
         USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
         USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
 
-        GUEST_USER.setId(0L);
-        GUEST_USER.setUsername("Guest");
-        GUEST_USER.setPassword("Guest");
-        GUEST_USER.setEmail("guest@example.com");
-        GUEST_USER.setRole(RoleEnum.VISITOR);
-        GUEST_USER.setStorageLimit(0L);
-        GUEST_USER.setUsedStorage(0L);
+        guestUser.setId(0L);
+        guestUser.setUsername("Guest");
+        guestUser.setPassword("Guest");
+        guestUser.setEmail("guest@example.com");
+        guestUser.setRole(RoleEnum.VISITOR);
+        guestUser.setStorageLimit(0L);
+        guestUser.setUsedStorage(0L);
 
     }
 
@@ -284,30 +283,7 @@ public class UserServiceImpl implements UserService {
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED)))
                 .map(SecurityContext::getAuthentication)
                 .map(auth -> (Long) auth.getPrincipal())
-                .flatMap(userId -> {
-                    if (Objects.equals(userId, 0L)) {
-                        return Mono.just(GUEST_USER);
-                    }
-                    return getUserFromCache(userId);
-                }));
-    }
-
-
-    /**
-     * 根據用戶ID獲取緩存中的用戶對象
-     *
-     * @param userId 用戶ID
-     *
-     * @return Mono<User> 返回用戶對象
-     */
-    @SkipRecord
-    private Mono<User> getUserFromCache(Long userId) {
-        return cacheManager.runAndSetCache(userId.toString(),
-                                           User.class,
-                                           CacheProviderEnum.USER_CACHE,
-                                           this.getById(userId),
-                                           List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
-        );
+                .flatMap(this::getById));
     }
 
 
@@ -324,15 +300,39 @@ public class UserServiceImpl implements UserService {
 
 
     /**
+     * 根據用戶ID獲取用戶對象
+     * 如果用戶ID為null，則返回錯誤
+     * 如果用戶ID為0，則返回遊客用戶對象
+     * 不然將從緩存管理器中獲取用戶對象
+     *
+     * @param userId 用戶ID
+     *
+     * @return Mono<User> 返回用戶對象
+     */
+    @Override
+    @RecordLevel(LogLevelEnum.DEBUG)
+    public Mono<User> getById(Long userId) {
+        if (userId == null) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND));
+        }
+
+        if (Objects.equals(userId, 0L)) {
+            return Mono.just(guestUser);
+        }
+
+        List<CacheRule<User>> cacheRules = List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE);
+        return cacheManager.runAndSetCache(userId.toString(), User.class, CacheProviderEnum.USER_CACHE, this.getByIdWithDB(userId), cacheRules);
+    }
+
+
+    /**
      * 根據ID獲取一個實體
      *
      * @param userId 實體ID
      *
      * @return 返回一個Optional對象
      */
-    @Override
-    @RecordLevel(LogLevelEnum.DEBUG)
-    public Mono<User> getById(Long userId) {
+    private Mono<User> getByIdWithDB(Long userId) {
         return userRepository.findById(userId);
     }
 

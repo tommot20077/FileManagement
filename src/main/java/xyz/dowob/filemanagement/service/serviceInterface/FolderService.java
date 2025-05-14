@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -37,13 +38,13 @@ public interface FolderService extends BaseFileService {
     /**
      * 編輯文件夾的接口
      *
-     * @param fileEditDTO 文件夾數據
-     *                    包含文件夾ID、文件夾名稱等信息
-     * @param user        用戶信息
+     * @param fileEditBO 文件夾數據
+     *                   包含文件夾ID、文件夾名稱等信息
+     * @param user       用戶信息
      *
      * @return 返回編輯結果
      */
-    default Mono<Void> editFolder(FileEditDTO fileEditDTO, User user) {
+    default Mono<Void> editFolder(FileEditBO fileEditBO, User user) {
         return Mono.empty();
     }
 
