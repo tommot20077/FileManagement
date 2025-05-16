@@ -49,7 +49,7 @@ public interface FileCrudService {
      *
      * @param entity 用戶文件元數據實體對象
      */
-    Mono<Void> updateUserFileMetadata(UserFileMetadata entity);
+    Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata entity);
 
     /**
      * 刪除一個用戶文件元數據實體

@@ -83,7 +83,7 @@ public class WebUserController extends BaseUserController {
     public Mono<ResponseEntity<?>> searchUserInfo(ServerWebExchange exchange,
                                                   @RequestParam Set<String> userInfos,
                                                   @RequestParam(required = false, defaultValue = "name") String type) {
-        String formatType = UserInfoTypeEnum.getUserInfoType(type).name();
+        String formatType = UserInfoTypeEnum.fromString(type).name();
         return super.searchUserInfo(exchange, userInfos, formatType);
     }
 }

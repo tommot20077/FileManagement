@@ -14,10 +14,7 @@ import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.TransfersTasksRepository;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -52,6 +49,7 @@ public class TransfersTasksManager {
      * 用於構造 TransfersTasksManager 對象
      *
      * @param transfersTasksRepository TransfersTasksRepository 用於操作傳輸任務的數據庫操作接口
+     * @param fileProperties           FileProperties 用於操作文件上傳相關配置的類
      */
     public TransfersTasksManager(TransfersTasksRepository transfersTasksRepository, FileProperties fileProperties) {
         this.transfersTasksRepository = transfersTasksRepository;
@@ -115,7 +113,7 @@ public class TransfersTasksManager {
      * @param message         任務消息
      * @param status          任務狀態
      *
-     * @return Mono<Void> 返回一個 Mono 對象
+     * @return Mono<Void>
      */
     public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, String gridFsId, String message, TransfersStatusEnum status) {
         TransfersTask transfersTask = new TransfersTask();
@@ -132,27 +130,6 @@ public class TransfersTasksManager {
 
 
     /**
-     * 用於完成一個傳輸任務時，更新任務的狀態
-     *
-     * @param md5             檔案的 MD5 值
-     * @param transfersTaskId 任務ID
-     * @param gridFsId        GridFS 檔案ID
-     *
-     * @return Mono<Void> 返回一個 Mono 對象
-     */
-    @RecordLevel(LogLevelEnum.DEBUG)
-    public Mono<Void> finishTransfersTask(String md5, String transfersTaskId, String gridFsId) {
-        return updateTransfersTask(md5,
-                                   transfersTaskId,
-                                   TransfersStatusEnum.COMPLETED,
-                                   "檔案處理成功",
-                                   gridFsId,
-                                   true
-        ).doOnSuccess(aVoid -> activeTransfersTask.remove(md5));
-    }
-
-
-    /**
      * 用於更新一個傳輸任務的狀態
      *
      * @param md5             檔案的 MD5 值
@@ -162,11 +139,11 @@ public class TransfersTasksManager {
      * @param gridFsId        GridFS 檔案ID
      * @param isFinished      是否完成
      *
-     * @return Mono<Void> 返回一個 Mono 對象
+     * @return Mono<Void>
      */
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> updateTransfersTask(String md5, String transfersTaskId, TransfersStatusEnum status, String message, String gridFsId, Boolean isFinished) {
-        TransfersTask transfersTask = activeTransfersTask.get(md5).get(transfersTaskId);
+        TransfersTask transfersTask = Optional.ofNullable(activeTransfersTask.get(md5)).map(map -> map.get(transfersTaskId)).orElse(null);
         if (transfersTask == null) {
             return Mono.error(new ProcessException(ProcessException.ErrorCode.NOT_EXISTING_MD5_TRANSFERS_TASK, md5));
         }
@@ -180,7 +157,12 @@ public class TransfersTasksManager {
         if (gridFsId != null) {
             transfersTask.setGridFsId(gridFsId);
         }
-        return transfersTasksRepository.save(transfersTask).then();
+        return transfersTasksRepository.save(transfersTask).flatMap(task -> {
+            if (isFinished) {
+                activeTransfersTask.remove(md5);
+            }
+            return Mono.empty();
+        });
     }
 
 
@@ -229,11 +211,12 @@ public class TransfersTasksManager {
      * @return Mono<Void> 返回一個 Mono 對象
      */
     @PreDestroy
+    @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> destroy() {
         List<TransfersStatusEnum> status = new ArrayList<>();
-        status.add(TransfersStatusEnum.COMPLETED);
-        status.add(TransfersStatusEnum.FAILED);
-        return transfersTasksRepository.findAllByStatusNotIn(status).collectList().flatMap(unfinishedTasks -> {
+        status.add(TransfersStatusEnum.UPLOADING);
+        status.add(TransfersStatusEnum.DOWNLOADING);
+        return transfersTasksRepository.findAllByStatusIn(status).collectList().flatMap(unfinishedTasks -> {
             if (unfinishedTasks.isEmpty()) {
                 return Mono.empty();
             }

@@ -14,7 +14,6 @@ import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseFolderController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
@@ -53,18 +52,18 @@ public class WebFolderController extends BaseFolderController {
      * @param fileProperties            文件屬性配置，用於加載系統層級的文件屬性配置。
      * @param validationService         驗證服務，對請求參數進行校驗。
      * @param folderService             資料夾業務層服務。
-     * @param userLimiterStrategy       用戶限額策略，控制用戶的操作限制。
      * @param objectMapper              對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
      * @param folderListTreeManager     資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
      * @param filePermissionRuleManager 文件權限規則管理器，處理文件的權限規則。
      */
-    public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
+    public WebFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                @Nullable FolderListTreeManager folderListTreeManager) {
         super(userService,
               permissionService,
               fileServiceStrategy,
               fileProperties,
-              validationService, folderService, userLimiterStrategy, objectMapper, filePermissionRuleManager,
+              validationService,
+              folderService, objectMapper, filePermissionRuleManager,
               folderListTreeManager
         );
     }

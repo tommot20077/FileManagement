@@ -131,7 +131,7 @@ public class TokenServiceImpl implements TokenService {
      * @param token 實體對象
      */
     @Override
-    public Mono<Void> update(Token token) {
+    public Mono<Token> update(Token token) {
         return Mono.empty();
     }
 

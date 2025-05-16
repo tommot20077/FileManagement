@@ -77,7 +77,7 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
      * @param exchange 請求交換對象
      * @param chain    過濾器鏈對象
      *
-     * @return Mono<Void> 異步響應對象
+     * @return Mono<Void>
      */
     @NotNull
     @Override
@@ -123,9 +123,7 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
 
         return Optional
                 .ofNullable(exchange.getRequest().getRemoteAddress())
-                .map(addr -> addr.getAddress().getHostAddress())
-                .filter(this::isValidIp)
-                .orElse(null);
+                .map(addr -> addr.getAddress().getHostAddress()).filter(this::isValidIp).orElse(null);
     }
 
     /**

@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
-import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadResponseDTO;
@@ -83,12 +83,12 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
     /**
      * 編輯文件的接口
      *
-     * @param fileEditDTO 文件ID
-     * @param user        用戶信息
+     * @param fileEditBO 文件ID
+     * @param user       用戶信息
      *
      * @return 返回編輯結果
      */
-    default Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+    default Mono<Void> editFile(FileEditBO fileEditBO, User user) {
         return Mono.empty();
     }
 

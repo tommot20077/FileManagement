@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.unity;
 
 import lombok.Data;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 
 import java.time.Duration;
@@ -35,22 +36,27 @@ public class CacheConcurrentHashMap<K, V> {
     /**
      * 預設過期時間為10分鐘
      */
-    private final static Duration DEFAULT_EXPIRE_DURATION = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_EXPIRE_DURATION = Duration.ofMinutes(10);
 
     /**
      * 預設最大保留時間為10分鐘
      */
-    private final static Duration DEFAULT_REMAIN_TIME_DURATION = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_REMAIN_TIME_DURATION = Duration.ofMinutes(10);
 
     /**
      * 預設清理間隔為10分鐘
      */
-    private final static Duration DEFAULT_CLEANUP_INTERVAL = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_CLEANUP_INTERVAL = Duration.ofMinutes(10);
 
     /**
-     * 預設初始容量為1024
+     * 預設初始容量為 64
      */
-    private final static int DEFAULT_INITIAL_CAPACITY = 64;
+    private static final int DEFAULT_INITIAL_CAPACITY = 64;
+
+    /**
+     * 預設辨識的標籤為 "CacheConcurrentHashMap"
+     */
+    private static final String DEFAULT_TAG = "CacheConcurrentHashMap";
 
     /**
      * 用於存儲緩存項的HashMap
@@ -61,6 +67,13 @@ public class CacheConcurrentHashMap<K, V> {
      * 用於存儲每個鍵的鎖的ConcurrentHashMap
      */
     private final ConcurrentHashMap<K, ReentrantLock> lockMap;
+
+    /**
+     * 用於辨識的標籤
+     */
+    @Setter
+    @Getter
+    private String tag;
 
     /**
      * 緩存項的過期時間，當前時間超過此時間，則該緩存項將被視為過期
@@ -159,7 +172,8 @@ public class CacheConcurrentHashMap<K, V> {
                 Thread t = new Thread(r, "CacheCleanerThread");
                 t.setDaemon(true);
                 return t;
-            });
+            }
+            );
             scheduleCleanupTask(cleanupInterval);
         }
     }
@@ -420,6 +434,22 @@ public class CacheConcurrentHashMap<K, V> {
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
+     * 此為重寫方法，使用預設的過期時間。
+     *
+     * @param key             鍵
+     * @param initValue       初始化值（當鍵不存在或過期時使用）
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresentOrDefault(K key, V initValue, BiFunction<? super K, ? super V, V> computeFunction) {
+        return computeIfPresentOrDefault(key, initValue, expireTime, computeFunction);
+    }
+
+
+    /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
      * 使用細粒度鎖確保操作的原子性。
      *
      * @param key             鍵
@@ -431,7 +461,7 @@ public class CacheConcurrentHashMap<K, V> {
      *
      * @throws IllegalArgumentException 如果鍵為 null 或過期時間無效
      */
-    public V computeIfPresentOrInit(K key, V initValue, Duration expire, BiFunction<K, V, V> computeFunction) {
+    public V computeIfPresentOrDefault(K key, V initValue, Duration expire, BiFunction<? super K, ? super V, V> computeFunction) {
         if (key == null) {
             throw new IllegalArgumentException("鍵不能為null");
         }
@@ -462,11 +492,57 @@ public class CacheConcurrentHashMap<K, V> {
 
 
     /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
+     * 此為重寫方法，使用預設的過期時間。
+     *
+     * @param key             鍵
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, V> computeFunction) {
+        return computeIfPresent(key, expireTime, computeFunction);
+    }
+
+
+    /**
+     * 原子性地對指定鍵的緩存值進行計算或初始化。
+     * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
+     *
+     * @param key             鍵
+     * @param expire          過期時間
+     * @param computeFunction 計算函數，接受當前值和鍵，返回新值
+     *
+     * @return 更新後的緩存值
+     */
+    public V computeIfPresent(K key, Duration expire, BiFunction<? super K, ? super V, V> computeFunction) {
+        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            CacheInfo<V> cacheInfo = cacheMap.get(key);
+            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
+                cacheMap.remove(key);
+                return null;
+            }
+            V newValue = computeFunction.apply(key, cacheInfo.getValue());
+            long expireTimeMillis = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            cacheMap.put(key, new CacheInfo<>(newValue, expireTimeMillis));
+            return newValue;
+        } finally {
+            lock.unlock();
+            cleanupLock(key, lock);
+        }
+
+    }
+
+
+    /**
      * 刪除緩存項
      *
      * @param key 鍵
      */
-    public void remove(K key) {
+    public void remove(@NonNull K key) {
         ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
         lock.lock();
         try {
@@ -550,7 +626,7 @@ public class CacheConcurrentHashMap<K, V> {
      */
     public Runnable getCleanupTask() {
         return () -> {
-            LogUnity.debug(null, "清理過期緩存資料");
+            LogUnity.debug("%s: 清理過期緩存資料", tag);
             synchronized (cacheMap) {
                 long currentTime = System.currentTimeMillis();
                 Set<K> expiredKeys = cacheMap
@@ -576,6 +652,7 @@ public class CacheConcurrentHashMap<K, V> {
      * 將清除所有緩存項，並關閉ScheduledExecutorService
      */
     public void destroy() {
+        LogUnity.info("%s: 銷毀緩存表資料", this.tag);
         synchronized (cacheMap) {
             cacheMap.clear();
         }

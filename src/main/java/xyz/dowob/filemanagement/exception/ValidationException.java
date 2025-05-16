@@ -210,9 +210,9 @@ public class ValidationException extends Exception {
         /**
          * 錯誤碼: 1126
          * HTTP狀態碼: 400
-         * 錯誤信息: WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議與JWT憑證
+         * 錯誤信息: WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議
          */
-        WEBSOCKET_PROTOCOL_ERROR(1126, HttpStatus.UNAUTHORIZED, "WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議和JWT憑證"),
+        WEBSOCKET_PROTOCOL_ERROR(1126, HttpStatus.UNAUTHORIZED, "WebSocket協議錯誤，請檢查是否包含Sec-WebSocket-Protocol協議"),
 
         /**
          * 錯誤碼: 1127
@@ -395,6 +395,14 @@ public class ValidationException extends Exception {
          * 錯誤信息: IP 地址已被禁止訪問
          */
         ALREADY_BAN_IP(1152, HttpStatus.FORBIDDEN, "此 IP 地址已被暫時禁止訪問"),
+
+
+        /**
+         * 錯誤碼: 1153
+         * HTTP狀態碼: 400
+         * 錯誤信息: 檔案包含病毒，已經被刪除
+         */
+        FILE_VIRUS_DETECTED(1153, HttpStatus.BAD_REQUEST, "檔案包含病毒，任務ID: %s"),
         ;
 
 
@@ -436,6 +444,25 @@ public class ValidationException extends Exception {
             this.code = code;
             this.httpStatus = HttpStatus.BAD_REQUEST;
             this.message = message;
+        }
+
+
+        /**
+         * 根據錯誤名稱獲取錯誤碼，此方法不區分大小寫以及拋出異常
+         * 當前查詢的錯誤名稱不在錯誤碼中時，返回null
+         *
+         * @param errorName 錯誤名稱
+         *
+         * @return 錯誤信息
+         */
+        public static ErrorCode fromName(String errorName) {
+            String upperCaseErrorName = errorName.toUpperCase();
+            for (ErrorCode errorCode : ErrorCode.values()) {
+                if (errorCode.name().equals(upperCaseErrorName)) {
+                    return errorCode;
+                }
+            }
+            return null;
         }
     }
 }

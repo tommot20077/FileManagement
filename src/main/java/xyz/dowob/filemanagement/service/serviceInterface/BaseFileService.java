@@ -2,10 +2,10 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileVersionDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 

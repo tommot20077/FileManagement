@@ -32,7 +32,7 @@ public class FileServiceStrategy {
      * 構造方法，用於注入所有的檔案處理方法
      * 會根據該類型的 FileHandlerType 注解來將對應的檔案處理方法存儲到 fileStrategies 中
      *
-     * @param fileServices 檔案處理方法
+     * @param fileServices 檔案處理方法列表
      */
     public FileServiceStrategy(List<FileService> fileServices) {
         fileStrategies = new EnumMap<>(FileEnum.class);
@@ -68,6 +68,7 @@ public class FileServiceStrategy {
      * @param fileEnum 檔案類型
      *
      * @return 返回對應的檔案處理方法
+     * @throws IllegalArgumentException 當找不到對應的檔案處理方法時拋出
      */
     public FileService getFileService(FileEnum fileEnum) {
         if (fileEnum != null) {

@@ -21,15 +21,16 @@ public class OpenApiConfig {
     /**
      * 配置Swagger的OpenApi設置
      *
-     * @return OpenAPI
+     * @return OpenAPI OpenAPI對象
      */
     @Bean
     public OpenAPI customOpenApi() {
-        return new OpenAPI().info(new Info()
-                                          .title("用戶檔案管理系統").version("1.0.0")
-                                          .description("用戶檔案管理系統 相關API")
-                                          .termsOfService("http://swagger.io/terms/")
-                                          .license(new License().name("Apache 2.0").url("http://springdoc.org")));
+        Info info = new Info()
+                .title("用戶檔案管理系統")
+                .version("1.0.0")
+                .description("用戶檔案管理系統 相關API")
+                .termsOfService("http://swagger.io/terms/")
+                .license(new License().name("Apache 2.0").url("http://springdoc.org"));
+        return new OpenAPI().info(info);
     }
-
 }

@@ -66,6 +66,11 @@ public class UserFileDataBO {
     private FileEnum fileType;
 
     /**
+     * 文件的MIME類型
+     */
+    private String mimeType;
+
+    /**
      * 文件大小
      */
     private Long fileSize;
@@ -138,7 +143,8 @@ public class UserFileDataBO {
         this.userId = userFileMetadata.getUserId();
         this.filename = userFileMetadata.getFilename();
         this.parentFolderId = userFileMetadata.getParentFolderId();
-        this.fileType = serverFileMetadata.getFileType();
+        this.fileType = userFileMetadata.getFileType();
+        this.mimeType = serverFileMetadata.getMimeType();
         this.fileSize = serverFileMetadata.getFileSize();
         this.lastAccessTime = userFileMetadata.getLastAccessTime();
         this.uploadTime = userFileMetadata.getUploadTime();

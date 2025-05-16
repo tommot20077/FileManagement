@@ -18,5 +18,6 @@
  * 16. UserFileListOrderEnum: 用於定義用戶文件列表排序類型 {@link xyz.dowob.filemanagement.customenum.UserFileListOrderEnum}
  * 17. UserInfoTypeEnum: 用於定義用戶信息類型 {@link xyz.dowob.filemanagement.customenum.UserInfoTypeEnum}
  * 18. UserLimiterEnum: 用於定義用戶限流器類型 {@link xyz.dowob.filemanagement.customenum.UserLimiterEnum}
+ * 19. WebsocketResponseType: 用於定義 WebSocket 回應類型 {@link xyz.dowob.filemanagement.customenum.WebsocketResponseType}
  */
 package xyz.dowob.filemanagement.customenum;

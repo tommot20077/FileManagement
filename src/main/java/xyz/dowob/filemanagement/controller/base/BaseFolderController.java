@@ -13,11 +13,11 @@ import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.manager.FolderListTreeManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -68,12 +68,11 @@ public abstract class BaseFolderController extends BaseFileController {
      * @param fileProperties            文件屬性配置，用於加載系統層級的文件屬性配置。
      * @param validationService         驗證服務，對請求參數進行校驗。
      * @param folderService             資料夾業務層服務。
-     * @param userLimiterStrategy       用戶限額策略，控制用戶的操作限制。
      * @param objectMapper              對象映射工具，用於將 Java 對象與 JSON 之間進行轉換。
      * @param folderListTreeManager     資料夾樹管理器，處理資料夾樹狀結構的初始化和管理。
      * @param filePermissionRuleManager 文件權限規則管理器，處理文件的權限規則。
      */
-    public BaseFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
+    public BaseFolderController(UserService userService, PermissionService<UserFileMetadata> permissionService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, FolderService folderService, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager,
                                 @Nullable FolderListTreeManager folderListTreeManager) {
         super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
         this.folderListTreeManager = folderListTreeManager;
@@ -98,7 +97,7 @@ public abstract class BaseFolderController extends BaseFileController {
                 .flatMap(user -> permissionService
                         .validateUserPermission(user, Long.parseLong(id), rules)
                         .flatMap(file -> validationService.validateFileType(file, FileEnum.FOLDER).then(folderService.deleteFolder(file, user)))
-                        .then(createResponseEntity(createResponse(exchange, "刪除資料夾成功", null))));
+                        .then(createResponseEntity(createApiResponse(exchange, "刪除資料夾成功", null))));
         return handleError(result, exchange);
     }
 
@@ -126,15 +125,16 @@ public abstract class BaseFolderController extends BaseFileController {
                             .validateUserPermission(user, fileMetadataMap.keySet())
                             .doOnNext(file -> fileMetadataMap.put(file.getId(), file))
                             .then(Mono.defer(() -> {
-                                fileEditDTO.setUserFileMetadata(fileMetadataMap.get(Long.parseLong(fileEditDTO.getFileId())));
-                                fileEditDTO.setParentFolderFileMetadata(fileMetadataMap.get(fileEditDTO.getParentFolderId()));
+                                FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
+                                fileEditBO.setUserFileMetadata(fileMetadataMap.get(Long.parseLong(fileEditDTO.getFileId())));
+                                fileEditBO.setParentFolderFileMetadata(fileMetadataMap.get(fileEditDTO.getParentFolderId()));
                                 return validationService
-                                        .validateFileType(fileEditDTO.getUserFileMetadata(), FileEnum.FOLDER)
-                                        .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(), FileEnum.FOLDER))
-                                        .then(folderService.editFolder(fileEditDTO, user));
+                                        .validateFileType(fileEditBO.getUserFileMetadata(), FileEnum.FOLDER)
+                                        .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
+                                        .then(folderService.editFolder(fileEditBO, user));
                             }));
                 })
-                .then(createResponseEntity(createResponse(exchange, "資料夾更新成功", null)));
+                .then(createResponseEntity(createApiResponse(exchange, "資料夾更新成功", null)));
         return handleError(responseEntityMono, exchange);
     }
 
@@ -158,7 +158,7 @@ public abstract class BaseFolderController extends BaseFileController {
             }
             return parentFolderMono
                     .then(folderService.createFolder(fileEditDTO, user))
-                    .then(createResponseEntity(createResponse(exchange, "資料夾建立成功", null)));
+                    .then(createResponseEntity(createApiResponse(exchange, "資料夾建立成功", null)));
         }), exchange);
     }
 
@@ -182,7 +182,7 @@ public abstract class BaseFolderController extends BaseFileController {
                                 result.put("filePaths", list);
                                 return Mono.just(result);
                             })));
-        }).flatMap(result -> createResponseEntity(createResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
+        }).flatMap(result -> createResponseEntity(createApiResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
     }
 
 
@@ -196,12 +196,12 @@ public abstract class BaseFolderController extends BaseFileController {
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
             if (!fileProperties.getGlobal().getEnableUserFolderListTree()) {
-                return createResponseEntity(createResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
+                return createResponseEntity(createApiResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
             }
             if (folderListTreeManager != null) {
                 CompletableFuture.runAsync(() -> folderListTreeManager.initializeTree(user.getId()));
             }
-            return (createResponseEntity(createResponse(exchange, "請求建立用戶檔案樹成功", null)));
+            return (createResponseEntity(createApiResponse(exchange, "請求建立用戶檔案樹成功", null)));
         }), exchange);
     }
 

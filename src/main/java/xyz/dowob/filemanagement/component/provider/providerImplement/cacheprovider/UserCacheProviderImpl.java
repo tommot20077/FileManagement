@@ -54,6 +54,7 @@ public class UserCacheProviderImpl implements CacheProvider {
      * 用戶緩存提供者實現類的構造方法
      *
      * @param redisProvider Redis操作提供者
+     * @param cacheProperties 緩存配置
      */
     public UserCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         Assert.isTrue(cacheProperties.getUserInfoCacheExpireTime().isPositive(), "用戶資訊緩存過期時間必須大於0");

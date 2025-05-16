@@ -6,24 +6,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.function.Tuples;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.PermissionEnum;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ValidationException;
-import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
+import xyz.dowob.filemanagement.unity.LogUnity;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
 import java.util.HashMap;
@@ -32,6 +37,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 文件上傳 WebSocket 處理器，用於處理文件上傳任務
@@ -79,21 +85,13 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      */
     private final ValidationService validationService;
 
-    /**
-     * 用戶服務
-     */
-    private final UserService userService;
 
     /**
      * 清除未活躍的 WebSocket 會話
      */
     public static void clearInactiveSession() {
         try (ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor()) {
-            service.scheduleAtFixedRate(() -> USER_SESSION_MAP.entrySet().removeIf(entry -> !entry.getValue().isOpen()),
-                                        5,
-                                        5,
-                                        java.util.concurrent.TimeUnit.MINUTES
-            );
+            service.scheduleAtFixedRate(() -> USER_SESSION_MAP.entrySet().removeIf(entry -> !entry.getValue().isOpen()), 5, 5, TimeUnit.MINUTES);
         }
     }
 
@@ -109,26 +107,43 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     @Override
     public Mono<Void> handle(@NonNull WebSocketSession session) {
         CustomWebSocketSession customSession = (CustomWebSocketSession) session;
-        return session.receive().flatMap(webSocketMessage -> {
-            try {
-                JsonNode jsonNode = objectMapper.readTree(webSocketMessage.getPayloadAsText());
-                Long userId = Long.parseLong(customSession.getUserId());
-                String type = convertJsonToObject(jsonNode.get("type"),
-                                                  String.class
-                ).orElseThrow(() -> new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "type"));
-                USER_SESSION_MAP.put(userId, customSession);
-                return switch (type) {
-                    case "initialUpload" -> handleInitialUpload(userId, customSession, jsonNode);
-                    case "bufferUpload" -> handleBufferUpload(customSession, jsonNode);
-                    default -> {
-                        ApiResponseDTO<?> response = createResponse(customSession.getHandshakeInfo().getUri().getPath(), 400, "未知的請求類型", null);
-                        yield sendMessage(customSession, response);
+        LogUnity.info(customSession, "WebSocket連接成功，session: %s", customSession.getAttributes());
+        return session
+                .receive()
+                .flatMap(webSocketMessage -> Mono.fromCallable(() -> {
+                    JsonNode jsonNode = objectMapper.readTree(webSocketMessage.getPayloadAsText());
+                    User user = customSession.getUser();
+                    if (user == null || !user.getRole().hasPermissions(PermissionEnum.UPLOAD)) {
+                        throw new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED);
                     }
-                };
-            } catch (JsonProcessingException | ValidationException e) {
-                return Mono.error(e);
-            }
-        }).then();
+
+                    String type = convertJsonToObject(jsonNode.get("type"),
+                                                      String.class
+                    ).orElseThrow(() -> new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "type"));
+                    USER_SESSION_MAP.put(user.getId(), customSession);
+                    return Tuples.of(user, type, jsonNode);
+                }).onErrorMap(JsonProcessingException.class, e -> new ValidationException(ValidationException.ErrorCode.INVALID_JSON_CONTENT, e)))
+                .flatMap(tuple3 -> {
+                    return switch (tuple3.getT2()) {
+                        case "initialUpload" -> handleInitialUpload(tuple3.getT1(), customSession, tuple3.getT3());
+                        case "bufferUpload" -> handleBufferUpload(customSession, tuple3.getT3());
+                        default -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "type"));
+                    };
+                })
+                .onErrorContinue((e, o) -> {
+                    CloseStatus closeStatus;
+                    ApiResponseDTO<?> response;
+                    if (e instanceof ValidationException validation) {
+                        response = createApiResponse(customSession, validation.getErrorCode().getCode(), validation.getMessage(), null);
+                        closeStatus = CloseStatus.NORMAL.withReason("終止當前連線");
+                    } else {
+                        response = createApiResponse(customSession, 500, "伺服器內部錯誤", null);
+                        closeStatus = CloseStatus.SERVER_ERROR.withReason("伺服器內部錯誤");
+                    }
+                    sendMessage(customSession, response).then(customSession.close(closeStatus)).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                })
+                .doFinally(signal -> removeSession(customSession.getUser().getId().toString()).subscribeOn(Schedulers.boundedElastic()).subscribe())
+                .then();
     }
 
 
@@ -139,48 +154,47 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * 沒有則建立上傳任務並返回初始化成功的響應
      * 若中途發生錯誤，則返回錯誤響應
      *
-     * @param userId   用戶 ID
+     * @param user     用戶
      * @param session  WebSocket 會話
      * @param jsonNode JSON 資料
      *
      * @return Mono<Void>
      */
-    private Mono<Void> handleInitialUpload(Long userId, WebSocketSession session, JsonNode jsonNode) {
-        Optional<FileMetadataDTO> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadataDTO.class);
-        return fileMetadataOptional
-                .map(fileMetadata -> userService
-                        .getById(userId)
-                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, userId.toString())))
-                        .flatMap(user -> {
-                            UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-                            if (!userLimiter.tryAcquire(user.getId())) {
-                                return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                                          UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                                ));
+    private Mono<Void> handleInitialUpload(User user, WebSocketSession session, JsonNode jsonNode) {
+        return Mono.defer(() -> {
+            LogUnity.info(session, "用戶 %s 嘗試上傳文件，獲取上傳任務的憑證", user.getId());
+            Optional<FileMetadataDTO> fileMetadataOptional = convertJsonToObject(jsonNode.get("data"), FileMetadataDTO.class);
+            if (fileMetadataOptional.isEmpty()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data"));
+            }
+            FileMetadataDTO fileMetadata = fileMetadataOptional.get();
+            UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
+            return userLimiter.tryAcquire(user.getId()).flatMap(acquired -> {
+                LogUnity.info(session, "用戶 %s 嘗試上傳文件，獲取上傳任務的憑證: %s", user.getId(), acquired);
+                if (!acquired) {
+                    return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                              UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                    ));
+                }
+                return validationService
+                        .validateFileMetadataDTO(fileMetadata, user)
+                        .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
+                        .flatMap(transferResponseDTO -> {
+                            ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
+                            if (transferResponseDTO.getIsFinished()) {
+                                response.setMessage("上傳任務完成");
+                            } else {
+                                response.setMessage("初始化上傳任務成功");
                             }
-                            return validationService
-                                    .validateFileMetadataDTO(fileMetadata, user)
-                                    .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
-                                    .flatMap(transferResponseDTO -> {
-                                        ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(),
-                                                                                    null,
-                                                                                    transferResponseDTO
-                                        );
-                                        if (transferResponseDTO.getIsFinished()) {
-                                            response.setMessage("上傳任務完成");
-                                        } else {
-                                            response.setMessage("初始化上傳任務成功");
-                                        }
-                                        return sendMessage(session, response);
-                                    })
-                                    .doFinally(signalType -> userLimiter.release(user.getId()));
-                        }))
-                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
-                .onErrorResume(ValidationException.class, e -> {
-                    String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
-                    int responseCode = e.getErrorCode().getCode();
-                    return sendMessage(session, createResponse(session.getHandshakeInfo().getUri().getPath(), responseCode, errorMessage, null));
-                });
+                            return sendMessage(session, response);
+                        })
+                        .doFinally(signalType -> userLimiter.release(user.getId()).subscribeOn(Schedulers.boundedElastic()).subscribe());
+            });
+        }).onErrorResume(ValidationException.class, e -> {
+            String errorMessage = String.format("建立上傳任務失敗: %s", e.getMessage());
+            int responseCode = e.getErrorCode().getCode();
+            return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), responseCode, errorMessage, null));
+        });
     }
 
 
@@ -192,7 +206,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @param clazz 類型
      * @param <T>   類型
      *
-     * @return Optional<T>
+     * @return Optional<T> 轉換後的 Optional 物件
      */
     @SkipRecord
     private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
@@ -244,6 +258,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * 傳送訊息給所有連線的用戶
      *
      * @param message 訊息內容
+     *
+     * @return Mono<Void>
      */
     public Mono<Void> broadcast(Object message) {
         return Flux.fromIterable(USER_SESSION_MAP.values()).filter(WebSocketSession::isOpen).flatMap(session -> sendMessage(session, message)).then();
@@ -254,6 +270,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * 移除用戶 ID 對應的 WebSocket 會話
      *
      * @param userId 用戶 ID
+     *
+     * @return Mono<Void>
      */
     public Mono<Void> removeSession(String userId) {
         WebSocketSession session = USER_SESSION_MAP.remove(Long.parseLong(userId));
@@ -274,7 +292,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
         return uploadChunkDTO
                 .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
+                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
                     String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
                     response.setMessage(message);
                     return sendMessage(session, response);
@@ -282,7 +300,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                 .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
                 .onErrorResume(Exception.class, e -> {
                     String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
-                    return sendMessage(session, createResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
+                    return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
                 });
     }
 
@@ -294,7 +312,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
      * @param clazz 類型
      * @param <T>   類型
      *
-     * @return Optional<T>
+     * @return Optional<T> 轉換後的 Optional 物件
      */
     @SkipRecord
     private <T> Optional<T> convertJsonToObject(String json, Class<T> clazz) {
@@ -309,7 +327,7 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     /**
      * 初始化參數名稱
      *
-     * @return Map<String, Class < ?>>
+     * @return Map<String, Class < ?>> 參數名稱與類型的映射
      */
     @SkipRecord
     private Map<String, Class<?>> initParameterNames() {

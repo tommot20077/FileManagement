@@ -183,7 +183,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
             if (taskQueueSize > workQueueCapacity * HIGH_TASK_THRESHOLD && remainingSystemThreads > 2) {
                 int newPoolSize = Math.min(maxPoolSize, currentPoolSize + 1);
                 String percentage = String.format("%.2f", queueLoadRatio * 100);
-                LogUnity.info(null, "當前任務隊列負載較高 ( %s %%)，增加線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
+                LogUnity.info("當前任務隊列負載較高 ( %s %%)，增加線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
@@ -192,7 +192,7 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
             if (taskQueueSize < workQueueCapacity * LOW_TASK_THRESHOLD && currentPoolSize > minPoolSize) {
                 int newPoolSize = Math.max(currentPoolSize - 1, minPoolSize);
                 String percentage = String.format("%.2f", queueLoadRatio * 100);
-                LogUnity.info(null, "當前任務隊列負載較低 ( %s%%)，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
+                LogUnity.info("當前任務隊列負載較低 ( %s%%)，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
@@ -202,14 +202,14 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
                 int newPoolSize = Math.max(currentPoolSize - 1, minPoolSize);
 
                 String format = "當前系統資源緊張，剩餘可用線程數: %s，減少線程池大小: " + currentPoolSize + " -> " + newPoolSize;
-                LogUnity.warn(null, format, remainingSystemThreads);
+                LogUnity.warn(format, remainingSystemThreads);
                 setCorePoolSize(newPoolSize);
                 setMaximumPoolSize(newPoolSize);
                 return;
             }
 
             if (taskQueueSize == 0 && activeThreads == 0) {
-                LogUnity.debug(null, "當前任務隊列為空，且沒有任務在執行，將線程池大小調整為 0");
+                LogUnity.debug("當前任務隊列為空，且沒有任務在執行，將線程池大小調整為 0");
                 setCorePoolSize(0);
                 setMaximumPoolSize(minPoolSize);
             }

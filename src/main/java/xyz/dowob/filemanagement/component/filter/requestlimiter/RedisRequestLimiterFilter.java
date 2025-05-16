@@ -170,7 +170,7 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
      * @param exchange 請求交換對象
      * @param chain    過濾器鏈對象
      *
-     * @return Mono<Void> 異步處理請求
+     * @return Mono<Void>
      */
     @NotNull
     @Override

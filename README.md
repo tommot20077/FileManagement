@@ -69,6 +69,7 @@
 
 - **多重驗證模式**：支援 JWT、Cookies 等身份驗證方式。
 - **端口防護機制**：透過 CSRF 憑證、CORS、HSTS 等手段加強系統安全性。
+- **檔案上傳安全性**：檔案上傳後，系統會對檔案進行病毒掃描，確保檔案安全。
 - **OpenAPI 3.0 規範**：確保 API 安全性與一致性，並提供 Swagger UI 可視化管理。
 
 #### 10. 容器化部署與自動化 CI/CD
@@ -88,7 +89,7 @@
 
 - **自定義線程池**，根據系統負載自適應調整，提高任務處理效率。
 - **RESTful API 設計**：統一 API 規範，提升前端開發效率。
-- **提供大量可配置參數**，如檔案大小限制、上傳數量限制、快取時間等，讓用戶可根據需求進行調整。
+- **提供大量可配置參數**，如檔案大小限制、上傳數量限制、快取時間等，可根據需求進行調整。
 
 ---
 
@@ -112,7 +113,7 @@
     - `application.yml`：設定應用程式的基本參數，如資料庫連線、快取設定等。 (
       更詳細的設定請參考 [範例設定檔案](https://github.com/tommot20077/FileManagement/blob/develop/src/main/resources/application-demo.yml))
     - 各資料庫的設定檔案。(如果在其他設定有進行更改這邊也需要同步處理)
-4. 需要用戶手動配置的參數為
+4. 需要手動配置的參數為
     - `application.yml` 中的
         - `spring.datasource.password`
         - `spring.data.mongodb.url`
@@ -138,7 +139,7 @@
 
 6. 補充:
     - 如果需要安裝前端頁面的話可以將 `docker-compose.yml` 中的 `frontend`
-      註釋移除，並下載前端 [Dockerfile](https://github.com/tommot20077/FileManagementWeb/blob/master/docker/Dockerfile)
+      註釋移除，並下載前端 [Dockerfile](https://github.com/tommot20077/FileManagementWeb/blob/master/docker/Dockerfile-front)
       放入當前目錄下，然後執行以下指令
         ```bash
         docker-compose up -d filemanager_front

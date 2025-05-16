@@ -29,6 +29,11 @@ public class GlobalProperties {
      */
     private forwarded forwarded = new forwarded();
 
+    /**
+     * Netty 線程池設定
+     */
+    private NettyPool nettyPool = new NettyPool();
+
     @Data
     public static class RequestLimiter {
         /**
@@ -114,13 +119,36 @@ public class GlobalProperties {
     @Data
     public static class forwarded {
         /**
-         * 轉發的 IP 的請求頭名稱
+         * 轉發的 IP 的請求頭名稱，預設為 X-Forwarded-For
          */
         private String xForwardedHeader = "X-Forwarded-For";
 
         /**
-         * 真實的 IP 的請求頭名稱
+         * 真實的 IP 的請求頭名稱，預設為 X-Real-IP
          */
         private String xRealIpHeader = "X-Real-IP";
+    }
+
+    @Data
+    public static class NettyPool {
+        /**
+         * Netty 最長閒置時間，預設為 1 分鐘
+         */
+        private Duration maxIdleTime = Duration.ofMinutes(1);
+
+        /**
+         * Netty 最長生命週期，預設為 1 小時
+         */
+        private Duration maxLifeTime = Duration.ofHours(1);
+
+        /**
+         * Netty 的請求最大併發數量，預設為 10
+         */
+        private int maxConnections = 10;
+
+        /**
+         * Netty 的請求佇列的最長等待時間，預設為 30 秒
+         */
+        private Duration pendingAcquireTimeout = Duration.ofSeconds(30);
     }
 }

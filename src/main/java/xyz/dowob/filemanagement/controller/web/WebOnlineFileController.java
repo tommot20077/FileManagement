@@ -10,12 +10,13 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.component.event.EventSink;
 import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
-import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.controller.base.BaseOnlineFileController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.data.event.FileEditedMessage;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -46,19 +47,18 @@ public class WebOnlineFileController extends BaseOnlineFileController {
      * @param fileProperties            文件屬性設置
      * @param validationService         驗證服務對象
      * @param permissionService         用戶文件元數據授權服務
-     * @param userLimiterStrategy       用戶限制策略
      * @param objectMapper              用於處理對象映射的工具
      * @param filePermissionRuleManager 文件權限規則管理器
+     * @param eventSink             文件事件發送器
      */
-    public WebOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
+    public WebOnlineFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager, EventSink<FileEditedMessage> eventSink) {
         super(userService,
               fileServiceStrategy,
               fileProperties,
               validationService,
               permissionService,
-              userLimiterStrategy,
               objectMapper,
-              filePermissionRuleManager
+              filePermissionRuleManager, eventSink
         );
     }
 

@@ -90,7 +90,8 @@ public class ValidationServiceImpl implements ValidationService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
-        return validateNotNull(fileMetadataDTO).then(validFileName(fileMetadataDTO.getFilename(), false))
+        return validateNotNull(fileMetadataDTO)
+                .then(validFileName(fileMetadataDTO.getFilename(), false))
                 .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
     }
 
@@ -104,12 +105,15 @@ public class ValidationServiceImpl implements ValidationService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateEditFileDTO(FileEditDTO fileEditDTO, boolean isFolder) {
-        return validateNotNull(fileEditDTO).then(Mono.defer(() -> switch (fileEditDTO.getEditType()) {
-            case EDIT_METADATA -> validFileName(fileEditDTO.getFilename(), isFolder);
-            case EDIT_CONTENT -> validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容");
-            case BUILD_HISTORY_RECORD ->
-                    validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(), 1000, "備註"));
-            case REVERT_HISTORY_RECORD, DELETE_HISTORY_RECORD -> Mono.empty();
+        return validateNotNull(fileEditDTO).then(Mono.defer(() -> {
+            return switch (fileEditDTO.getEditType()) {
+                case EDIT_METADATA -> validFileName(fileEditDTO.getFilename(), isFolder);
+                case EDIT_CONTENT -> validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容");
+                case BUILD_HISTORY_RECORD ->
+                        validLength(fileEditDTO.getContent(), Math.pow(2, 20), "檔案內容").then(validLength(fileEditDTO.getNote(), 1000, "備註"));
+                case REVERT_HISTORY_RECORD, DELETE_HISTORY_RECORD -> Mono.empty();
+                case null -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "editType"));
+            };
         }));
     }
 

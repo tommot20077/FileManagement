@@ -15,11 +15,13 @@ import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDAO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.entity.FileTrashRecord;
+import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileShareRecord;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 用戶檔案元數據操作介面，使用Spring Data R2DBC來操作數據庫，繼承ReactiveCrudRepository。
@@ -53,6 +55,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      */
     Flux<UserFileMetadata> findAllByUserIdAndIsDeleted(Long userId, Boolean isDeleted);
 
+
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
      *
@@ -66,6 +69,64 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         return entityOperations.select(UserFileMetadata.class).matching(org.springframework.data.relational.core.query.Query.query(criteria)).all();
     }
 
+
+    /**
+     * 查詢指定的父文件夾ID下的所有檔案元數據，並根據用戶ID和共享類型進行過濾
+     * 最終僅返回用戶有權限訪問的檔案元數據
+     *
+     * @param parentFolderId   父文件夾ID
+     * @param user             用戶
+     * @param entityOperations R2dbc實體操作
+     *
+     * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
+     */
+    default Flux<UserFileMetadata> findAllByParentFolderIdWithShare(Long parentFolderId, User user, R2dbcEntityOperations entityOperations) {
+        List<UserFileMetadata> allowFiles = new ArrayList<>();
+
+        Criteria criteria = Criteria.where("parent_folder_id").is(parentFolderId).and("is_deleted").is(false);
+        Mono<UserFileMetadata> folderMono = findById(parentFolderId.toString());
+        Mono<List<UserFileMetadata>> childFileList = entityOperations
+                .select(UserFileMetadata.class)
+                .matching(org.springframework.data.relational.core.query.Query.query(criteria))
+                .all()
+                .collectList();
+
+        return childFileList.flatMapMany(filesList -> {
+            Set<Long> allFileIdSet = filesList.stream().map(UserFileMetadata::getId).collect(Collectors.toSet());
+            allFileIdSet.add(parentFolderId);
+            Criteria shareCriteria = Criteria.where("user_id").is(user.getId()).and("file_id").in(allFileIdSet);
+
+            Mono<Map<Long, UserFileShareRecord>> shareRecords = entityOperations
+                    .select(UserFileShareRecord.class)
+                    .matching(org.springframework.data.relational.core.query.Query.query(shareCriteria))
+                    .all()
+                    .collectMap(UserFileShareRecord::getFileId);
+
+
+            return Mono.zip(folderMono, shareRecords).flatMapMany(tuple2 -> {
+                UserFileMetadata folder = tuple2.getT1();
+                Map<Long, UserFileShareRecord> shareRecordMap = tuple2.getT2();
+
+                filesList.forEach(file -> {
+                    if (file.getFileType() == FileEnum.FOLDER || Objects.equals(file.getUserId(), user.getId())) {
+                        allowFiles.add(file);
+                        return;
+                    }
+
+                    if (file.getShareType() == FileShareTypeEnum.PUBLIC) {
+                        allowFiles.add(file);
+                    } else if (file.getShareType() != FileShareTypeEnum.NONE) {
+                        if (shareRecordMap.get(file.getId()) != null) {
+                            allowFiles.add(file);
+                        } else if (file.getShareType() == FileShareTypeEnum.DEFAULT && shareRecordMap.get(folder.getId()) != null) {
+                            allowFiles.add(file);
+                        }
+                    }
+                });
+                return Flux.fromIterable(allowFiles);
+            });
+        });
+    }
 
     /**
      * 根據用戶ID和父文件夾ID查詢檔案元數據並可指定是否需要顯示刪除檔案，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
@@ -98,6 +159,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     @Query("SELECT * FROM user_file_metadata WHERE user_id = :userId AND parent_folder_id IS NULL AND is_deleted = 0")
     Flux<UserFileMetadata> findAllByUserIdAndParentFolderIdIsNull(@Param("userId") Long userId);
 
+
     /**
      * 查詢所有星標檔案
      *
@@ -108,6 +170,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
      * @return Flux<UserFileMetadata> 返回所有星標檔案元數據
      */
     Flux<UserFileMetadata> findAllByUserIdAndIsStarAndIsDeleted(Long userId, Boolean isStar, Boolean isDeleted);
+
 
     /**
      * 根據用戶ID和最後訪問時間查詢檔案元數據
@@ -207,7 +270,7 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                     if (fileIds.isEmpty()) {
                         return Flux.empty();
                     }
-                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.PRIVATE);
+                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.NONE);
                     return r2dbcEntityOperations
                             .select(UserFileMetadata.class)
                             .matching(org.springframework.data.relational.core.query.Query.query(criteria))

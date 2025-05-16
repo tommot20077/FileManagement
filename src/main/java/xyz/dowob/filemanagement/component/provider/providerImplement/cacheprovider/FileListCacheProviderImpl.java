@@ -11,6 +11,7 @@ import xyz.dowob.filemanagement.component.provider.providerInterface.CacheProvid
 import xyz.dowob.filemanagement.config.properties.CacheProperties;
 import xyz.dowob.filemanagement.customenum.CacheProviderEnum;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.time.Duration;
 import java.util.*;
@@ -60,7 +61,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<List < T>>
+     * @return Mono<List < T>> 返回緩存的列表
      */
     @Override
     public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
@@ -75,7 +76,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
      * @param clazz 值的類型
      * @param <T>   泛型類型
      *
-     * @return Mono<Map < String, List < T>>>
+     * @return Mono<Map < String, List < T>>> 返回緩存的 Map
      */
     public <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
         HashMap<String, List<T>> map = new HashMap<>();
@@ -137,6 +138,7 @@ public class FileListCacheProviderImpl implements CacheProvider {
      */
     @Override
     public Mono<Void> delete(String key) {
+        LogUnity.warn("刪除緩存鍵: " + key);
         return redisProvider.deleteList(key);
     }
 

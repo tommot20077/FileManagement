@@ -103,6 +103,7 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
      * 此方法用於重置密碼憑證，當用戶重置密碼後刪除憑證
      *
      * @param userId 用戶ID
+     * @return Mono<Void>
      */
     @Override
     public Mono<Void> revokeToken(Long userId) {

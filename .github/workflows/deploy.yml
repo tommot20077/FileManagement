@@ -77,72 +77,72 @@ jobs:
           echo "::group::後端部署進度"
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             set -e
-
+          
             # 顯示部署信息
             echo "部署信息:"
             echo "  - 時間: $(date)"
             echo "  - 分支: ${GITHUB_REF##*/}"
             echo "  - 提交: ${GITHUB_SHA}"
-
+          
             # 進入專案目錄
             cd /root/dev/FileManager
             echo "更新到最新代碼"
-
+          
             # 拉取最新代碼確保獲取所有遠端變更
             git fetch --all
-
+          
             # 強制同步到遠端分支
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
-
+          
             # 添加權限
             chmod +x ./mvnw
-
+          
             # 使用 Maven 構建 JAR (使用 OpenJDK 21)
             echo "構建應用"
             ./mvnw clean package -DskipTests
-
+          
             # 確認 target 目錄內是否有 JAR 文件
             JAR_FILE=$(find target -maxdepth 1 -name "*.jar" | head -n 1)
-
+          
             if [ -z "$JAR_FILE" ]; then
               echo "構建失敗: JAR 文件不存在"
               exit 1
             else
               echo "構建成功: 找到 JAR => $JAR_FILE"
             fi
-
+          
             echo "停止現有服務"
             # 使用 docker compose 停止現有服務
             docker compose down filemanager-end
-
+          
             # 刪除舊的映像檔 (若存在)
             if [ "$(docker images -q filemanager-end:latest)" ]; then
               echo "刪除舊映像檔"
               docker rmi filemanager-end:latest
             fi
-
+          
             # 清理無用的映像檔
             docker image prune -f
-
+          
             # 使用 docker compose 重新構建並啟動服務
             echo "構建新容器"
             docker compose build filemanager-end
-
+          
             echo "啟動服務"
             docker compose up -d filemanager-end
-
+          
             # 檢查服務狀態
             echo "檢查服務狀態"
             docker ps | grep filemanager-end
-
+          
             # 等待服務啟動
             echo "等待服務啟動 (10秒)"
             sleep 10
-
+          
             # 檢查日誌
             echo "最近日誌:"
             docker logs --tail 50 filemanager-end
-
+          
             # 檢查服務健康狀態
             echo "健康檢查"
             if docker ps | grep filemanager-end | grep -q "Up"; then
@@ -184,48 +184,47 @@ jobs:
           fi
           echo "BRANCH=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
 
-
       - name: 在 VPS 上部署前端
         id: deploy_frontend
         run: |
           echo "::group::前端部署進度"
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             set -e
-
+          
             # 進入前端專案目錄
             cd /root/dev/FileManager-front
             echo "更新前端代碼"
-
+          
             # 拉取最新代碼確保獲取所有遠端變更
             git fetch --all
-
+          
             # 強制同步到遠端分支
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
-
+          
             # 進入主專案目錄
             cd /root/dev/FileManager
-
+          
             echo "停止現有前端服務"
             # 使用 docker compose 停止現有服務
             docker compose down filemanager-front
-
+          
             # 刪除舊的映像檔 (若存在)
             if [ "$(docker images -q filemanager-front:latest)" ]; then
               echo "刪除舊前端映像檔"
               docker rmi filemanager-front:latest
             fi
-
+          
             # 清理無用的映像檔
             docker image prune -f
             docker system prune -af
-
+          
             # 使用 docker compose 重新構建並啟動前端服務
             echo "構建新前端容器"
             docker compose build filemanager-front
-
+          
             echo "啟動前端服務"
             docker compose up -d filemanager-front
-
+          
             # 檢查服務狀態
             echo "檢查前端服務狀態"
             docker ps | grep filemanager-front
@@ -258,15 +257,15 @@ jobs:
             # 執行應用健康檢查
             echo "執行應用健康檢查"
             HEALTH_CHECK_URL="http://127.0.0.1:8078/actuator/health"
-
+          
             # 嘗試次數
             MAX_ATTEMPTS=5
             ATTEMPT=1
-
+          
             while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
               echo "嘗試 $ATTEMPT/$MAX_ATTEMPTS..."
               RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_CHECK_URL)
-
+          
               if [ "$RESPONSE" = "200" ]; then
                 echo "健康檢查通過!"
                 exit 0
@@ -277,10 +276,10 @@ jobs:
                   sleep 10
                 fi
               fi
-
+          
               ATTEMPT=$((ATTEMPT+1))
             done
-
+          
             echo "健康檢查失敗: 應用未能在指定時間內就緒"
             exit 1
           EOF
@@ -344,19 +343,50 @@ jobs:
           echo "計算 setup.zip 校驗和"
           sha256sum docker/src/setup.zip
 
+      - name: 刪除所有現有 Pre-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "查詢並刪除所有現有的 Pre-release"
+          # 獲取所有 Releases，並保留 prerelease 為 true 的陣列
+          RELEASES=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            | jq '[.[] | select(.prerelease == true) | {id: .id, tag_name: .tag_name}]')
+
+          COUNT=$(echo "$RELEASES" | jq 'length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "找到 $COUNT 個 Pre-release，將全部刪除："
+            git fetch --tags
+            echo "$RELEASES" | jq -c '.[]' | while read -r release; do
+              RELEASE_ID=$(echo "$release" | jq -r '.id')
+              TAG_NAME=$(echo "$release" | jq -r '.tag_name')
+              echo "刪除 Release ID: $RELEASE_ID (標籤: $TAG_NAME)"
+              curl -X DELETE \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+              git push origin :refs/tags/$TAG_NAME
+            done
+          else
+            echo "未找到任何 Pre-release，跳過刪除"
+          fi
+
       - name: 確定 Beta 標籤和 Release 名稱
         id: set_release
+        env:
+          SHA: ${{ github.sha }}
         run: |
           # 確保 github.sha 存在
-          if [ -z "${{ github.sha }}" ]; then
+          if [ -z "$SHA" ]; then
             echo "錯誤：github.sha 為空"
             exit 1
           fi
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c 1-7)
+          SHORT_SHA=$(echo "$SHA" | cut -c 1-7)
           echo "分支為 develop，設置標籤為 beta-$SHORT_SHA"
           echo "TAG_NAME=beta-$SHORT_SHA" >> $GITHUB_OUTPUT
           echo "RELEASE_NAME=測試版本 ($SHORT_SHA)" >> $GITHUB_OUTPUT
-          echo "RELEASE_BODY=本更新為 develop 分支版本 ${{ github.sha }} 的測試版本 >> $GITHUB_OUTPUT
+          echo "RELEASE_BODY=本更新為 develop 分支版本 $SHA 的測試版本" >> $GITHUB_OUTPUT
 
       - name: 刪除現有 Beta 版本 (latest) Release
         env:
@@ -484,8 +514,6 @@ jobs:
           echo "RELEASE_NAME=正式版本 $VERSION" >> $GITHUB_OUTPUT
           echo "RELEASE_BODY=本更新為 release/$VERSION 分支版本 $SHA 的正式版本" >> $GITHUB_OUTPUT
 
-
-
       - name: 創建版本標籤
         run: |
           TAG_NAME=$(echo "${{ steps.set_release.outputs.TAG_NAME }}")
@@ -520,12 +548,12 @@ jobs:
           RELEASE_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME | jq -r '.id')
-
+          
           if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
             ASSET_IDS=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets | jq -r '.[].id')
-
+          
             if [ -n "$ASSET_IDS" ]; then
               echo "找到以下舊資產，將全部刪除："
               echo "$ASSET_IDS"

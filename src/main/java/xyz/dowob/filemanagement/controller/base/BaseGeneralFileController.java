@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
@@ -22,10 +23,11 @@ import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
-import xyz.dowob.filemanagement.data.api.ApiResponseDTO;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
 import xyz.dowob.filemanagement.data.file.dto.UploadChunkDTO;
+import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.LimitationException;
@@ -101,31 +103,35 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     public Mono<ResponseEntity<?>> uploadFile(FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             UserLimiter userLimiter = userLimiterStrategy.getUserLimiter(UserLimiterEnum.USER_UPLOAD_LIMITER);
-            if (!userLimiter.tryAcquire(user.getId())) {
-                return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
-                                                          UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
-                ));
-            }
-            List<Long> fileIds = new ArrayList<>();
-            if (fileMetadataDTO.getParentFolderId() != null) {
-                fileIds.add(fileMetadataDTO.getParentFolderId());
-            }
+            return userLimiter.tryAcquire(user.getId()).flatMap(acquire -> {
+                if (!acquire) {
+                    return Mono.error(new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT,
+                                                              UserLimiterEnum.USER_UPLOAD_LIMITER.getError()
+                    ));
+                }
 
-            return validationService
-                    .validateFileMetadataDTO(fileMetadataDTO, user)
-                    .thenMany(permissionService
-                                      .validateUserPermission(user, fileIds)
-                                      .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
-                    .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
-                        ApiResponseDTO<?> apiResponse;
-                        if (transferResponseDTO.getIsFinished()) {
-                            apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
-                        } else {
-                            apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
-                        }
-                        return createResponseEntity(apiResponse);
-                    }))
-                    .doFinally(signalType -> userLimiter.release(user.getId()));
+                List<Long> fileIds = new ArrayList<>();
+                if (fileMetadataDTO.getParentFolderId() != null) {
+                    fileIds.add(fileMetadataDTO.getParentFolderId());
+                }
+
+                return validationService
+                        .validateFileMetadataDTO(fileMetadataDTO, user)
+                        .thenMany(permissionService
+                                          .validateUserPermission(user, fileIds)
+                                          .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
+                        .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
+                            ApiResponseDTO<?> apiResponse;
+                            if (transferResponseDTO.getIsFinished()) {
+                                apiResponse = createApiResponse(exchange, "上傳成功", transferResponseDTO);
+                            } else {
+                                apiResponse = createApiResponse(exchange, "建立任務成功", transferResponseDTO);
+                            }
+                            return createResponseEntity(apiResponse);
+                        }))
+                        .publishOn(Schedulers.boundedElastic())
+                        .doFinally(signalType -> userLimiter.release(user.getId()).subscribe());
+            });
         });
         return handleError(action, exchange);
     }
@@ -197,24 +203,18 @@ public abstract class BaseGeneralFileController extends BaseFileController {
      * @return Mono<ResponseEntity < ?>> 返回文件信息
      */
     public Mono<ResponseEntity<?>> getFileType(Long id, ServerWebExchange exchange) {
-        Mono<ResponseEntity<?>> result = userService
-                .getUser(exchange)
-                .flatMap(user -> permissionService
-                        .validateUserPermission(user, id, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
-                        .flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE))
-                        .flatMap(file -> fileServiceStrategy
-                                .getFileService()
-                                .getByServerFileMetadataId(file.getServerFileId())
-                                .flatMap(serverFileMetadata -> {
-                                    String fileType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
-                                    long fileSize = serverFileMetadata.getFileSize();
-                                    ApiResponseDTO<?> apiResponse = createResponse(exchange,
-                                                                                   "獲取文件類型成功",
-                                                                                   Map.of("X-File-Content-Type", fileType, "X-File-Size", fileSize)
-                                    );
-                                    return createResponseEntity(apiResponse);
-                                })));
-
+        Mono<ResponseEntity<?>> result = userService.getUser(exchange).flatMap(user -> {
+            Collection<Permission<UserFileMetadata>> rules = FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager);
+            return permissionService.validateUserPermission(user, id, rules);
+        }).flatMap(file -> validationService.validateFileType(file, CUSTOM_FILE_TYPE)).flatMap(file -> {
+            return fileServiceStrategy.getFileService().getByServerFileMetadataId(file.getServerFileId()).flatMap(serverFileMetadata -> {
+                String mediaType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
+                long fileSize = serverFileMetadata.getFileSize();
+                Map<String, Object> data = Map.of("X-File-Content-Type", mediaType, "X-File-Size", fileSize);
+                ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "獲取文件類型成功", data);
+                return createResponseEntity(apiResponse);
+            });
+        });
         return handleError(result, exchange);
     }
 
@@ -238,7 +238,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
                         .flatMap(file -> validationService
                                 .validateFileType(file, CUSTOM_FILE_TYPE)
                                 .then(fileServiceStrategy.getFileService().deleteFile(file, user))))
-                .then(createResponseEntity(createResponse(exchange, "刪除成功", null)));
+                .then(createResponseEntity(createApiResponse(exchange, "刪除成功", null)));
         return handleError(result, exchange);
     }
 
@@ -263,20 +263,21 @@ public abstract class BaseGeneralFileController extends BaseFileController {
                     }
 
                     return permissionService.validateUserPermission(user, fileIds).collectList().flatMap(fileList -> {
+                        FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
                         for (UserFileMetadata file : fileList) {
                             if (file.getId().equals(fileEditDTO.getParentFolderId())) {
-                                fileEditDTO.setParentFolderFileMetadata(file);
+                                fileEditBO.setParentFolderFileMetadata(file);
                             } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
-                                fileEditDTO.setUserFileMetadata(file);
+                                fileEditBO.setUserFileMetadata(file);
                             }
                         }
                         return validationService
-                                .validateFileType(fileEditDTO.getUserFileMetadata(), CUSTOM_FILE_TYPE)
-                                .then(validationService.validateFileType(fileEditDTO.getParentFolderFileMetadata(), FileEnum.FOLDER))
-                                .then(fileServiceStrategy.getFileService().editFile(fileEditDTO, user));
+                                .validateFileType(fileEditBO.getUserFileMetadata(), CUSTOM_FILE_TYPE)
+                                .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
+                                .then(fileServiceStrategy.getFileService().editFile(fileEditBO, user));
                     });
                 })
-                .then(createResponseEntity(createResponse(exchange, "資料更新成功", null)));
+                .then(createResponseEntity(createApiResponse(exchange, "資料更新成功", null)));
         return handleError(result, exchange);
     }
 
@@ -342,9 +343,9 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         return handleError(fileServiceStrategy.getFileService().uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsSuccess()) {
-                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                apiResponse = createApiResponse(exchange, "上傳成功", transferResponseDTO);
             } else {
-                apiResponse = createResponse(exchange, HttpStatus.BAD_REQUEST.value(), "上傳失敗", transferResponseDTO);
+                apiResponse = createApiResponse(exchange, HttpStatus.BAD_REQUEST.value(), "上傳失敗", transferResponseDTO);
             }
             return createResponseEntity(apiResponse);
         }), exchange);
@@ -394,15 +395,15 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         }).flatMap(transferResponseDTO -> {
             ApiResponseDTO<?> apiResponse;
             if (transferResponseDTO.getIsFinished()) {
-                apiResponse = createResponse(exchange, "上傳成功", transferResponseDTO);
+                apiResponse = createApiResponse(exchange, "上傳成功", transferResponseDTO);
             } else {
-                apiResponse = createResponse(exchange, "建立任務成功", transferResponseDTO);
+                apiResponse = createApiResponse(exchange, "建立任務成功", transferResponseDTO);
             }
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
             String errorMessage = String.format("上傳失敗: %s", e.getMessage());
             int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createResponse(exchange, responseCode, errorMessage, null));
+            return createResponseEntity(createApiResponse(exchange, responseCode, errorMessage, null));
         });
     }
 

@@ -51,14 +51,13 @@ public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
     public Mono<Authentication> authenticate(Authentication authentication) {
         String token = authentication.getCredentials().toString();
         JwtTokenProviderImpl jwtTokenProvider = (JwtTokenProviderImpl) tokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
-        try {
+        return Mono.defer(() -> {
             Mono<Long> userId = jwtTokenProvider.validateToken(token, null);
             return userId.flatMap(id -> jwtTokenProvider.getClaimsFromToken(token).map(claims -> claims.get("role")).map(roles -> {
                 List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority((String) roles));
-                return new UsernamePasswordAuthenticationToken(id, null, authorities);
+                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(id, token, authorities);
+                return (Authentication) auth;
             }));
-        } catch (Exception e) {
-            return Mono.empty();
-        }
+        });
     }
 }

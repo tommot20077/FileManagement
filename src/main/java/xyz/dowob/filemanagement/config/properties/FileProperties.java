@@ -44,6 +44,11 @@ public class FileProperties {
     private Backup backup = new Backup();
 
     /**
+     * 建立安全性配置
+     */
+    private Security security = new Security();
+
+    /**
      * 文件上傳配置
      */
     @Data
@@ -60,6 +65,17 @@ public class FileProperties {
          * 當設置為 false 時，用戶可以使用其指定的上傳模式 {@link TransmissionEnum}
          */
         private boolean forceUseServerConfig = false;
+
+        /**
+         * WebSocket上傳檔案的路徑，默認為 /file/upload
+         */
+        private String uploadWebSocketPath = "/file/upload";
+
+        /**
+         * WebSocket編輯線上檔案的路徑
+         * 默認為 /file/editing
+         */
+        private String editOnlineFileWebSocketPath = "/file/editing";
 
         /**
          * Websocket最大允許分塊大小，默認為 20MB
@@ -90,6 +106,11 @@ public class FileProperties {
          * 當設置值小於等於0時，則不限制上傳檔案的大小
          */
         private DataSize maxUploadFileSize = DataSize.ofGigabytes(10);
+
+        /**
+         * 上傳檔案最大的時間限制，默認為 6小時
+         */
+        private Duration maxUploadDuration = Duration.ofHours(6);
     }
 
 
@@ -112,13 +133,6 @@ public class FileProperties {
          * 下載資料夾的壓縮檔案暫存路徑，默認為 ./temp
          */
         private String folderTempDownloadPath = "./temp/folder-zip";
-
-        /**
-         * 單次資料夾下載的最大併發數量限制，默認為 5
-         * 此值用於限制資料夾一邊查詢一邊寫入到壓縮檔案的最大併發數量
-         * 若此值設定過高，則可能會導致資料夾下載 GridFS 的性能下降
-         */
-        private int folderDownloadConcurrentLimit = 5;
     }
 
 
@@ -151,7 +165,6 @@ public class FileProperties {
          * 此參數用於用戶查詢最近使用的檔案所顯示的數量
          */
         private Integer showRecentFileCount = 20;
-
     }
 
     @Data
@@ -165,5 +178,42 @@ public class FileProperties {
          * 線上檔案歷程記錄備份保留數量，當設置值小於等於0時，則不限制保留數量，默認為 30
          */
         private Integer maxOnlineHistoryCount = 30;
+    }
+
+    @Data
+    public static class Security {
+        /**
+         * 是否啟用安全性檢查，默認為 true
+         */
+        private Boolean enableSecurityCheck = true;
+
+        /**
+         * 連線到防毒軟體的主機名稱或 IP 位址，默認為 localhost
+         */
+        private String host = "localhost";
+
+        /**
+         * 連線到防毒軟體的埠號，默認為 3310
+         */
+        private Integer port = 3310;
+
+        /**
+         * 安全性檢查的超時時間，默認為 30秒
+         */
+        private Duration timeout = Duration.ofSeconds(30);
+
+        /**
+         * 安全性檢查的最小檔案大小，默認為 0
+         * 當檔案大小小於此值時，則不進行安全性檢查
+         * 若設置值小於等於0時，則不限制檔案大小
+         */
+        private DataSize minFileSize = DataSize.ofBytes(0);
+
+        /**
+         * 安全性檢查的最大檔案大小，默認為 10GB
+         * 當檔案大小大於此值時，則不進行安全性檢查
+         * 若設置值小於等於0時，則不限制檔案大小
+         */
+        private DataSize maxFileSize = DataSize.ofGigabytes(10);
     }
 }

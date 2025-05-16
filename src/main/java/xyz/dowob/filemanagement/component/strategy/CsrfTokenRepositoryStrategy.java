@@ -27,8 +27,6 @@ import java.util.List;
 public class CsrfTokenRepositoryStrategy {
     /**
      * 選定的 CsrfTokenRepository，根據 {@link SecurityProperties} 中的設定
-     * -- GETTER --
-     * 獲取 Csrf 憑證存儲庫
      */
     private final CustomServerCsrfTokenRepository csrfTokenRepository;
 

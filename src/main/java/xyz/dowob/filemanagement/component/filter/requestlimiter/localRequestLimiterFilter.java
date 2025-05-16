@@ -130,13 +130,14 @@ public class localRequestLimiterFilter implements WebFilter, ResponseUnity {
         Assert.isTrue(requestLimiter.getFailureCount() > 0, "禁止IP的失敗次數必須大於0");
 
         this.objectMapper = objectMapper;
+        Duration cleanupInterval = requestLimiter.getCleanInterval();
 
         this.limit = requestLimiter.getLimit() <= 0 ? Integer.MAX_VALUE : requestLimiter.getLimit();
         this.refill = requestLimiter.getRefill() <= 0 ? this.limit : requestLimiter.getRefill();
-
         this.refillDuration = requestLimiter.getRefillDuration();
-        Duration cleanupInterval = requestLimiter.getCleanInterval();
+
         this.ipBucketLimiterMap = new CacheConcurrentHashMap<>(1024, this.refillDuration, this.refillDuration, cleanupInterval, false);
+        this.ipBucketLimiterMap.setTag("請求限制器緩存表");
 
         this.banDuration = requestLimiter.getBanIpDuration();
         this.banExpireDuration = requestLimiter.getBanExpireDuration();
@@ -144,6 +145,7 @@ public class localRequestLimiterFilter implements WebFilter, ResponseUnity {
         this.isEnableBanIp = requestLimiter.isEnableBanIp();
         if (this.isEnableBanIp) {
             this.banIpMap = new CacheConcurrentHashMap<>(64, this.banDuration, this.banExpireDuration, cleanupInterval, false);
+            this.banIpMap.setTag("封禁IP地址緩存表");
             this.failureCount = requestLimiter.getFailureCount();
         }
     }
@@ -191,7 +193,7 @@ public class localRequestLimiterFilter implements WebFilter, ResponseUnity {
             LogUnity.info(exchange, "IP: %s 請求超過限制值: %s", ip, limit);
             if (isEnableBanIp) {
                 AtomicBoolean isBanned = new AtomicBoolean(false);
-                banIpMap.computeIfPresentOrInit(key, 0L, banDuration, (k, currentValue) -> {
+                banIpMap.computeIfPresentOrDefault(key, 0L, banDuration, (k, currentValue) -> {
                     long newValue = currentValue == null ? 1L : currentValue + 1;
                     if (newValue >= failureCount) {
                         isBanned.set(true);

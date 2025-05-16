@@ -9,12 +9,10 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 此類用於提供 Redis 的操作方法，透過自定義方法操作 RedisTemplate 來對數據進行操作
@@ -42,9 +40,9 @@ public class RedisProvider {
     private final ObjectMapper objectMapper;
 
     /**
-     * 隨機緩存過期時間比例
+     * 隨機緩存過期時間比例上限，將會隨機生成一個過期時間，範圍為 [expireTime, expireTime * RANDOM_CACHE_EXPIRE_TIME_RATIO]
      */
-    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 0.2f;
+    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 1.2f;
 
     /**
      * 通過構造方法注入 RedisTemplate 和 ObjectMapper
@@ -89,9 +87,40 @@ public class RedisProvider {
 
 
     /**
+     * 僅在鍵不存在的情況下設置值
+     *
+     * @param key   鍵
+     * @param value 值
+     *
+     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     */
+    public Mono<Boolean> setValueIfAbsent(String key, Object value) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value);
+    }
+
+
+    /**
+     * 僅在鍵不存在的情況下設置值，並設置過期時間
+     *
+     * @param key        鍵
+     * @param value      值
+     * @param expireTime 過期時間
+     *
+     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     */
+    public Mono<Boolean> setValueIfAbsent(String key, Object value, Duration expireTime) {
+        if (expireTime == null || expireTime.isNegative()) {
+            return setValueIfAbsent(key, value);
+        }
+        return redisTemplate.opsForValue().setIfAbsent(key, value).flatMap(result -> setExpire(key, expireTime).thenReturn(result));
+    }
+
+
+    /**
      * 根據鍵獲取數據
      *
      * @param key 鍵
+     * @return 查詢到的數據對象
      */
     public Mono<Object> getValue(String key) {
         return redisTemplate.opsForValue().get(key);
@@ -102,6 +131,8 @@ public class RedisProvider {
      * 根據鍵獲取數據
      *
      * @param key 鍵
+     * @param clazz 類型
+     * @return 查詢到的數據對象
      */
     public <T> Mono<T> getValue(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key).cast(clazz);
@@ -109,9 +140,47 @@ public class RedisProvider {
 
 
     /**
-     * 根據鍵獲取數據
+     * 依照鍵刪除儲存類型為 Value 的數據
      *
      * @param key 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(String key) {
+        return redisTemplate.delete(key).then();
+    }
+
+
+    /**
+     * 依照鍵刪除儲存類型為 Value 的數據
+     *
+     * @param keys 鍵的集合
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(Collection<String> keys) {
+        return redisTemplate.delete(keys.toArray(new String[0])).then();
+    }
+
+
+    /**
+     * 依照鍵刪除儲存類型為 Value 的數據
+     *
+     * @param keys 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> deleteValue(String... keys) {
+        return redisTemplate.delete(keys).then();
+    }
+
+
+    /**
+     * 獲取值並轉換為分頁響應
+     *
+     * @param key   鍵
+     * @param clazz 類型
+     * @return 返回 分頁回應傳輸對象
      */
     @HideOverLength
     public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromValue(String key, Class<T> clazz) {
@@ -125,9 +194,10 @@ public class RedisProvider {
     /**
      * 獲取數據列表
      *
-     * @param key 鍵
+     * @param key   鍵
+     * @param clazz 類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getValueList(String key, Class<T> clazz) {
         return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
@@ -158,18 +228,6 @@ public class RedisProvider {
      */
     public Mono<Long> incrementDelta(String key, long delta, Duration expireTime) {
         return incrementDelta(key, delta).flatMap(incrementResult -> setExpire(key, expireTime).thenReturn(incrementResult));
-    }
-
-
-    /**
-     * 刪除 Redis 中的數據
-     *
-     * @param key 鍵
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    public Mono<Void> delete(String key) {
-        return redisTemplate.delete(key).then();
     }
 
 
@@ -252,8 +310,9 @@ public class RedisProvider {
      *
      * @param hashKey  Hash 的鍵
      * @param innerKey Hash 內部的鍵
+     * @param clazz   類型
      *
-     * @return 返回 Mono<Object> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
         return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
@@ -265,8 +324,9 @@ public class RedisProvider {
      *
      * @param hashKey   Hash 的鍵
      * @param innerKeys Hash 內部的鍵的集合
+     * @param clazz     類型
      *
-     * @return 返回 Mono<Object> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Flux<T> getHashMapList(String hashKey, List<String> innerKeys, Class<T> clazz) {
         List<Object> innerKeyList = innerKeys.stream().map(innerKey -> (Object) innerKey).toList();
@@ -292,7 +352,7 @@ public class RedisProvider {
      * @param KeyClass   Key 的類型
      * @param ValueClass Value 的類型
      *
-     * @return 返回 Flux<Map.Entry<Object, Object>> 對象
+     * @return 返回 Flux<Map.Entry<K, V>> 對象
      */
     public <K, V> Flux<Map.Entry<K, V>> getAllHashMap(String hashKey, Class<K> KeyClass, Class<V> ValueClass) {
         return redisTemplate.opsForHash().entries(hashKey).map(entry -> {
@@ -354,8 +414,9 @@ public class RedisProvider {
      * 獲取 HashMap 中的查詢Key的所有數據
      *
      * @param hashKey Hash 的鍵
+     * @param clazz   類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getHashMapAll(String hashKey, Class<T> clazz) {
         return redisTemplate.opsForHash().values(hashKey).cast(clazz);
@@ -474,8 +535,9 @@ public class RedisProvider {
      * 取得 Set 中的數據
      *
      * @param key 鍵
+     * @param clazz 類型
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Mono<T> 對象
      */
     public <T> Flux<T> getSet(String key, Class<T> clazz) {
         return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
@@ -567,8 +629,9 @@ public class RedisProvider {
      * 獲取 List 中的數據
      *
      * @param key 鍵
+     * @param clazz 類型
      *
-     * @return 返回 Flux<Object> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getList(String key, Class<T> clazz) {
         return getList(key).cast(clazz);
@@ -579,8 +642,11 @@ public class RedisProvider {
      * 獲取 List 中的數據
      *
      * @param key 鍵
+     * @param start 起始序號
+     * @param end   結束序號
+     * @param clazz 類型
      *
-     * @return 返回 Mono<Void> 對象
+     * @return 返回 Flux<T> 對象
      */
     public <T> Flux<T> getListContent(String key, long start, long end, Class<T> clazz) {
         return redisTemplate.opsForList().range(key, start, end).flatMap(object -> convertObjectList(object, clazz)).switchIfEmpty(Flux.empty());
@@ -617,9 +683,8 @@ public class RedisProvider {
     public Mono<Void> insertList(String key, Object value, Boolean isLeft) {
         if (isLeft) {
             return redisTemplate.opsForList().leftPush(key, value).then();
-        } else {
-            return redisTemplate.opsForList().rightPush(key, value).then();
         }
+        return redisTemplate.opsForList().rightPush(key, value).then();
     }
 
 
@@ -797,6 +862,18 @@ public class RedisProvider {
 
 
     /**
+     * 刪除 Redis 中的數據，此刪除方法會檢查所有的數據類型找出對應的鍵並刪除
+     *
+     * @param key 鍵
+     *
+     * @return 返回 Mono<Void> 對象
+     */
+    public Mono<Void> delete(String key) {
+        return redisTemplate.delete(key).then();
+    }
+
+
+    /**
      * 依照通配符刪除 Redis 中的數據
      *
      * @param pattern 通配符
@@ -830,7 +907,9 @@ public class RedisProvider {
      * @return 返回 Mono<Void> 對象
      */
     private Mono<Void> setExpire(String key, Duration expireTime) {
-        Duration randomExpireTime = Duration.ofSeconds(Math.round(expireTime.getSeconds() * RANDOM_CACHE_EXPIRE_TIME_RATIO));
+        Random random = new Random();
+        float randomRatio = 1.0f + random.nextFloat() * (RANDOM_CACHE_EXPIRE_TIME_RATIO - 1.0f);
+        Duration randomExpireTime = Duration.ofSeconds((long) (expireTime.getSeconds() * randomRatio));
         return redisTemplate.expire(key, randomExpireTime).then();
     }
 

@@ -6,7 +6,6 @@ import lombok.Data;
 import xyz.dowob.filemanagement.customenum.EditTypeEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import xyz.dowob.filemanagement.data.file.po.ShareUserEditPO;
-import xyz.dowob.filemanagement.entity.UserFileMetadata;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -78,14 +77,4 @@ public class FileEditDTO {
      * 恢復的版本號
      */
     private Long version;
-
-    /**
-     * 文件元數據，用於驗證用戶權限
-     */
-    private UserFileMetadata userFileMetadata;
-
-    /**
-     * 父資料夾元數據
-     */
-    private UserFileMetadata parentFolderFileMetadata;
 }

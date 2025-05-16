@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
@@ -23,17 +22,21 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import xyz.dowob.filemanagement.component.strategy.CsrfTokenRepositoryStrategy;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
+import xyz.dowob.filemanagement.customenum.RoleEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
 import xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository;
+import xyz.dowob.filemanagement.unity.LogUnity;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * 安全配置類，用於配置安全相關的設置。
  * 用於管理用戶權限、預授權以及請求安全設定
+ * 此類實現了 ResponseUnity 接口，提供通用的回應處理方法
  *
  * @author yuan
  * @program FileManagement
@@ -66,19 +69,18 @@ public class SecurityConfig implements ResponseUnity {
      */
     private final CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy;
 
-
     /**
      * 不需要驗證CSRF的方法
      */
     private final List<HttpMethod> PASS_METHODS = List.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.TRACE);
 
-
     /**
      * SecurityConfig 的構造函數
      *
-     * @param securityContextRepository JwtSecurityContextRepository 用於操作安全上下文的數據庫操作類
-     * @param mapper                    ObjectMapper 用於對象與 JSON 之間的轉換
-     * @param securityProperties        SecurityProperties 用於配置安全相關的參數
+     * @param securityContextRepository   JwtSecurityContextRepository 用於操作安全上下文的數據庫操作類
+     * @param mapper                      ObjectMapper 用於對象與 JSON 之間的轉換
+     * @param securityProperties          SecurityProperties 用於配置安全相關的參數
+     * @param csrfTokenRepositoryStrategy CSRF Token 儲存庫策略
      */
     public SecurityConfig(JwtSecurityContextRepository securityContextRepository, ObjectMapper mapper, SecurityProperties securityProperties, CsrfTokenRepositoryStrategy csrfTokenRepositoryStrategy) {
         this.securityContextRepository = securityContextRepository;
@@ -89,7 +91,16 @@ public class SecurityConfig implements ResponseUnity {
 
 
     /**
-     * 配置安全過濾器鏈
+     * 配置安全過濾器鏈，此處理鏈設定了以下內容：
+     * 1. CORS 設定: 這邊添加了自定義的 CORS 來源設定 {@link #corsConfigurationSource()}
+     * 2. CSRF 設定: 禁用默認的 CSRF 設定而採用自定義的 CSRF 設定 {@link #csrfValidationFilter()}
+     * 3. HTTP 標頭設定: 設定了 HSTS 和 CSP 的相關配置
+     * 4. 安全內容設定: 設定自定義的安全內容 {@link #securityContextRepository}
+     * 5. 配置過濾器鏈的順序:
+     * - 在 HTTP 標頭寫入之前添加請求 ID 過濾器 {@link #traceIdFilter()}
+     * - 在 CSRF 驗證過濾器之後添加上下文過濾器 {@link #contextWebFilter()}
+     * - 在身份驗證過濾器之後添加用戶信息過濾器 {@link #userInfoFilter()}
+     * 6. 異常處理: 設定了身份驗證和訪問拒絕的異常處理
      *
      * @param http ServerHttpSecurity 用於配置安全過濾器鏈的類
      *
@@ -108,7 +119,7 @@ public class SecurityConfig implements ResponseUnity {
                             contentSecurityPolicySpec.policyDirectives("default-src 'self'; script-src 'self'");
                         }))
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .authorizeExchange(pathSecurity())
+                .authorizeExchange(this::configurePathSecurity)
                 .securityContextRepository(securityContextRepository)
                 .addFilterBefore(traceIdFilter(), SecurityWebFiltersOrder.HTTP_HEADERS_WRITER)
                 .addFilterAt(csrfValidationFilter(), SecurityWebFiltersOrder.CSRF)
@@ -174,6 +185,7 @@ public class SecurityConfig implements ResponseUnity {
                 .defer(() -> ReactiveSecurityContextHolder
                         .getContext()
                         .map(SecurityContext::getAuthentication)
+                        .filter(auth -> auth != null && auth.isAuthenticated())
                         .map(auth -> (Long) auth.getPrincipal())
                         .flatMap(userId -> {
                             exchange.getAttributes().put("userId", userId.toString());
@@ -274,41 +286,65 @@ public class SecurityConfig implements ResponseUnity {
 
 
     /**
-     * 獲取允許訪客訪問的路徑
-     *
-     * @return 允許訪問的路徑
+     * 設置路徑安全檢查，會將 SecurityProperties 中的路徑規則應用到當前的請求中 {@link SecurityProperties#getPaths()}
+     * @param exchange ServerHttpSecurity.AuthorizeExchangeSpec 用於配置路徑安全的請求對象
      */
-    private String[] allowGuestPath() {
-        return new String[]{"/docs/**", "/api/v1/user/info", "/web/v1/user/info", "/api/v1/folders/*", "/web/v1/folders/*", "/api/v1/folders/*/download", "/web/v1/folders/*/download", "/api/v1/files/*", "/web/v1/files/*", "/api/v1/files/*/info", "/web/v1/files/*/info", "/api/v1/docs/*", "/web/v1/docs/*", "/api/v1/docs/history/*", "/web/v1/docs/history/*",};
+    private void configurePathSecurity(ServerHttpSecurity.AuthorizeExchangeSpec exchange) {
+        Collection<SecurityProperties.Paths.PathRuleConfig> rules = securityProperties.getPaths().getEffectiveRules();
+
+        applyRulesForRole(exchange, rules, RoleEnum.ANONYMOUS);
+        applyRulesForRole(exchange, rules, RoleEnum.VISITOR);
+        applyRulesForRole(exchange, rules, RoleEnum.USER);
+        applyRulesForRole(exchange, rules, RoleEnum.ADVANCED_USER);
+        applyRulesForRole(exchange, rules, RoleEnum.ADMIN);
+
+        exchange.anyExchange().hasAnyAuthority(RoleEnum.USER.name(), RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
     }
 
 
     /**
-     * 獲取禁止訪客訪問的路徑
-     *
-     * @return 禁止訪問的路徑
+     * 根據角色設置路徑安全檢查，將 SecurityProperties 中的路徑規則應用到當前的請求中並設置路徑所需的角色資格
+     * @param exchange ServerHttpSecurity.AuthorizeExchangeSpec 用於配置路徑安全的請求對象
+     * @param allRules 所有的路徑規則
+     * @param role 角色
      */
-    private String[] denyGuestPath() {
-        return new String[]{"/api/v1/folders/star", "/web/v1/folders/star", "/api/v1/folders/recently", "/web/v1/folders/recently", "/api/v1/folders/recycle", "/web/v1/folders/recycle", "/api/v1/folders/shared", "/web/v1/folders/shared", "/api/v1/folders/all", "/web/v1/folders/all", "/api/v1/folders/path/*", "/web/v1/folders/path/*", "/api/v1/files/user-file-list", "/web/v1/files/user-file-list", "/api/v1/files/search", "/web/v1/files/search",};
-    }
+    private void applyRulesForRole(ServerHttpSecurity.AuthorizeExchangeSpec exchange, Collection<SecurityProperties.Paths.PathRuleConfig> allRules, RoleEnum role) {
+        List<SecurityProperties.Paths.PathRuleConfig> roleSpecificRules = allRules.stream().filter(rule -> role.equals(rule.getRole())).toList();
 
+        for (SecurityProperties.Paths.PathRuleConfig rule : roleSpecificRules) {
+            ServerHttpSecurity.AuthorizeExchangeSpec.Access spec;
+            if (rule.getMethod() != null) {
+                spec = exchange.pathMatchers(rule.getMethod(), rule.getPattern());
+            } else {
+                spec = exchange.pathMatchers(rule.getPattern());
+            }
 
-    /**
-     * 獲取訪問權限的路徑
-     *
-     * @return 訪問權限的路徑
-     */
-    private Customizer<ServerHttpSecurity.AuthorizeExchangeSpec> pathSecurity() {
-        return exchange -> exchange
-                .pathMatchers(denyGuestPath())
-                .hasAnyAuthority("USER", "ADVANCE_USER", "ADMIN")
-                .pathMatchers(HttpMethod.GET, allowGuestPath())
-                .permitAll()
-                .pathMatchers("/api/v1/guest/**", "/web/v1/guest/**", "/actuator/health")
-                .permitAll()
-                .pathMatchers("/actuator/**")
-                .hasAnyAuthority("ADMIN")
-                .anyExchange()
-                .hasAnyAuthority("USER", "ADVANCE_USER", "ADMIN");
+            switch (role) {
+                case RoleEnum.ANONYMOUS:
+                    LogUnity.trace("設定的路徑: " + rule.getPattern() + "，將允許匿名訪問");
+                    spec.permitAll();
+                    break;
+                case RoleEnum.VISITOR:
+                    LogUnity.trace("設定的路徑: " + rule.getPattern() + "，將允許訪客以上訪問");
+                    spec.hasAnyAuthority(RoleEnum.VISITOR.name(), RoleEnum.USER.name(), RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
+                    break;
+                case RoleEnum.USER:
+                    LogUnity.trace("設定的路徑: " + rule.getPattern() + "，將允許用戶以上訪問");
+                    spec.hasAnyAuthority(RoleEnum.USER.name(), RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
+                    break;
+                case RoleEnum.ADVANCED_USER:
+                    LogUnity.trace("設定的路徑: " + rule.getPattern() + "，將允許高級用戶以上訪問");
+                    spec.hasAnyAuthority(RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
+                    break;
+                case RoleEnum.ADMIN:
+                    LogUnity.trace("設定的路徑: " + rule.getPattern() + "，將允許管理員訪問");
+                    spec.hasAuthority(RoleEnum.ADMIN.name());
+                    break;
+                default:
+                    LogUnity.warn("未知的角色: " + rule.getRole() + " 設定的路徑: " + rule.getPattern() + "，將自動拒絕訪問");
+                    spec.denyAll();
+                    break;
+            }
+        }
     }
 }

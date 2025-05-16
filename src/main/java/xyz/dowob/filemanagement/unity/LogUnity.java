@@ -3,10 +3,13 @@ package xyz.dowob.filemanagement.unity;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import xyz.dowob.filemanagement.component.filter.ClientIpFilter;
+import xyz.dowob.filemanagement.component.handler.CustomWebSocketSession;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 日誌通實現類，裡面封裝了日誌的輸出方法，並提供統一的日誌格式
@@ -22,7 +25,6 @@ import java.util.Objects;
  **/
 @Log4j2
 public class LogUnity {
-
     /**
      * 輸出 TRACE 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
@@ -33,6 +35,33 @@ public class LogUnity {
      */
     public static void trace(ServerWebExchange exchange, @NotNull String message, Object... args) {
         trace(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Object... args) {
+        trace((ServerWebExchange) null, message, null, args);
+    }
+
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Throwable throwable, Object... args) {
+        trace((ServerWebExchange) null, message, throwable, args);
     }
 
 
@@ -55,6 +84,37 @@ public class LogUnity {
 
 
     /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void trace(WebSocketSession session, @NotNull String message, Object... args) {
+        trace(session, message, null, args);
+    }
+
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void trace(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isTraceEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.trace(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
      * 輸出 DEBUG 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
      *
@@ -64,6 +124,19 @@ public class LogUnity {
      */
     public static void debug(ServerWebExchange exchange, @NotNull String message, Object... args) {
         debug(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Object... args) {
+        debug((ServerWebExchange) null, message, null, args);
     }
 
 
@@ -86,6 +159,33 @@ public class LogUnity {
 
 
     /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Throwable throwable, Object... args) {
+        debug((ServerWebExchange) null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void debug(WebSocketSession session, @NotNull String message, Object... args) {
+        debug(session, message, null, args);
+    }
+
+
+    /**
      * 輸出 INFO 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
      *
@@ -95,6 +195,37 @@ public class LogUnity {
      */
     public static void info(ServerWebExchange exchange, @NotNull String message, Object... args) {
         info(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isDebugEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.debug(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Object... args) {
+        info((ServerWebExchange) null, message, null, args);
     }
 
 
@@ -117,6 +248,33 @@ public class LogUnity {
 
 
     /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Throwable throwable, Object... args) {
+        info((ServerWebExchange) null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void info(WebSocketSession session, @NotNull String message, Object... args) {
+        info(session, message, null, args);
+    }
+
+
+    /**
      * 輸出 WARN 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
      *
@@ -126,6 +284,37 @@ public class LogUnity {
      */
     public static void warn(ServerWebExchange exchange, @NotNull String message, Object... args) {
         warn(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 INFO 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isInfoEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.info(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Object... args) {
+        warn((ServerWebExchange) null, message, null, args);
     }
 
 
@@ -148,6 +337,33 @@ public class LogUnity {
 
 
     /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Throwable throwable, Object... args) {
+        warn((ServerWebExchange) null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void warn(WebSocketSession session, @NotNull String message, Object... args) {
+        warn(session, message, null, args);
+    }
+
+
+    /**
      * 輸出 ERROR 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
      *
@@ -157,6 +373,37 @@ public class LogUnity {
      */
     public static void error(ServerWebExchange exchange, @NotNull String message, Object... args) {
         error(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 WARN 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isWarnEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.warn(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Object... args) {
+        error((ServerWebExchange) null, message, null, args);
     }
 
 
@@ -179,6 +426,33 @@ public class LogUnity {
 
 
     /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Throwable throwable, Object... args) {
+        error((ServerWebExchange) null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void error(WebSocketSession session, @NotNull String message, Object... args) {
+        error(session, message, null, args);
+    }
+
+
+    /**
      * 輸出 FATAL 級別的日誌
      * 此為重載方法，表示不需要傳入 throwable 參數
      *
@@ -188,6 +462,37 @@ public class LogUnity {
      */
     public static void fatal(ServerWebExchange exchange, @NotNull String message, Object... args) {
         fatal(exchange, message, null, args);
+    }
+
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isErrorEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.error(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Object... args) {
+        fatal((ServerWebExchange) null, message, null, args);
     }
 
 
@@ -210,30 +515,87 @@ public class LogUnity {
 
 
     /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Throwable throwable, Object... args) {
+        fatal((ServerWebExchange) null, message, throwable, args);
+    }
+
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void fatal(WebSocketSession session, @NotNull String message, Object... args) {
+        fatal(session, message, null, args);
+    }
+
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isFatalEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.fatal(getFormatMessage(session, message), throwable);
+        }
+    }
+
+
+    /**
      * 獲取請求ID、請求者名稱和用戶ID
      * 當前請求如果為空，則其為伺服器端請求
      * 如果請求者名稱為空，則其為尚未登錄的用戶請求
      * 如果請求者名稱不為空，則其為用戶請求
      *
-     * @param exchange ServerWebExchange 對象
+     * @param info 當前請求的對象
      *
      * @return UserRequestInfo 請求信息
      */
-    private static String getFormatMessage(@Nullable ServerWebExchange exchange, String message) {
+    private static String getFormatMessage(@Nullable Object info, String message) {
         String requestId;
         String requestIp;
         String identify = null;
 
-        if (exchange == null) {
+        if (info == null) {
             requestId = "無";
             requestIp = "Server";
         } else {
-            String userId = exchange.getAttribute("userId");
-            requestIp = ClientIpFilter.getClientIpFromExchange(exchange).orElse("Server");
-            requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId") : "無";
-            if (exchange.getAttribute("userId") != null && !Objects.equals(userId, "0")) {
+            String userId = null;
+            if (info instanceof ServerWebExchange exchange) {
+                userId = exchange.getAttribute("userId");
+                requestIp = ClientIpFilter.getClientIpFromExchange(exchange).orElse("Server");
+                requestId = exchange.getAttribute("requestId") != null ? exchange.getAttribute("requestId") : "無";
+
+            } else if (info instanceof CustomWebSocketSession session) {
+                userId = Optional.ofNullable(session.getUser()).map(user -> user.getId().toString()).orElse(null);
+                requestIp = session.getAttribute("clientIp") != null ? session.getAttribute("clientIp").toString() : "Server";
+                requestId = session.getAttribute("requestId") != null ? session.getAttribute("requestId").toString() : "無";
+            } else {
+                requestId = "無";
+                requestIp = "Server";
+            }
+            if (userId != null && !Objects.equals(userId, "0")) {
                 identify = "(用戶ID:" + userId + ") ";
             }
+
         }
         if (identify == null) {
             identify = "";

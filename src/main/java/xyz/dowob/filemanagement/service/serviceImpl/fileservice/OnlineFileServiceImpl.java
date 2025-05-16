@@ -14,10 +14,7 @@ import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import xyz.dowob.filemanagement.annotation.FileHandlerType;
-import xyz.dowob.filemanagement.annotation.HideOverLength;
-import xyz.dowob.filemanagement.annotation.RecordLevel;
-import xyz.dowob.filemanagement.annotation.SkipRecord;
+import xyz.dowob.filemanagement.annotation.*;
 import xyz.dowob.filemanagement.component.manager.CacheManager;
 import xyz.dowob.filemanagement.component.manager.TransfersTasksManager;
 import xyz.dowob.filemanagement.component.provider.factory.ContentConvertProviderFactory;
@@ -26,16 +23,15 @@ import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvid
 import xyz.dowob.filemanagement.component.provider.provider.GridFsProvider;
 import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
+import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
-import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
-import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.LogLevelEnum;
-import xyz.dowob.filemanagement.data.api.PagedResponseDTO;
+import xyz.dowob.filemanagement.customenum.*;
+import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.OnlineHistoryCountAndOldestDAO;
 import xyz.dowob.filemanagement.data.file.dto.*;
 import xyz.dowob.filemanagement.data.file.po.CustomPatchPO;
+import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -103,13 +99,14 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * @param userFIleShareRecordRepository   用戶檔案分享記錄操作介面
      */
     public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
-                                 @Nullable FolderListTreeProvider folderListTreeProvider) {
+                                 @Nullable FolderListTreeProvider folderListTreeProvider, @Nullable FileScanProvider fileScanProvider) {
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
               userRepository,
               redisProvider,
               gridFsProvider,
+              fileScanProvider,
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,
@@ -129,7 +126,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
     /**
      * 下載指定文件。
-     * <p>
      * 根據文件元數據查找用戶文件，並返回文件內容。如果文件內容轉換為DTO對象失敗，將會返回錯誤。
      *
      * @param userFileMetadata 文件的元數據，包含文件ID和其他元數據信息。
@@ -141,6 +137,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
     @Override
     public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
         return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+            userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
             if (Objects.equals(optional[0], DownloadActionEnum.DOWNLOAD.name())) {
                 ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
                 return convertProvider.convertToDataBuffer(userOnlineFile.getContent()).flatMap(dataBufferSize -> {
@@ -157,8 +156,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
             try {
                 EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
-                userFileMetadata.setLastAccessTime(LocalDateTime.now());
-                userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
                 return Mono.just(new UserFileDataBO(userOnlineFile, userFileMetadata, content));
             } catch (JsonProcessingException e) {
                 return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
@@ -169,7 +166,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
     /**
      * 上傳指定文件。
-     * <p>
      * 根據給定的文件元數據創建文件元數據並保存，然後上傳文件內容。如果操作成功，將返回上傳結果。
      *
      * @param fileMetadataDTO 文件的元數據，包含文件名稱、父目錄等信息。
@@ -228,21 +224,22 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
     /**
      * 編輯指定文件。
-     * <p>
      * 根據文件編輯類型執行不同的操作（例如，編輯元數據、編輯內容、構建歷史記錄等）。
      *
-     * @param fileEditDTO 編輯文件數據傳輸對象，包含文件ID和編輯類型。
-     * @param user        當前操作的用戶。
+     * @param fileEditBO 編輯文件數據傳輸對象，包含文件ID和編輯類型。
+     * @param user       當前操作的用戶。
      *
      * @return Mono<Void> 空的 Mono 表示編輯操作已完成。
      */
     @Override
-    public Mono<Void> editFile(FileEditDTO fileEditDTO, User user) {
+    @RequirePermission(PermissionEnum.WRITE)
+    public Mono<Void> editFile(FileEditBO fileEditBO, User user) {
+        FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
         return findUserOnlineFileById(fileEditDTO.getFileId()).flatMap(userOnlineFile -> switch (fileEditDTO.getEditType()) {
-            case EDIT_METADATA -> super.editFile(fileEditDTO, user);
-            case EDIT_CONTENT -> saveContent(userOnlineFile, fileEditDTO, user);
-            case BUILD_HISTORY_RECORD -> buildHistoryRecord(userOnlineFile, fileEditDTO, user);
-            case REVERT_HISTORY_RECORD -> revertHistoryRecord(userOnlineFile, fileEditDTO, user);
+            case EDIT_METADATA -> super.editFile(fileEditBO, user);
+            case EDIT_CONTENT -> saveContent(userOnlineFile, fileEditBO, user);
+            case BUILD_HISTORY_RECORD -> buildHistoryRecord(userOnlineFile, fileEditBO, user);
+            case REVERT_HISTORY_RECORD -> revertHistoryRecord(userOnlineFile, fileEditBO, user);
             case DELETE_HISTORY_RECORD -> deleteHistoryRecord(userOnlineFile, fileEditDTO.getVersion());
         });
     }
@@ -335,15 +332,16 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 根據編輯傳入的內容格式化並保存文件內容。若文件內容為空，則保存為空內容。
      *
      * @param userOnlineFile 用戶在線文件對象，包含當前文件內容。
-     * @param fileEditDTO    編輯文件數據傳輸對象，包含文件內容。
+     * @param fileEditBO     編輯文件數據傳輸對象，包含文件內容。
      * @param user           當前操作的用戶。
      *
      * @return Mono<Void> 空的 Mono，表示操作完成。
      */
-    private Mono<Void> saveContent(UserOnlineFile userOnlineFile, FileEditDTO fileEditDTO, User user) {
+    private Mono<Void> saveContent(UserOnlineFile userOnlineFile, FileEditBO fileEditBO, User user) {
         return Mono.defer(() -> {
             userOnlineFile.setLastModifiedBy(user.getId());
             userOnlineFile.setIsMatchHistory(false);
+            FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
             if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
                 userOnlineFile.setContent(EMPTY_CONTENT);
                 return Mono.just(userOnlineFile);
@@ -353,7 +351,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 userOnlineFile.setContent(contentJson);
                 return Mono.just(userOnlineFile);
             });
-        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata())));
+        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
     }
 
 
@@ -363,12 +361,13 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 該方法會根據當前文件內容和修改記錄生成新的歷史記錄。若文件內容無變動，則會返回錯誤。
      *
      * @param userOnlineFile 用戶在線文件對象，包含當前文件的基本信息。
-     * @param fileEditDTO    編輯文件數據傳輸對象，包含文件的修改內容。
+     * @param fileEditBO     編輯文件數據傳輸對象，包含文件的修改內容。
      * @param user           當前操作的用戶。
      *
      * @return Mono<Void> 空的 Mono，表示操作完成。
      */
-    private Mono<Void> buildHistoryRecord(UserOnlineFile userOnlineFile, FileEditDTO fileEditDTO, User user) {
+    private Mono<Void> buildHistoryRecord(UserOnlineFile userOnlineFile, FileEditBO fileEditBO, User user) {
+        FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
         if (userOnlineFile.getIsMatchHistory() == null || userOnlineFile.getLastHistoryVersion() == null) {
             return formatObjectToJson(fileEditDTO.getContent()).flatMap(newContent -> {
                 userOnlineFile.setContent(newContent);
@@ -377,7 +376,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 userOnlineFile.setCurrentSnapshotCount(0);
                 userOnlineFile.setLastModifiedBy(user.getId());
                 return createInitialHistory(userOnlineFile, fileEditDTO, newContent);
-            }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditDTO.getUserFileMetadata())));
+            }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
         }
 
         Mono<EditorContentDTO> lastContentJsonDTOMono;
@@ -390,12 +389,13 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }
 
 
-        return lastContentJsonDTOMono.flatMap(compareContentDTO -> Mono.defer(() -> {
-            if (compareContentDTO.equals(fileEditDTO.getContent())) {
+        return lastContentJsonDTOMono
+                .flatMap(compareContentDTO -> Mono.defer(() -> {
+                    if (compareContentDTO.equals(fileEditDTO.getContent())) {
                         return Mono.error(new ValidationException(ValidationException.ErrorCode.NO_CHANGE_IN_CONTENT));
                     }
 
-            Mono<String> diffResult = calculateFileContentDiff(compareContentDTO, fileEditDTO.getContent());
+                    Mono<String> diffResult = calculateFileContentDiff(compareContentDTO, fileEditDTO.getContent());
                     if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
                         userOnlineFile.setContent(EMPTY_CONTENT);
                         return diffResult;
@@ -404,7 +404,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                         userOnlineFile.setContent(newContent);
                         return diffResult;
                     });
-        })).flatMap(diffResult -> userOnlineFileHistoryRepository.findTopNByFileIdOrderByVersionDesc(userOnlineFile.getId(), 1)
+                }))
+                .flatMap(diffResult -> userOnlineFileHistoryRepository
+                        .findTopNByFileIdOrderByVersionDesc(userOnlineFile.getId(), 1)
                         .map(UserOnlineFileHistory::getVersion)
                         .defaultIfEmpty(0L)
                         .flatMap(version -> {
@@ -429,7 +431,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                                 userOnlineFileHistory.setPreviousVersion(version);
                             }
                             return userOnlineFileHistoryRepository.save(userOnlineFileHistory).then(userOnlineFileRepository.save(userOnlineFile));
-                        }).then(Mono.when(updateUserFileMetadata(fileEditDTO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile))));
+                        })
+                        .then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile))));
     }
 
 
@@ -483,19 +486,34 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 .flatMap(previousHistory -> findHistoryChainRecursive(previousHistory, chain));
     }
 
-
     /**
-     * 將JSON格式的字符串轉換為EditorContentJsonDTO對象。
-     * <p>
-     * 該方法將會嘗試將JSON字符串解析成指定的DTO對象，並處理解析過程中的錯誤。
+     * 還原歷史記錄
+     * 此方法根據給定的版本號還原文件的歷史記錄。如果是快照版本，將直接還原；如果是增量版本，則會計算並應用補丁。
      *
-     * @param json JSON格式的字符串，表示文件的內容。
+     * @param userOnlineFile 用戶正在編輯的在線文件。
+     * @param fileEditBO     用於編輯文件的數據傳輸對象，包含文件內容和版本號。
+     * @param user           當前執行還原操作的用戶。
      *
-     * @return Mono<EditorContentDTO> 轉換後的EditorContentDTO對象。
+     * @return 空Mono
      */
-    private Mono<EditorContentDTO> formatJsonToEditorContentJsonDTO(String json) {
-        return Mono.fromCallable(() -> objectMapper.readValue(json, EditorContentDTO.class))
-                .onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
+    private Mono<Void> revertHistoryRecord(UserOnlineFile userOnlineFile, FileEditBO fileEditBO, User user) {
+        Long targetVersion = fileEditBO.getFileEditDTO().getVersion();
+        return Mono.defer(() -> {
+            if (targetVersion == null || targetVersion < 0) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_VERSION_NUMBER, targetVersion));
+            }
+
+            return userOnlineFileHistoryRepository
+                    .findByFileIdAndVersion(userOnlineFile.getId(), targetVersion)
+                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_HISTORY_RECORD, targetVersion)));
+        }).flatMap(targetHistory -> {
+            if (targetHistory.getIsSnapshot()) {
+                return saveFileHistory(userOnlineFile, targetHistory.getSnapshotContent(), user, targetHistory.getVersion());
+            }
+            return getCompleteContent(targetHistory)
+                    .flatMap(this::formatObjectToJson)
+                    .flatMap(contentJson -> saveFileHistory(userOnlineFile, contentJson, user, targetHistory.getVersion()));
+        }).then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile)));
     }
 
 
@@ -550,11 +568,11 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      *
      * @return 操作已完成的 Mono
      */
-    public Mono<Void> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
+    public Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
         return Mono.defer(() -> {
             userFileMetadata.setLastAccessTime(LocalDateTime.now());
             return userFileMetaRepository.save(userFileMetadata);
-        }).then().subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
 
@@ -594,35 +612,19 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }).toList();
     }
 
-
     /**
-     * 還原歷史記錄
-     * 此方法根據給定的版本號還原文件的歷史記錄。如果是快照版本，將直接還原；如果是增量版本，則會計算並應用補丁。
+     * 將JSON格式的字符串轉換為EditorContentJsonDTO對象。
+     * <p>
+     * 該方法將會嘗試將JSON字符串解析成指定的DTO對象，並處理解析過程中的錯誤。
      *
-     * @param userOnlineFile 用戶正在編輯的在線文件。
-     * @param editDTO        用於編輯文件的數據傳輸對象，包含文件內容和版本號。
-     * @param user           當前執行還原操作的用戶。
+     * @param json JSON格式的字符串，表示文件的內容。
      *
-     * @return 空Mono
+     * @return Mono<EditorContentDTO> 轉換後的EditorContentDTO對象。
      */
-    private Mono<Void> revertHistoryRecord(UserOnlineFile userOnlineFile, FileEditDTO editDTO, User user) {
-        Long targetVersion = editDTO.getVersion();
-        return Mono.defer(() -> {
-            if (targetVersion == null || targetVersion < 0) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_VERSION_NUMBER, targetVersion));
-            }
-
-            return userOnlineFileHistoryRepository
-                    .findByFileIdAndVersion(userOnlineFile.getId(), targetVersion)
-                    .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_HISTORY_RECORD, targetVersion)));
-        }).flatMap(targetHistory -> {
-            if (targetHistory.getIsSnapshot()) {
-                return saveFileHistory(userOnlineFile, targetHistory.getSnapshotContent(), user, targetHistory.getVersion());
-            }
-            return getCompleteContent(targetHistory)
-                    .flatMap(this::formatObjectToJson)
-                    .flatMap(contentJson -> saveFileHistory(userOnlineFile, contentJson, user, targetHistory.getVersion()));
-        }).then(Mono.when(updateUserFileMetadata(editDTO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile)));
+    private Mono<EditorContentDTO> formatJsonToEditorContentJsonDTO(String json) {
+        return Mono
+                .fromCallable(() -> objectMapper.readValue(json, EditorContentDTO.class))
+                .onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
     }
 
 

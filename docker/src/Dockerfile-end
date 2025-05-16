@@ -22,4 +22,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
 
 # 如果你的 compose 有更改，請確保這裡的環境變數也有更改
-CMD ["/app/wait-init.sh", "filemanager_mysql", "3306", "60", "/app/wait-init.sh", "filemanager_mongo", "27017", "60", "/app/wait-init.sh", "filemanager_redis", "6381", "60", "java", "-jar", "app.jar"]
+CMD ["/wait-for-it.sh", "file_mysql", "3306", "60", "/wait-for-it.sh", "file_mongo", "27017", "60", "/wait-for-it.sh", "file_redis", "6381", "60","/wait-for-it.sh", "file_mysql", "3306", "60","/wait-for-it.sh", "file_clamav", "3306", "60", "java", "-jar", "app.jar"]

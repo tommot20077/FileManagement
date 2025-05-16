@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.customenum.TransfersStatusEnum;
 import xyz.dowob.filemanagement.entity.TransfersTask;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -31,6 +32,7 @@ public interface TransfersTasksRepository extends ReactiveCrudRepository<Transfe
      */
     Mono<TransfersTask> findByMd5(String md5);
 
+
     /**
      * 根據傳輸任務ID查詢文件傳輸任務
      *
@@ -40,6 +42,7 @@ public interface TransfersTasksRepository extends ReactiveCrudRepository<Transfe
      */
     Mono<TransfersTask> findByTransferTaskId(String transferTaskId);
 
+
     /**
      * 依照指定的狀態查詢未包含在指定狀態中的文件傳輸任務
      *
@@ -47,7 +50,17 @@ public interface TransfersTasksRepository extends ReactiveCrudRepository<Transfe
      *
      * @return Flux<TransfersTask>
      */
-    Flux<TransfersTask> findAllByStatusNotIn(@Param("status") List<TransfersStatusEnum> status);
+    Flux<TransfersTask> findAllByStatusIn(@Param("status") List<TransfersStatusEnum> status);
 
+
+    /**
+     * 根據狀態列表和開始時間查詢文件傳輸任務
+     *
+     * @param status    狀態列表
+     * @param startTime 開始時間
+     *
+     * @return Flux<TransfersTask>
+     */
+    Flux<TransfersTask> findAllByStatusInAndStartTimeBefore(@Param("status") List<TransfersStatusEnum> status, LocalDateTime startTime);
 
 }

@@ -35,10 +35,9 @@ build/
 /docker-compose.yml
 /Dockerfile
 /logs/
-/config/application.yml
-/mongo/init/initMongo.js
-/mysql/init/initMySQL.sql
-/mongo/conf/mongod.conf
-/mysql/conf/my.cnf
-/redis/conf/redis.conf
 /wait-init.sh
+/mongo/
+/mysql/
+/redis/
+/config/
+/.xcodemap/config/xcodemap-class-filter.yaml

@@ -1,6 +1,7 @@
 package xyz.dowob.filemanagement.controller.web;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -16,6 +17,7 @@ import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.data.user.dto.UserEmailDTO;
 import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
+import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 
 /**
  * 用於處理訪客相關的Web請求的控制器
@@ -38,8 +40,8 @@ public class WebGuestController extends BaseGuestController {
      * @param userService          用戶服務
      * @param securityProperties   安全屬性配置
      */
-    protected WebGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties) {
-        super(authorizationService, userService, securityProperties);
+    protected WebGuestController(AuthorizationService authorizationService, UserService userService, SecurityProperties securityProperties, ValidationService validationService) {
+        super(authorizationService, validationService, userService, securityProperties);
     }
 
 
@@ -48,6 +50,7 @@ public class WebGuestController extends BaseGuestController {
      *
      * @param registerUserDTO 註冊用戶的數據傳輸對象
      * @param exchange        當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 註冊結果
      */
     @PostMapping("/register")
@@ -61,11 +64,12 @@ public class WebGuestController extends BaseGuestController {
      *
      * @param authRequestDTO 登入請求數據
      * @param exchange       當前請求對象
+     *
      * @return Mono<ResponseEntity < ?>> 登入結果
      */
     @HideSensitive
     @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login(@RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
+    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
         return super.login(authRequestDTO, exchange, true);
     }
 
