@@ -47,7 +47,7 @@ import static org.mockito.Mockito.when;
  * 每個測試皆對應實際驗證邏輯的特定狀況與例外行為，確保使用者授權與安全性處理的正確性與健壯性。
  */
 
-@DisplayName("AuthorizationServiceImpl 授權流程測試")
+@DisplayName("AuthorizationServiceImpl 授權處理測試")
 @ExtendWith(MockitoExtension.class)
 class AuthorizationServiceImplTest {
 

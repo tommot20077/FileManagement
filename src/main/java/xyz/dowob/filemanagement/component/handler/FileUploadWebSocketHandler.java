@@ -199,11 +199,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                         .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
                         .flatMap(transferResponseDTO -> {
                             ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                            if (transferResponseDTO.getIsFinished()) {
-                                response.setMessage("上傳任務完成");
-                            } else {
-                                response.setMessage("初始化上傳任務成功");
-                            }
+                            String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "初始化上傳任務成功";
+                            response.setMessage(message);
                             return sendMessage(session, response);
                         })
                         .doFinally(signalType -> userLimiter.release(user.getId()).subscribeOn(Schedulers.boundedElastic()).subscribe());

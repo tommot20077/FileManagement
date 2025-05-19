@@ -18,6 +18,7 @@ import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * 檔案權限服務實現類，分離檔案權限驗證邏輯
@@ -82,18 +83,19 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
      * @param fileIds 文件ID集合
      * @param rules   權限規則
      *
-     * @return UserFileMetadata 文件元數據
+     * @return Mono<Map < Long, UserFileMetadata>> 文件元數據集合
      */
     @Override
-    public Flux<UserFileMetadata> validateUserPermission(User user, Iterable<Long> fileIds,
-                                                         @Nullable Collection<Permission<UserFileMetadata>> rules) {
+    public Mono<Map<Long, UserFileMetadata>> validateUserPermission(User user, Iterable<Long> fileIds,
+                                                                    @Nullable Collection<Permission<UserFileMetadata>> rules) {
         if (fileIds == null || !fileIds.iterator().hasNext()) {
-            return Flux.empty();
+            return Mono.just(Map.of());
         }
         return Flux
                 .fromIterable(fileIds)
                 .flatMap(fileId -> userFileMetaRepository.findById(fileId.toString()).switchIfEmpty(reservedSearchMethod(user, fileId)))
-                .flatMap(file -> checkPermissions(user, file, rules));
+                .flatMap(file -> checkPermissions(user, file, rules))
+                .collectMap(UserFileMetadata::getId, file -> file);
     }
 
     /**

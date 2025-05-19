@@ -29,7 +29,6 @@ import java.util.Optional;
  *
  * @author yuan
  * @program FileManagement
- * @ClassName FilePermissionRuleManager
  * @create 2025/2/25
  * @Version 1.0
  **/
@@ -95,6 +94,7 @@ public class FilePermissionRuleManager {
      * 2. allowShared: 允許共享者訪問，基於以下規則進行權限檢查：
      * - 如果文件是公開的(PUBLIC)或當前用戶是擁有者，則允許訪問
      * - 如果文件是私有的(NONE)，則拒絕訪問
+     * - 如果文件是私有的(PRIVATE)，則檢查用戶是否有該文件的共享記錄
      * - 如果文件是默認的(DEFAULT)，則檢查父資料夾的權限：
      * - 如果父資料夾是公開的(PUBLIC)，則允許訪問
      * - 如果當前用戶有父資料夾權限且不是關閉分享的(NONE)，則允許訪問

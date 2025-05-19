@@ -85,6 +85,10 @@ public class JwtTokenProviderImpl implements TokenProvider {
     @Override
     @HideSensitive
     public Mono<String> generateToken(User user) {
+        if (user == null) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND));
+        }
+
         Mono<Token> tokenMono = tokenRepository.findByUserId(user.getId()).switchIfEmpty(Mono.defer(() -> {
             Token newToken = new Token();
             newToken.setUserId(user.getId());
@@ -101,7 +105,10 @@ public class JwtTokenProviderImpl implements TokenProvider {
             Date expirationDate = new Date(now.getTime() + expirationMs);
             String jwtToken = Jwts
                     .builder()
-                    .subject(String.valueOf(user.getId())).issuedAt(now).claim("role", role).claim("username", user.getUsername())
+                    .subject(String.valueOf(user.getId()))
+                    .issuedAt(now)
+                    .claim("role", role)
+                    .claim("username", user.getUsername())
                     .claim("version", tokenVersion)
                     .expiration(expirationDate)
                     .signWith(key)
@@ -136,7 +143,8 @@ public class JwtTokenProviderImpl implements TokenProvider {
         return Mono.defer(() -> {
             TokenCacheEntity cacheEntity = cacheTokenMap.get(token);
 
-            return getClaimsFromToken(token).flatMap(claims -> validateTokenWithClaims(token, claims, cacheEntity))
+            return getClaimsFromToken(token)
+                    .flatMap(claims -> validateTokenWithClaims(token, claims, cacheEntity))
                     .retryWhen(Retry.backoff(1, Duration.ofSeconds(3)).filter(e -> !(e instanceof ValidationException)));
         });
     }

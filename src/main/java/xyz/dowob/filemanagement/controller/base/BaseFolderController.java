@@ -30,7 +30,6 @@ import xyz.dowob.filemanagement.service.serviceInterface.ValidationService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -116,23 +115,22 @@ public abstract class BaseFolderController extends BaseFileController {
                 .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
                 .then(userService.getUser(exchange))
                 .flatMap(user -> {
-                    Map<Long, UserFileMetadata> fileMetadataMap = new HashMap<>();
-                    fileMetadataMap.put(Long.parseLong(fileEditDTO.getFileId()), null);
+                    List<Long> fileIds = new ArrayList<>();
+
+                    Long fileId = Long.parseLong(fileEditDTO.getFileId());
+                    fileIds.add(fileId);
                     if (fileEditDTO.getParentFolderId() != null) {
-                        fileMetadataMap.put(fileEditDTO.getParentFolderId(), null);
+                        fileIds.add(fileEditDTO.getParentFolderId());
                     }
-                    return permissionService
-                            .validateUserPermission(user, fileMetadataMap.keySet())
-                            .doOnNext(file -> fileMetadataMap.put(file.getId(), file))
-                            .then(Mono.defer(() -> {
-                                FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
-                                fileEditBO.setUserFileMetadata(fileMetadataMap.get(Long.parseLong(fileEditDTO.getFileId())));
-                                fileEditBO.setParentFolderFileMetadata(fileMetadataMap.get(fileEditDTO.getParentFolderId()));
-                                return validationService
-                                        .validateFileType(fileEditBO.getUserFileMetadata(), FileEnum.FOLDER)
-                                        .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
-                                        .then(folderService.editFolder(fileEditBO, user));
-                            }));
+                    return permissionService.validateUserPermission(user, fileIds).flatMap(map -> {
+                        FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
+                        fileEditBO.setUserFileMetadata(map.get(fileId));
+                        fileEditBO.setParentFolderFileMetadata(map.get(fileEditDTO.getParentFolderId()));
+                        return validationService
+                                .validateFileType(fileEditBO.getUserFileMetadata(), FileEnum.FOLDER)
+                                .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
+                                .then(folderService.editFolder(fileEditBO, user));
+                    });
                 })
                 .then(createResponseEntity(createApiResponse(exchange, "資料夾更新成功", null)));
         return handleError(responseEntityMono, exchange);
@@ -149,17 +147,18 @@ public abstract class BaseFolderController extends BaseFileController {
      */
     public Mono<ResponseEntity<?>> createFolder(FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         return handleError(validationService.validateEditFileDTO(fileEditDTO, true).then(userService.getUser(exchange)).flatMap(user -> {
-            Mono<UserFileMetadata> parentFolderMono = Mono.empty();
+                               Mono<UserFileMetadata> parentFolderMono = Mono.empty();
 
-            if (fileEditDTO.getParentFolderId() != null) {
-                parentFolderMono = permissionService
-                        .validateUserPermission(user, fileEditDTO.getParentFolderId())
-                        .flatMap(file -> validationService.validateFileType(file, FileEnum.FOLDER));
-            }
-            return parentFolderMono
-                    .then(folderService.createFolder(fileEditDTO, user))
-                    .then(createResponseEntity(createApiResponse(exchange, "資料夾建立成功", null)));
-        }), exchange);
+                               if (fileEditDTO.getParentFolderId() != null) {
+                                   parentFolderMono = permissionService
+                                           .validateUserPermission(user, fileEditDTO.getParentFolderId())
+                                           .flatMap(file -> validationService.validateFileType(file, FileEnum.FOLDER));
+                               }
+                               return parentFolderMono
+                                       .then(folderService.createFolder(fileEditDTO, user))
+                                       .then(createResponseEntity(createApiResponse(exchange, "資料夾建立成功", null)));
+                           }), exchange
+        );
     }
 
 
@@ -173,16 +172,17 @@ public abstract class BaseFolderController extends BaseFileController {
      */
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, Long fileId) {
         return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
-            HashMap<String, Object> result = new HashMap<>();
-            return permissionService
-                    .validateUserPermission(user, fileId, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
-                    .flatMap(file -> validationService
-                            .validateFileType(file, FileEnum.FOLDER)
-                            .then(folderService.getUserFilePaths(file, user).flatMap(list -> {
-                                result.put("filePaths", list);
-                                return Mono.just(result);
-                            })));
-        }).flatMap(result -> createResponseEntity(createApiResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange);
+                               HashMap<String, Object> result = new HashMap<>();
+                               return permissionService
+                                       .validateUserPermission(user, fileId, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
+                                       .flatMap(file -> validationService
+                                               .validateFileType(file, FileEnum.FOLDER)
+                                               .then(folderService.getUserFilePaths(file, user).flatMap(list -> {
+                                                   result.put("filePaths", list);
+                                                   return Mono.just(result);
+                                               })));
+                           }).flatMap(result -> createResponseEntity(createApiResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange
+        );
     }
 
 
@@ -195,14 +195,15 @@ public abstract class BaseFolderController extends BaseFileController {
      */
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return handleError(userService.getUser(exchange).flatMap(user -> {
-            if (!fileProperties.getGlobal().getEnableUserFolderListTree()) {
-                return createResponseEntity(createApiResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
-            }
-            if (folderListTreeManager != null) {
-                CompletableFuture.runAsync(() -> folderListTreeManager.initializeTree(user.getId()));
-            }
-            return (createResponseEntity(createApiResponse(exchange, "請求建立用戶檔案樹成功", null)));
-        }), exchange);
+                               if (!fileProperties.getGlobal().getEnableUserFolderListTree()) {
+                                   return createResponseEntity(createApiResponse(exchange, "當前設定不支持建立用戶檔案樹", null));
+                               }
+                               if (folderListTreeManager != null) {
+                                   CompletableFuture.runAsync(() -> folderListTreeManager.initializeTree(user.getId()));
+                               }
+                               return (createResponseEntity(createApiResponse(exchange, "請求建立用戶檔案樹成功", null)));
+                           }), exchange
+        );
     }
 
 

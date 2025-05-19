@@ -21,48 +21,7 @@ import xyz.dowob.filemanagement.repostiory.UserRepository;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
-
-/**
- * ValidationServiceImpl 驗證邏輯單元測試。
- * <p>
- * 測試涵蓋：
- * <p>
- * 一、註冊驗證（validateRegisterDTO）
- * - DTO 為 null
- * - 帳號重複或格式錯誤（空白、不合法字符）
- * - 信箱已存在
- * - 密碼與確認密碼不一致
- * - 密碼強度不足（缺乏大寫、是回文等）
- * - 欄位為空的邊界條件
- * - 資料庫異常情境（查詢失敗）
- * - 完整正確輸入應成功通過
- * <p>
- * 二、重設密碼驗證（validateResetPasswordDTO）
- * - DTO 為 null
- * - 密碼與確認密碼不一致
- * - 密碼強度不足
- * - 欄位為空的邊界條件
- * - 輸入正確應成功通過
- * <p>
- * 三、檔案上傳驗證（validateFileMetadataDTO）
- * - DTO 為 null
- * - 檔名不合法或過長
- * - 檔案大小超過使用者剩餘儲存空間
- * - 邊界檔名長度測試
- * - 完整正確輸入應成功通過
- * <p>
- * 四、檔案編輯驗證（validateEditFileDTO）
- * - DTO 為 null
- * - 編輯類型為 null 或不合法
- * - 檔名不合法（含不允許字符）
- * - 編輯內容過長（超過限制）
- * - 備註過長
- * - 合法內容與備註應成功通過
- * - 編輯歷史版本、還原歷史等情境測試
- * <p>
- * 每個測試方法皆對應一個驗證邏輯的具體錯誤或成功情境，確保驗證流程健壯且可追蹤。
- */
-@DisplayName("ValidationServiceImpl 驗證邏輯測試")
+@DisplayName("ValidationServiceImpl 處理驗證測試")
 @ExtendWith(MockitoExtension.class)
 class ValidationServiceImplTest {
 

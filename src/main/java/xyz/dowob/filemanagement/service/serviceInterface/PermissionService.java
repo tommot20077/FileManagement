@@ -1,12 +1,12 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import jakarta.annotation.Nullable;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.functionInterface.Permission;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * 權限服務接口，用戶可以通過實現 PermissionService 介面來自定義權限驗證邏輯
@@ -51,7 +51,7 @@ public interface PermissionService<T> {
      *
      * @return 是否有權限
      */
-    default Flux<T> validateUserPermission(User user, Iterable<Long> fileId) {
+    default Mono<Map<Long, T>> validateUserPermission(User user, Iterable<Long> fileId) {
         return validateUserPermission(user, fileId, null);
     }
 
@@ -63,5 +63,5 @@ public interface PermissionService<T> {
      *
      * @return 是否有權限
      */
-    Flux<T> validateUserPermission(User user, Iterable<Long> fileId, @Nullable Collection<Permission<T>> rules);
+    Mono<Map<Long, T>>validateUserPermission(User user, Iterable<Long> fileId, @Nullable Collection<Permission<T>> rules);
 }
