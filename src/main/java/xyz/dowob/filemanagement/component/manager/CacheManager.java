@@ -52,7 +52,7 @@ public class CacheManager {
     /**
      * 緩存提供者的Map，用於存儲不同類型的緩存提供者
      */
-    private final EnumMap<CacheProviderEnum, CacheProvider> cacheProviderMap;
+    private static final EnumMap<CacheProviderEnum, CacheProvider> cacheProviderMap = new EnumMap<>(CacheProviderEnum.class);
     /**
      * Redis 操作提供者
      */
@@ -67,7 +67,6 @@ public class CacheManager {
      */
     public CacheManager(List<CacheProvider> cacheProviderList, RedisProvider redisProvider) {
         this.redisProvider = redisProvider;
-        cacheProviderMap = new EnumMap<>(CacheProviderEnum.class);
         for (CacheProvider provider : cacheProviderList) {
             CacheProviderType cacheProviderType = AnnotatedElementUtils.findMergedAnnotation(provider.getClass(), CacheProviderType.class);
             if (cacheProviderType != null) {
@@ -669,7 +668,7 @@ public class CacheManager {
      * @return CacheRule<R> 緩存規則
      */
     @SkipRecord
-    public <R> CacheRule<R> generateCacheRule(Function<R, ?> keyExtractor, CacheProviderEnum cacheProviderEnum) {
+    public static <R> CacheRule<R> generateCacheRule(Function<R, ?> keyExtractor, CacheProviderEnum cacheProviderEnum) {
         return (value, expire) -> {
             String key = keyExtractor.apply(value).toString();
             return Optional

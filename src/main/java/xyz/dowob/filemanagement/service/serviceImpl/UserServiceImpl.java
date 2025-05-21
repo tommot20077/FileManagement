@@ -56,6 +56,15 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     /**
+     * 用戶ID緩存規則
+     */
+    private static final CacheRule<User> USER_ID_CACHE_RULE = CacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
+    /**
+     * 用戶名緩存規則
+     */
+    private static final CacheRule<User> USERNAME_CACHE_RULE = CacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
+
+    /**
      * 用戶數據庫操作對象
      */
     private final UserRepository userRepository;
@@ -99,23 +108,12 @@ public class UserServiceImpl implements UserService {
      * 用於處理遊客的請求
      */
     private final User guestUser = new User();
-    /**
-     * 用戶ID緩存規則
-     */
-    private CacheRule<User> USER_ID_CACHE_RULE;
-    /**
-     * 用戶名緩存規則
-     */
-    private CacheRule<User> USERNAME_CACHE_RULE;
 
     /**
      * 初始化緩存規則
      */
     @PostConstruct
     public void init() {
-        USERNAME_CACHE_RULE = cacheManager.generateCacheRule(User::getUsername, CacheProviderEnum.USER_CACHE);
-        USER_ID_CACHE_RULE = cacheManager.generateCacheRule(User::getId, CacheProviderEnum.USER_CACHE);
-
         guestUser.setId(0L);
         guestUser.setUsername("Guest");
         guestUser.setPassword("Guest");
@@ -181,12 +179,17 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Mono<Void> logout(Long userId, ServerWebExchange exchange) {
+        if (Objects.equals(userId, 0L) || exchange == null) {
+            return Mono.empty();
+        }
+
         return exchange
                 .getSession()
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED, "無法獲取 Session")))
                 .flatMap(session -> userRepository
                         .findById(userId)
-                        .flatMap(user -> tokenService.revokeToken(user.getId(), TokenEnum.JWT_AUTHORIZATION_TOKEN))
-                        .then(session.invalidate()))
+                        .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "用戶ID: " + userId)))
+                        .flatMap(user -> tokenService.revokeToken(user.getId(), TokenEnum.JWT_AUTHORIZATION_TOKEN).then(session.invalidate())))
                 .doFinally(signalType -> SecurityContextHolder.clearContext());
     }
 
@@ -319,7 +322,7 @@ public class UserServiceImpl implements UserService {
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getById(Long userId) {
         if (userId == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND));
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "空值的用戶ID"));
         }
 
         if (Objects.equals(userId, 0L)) {
@@ -327,7 +330,9 @@ public class UserServiceImpl implements UserService {
         }
 
         List<CacheRule<User>> cacheRules = List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE);
-        return cacheManager.runAndSetCache(userId.toString(), User.class, CacheProviderEnum.USER_CACHE, this.getByIdWithDB(userId), cacheRules);
+        return cacheManager
+                .runAndSetCache(userId.toString(), User.class, CacheProviderEnum.USER_CACHE, this.getByIdWithDB(userId), cacheRules)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "用戶ID: " + userId)));
     }
 
     /**
@@ -352,8 +357,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Flux<User> getAllByParams(String type, Object... args) {
-        if (args.length == 0) {
-            return Flux.empty();
+
+
+        if (args == null || args.length == 0) {
+            return Flux.error(new ValidationException(ValidationException.ErrorCode.SEARCH_CRITERIA_EMPTY));
+        }
+
+
+        if (type == null || (!Objects.equals(type, UserInfoTypeEnum.ID.name()) && !Objects.equals(type, UserInfoTypeEnum.NAME.name()))) {
+            return Flux.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "無效的查詢類型: " + type));
         }
 
         List<String> userInfoList = new LinkedList<>();
@@ -368,6 +380,7 @@ public class UserServiceImpl implements UserService {
             userInfoList.remove(userType);
         });
 
+
         if (userInfoList.isEmpty()) {
             return cacheUserFlux;
         }
@@ -375,22 +388,38 @@ public class UserServiceImpl implements UserService {
 
         Flux<User> userRepositoryChooseFlux;
         if (isId) {
-            userRepositoryChooseFlux = userRepository.findAllByIdIn(userInfoList
-                                                                            .stream()
-                                                                            .filter(id -> id.matches("\\d+"))
-                                                                            .map(Long::parseLong)
-                                                                            .collect(Collectors.toList()));
+            List<Long> validIds = userInfoList.stream().filter(id -> id != null && id.matches("\\d+"))
+
+                                              .map(Long::parseLong).collect(Collectors.toList());
+
+
+            if (validIds.isEmpty()) {
+                return Flux.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "提供的ID均無效"));
+            }
+            userRepositoryChooseFlux = userRepository.findAllByIdIn(validIds);
         } else {
-            userRepositoryChooseFlux = userRepository.findAllByUsernameIn(userInfoList);
+            List<String> validUsernames = userInfoList.stream().filter(username -> username != null && !username.trim().isEmpty())
+
+                                                      .collect(Collectors.toList());
+
+
+            if (validUsernames.isEmpty()) {
+                return Flux.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "提供的使用者名稱均無效"));
+            }
+            userRepositoryChooseFlux = userRepository.findAllByUsernameIn(validUsernames);
         }
 
 
         Flux<User> userRepositoryFlux = cacheManager.runAndSetCache(userInfoList,
+
+
                                                                     User.class,
                                                                     CacheProviderEnum.USER_CACHE,
                                                                     userRepositoryChooseFlux,
                                                                     List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
         );
+
+
         return cacheUserFlux.concatWith(userRepositoryFlux);
     }
 
