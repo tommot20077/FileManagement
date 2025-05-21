@@ -54,46 +54,38 @@ import static xyz.dowob.filemanagement.customenum.FileEnum.*;
 @RequiredArgsConstructor
 public abstract class BaseFileController implements ResponseUnity {
     /**
+     * 自定義文件類型，表示支持的文件類型枚舉，包含圖片、視頻、音樂、文檔等。
+     */
+    protected static final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
+    /**
      * 用戶業務層對象，用於操作用戶資料。
      */
     protected final UserService userService;
-
     /**
      * 檔案策略，用於決定不同的文件處理策略。
      */
     protected final FileServiceStrategy fileServiceStrategy;
-
     /**
      * 檔案屬性，提供文件配置和屬性信息。
      */
     protected final FileProperties fileProperties;
-
     /**
      * 驗證服務，用於文件相關的數據驗證。
      */
     protected final ValidationService validationService;
-
     /**
      * 權限服務，負責處理文件的訪問控制和權限驗證。
      * 用戶和文件的操作權限校驗。
      */
     protected final PermissionService<UserFileMetadata> permissionService;
-
     /**
      * 對象轉換工具，用於將 Java 對象與 JSON 之間進行轉換。
      */
     protected final ObjectMapper objectMapper;
-
     /**
      * 文件權限規則管理器，用於管理文件的權限規則。
      */
     protected final FilePermissionRuleManager filePermissionRuleManager;
-
-    /**
-     * 自定義文件類型，表示支持的文件類型枚舉，包含圖片、視頻、音樂、文檔等。
-     */
-    protected static final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
-
 
     /**
      * 獲取用戶文件列表，根據資料夾 ID 獲取該資料夾下的文件列表。

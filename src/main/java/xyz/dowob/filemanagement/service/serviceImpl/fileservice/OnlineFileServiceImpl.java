@@ -123,47 +123,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
     }
 
-
-    /**
-     * 下載指定文件。
-     * 根據文件元數據查找用戶文件，並返回文件內容。如果文件內容轉換為DTO對象失敗，將會返回錯誤。
-     *
-     * @param userFileMetadata 文件的元數據，包含文件ID和其他元數據信息。
-     * @param user             當前操作的用戶。
-     * @param optional         可選參數，此處為下載類型
-     *
-     * @return Mono<UserFileDataBO> 包含文件數據和元數據的業務對象。
-     */
-    @Override
-    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
-        return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
-            userFileMetadata.setLastAccessTime(LocalDateTime.now());
-            userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
-
-            if (Objects.equals(optional[0], DownloadActionEnum.DOWNLOAD.name())) {
-                ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
-                return convertProvider.convertToDataBuffer(userOnlineFile.getContent()).flatMap(dataBufferSize -> {
-                    UserFileDataBO userFileDataBO = new UserFileDataBO();
-                    userFileDataBO.setFilename(userFileMetadata.getFilename());
-                    userFileDataBO.setFileType(FileEnum.ONLINE_DOCUMENT);
-                    userFileDataBO.setFileSize(dataBufferSize.size());
-                    userFileDataBO.setDataBufferFlux(dataBufferSize.dataBuffer());
-
-                    String name = userFileMetadata.getFilename().split("\\.")[0] + "." + ConvertProviderEnum.DOCX.getSuffix();
-                    userFileDataBO.setFilename(name);
-                    return Mono.just(userFileDataBO);
-                });
-            }
-            try {
-                EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
-                return Mono.just(new UserFileDataBO(userOnlineFile, userFileMetadata, content));
-            } catch (JsonProcessingException e) {
-                return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
-            }
-        });
-    }
-
-
     /**
      * 上傳指定文件。
      * 根據給定的文件元數據創建文件元數據並保存，然後上傳文件內容。如果操作成功，將返回上傳結果。
@@ -205,6 +164,44 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+    /**
+     * 下載指定文件。
+     * 根據文件元數據查找用戶文件，並返回文件內容。如果文件內容轉換為DTO對象失敗，將會返回錯誤。
+     *
+     * @param userFileMetadata 文件的元數據，包含文件ID和其他元數據信息。
+     * @param user             當前操作的用戶。
+     * @param optional         可選參數，此處為下載類型
+     *
+     * @return Mono<UserFileDataBO> 包含文件數據和元數據的業務對象。
+     */
+    @Override
+    public Mono<UserFileDataBO> downloadFile(UserFileMetadata userFileMetadata, User user, String... optional) {
+        return findUserOnlineFileById(userFileMetadata.getId().toString()).flatMap(userOnlineFile -> {
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+            userFileMetaRepository.save(userFileMetadata).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+            if (Objects.equals(optional[0], DownloadActionEnum.DOWNLOAD.name())) {
+                ContentConvertProvider convertProvider = ContentConvertProviderFactory.createProvider(ConvertProviderEnum.DOCX, new ConvertConfig());
+                return convertProvider.convertToDataBuffer(userOnlineFile.getContent()).flatMap(dataBufferSize -> {
+                    UserFileDataBO userFileDataBO = new UserFileDataBO();
+                    userFileDataBO.setFilename(userFileMetadata.getFilename());
+                    userFileDataBO.setFileType(FileEnum.ONLINE_DOCUMENT);
+                    userFileDataBO.setFileSize(dataBufferSize.size());
+                    userFileDataBO.setDataBufferFlux(dataBufferSize.dataBuffer());
+
+                    String name = userFileMetadata.getFilename().split("\\.")[0] + "." + ConvertProviderEnum.DOCX.getSuffix();
+                    userFileDataBO.setFilename(name);
+                    return Mono.just(userFileDataBO);
+                });
+            }
+            try {
+                EditorContentDTO content = objectMapper.readValue(userOnlineFile.getContent(), EditorContentDTO.class);
+                return Mono.just(new UserFileDataBO(userOnlineFile, userFileMetadata, content));
+            } catch (JsonProcessingException e) {
+                return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
+            }
+        });
+    }
 
     /**
      * 刪除指定文件。
@@ -244,6 +241,35 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+    /**
+     * 更新用戶文件元數據
+     * 此方法用於更新用戶文件的元數據。它會更新 lastAccessTime 並將新的元數據保存到數據庫中。
+     *
+     * @param userFileMetadata: 用戶文件的元數據對象，包含文件的各種信息。
+     *
+     * @return 操作已完成的 Mono
+     */
+    public Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
+        return Mono.defer(() -> {
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
+            return userFileMetaRepository.save(userFileMetadata);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 根據文件ID查找用戶在線文件。
+     * <p>
+     * 這個方法會查找指定ID的用戶在線文件。如果找不到文件，將會拋出文件不存在的錯誤。
+     *
+     * @param fileId 文件的唯一ID。
+     *
+     * @return Mono<UserOnlineFile> 返回查詢到的用戶在線文件。
+     */
+    private Mono<UserOnlineFile> findUserOnlineFileById(String fileId) {
+        return userOnlineFileRepository
+                .findById(fileId)
+                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)));
+    }
 
     /**
      * 獲取指定文件的版本列表。
@@ -284,23 +310,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 }));
     }
 
-
-    /**
-     * 根據文件ID查找用戶在線文件。
-     * <p>
-     * 這個方法會查找指定ID的用戶在線文件。如果找不到文件，將會拋出文件不存在的錯誤。
-     *
-     * @param fileId 文件的唯一ID。
-     *
-     * @return Mono<UserOnlineFile> 返回查詢到的用戶在線文件。
-     */
-    private Mono<UserOnlineFile> findUserOnlineFileById(String fileId) {
-        return userOnlineFileRepository
-                .findById(fileId)
-                .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)));
-    }
-
-
     /**
      * 創建指定文件的初始歷史記錄。
      * <p>
@@ -324,7 +333,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         history.setNote(fileEditDTO.getNote());
         return userOnlineFileHistoryRepository.save(history);
     }
-
 
     /**
      * 保存編輯後的文件內容。
@@ -353,7 +361,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             });
         }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
     }
-
 
     /**
      * 根據文件編輯內容創建新的歷史記錄。
@@ -435,7 +442,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                         .then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile))));
     }
 
-
     /**
      * 將指定的歷史紀錄轉換成完整的文件內容。
      * <p>
@@ -458,7 +464,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return formatJsonToEditorContentJsonDTO(baseContent).flatMap(editorContentDTO -> applyPatchToContent(editorContentDTO, historyChain));
         });
     }
-
 
     /**
      * 遞歸查找並構建歷史紀錄鏈。
@@ -516,7 +521,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }).then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile)));
     }
 
-
     /**
      * 計算兩個文件內容的差異。
      * <p>
@@ -536,7 +540,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return objectMapper.writeValueAsString(customPath);
         }).onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.CALCULATE_CONTENT_DIFFERENCE_FAILED, e));
     }
-
 
     /**
      * 應用還原差異
@@ -558,23 +561,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         Patch<String> patch = patchDTO.toPatch();
         return DiffUtils.patch(contents, patch);
     }
-
-
-    /**
-     * 更新用戶文件元數據
-     * 此方法用於更新用戶文件的元數據。它會更新 lastAccessTime 並將新的元數據保存到數據庫中。
-     *
-     * @param userFileMetadata: 用戶文件的元數據對象，包含文件的各種信息。
-     *
-     * @return 操作已完成的 Mono
-     */
-    public Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
-        return Mono.defer(() -> {
-            userFileMetadata.setLastAccessTime(LocalDateTime.now());
-            return userFileMetaRepository.save(userFileMetadata);
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
 
     /**
      * 格式化對象為JSON

@@ -40,14 +40,23 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = {"file.global.enable-user-folder-list-tree"}, havingValue = "true", matchIfMissing = true)
 public class FolderListTreeProvider {
     /**
+     * 線程池執行器，用於執行線程池任務
+     */
+    private static final DynamicThreadPoolExecutor threadPoolExecutor = new DynamicThreadPoolExecutor(2,
+                                                                                                      4,
+                                                                                                      60,
+                                                                                                      TimeUnit.SECONDS,
+                                                                                                      new LinkedBlockingQueue<>(1024)
+    );
+    /**
      * 用戶檔案列表樹映射，用於存儲用戶的檔案列表樹
      */
     private final Map<Long, FolderTree> userFileListTree;
-
     /**
      * 最大資料夾深度
      */
     private final int maxFolderDepth;
+
 
     /**
      * FolderListTreeProvider 構造方法
@@ -59,18 +68,6 @@ public class FolderListTreeProvider {
         this.maxFolderDepth = fileProperties.getGlobal().getMaxFolderDepth();
         this.userFileListTree = new ConcurrentHashMap<>();
     }
-
-
-    /**
-     * 線程池執行器，用於執行線程池任務
-     */
-    private static final DynamicThreadPoolExecutor threadPoolExecutor = new DynamicThreadPoolExecutor(2,
-                                                                                                      4,
-                                                                                                      60,
-                                                                                                      TimeUnit.SECONDS,
-                                                                                                      new LinkedBlockingQueue<>(1024)
-    );
-
 
     /**
      * 添加新的資料夾到用戶的檔案列表樹中

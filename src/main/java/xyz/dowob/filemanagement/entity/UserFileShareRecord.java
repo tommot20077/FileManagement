@@ -46,21 +46,15 @@ public class UserFileShareRecord {
         this.fileId = fileId;
     }
 
-
     /**
-     * 重寫toString方法，用於打印對象
+     * 重寫hashCode方法，用於判斷用戶是否相同
      *
-     * @return String
+     * @return hashCode
      */
     @Override
-    public String toString() {
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("id", id);
-        map.put("userId", userId);
-        map.put("fileId", fileId);
-        return map.toString();
+    public int hashCode() {
+        return id.hashCode();
     }
-
 
     /**
      * 重寫equals方法，用於判斷用戶是否相同
@@ -81,14 +75,17 @@ public class UserFileShareRecord {
         return id.equals(record.id);
     }
 
-
     /**
-     * 重寫hashCode方法，用於判斷用戶是否相同
+     * 重寫toString方法，用於打印對象
      *
-     * @return hashCode
+     * @return String
      */
     @Override
-    public int hashCode() {
-        return id.hashCode();
+    public String toString() {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("id", id);
+        map.put("userId", userId);
+        map.put("fileId", fileId);
+        return map.toString();
     }
 }

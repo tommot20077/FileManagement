@@ -225,18 +225,6 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     }
 
     /**
-     * 設置為遊客身分的用戶對象
-     *
-     * @return Mono<User> 返回遊客身分的用戶對象
-     */
-    private Mono<SecurityContext> createGuestSecurityContext() {
-        List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(RoleEnum.VISITOR.name()));
-        Authentication guestAuth = new UsernamePasswordAuthenticationToken(GUEST_USER.getId(), null, authorities);
-        return Mono.just(new SecurityContextImpl(guestAuth));
-    }
-
-
-    /**
      * 創建 WebSocket 錯誤的身份驗證對象
      *
      * @param errorCode 錯誤代碼
@@ -249,6 +237,17 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
         UsernamePasswordAuthenticationToken errorToken = new UsernamePasswordAuthenticationToken(principal, null);
         errorToken.setDetails(errorCode);
         return errorToken;
+    }
+
+    /**
+     * 設置為遊客身分的用戶對象
+     *
+     * @return Mono<User> 返回遊客身分的用戶對象
+     */
+    private Mono<SecurityContext> createGuestSecurityContext() {
+        List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(RoleEnum.VISITOR.name()));
+        Authentication guestAuth = new UsernamePasswordAuthenticationToken(GUEST_USER.getId(), null, authorities);
+        return Mono.just(new SecurityContextImpl(guestAuth));
     }
 
 

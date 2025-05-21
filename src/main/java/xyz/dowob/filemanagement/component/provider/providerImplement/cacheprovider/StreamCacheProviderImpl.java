@@ -248,20 +248,6 @@ public class StreamCacheProviderImpl implements CacheProvider {
         });
     }
 
-
-    /**
-     * 將base64格式的字符串轉換為流
-     *
-     * @param base64 base64字符串
-     *
-     * @return Flux<DataBuffer> 轉換後的數據流
-     */
-    private Flux<DataBuffer> formatBase64ToStream(String base64) {
-        byte[] bytes = Base64.getDecoder().decode(base64);
-        return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes));
-    }
-
-
     /**
      * 刪除未完成的緩存
      *
@@ -276,5 +262,17 @@ public class StreamCacheProviderImpl implements CacheProvider {
             keysToDelete.add(key + "_" + i);
         }
         return redisProvider.deleteHash(CACHE_PREFIX, keysToDelete).retryWhen(Retry.backoff(3, Duration.ofMinutes(1)));
+    }
+
+    /**
+     * 將base64格式的字符串轉換為流
+     *
+     * @param base64 base64字符串
+     *
+     * @return Flux<DataBuffer> 轉換後的數據流
+     */
+    private Flux<DataBuffer> formatBase64ToStream(String base64) {
+        byte[] bytes = Base64.getDecoder().decode(base64);
+        return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes));
     }
 }

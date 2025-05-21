@@ -107,44 +107,6 @@ public class CacheConcurrentHashMap<K, V> {
 
     /**
      * CacheConcurrentHashMap的構造函數
-     * 自訂初始容量，其餘使用預設值
-     *
-     * @param initialCapacity 初始容量
-     * @param enableCleanup   是否啟用清理任務
-     */
-    public CacheConcurrentHashMap(int initialCapacity, boolean enableCleanup) {
-        this(initialCapacity, DEFAULT_EXPIRE_DURATION, DEFAULT_REMAIN_TIME_DURATION, DEFAULT_CLEANUP_INTERVAL, enableCleanup);
-    }
-
-
-    /**
-     * CacheConcurrentHashMap的構造函數
-     * 自訂初始容量和過期時間，其餘使用預設值
-     *
-     * @param initialCapacity 初始容量
-     * @param expireTime      預設過期時間
-     * @param enableCleanup   是否啟用清理任務
-     */
-    public CacheConcurrentHashMap(int initialCapacity, Duration expireTime, boolean enableCleanup) {
-        this(initialCapacity, expireTime, expireTime, DEFAULT_CLEANUP_INTERVAL, enableCleanup);
-    }
-
-
-    /**
-     * CacheConcurrentHashMap的構造函數
-     * 自訂初始容量、過期時間和最大保留時間，其餘使用預設值
-     *
-     * @param initialCapacity 初始容量
-     * @param expireTime      預設過期時間
-     * @param maxRemainTime   預設最大保留時間
-     */
-    public CacheConcurrentHashMap(int initialCapacity, Duration expireTime, Duration maxRemainTime) {
-        this(initialCapacity, expireTime, maxRemainTime, DEFAULT_CLEANUP_INTERVAL, true);
-    }
-
-
-    /**
-     * CacheConcurrentHashMap的構造函數
      *
      * @param initialCapacity 初始容量
      * @param expireTime      預設過期時間
@@ -178,6 +140,92 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
+    /**
+     * CacheConcurrentHashMap的構造函數
+     * 自訂初始容量，其餘使用預設值
+     *
+     * @param initialCapacity 初始容量
+     * @param enableCleanup   是否啟用清理任務
+     */
+    public CacheConcurrentHashMap(int initialCapacity, boolean enableCleanup) {
+        this(initialCapacity, DEFAULT_EXPIRE_DURATION, DEFAULT_REMAIN_TIME_DURATION, DEFAULT_CLEANUP_INTERVAL, enableCleanup);
+    }
+
+    /**
+     * CacheConcurrentHashMap的構造函數
+     * 自訂初始容量和過期時間，其餘使用預設值
+     *
+     * @param initialCapacity 初始容量
+     * @param expireTime      預設過期時間
+     * @param enableCleanup   是否啟用清理任務
+     */
+    public CacheConcurrentHashMap(int initialCapacity, Duration expireTime, boolean enableCleanup) {
+        this(initialCapacity, expireTime, expireTime, DEFAULT_CLEANUP_INTERVAL, enableCleanup);
+    }
+
+
+    /**
+     * CacheConcurrentHashMap的構造函數
+     * 自訂初始容量、過期時間和最大保留時間，其餘使用預設值
+     *
+     * @param initialCapacity 初始容量
+     * @param expireTime      預設過期時間
+     * @param maxRemainTime   預設最大保留時間
+     */
+    public CacheConcurrentHashMap(int initialCapacity, Duration expireTime, Duration maxRemainTime) {
+        this(initialCapacity, expireTime, maxRemainTime, DEFAULT_CLEANUP_INTERVAL, true);
+    }
+
+    /**
+     * 定時清理過期項目的啟動方法
+     *
+     * @param interval 清理間隔時間
+     *
+     * @throws IllegalStateException 當前清理任務未啟用時，拋出異常
+     */
+    private void scheduleCleanupTask(Duration interval) {
+        if (scheduler == null) {
+            throw new IllegalStateException("清理任務未啟用，請在構造函數中設置enableCleanup為true");
+        }
+        scheduler.scheduleAtFixedRate(this::getCleanupTask, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * 獲取清理過期項目的任務
+     *
+     * @return 清理過期項目的任務
+     */
+    public Runnable getCleanupTask() {
+        return () -> {
+            LogUnity.debug("%s: 清理過期緩存資料", tag);
+            synchronized (cacheMap) {
+                long currentTime = System.currentTimeMillis();
+                Set<K> expiredKeys = cacheMap
+                        .entrySet()
+                        .stream()
+                        .filter(entry -> entry.getValue().getExpireTimeMillis() < currentTime)
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toSet());
+                expiredKeys.forEach(key -> {
+                    cacheMap.remove(key);
+                    ReentrantLock lock = lockMap.get(key);
+                    if (lock != null && lock.getQueueLength() == 0 && !lock.isLocked()) {
+                        lockMap.remove(key);
+                    }
+                });
+            }
+        };
+    }
+
+    /**
+     * 設定緩存並使用預設的過期時間和最大保留時間
+     *
+     * @param key   鍵
+     * @param value 值
+     */
+    public void set(K key, V value) {
+        this.set(key, value, expireTime, maxRemainTime);
+    }
 
     /**
      * 設置緩存項的值和過期時間
@@ -211,17 +259,18 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
-
     /**
-     * 設定緩存並使用預設的過期時間和最大保留時間
+     * 獲取緩存項的值，當前緩存項不存在或過期時，返回預設值
      *
-     * @param key   鍵
-     * @param value 值
+     * @param key          鍵
+     * @param defaultValue 預設值
+     *
+     * @return 緩存項的值或預設值
      */
-    public void set(K key, V value) {
-        this.set(key, value, expireTime, maxRemainTime);
+    public V checkOrDefault(K key, V defaultValue) {
+        V value = this.check(key);
+        return value == null ? defaultValue : value;
     }
-
 
     /**
      * 設置緩存項的值和過期時間
@@ -234,7 +283,6 @@ public class CacheConcurrentHashMap<K, V> {
         this.set(key, value, expire, maxRemainTime);
     }
 
-
     /**
      * 批量設置緩存項的值和過期時間
      *
@@ -246,7 +294,6 @@ public class CacheConcurrentHashMap<K, V> {
         kvMap.forEach((key, value) -> this.set(key, value, expire, maxRemain));
     }
 
-
     /**
      * 批量設置緩存項的值和過期時間，並使用預設的最大保留時間
      *
@@ -256,19 +303,6 @@ public class CacheConcurrentHashMap<K, V> {
     public void setAll(Map<K, V> kvMap, Duration expire) {
         kvMap.forEach((key, value) -> this.set(key, value, expire, maxRemainTime));
     }
-
-
-    /**
-     * 獲取緩存項的值並刷新過期時間
-     *
-     * @param key 鍵
-     *
-     * @return 緩存項的值
-     */
-    public V get(K key) {
-        return this.get(key, expireTime);
-    }
-
 
     /**
      * 獲取封裝紀錄並刷新過期時間
@@ -280,34 +314,6 @@ public class CacheConcurrentHashMap<K, V> {
     public CacheInfo<V> getInfo(K key) {
         return getAndRefresh(key, expireTime);
     }
-
-
-    /**
-     * 獲取緩存項的值並指定緩存的過期時間
-     *
-     * @param key    鍵
-     * @param expire 過期時間
-     *
-     * @return 緩存項的值
-     */
-    public V get(K key, Duration expire) {
-        CacheInfo<V> cacheInfo = getAndRefresh(key, expire);
-        return cacheInfo == null ? null : cacheInfo.getValue();
-    }
-
-
-    /**
-     * 獲取封裝紀錄並指定緩存的過期時間
-     *
-     * @param key    鍵
-     * @param expire 過期時間
-     *
-     * @return 緩存項的值
-     */
-    public CacheInfo<V> getInfo(K key, Duration expire) {
-        return getAndRefresh(key, expire);
-    }
-
 
     /**
      * 獲取緩存項的值但不刷新過期時間
@@ -332,6 +338,135 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
+    /**
+     * 清理鎖
+     * 當鎖的排隊長度為0且鎖未被鎖定，並且緩存項不存在時，則移除鎖
+     *
+     * @param key  鍵
+     * @param lock 鎖
+     */
+    private void cleanupLock(K key, ReentrantLock lock) {
+        if (lock.getQueueLength() == 0 && !lock.isLocked() && cacheMap.get(key) == null) {
+            lockMap.remove(key);
+        }
+    }
+
+    /**
+     * 獲取緩存項的值並刷新過期時間
+     *
+     * @param key 鍵
+     *
+     * @return 緩存項的值
+     */
+    public V get(K key) {
+        return this.get(key, expireTime);
+    }
+
+    /**
+     * 批量獲取緩存項的值
+     *
+     * @param keys 鍵的列表
+     *
+     * @return 緩存項的值的列表
+     */
+    public List<V> getAll(List<K> keys) {
+        return keys.stream().map(this::get).collect(Collectors.toList());
+    }
+
+    /**
+     * 獲取緩存項的值並指定緩存的過期時間
+     *
+     * @param key    鍵
+     * @param expire 過期時間
+     *
+     * @return 緩存項的值
+     */
+    public V get(K key, Duration expire) {
+        CacheInfo<V> cacheInfo = getAndRefresh(key, expire);
+        return cacheInfo == null ? null : cacheInfo.getValue();
+    }
+
+    /**
+     * 批量設置緩存項的值和過期時間，並使用預設的過期時間和最大保留時間
+     *
+     * @param key    鍵
+     * @param expire 過期時間
+     */
+    private CacheInfo<V> getAndRefresh(K key, Duration expire) {
+        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            CacheInfo<V> cacheInfo = cacheMap.get(key);
+            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
+                cacheMap.remove(key);
+                lockMap.remove(key);
+                return null;
+            }
+            long newExpireTime = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            cacheInfo.setExpireTimeMillis(newExpireTime);
+            return cacheInfo;
+        } finally {
+            lock.unlock();
+            cleanupLock(key, lock);
+        }
+    }
+
+    /**
+     * 批量獲取緩存項的值並指定緩存的過期時間
+     *
+     * @param keys   鍵的列表
+     * @param expire 過期時間
+     *
+     * @return 緩存項的值的列表
+     */
+    public List<V> getAll(List<K> keys, Duration expire) {
+        return keys.stream().map(key -> this.get(key, expire)).collect(Collectors.toList());
+    }
+
+    /**
+     * 批量獲取緩存項的封裝紀錄並指定緩存的過期時間
+     *
+     * @param keys 鍵的列表
+     *
+     * @return 緩存項的封裝紀錄的列表
+     */
+    public List<CacheInfo<V>> getAllInfo(List<K> keys, Duration expire) {
+        return keys.stream().map(key -> this.getInfo(key, expire)).collect(Collectors.toList());
+    }
+
+    /**
+     * 獲取封裝紀錄並指定緩存的過期時間
+     *
+     * @param key    鍵
+     * @param expire 過期時間
+     *
+     * @return 緩存項的值
+     */
+    public CacheInfo<V> getInfo(K key, Duration expire) {
+        return getAndRefresh(key, expire);
+    }
+
+    /**
+     * 獲取緩存項的值並不刷新過期時間
+     *
+     * @param keys 鍵的列表
+     *
+     * @return 緩存項的值的列表
+     */
+    public List<V> checkAll(List<K> keys) {
+        return keys.stream().map(this::check).collect(Collectors.toList());
+    }
+
+    /**
+     * 獲取緩存項的封裝紀錄並不刷新過期時間
+     *
+     * @param keys 鍵的列表
+     *
+     * @return 緩存項的封裝紀錄的列表
+     */
+    public List<CacheInfo<V>> checkAllInfo(List<K> keys) {
+        return keys.stream().map(this::checkInfo).collect(Collectors.toList());
+    }
 
     /**
      * 獲取緩存項的封裝紀錄但不刷新過期時間
@@ -356,81 +491,6 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
-
-    /**
-     * 獲取緩存項的值，當前緩存項不存在或過期時，返回預設值
-     *
-     * @param key          鍵
-     * @param defaultValue 預設值
-     *
-     * @return 緩存項的值或預設值
-     */
-    public V checkOrDefault(K key, V defaultValue) {
-        V value = this.check(key);
-        return value == null ? defaultValue : value;
-    }
-
-
-    /**
-     * 批量獲取緩存項的值
-     *
-     * @param keys 鍵的列表
-     *
-     * @return 緩存項的值的列表
-     */
-    public List<V> getAll(List<K> keys) {
-        return keys.stream().map(this::get).collect(Collectors.toList());
-    }
-
-
-    /**
-     * 批量獲取緩存項的值並指定緩存的過期時間
-     *
-     * @param keys   鍵的列表
-     * @param expire 過期時間
-     *
-     * @return 緩存項的值的列表
-     */
-    public List<V> getAll(List<K> keys, Duration expire) {
-        return keys.stream().map(key -> this.get(key, expire)).collect(Collectors.toList());
-    }
-
-
-    /**
-     * 批量獲取緩存項的封裝紀錄並指定緩存的過期時間
-     *
-     * @param keys 鍵的列表
-     *
-     * @return 緩存項的封裝紀錄的列表
-     */
-    public List<CacheInfo<V>> getAllInfo(List<K> keys, Duration expire) {
-        return keys.stream().map(key -> this.getInfo(key, expire)).collect(Collectors.toList());
-    }
-
-    /**
-     * 獲取緩存項的值並不刷新過期時間
-     *
-     * @param keys 鍵的列表
-     *
-     * @return 緩存項的值的列表
-     */
-    public List<V> checkAll(List<K> keys) {
-        return keys.stream().map(this::check).collect(Collectors.toList());
-    }
-
-
-    /**
-     * 獲取緩存項的封裝紀錄並不刷新過期時間
-     *
-     * @param keys 鍵的列表
-     *
-     * @return 緩存項的封裝紀錄的列表
-     */
-    public List<CacheInfo<V>> checkAllInfo(List<K> keys) {
-        return keys.stream().map(this::checkInfo).collect(Collectors.toList());
-    }
-
-
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
@@ -445,7 +505,6 @@ public class CacheConcurrentHashMap<K, V> {
     public V computeIfPresentOrDefault(K key, V initValue, BiFunction<? super K, ? super V, V> computeFunction) {
         return computeIfPresentOrDefault(key, initValue, expireTime, computeFunction);
     }
-
 
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
@@ -490,7 +549,6 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
-
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
@@ -504,7 +562,6 @@ public class CacheConcurrentHashMap<K, V> {
     public V computeIfPresent(K key, BiFunction<? super K, ? super V, V> computeFunction) {
         return computeIfPresent(key, expireTime, computeFunction);
     }
-
 
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
@@ -536,6 +593,14 @@ public class CacheConcurrentHashMap<K, V> {
 
     }
 
+    /**
+     * 批量刪除緩存項
+     *
+     * @param keys 鍵的列表
+     */
+    public void removeAll(List<K> keys) {
+        keys.forEach(this::remove);
+    }
 
     /**
      * 刪除緩存項
@@ -552,100 +617,6 @@ public class CacheConcurrentHashMap<K, V> {
             lock.unlock();
         }
     }
-
-
-    /**
-     * 批量刪除緩存項
-     *
-     * @param keys 鍵的列表
-     */
-    public void removeAll(List<K> keys) {
-        keys.forEach(this::remove);
-    }
-
-
-    /**
-     * 批量設置緩存項的值和過期時間，並使用預設的過期時間和最大保留時間
-     *
-     * @param key    鍵
-     * @param expire 過期時間
-     */
-    private CacheInfo<V> getAndRefresh(K key, Duration expire) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                cacheMap.remove(key);
-                lockMap.remove(key);
-                return null;
-            }
-            long newExpireTime = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
-            cacheInfo.setExpireTimeMillis(newExpireTime);
-            return cacheInfo;
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
-    }
-
-
-    /**
-     * 清理鎖
-     * 當鎖的排隊長度為0且鎖未被鎖定，並且緩存項不存在時，則移除鎖
-     *
-     * @param key  鍵
-     * @param lock 鎖
-     */
-    private void cleanupLock(K key, ReentrantLock lock) {
-        if (lock.getQueueLength() == 0 && !lock.isLocked() && cacheMap.get(key) == null) {
-            lockMap.remove(key);
-        }
-    }
-
-
-    /**
-     * 定時清理過期項目的啟動方法
-     *
-     * @param interval 清理間隔時間
-     *
-     * @throws IllegalStateException 當前清理任務未啟用時，拋出異常
-     */
-    private void scheduleCleanupTask(Duration interval) {
-        if (scheduler == null) {
-            throw new IllegalStateException("清理任務未啟用，請在構造函數中設置enableCleanup為true");
-        }
-        scheduler.scheduleAtFixedRate(this::getCleanupTask, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
-    }
-
-
-    /**
-     * 獲取清理過期項目的任務
-     *
-     * @return 清理過期項目的任務
-     */
-    public Runnable getCleanupTask() {
-        return () -> {
-            LogUnity.debug("%s: 清理過期緩存資料", tag);
-            synchronized (cacheMap) {
-                long currentTime = System.currentTimeMillis();
-                Set<K> expiredKeys = cacheMap
-                        .entrySet()
-                        .stream()
-                        .filter(entry -> entry.getValue().getExpireTimeMillis() < currentTime)
-                        .map(Map.Entry::getKey)
-                        .collect(Collectors.toSet());
-                expiredKeys.forEach(key -> {
-                    cacheMap.remove(key);
-                    ReentrantLock lock = lockMap.get(key);
-                    if (lock != null && lock.getQueueLength() == 0 && !lock.isLocked()) {
-                        lockMap.remove(key);
-                    }
-                });
-            }
-        };
-    }
-
 
     /**
      * 銷毀緩存提供的資源

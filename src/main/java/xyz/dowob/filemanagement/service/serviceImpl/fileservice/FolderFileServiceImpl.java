@@ -288,6 +288,57 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         });
     }
 
+    /**
+     * 下載文件夾的實現
+     * 此方法會查詢所有子文件夾和文件，並將其壓縮成一個zip文件後返回成 UserFileDataBO對象
+     * <p>
+     * 對於創建 ZipOutputStream、關閉 ZipOutputStream、刪除臨時檔案可能會回傳 Mono.error
+     *
+     * @param rootFolder 根文件夾
+     * @param user       用戶
+     *
+     * @return Mono<UserFileDataBO> 文件數據
+     */
+    @Override
+    public Mono<UserFileDataBO> downloadFolder(UserFileMetadata rootFolder, User user) {
+        try {
+            String zipFileName = getTempZipFilename(rootFolder);
+            String tempDownloadPath = downloadFolderPath + zipFileName;
+            Map<String, AtomicInteger> zipEntryNameCountMap = new ConcurrentHashMap<>();
+            return Mono
+                    .usingWhen(Mono.just(new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(tempDownloadPath)))),
+                               zos -> processFolder(zos, rootFolder, rootFolder.getFilename(), zipEntryNameCountMap, user),
+                               zos -> Mono.fromRunnable(() -> {
+                                   try {
+                                       zos.close();
+                                   } catch (IOException e) {
+                                       throw Exceptions.propagate(e);
+                                   }
+                               }).subscribeOn(Schedulers.boundedElastic())
+                    )
+                    .then(Mono.defer(() -> {
+                        File zipFile = new File(tempDownloadPath);
+                        long fileSize = zipFile.length();
+                        Flux<DataBuffer> dataFlux = DataBufferUtils.read(zipFile.toPath(), DefaultDataBufferFactory.sharedInstance, bufferSize);
+
+                        UserFileDataBO userFileDataBO = UserFileDataBO
+                                .builder()
+                                .fileSize(fileSize)
+                                .filename(zipFileName)
+                                .fileType(FileEnum.ZIP)
+                                .dataBufferFlux(dataFlux)
+                                .build();
+                        return Mono.just(userFileDataBO);
+                    }).doFinally(signal -> {
+                        File file = new File(tempDownloadPath);
+                        if (file.exists() && !file.delete()) {
+                            throw new RuntimeException(new ProcessException(ProcessException.ErrorCode.DELETE_TEMP_FILE_FAILED, tempDownloadPath));
+                        }
+                    }));
+        } catch (FileNotFoundException e) {
+            throw Exceptions.propagate(e);
+        }
+    }
 
     /**
      * 恢復文件夾的實現
@@ -345,7 +396,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         })));
     }
 
-
     /**
      * 批量恢復文件夾的實現
      *
@@ -358,7 +408,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> restoreFile(folder, user));
     }
-
 
     /**
      * 刪除文件夾的實現
@@ -399,7 +448,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         });
     }
 
-
     /**
      * 批量刪除文件夾的實現
      *
@@ -412,60 +460,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
     }
-
-
-    /**
-     * 下載文件夾的實現
-     * 此方法會查詢所有子文件夾和文件，並將其壓縮成一個zip文件後返回成 UserFileDataBO對象
-     * <p>
-     * 對於創建 ZipOutputStream、關閉 ZipOutputStream、刪除臨時檔案可能會回傳 Mono.error
-     *
-     * @param rootFolder 根文件夾
-     * @param user       用戶
-     *
-     * @return Mono<UserFileDataBO> 文件數據
-     */
-    @Override
-    public Mono<UserFileDataBO> downloadFolder(UserFileMetadata rootFolder, User user) {
-        try {
-            String zipFileName = getTempZipFilename(rootFolder);
-            String tempDownloadPath = downloadFolderPath + zipFileName;
-            Map<String, AtomicInteger> zipEntryNameCountMap = new ConcurrentHashMap<>();
-            return Mono
-                    .usingWhen(Mono.just(new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(tempDownloadPath)))),
-                               zos -> processFolder(zos, rootFolder, rootFolder.getFilename(), zipEntryNameCountMap, user),
-                               zos -> Mono.fromRunnable(() -> {
-                                   try {
-                                       zos.close();
-                                   } catch (IOException e) {
-                                       throw Exceptions.propagate(e);
-                                   }
-                               }).subscribeOn(Schedulers.boundedElastic())
-                    )
-                    .then(Mono.defer(() -> {
-                        File zipFile = new File(tempDownloadPath);
-                        long fileSize = zipFile.length();
-                        Flux<DataBuffer> dataFlux = DataBufferUtils.read(zipFile.toPath(), DefaultDataBufferFactory.sharedInstance, bufferSize);
-
-                        UserFileDataBO userFileDataBO = UserFileDataBO
-                                .builder()
-                                .fileSize(fileSize)
-                                .filename(zipFileName)
-                                .fileType(FileEnum.ZIP)
-                                .dataBufferFlux(dataFlux)
-                                .build();
-                        return Mono.just(userFileDataBO);
-                    }).doFinally(signal -> {
-                        File file = new File(tempDownloadPath);
-                        if (file.exists() && !file.delete()) {
-                            throw new RuntimeException(new ProcessException(ProcessException.ErrorCode.DELETE_TEMP_FILE_FAILED, tempDownloadPath));
-                        }
-                    }));
-        } catch (FileNotFoundException e) {
-            throw Exceptions.propagate(e);
-        }
-    }
-
 
     /**
      * 處理文件夾的壓縮

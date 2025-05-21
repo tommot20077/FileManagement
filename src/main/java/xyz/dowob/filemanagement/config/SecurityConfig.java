@@ -131,70 +131,6 @@ public class SecurityConfig implements ResponseUnity {
                 .build();
     }
 
-
-    /**
-     * 配置安全過濾器鏈，此過濾器會依照自定義的{@link CustomRequestContextHolder} 進行上下文的設置
-     *
-     * @return SecurityWebFilterChain 安全過濾器鏈
-     */
-    @Bean
-    public WebFilter contextWebFilter() {
-        return (exchange, chain) -> chain.filter(exchange).contextWrite(CustomRequestContextHolder.mutate(exchange));
-    }
-
-
-    /**
-     * 密碼加密處理的 Bean
-     *
-     * @return PasswordEncoder BCrypt算法加密器
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-
-    /**
-     * 生成唯一的請求 ID
-     * 用於追蹤請求的唯一標識符
-     *
-     * @return WebFilter 請求 ID 過濾器
-     */
-    @Bean
-    public WebFilter traceIdFilter() {
-        return (exchange, chain) -> {
-            String traceId = exchange.getAttribute("requestId");
-            if (traceId == null) {
-                traceId = UUID.randomUUID().toString();
-                exchange.getAttributes().put("requestId", traceId);
-            }
-            return chain.filter(exchange);
-        };
-    }
-
-
-    /**
-     * 用戶信息過濾器
-     * 用於獲取用戶 ID 並將其存儲在請求屬性中
-     *
-     * @return WebFilter 用戶信息過濾器
-     */
-    @Bean
-    public WebFilter userInfoFilter() {
-        return ((exchange, chain) -> Mono
-                .defer(() -> ReactiveSecurityContextHolder
-                        .getContext()
-                        .map(SecurityContext::getAuthentication)
-                        .filter(auth -> auth != null && auth.isAuthenticated())
-                        .map(auth -> (Long) auth.getPrincipal())
-                        .flatMap(userId -> {
-                            exchange.getAttributes().put("userId", userId.toString());
-                            return Mono.empty();
-                        }))
-                .then(chain.filter(exchange)));
-    }
-
-
     /**
      * 配置 CORS
      * 配置允許跨域的來源、方法、是否允許携帶憑證
@@ -235,6 +171,39 @@ public class SecurityConfig implements ResponseUnity {
         return source;
     }
 
+    /**
+     * 設置路徑安全檢查，會將 SecurityProperties 中的路徑規則應用到當前的請求中 {@link SecurityProperties#getPaths()}
+     * @param exchange ServerHttpSecurity.AuthorizeExchangeSpec 用於配置路徑安全的請求對象
+     */
+    private void configurePathSecurity(ServerHttpSecurity.AuthorizeExchangeSpec exchange) {
+        Collection<SecurityProperties.Paths.PathRuleConfig> rules = securityProperties.getPaths().getEffectiveRules();
+
+        applyRulesForRole(exchange, rules, RoleEnum.ANONYMOUS);
+        applyRulesForRole(exchange, rules, RoleEnum.VISITOR);
+        applyRulesForRole(exchange, rules, RoleEnum.USER);
+        applyRulesForRole(exchange, rules, RoleEnum.ADVANCED_USER);
+        applyRulesForRole(exchange, rules, RoleEnum.ADMIN);
+
+        exchange.anyExchange().hasAnyAuthority(RoleEnum.USER.name(), RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
+    }
+
+    /**
+     * 生成唯一的請求 ID
+     * 用於追蹤請求的唯一標識符
+     *
+     * @return WebFilter 請求 ID 過濾器
+     */
+    @Bean
+    public WebFilter traceIdFilter() {
+        return (exchange, chain) -> {
+            String traceId = exchange.getAttribute("requestId");
+            if (traceId == null) {
+                traceId = UUID.randomUUID().toString();
+                exchange.getAttributes().put("requestId", traceId);
+            }
+            return chain.filter(exchange);
+        };
+    }
 
     /**
      * 配置 CSRF Token 驗證過濾器，用於驗證 CSRF Token 的合法性
@@ -271,36 +240,36 @@ public class SecurityConfig implements ResponseUnity {
         };
     }
 
-
     /**
-     * 判斷是否為安全方法，安全方法不進行 CSRF Token 驗證
-     * 安全方法包括 GET、HEAD、OPTIONS、TRACE 方法，定義在 {@link #PASS_METHODS}
+     * 配置安全過濾器鏈，此過濾器會依照自定義的{@link CustomRequestContextHolder} 進行上下文的設置
      *
-     * @param exchange 伺服器 Web 交換對象
-     *
-     * @return 是否為安全方法
+     * @return SecurityWebFilterChain 安全過濾器鏈
      */
-    public boolean isSafeMethod(ServerWebExchange exchange) {
-        return PASS_METHODS.contains(exchange.getRequest().getMethod());
+    @Bean
+    public WebFilter contextWebFilter() {
+        return (exchange, chain) -> chain.filter(exchange).contextWrite(CustomRequestContextHolder.mutate(exchange));
     }
 
-
     /**
-     * 設置路徑安全檢查，會將 SecurityProperties 中的路徑規則應用到當前的請求中 {@link SecurityProperties#getPaths()}
-     * @param exchange ServerHttpSecurity.AuthorizeExchangeSpec 用於配置路徑安全的請求對象
+     * 用戶信息過濾器
+     * 用於獲取用戶 ID 並將其存儲在請求屬性中
+     *
+     * @return WebFilter 用戶信息過濾器
      */
-    private void configurePathSecurity(ServerHttpSecurity.AuthorizeExchangeSpec exchange) {
-        Collection<SecurityProperties.Paths.PathRuleConfig> rules = securityProperties.getPaths().getEffectiveRules();
-
-        applyRulesForRole(exchange, rules, RoleEnum.ANONYMOUS);
-        applyRulesForRole(exchange, rules, RoleEnum.VISITOR);
-        applyRulesForRole(exchange, rules, RoleEnum.USER);
-        applyRulesForRole(exchange, rules, RoleEnum.ADVANCED_USER);
-        applyRulesForRole(exchange, rules, RoleEnum.ADMIN);
-
-        exchange.anyExchange().hasAnyAuthority(RoleEnum.USER.name(), RoleEnum.ADVANCED_USER.name(), RoleEnum.ADMIN.name());
+    @Bean
+    public WebFilter userInfoFilter() {
+        return ((exchange, chain) -> Mono
+                .defer(() -> ReactiveSecurityContextHolder
+                        .getContext()
+                        .map(SecurityContext::getAuthentication)
+                        .filter(auth -> auth != null && auth.isAuthenticated())
+                        .map(auth -> (Long) auth.getPrincipal())
+                        .flatMap(userId -> {
+                            exchange.getAttributes().put("userId", userId.toString());
+                            return Mono.empty();
+                        }))
+                .then(chain.filter(exchange)));
     }
-
 
     /**
      * 根據角色設置路徑安全檢查，將 SecurityProperties 中的路徑規則應用到當前的請求中並設置路徑所需的角色資格
@@ -346,5 +315,27 @@ public class SecurityConfig implements ResponseUnity {
                     break;
             }
         }
+    }
+
+    /**
+     * 判斷是否為安全方法，安全方法不進行 CSRF Token 驗證
+     * 安全方法包括 GET、HEAD、OPTIONS、TRACE 方法，定義在 {@link #PASS_METHODS}
+     *
+     * @param exchange 伺服器 Web 交換對象
+     *
+     * @return 是否為安全方法
+     */
+    public boolean isSafeMethod(ServerWebExchange exchange) {
+        return PASS_METHODS.contains(exchange.getRequest().getMethod());
+    }
+
+    /**
+     * 密碼加密處理的 Bean
+     *
+     * @return PasswordEncoder BCrypt算法加密器
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

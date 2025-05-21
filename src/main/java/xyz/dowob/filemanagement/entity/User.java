@@ -61,7 +61,7 @@ public class User {
      * 用戶的存儲限制
      */
     @Column("storage_limit")
-    private Long storageLimit = role.getDefaultStorageLimit();
+    private Long storageLimit = RoleEnum.USER.getDefaultStorageLimit();
 
     /**
      * 用戶的已使用存儲

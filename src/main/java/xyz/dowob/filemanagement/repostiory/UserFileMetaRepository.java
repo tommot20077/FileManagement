@@ -249,36 +249,6 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
                 });
     }
 
-
-    /**
-     * 根據用戶ID查詢所有共享給該用戶的檔案元數據
-     *
-     * @param userId                用戶ID
-     * @param r2dbcEntityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetadata>
-     */
-    default Flux<UserFileMetadata> findAllByShareWithUserId(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
-
-        return r2dbcEntityOperations
-                .select(UserFileShareRecord.class)
-                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("user_id").is(userId)))
-                .all()
-                .map(UserFileShareRecord::getFileId)
-                .collectList()
-                .flatMapMany(fileIds -> {
-                    if (fileIds.isEmpty()) {
-                        return Flux.empty();
-                    }
-                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.NONE);
-                    return r2dbcEntityOperations
-                            .select(UserFileMetadata.class)
-                            .matching(org.springframework.data.relational.core.query.Query.query(criteria))
-                            .all();
-                });
-    }
-
-
     /**
      * 根據用戶ID和過濾條件查詢檔案元數據
      *
@@ -350,6 +320,33 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
         return result1.mergeWith(result2);
     }
 
+    /**
+     * 根據用戶ID查詢所有共享給該用戶的檔案元數據
+     *
+     * @param userId                用戶ID
+     * @param r2dbcEntityOperations R2dbc實體操作
+     *
+     * @return Flux<UserFileMetadata>
+     */
+    default Flux<UserFileMetadata> findAllByShareWithUserId(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
+
+        return r2dbcEntityOperations
+                .select(UserFileShareRecord.class)
+                .matching(org.springframework.data.relational.core.query.Query.query(Criteria.where("user_id").is(userId)))
+                .all()
+                .map(UserFileShareRecord::getFileId)
+                .collectList()
+                .flatMapMany(fileIds -> {
+                    if (fileIds.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    Criteria criteria = Criteria.where("id").in(fileIds).and("is_deleted").is(false).and("share_type").not(FileShareTypeEnum.NONE);
+                    return r2dbcEntityOperations
+                            .select(UserFileMetadata.class)
+                            .matching(org.springframework.data.relational.core.query.Query.query(criteria))
+                            .all();
+                });
+    }
 
     /**
      * 根據檔案ID查詢檔案共享類型

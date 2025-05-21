@@ -91,25 +91,22 @@ public class localRequestLimiterFilter implements WebFilter, ResponseUnity {
      * 限流器緩存儲存Map，用於存儲每個IP的請求限制器
      */
     private final CacheConcurrentHashMap<String, Bucket> ipBucketLimiterMap;
-
+    /**
+     * JSON 轉換器
+     * 用於將對象轉換為 JSON 字符串
+     */
+    private final ObjectMapper objectMapper;
     /**
      * 失敗次數，當請求次數超過這個值時，會禁止IP訪問
      * 僅在啟用禁止IP時生效
      * 當設置為值小於等於 0 時，則拋出異常
      */
     private int failureCount = 5;
-
     /**
      * 禁止IP的緩存儲存Map，用於存儲每個IP的禁止狀態
      * 當請求次數超過 {@link #failureCount} 時，會將IP加入禁止列表
      */
     private CacheConcurrentHashMap<String, Long> banIpMap = null;
-
-    /**
-     * JSON 轉換器
-     * 用於將對象轉換為 JSON 字符串
-     */
-    private final ObjectMapper objectMapper;
 
 
     /**

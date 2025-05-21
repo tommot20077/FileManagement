@@ -63,23 +63,6 @@ public class FileTrashRecord {
         this.deleteTime = deleteTime;
     }
 
-
-    /**
-     * 重寫 toString 方法
-     *
-     * @return 返回對象的字符串表示
-     */
-    @Override
-    public String toString() {
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("fileId", fileId);
-        map.put("userId", userId);
-        map.put("parentFolderId", parentFolderId);
-        map.put("deleteTime", deleteTime);
-        return map.toString();
-    }
-
-
     /**
      * 重寫 equals 方法
      *
@@ -97,5 +80,20 @@ public class FileTrashRecord {
         }
         FileTrashRecord that = (FileTrashRecord) obj;
         return that.fileId.equals(fileId);
+    }
+
+    /**
+     * 重寫 toString 方法
+     *
+     * @return 返回對象的字符串表示
+     */
+    @Override
+    public String toString() {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("fileId", fileId);
+        map.put("userId", userId);
+        map.put("parentFolderId", parentFolderId);
+        map.put("deleteTime", deleteTime);
+        return map.toString();
     }
 }

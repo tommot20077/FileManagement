@@ -85,36 +85,6 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
         return super.uploadFile(fileMetadataDTO, exchange);
     }
 
-
-    /**
-     * 上傳文件分塊的 API 請求，根據文件 ID 上傳文件分塊
-     * 會依照用戶選擇的上傳方式進行上傳
-     *
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
-     */
-    @PostMapping("/upload-chunk")
-    public Mono<ResponseEntity<?>> uploadFileData(
-            @RequestParam(name = "type", required = false) String transmissionType, ServerWebExchange exchange) {
-        return handleError(super.uploadFileData(transmissionType, exchange), exchange);
-    }
-
-
-    /**
-     * 刪除文件的 API 請求，根據文件 ID 刪除文件
-     *
-     * @param id       文件 ID
-     * @param exchange 請求對象
-     *
-     * @return Mono<ResponseEntity < ?>> 返回刪除文件的結果
-     */
-    @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
-        return super.deleteFile(id, exchange);
-    }
-
-
     /**
      * 下載文件的 API 請求，根據文件 ID 下載文件並提供預覽或是下載
      * 預設為預覽
@@ -132,20 +102,18 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
         return super.downloadFile(action, id, exchange).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 
-
     /**
-     * 獲取文件的信息的 API 請求，根據文件 ID 獲取文件的信息
+     * 刪除文件的 API 請求，根據文件 ID 刪除文件
      *
      * @param id       文件 ID
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回文件的信息
+     * @return Mono<ResponseEntity < ?>> 返回刪除文件的結果
      */
-    @GetMapping("/{id}/info")
-    public Mono<ResponseEntity<?>> getFileInfo(@PathVariable Long id, ServerWebExchange exchange) {
-        return super.getFileType(id, exchange);
+    @DeleteMapping("/{id}")
+    public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
+        return super.deleteFile(id, exchange);
     }
-
 
     /**
      * 編輯文件的 API 請求，根據文件 ID 編輯文件
@@ -160,6 +128,19 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
         return super.editFile(fileEditDTO, exchange);
     }
 
+    /**
+     * 上傳文件分塊的 API 請求，根據文件 ID 上傳文件分塊
+     * 會依照用戶選擇的上傳方式進行上傳
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     */
+    @PostMapping("/upload-chunk")
+    public Mono<ResponseEntity<?>> uploadFileData(
+            @RequestParam(name = "type", required = false) String transmissionType, ServerWebExchange exchange) {
+        return handleError(super.uploadFileData(transmissionType, exchange), exchange);
+    }
 
     /**
      * 獲取用戶文件列表的API請求
@@ -177,6 +158,18 @@ public class ApiGeneralFileController extends BaseGeneralFileController {
         return super.getUserFileList(exchange, page, size, types);
     }
 
+    /**
+     * 獲取文件的信息的 API 請求，根據文件 ID 獲取文件的信息
+     *
+     * @param id       文件 ID
+     * @param exchange 請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回文件的信息
+     */
+    @GetMapping("/{id}/info")
+    public Mono<ResponseEntity<?>> getFileInfo(@PathVariable Long id, ServerWebExchange exchange) {
+        return super.getFileType(id, exchange);
+    }
 
     /**
      * 將檔案移動到回收站的 API 請求

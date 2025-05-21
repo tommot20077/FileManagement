@@ -37,34 +37,6 @@ public class LogUnity {
         trace(exchange, message, null, args);
     }
 
-
-    /**
-     * 輸出 TRACE 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void trace(@NotNull String message, Object... args) {
-        trace((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 TRACE 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void trace(@NotNull String message, Throwable throwable, Object... args) {
-        trace((ServerWebExchange) null, message, throwable, args);
-    }
-
-
     /**
      * 輸出 TRACE 級別的日誌
      *
@@ -81,483 +53,6 @@ public class LogUnity {
             log.trace(getFormatMessage(exchange, message), throwable);
         }
     }
-
-
-    /**
-     * 輸出 TRACE 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void trace(WebSocketSession session, @NotNull String message, Object... args) {
-        trace(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 TRACE 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void trace(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isTraceEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.trace(getFormatMessage(session, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param exchange ServerWebExchange 對象
-     * @param message  日誌訊息
-     * @param args     日誌訊息的參數
-     */
-    public static void debug(ServerWebExchange exchange, @NotNull String message, Object... args) {
-        debug(exchange, message, null, args);
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void debug(@NotNull String message, Object... args) {
-        debug((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     *
-     * @param exchange  ServerWebExchange 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void debug(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isDebugEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.debug(getFormatMessage(exchange, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void debug(@NotNull String message, Throwable throwable, Object... args) {
-        debug((ServerWebExchange) null, message, throwable, args);
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void debug(WebSocketSession session, @NotNull String message, Object... args) {
-        debug(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param exchange ServerWebExchange 對象
-     * @param message  日誌訊息
-     * @param args     日誌訊息的參數
-     */
-    public static void info(ServerWebExchange exchange, @NotNull String message, Object... args) {
-        info(exchange, message, null, args);
-    }
-
-
-    /**
-     * 輸出 DEBUG 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void debug(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isDebugEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.debug(getFormatMessage(session, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void info(@NotNull String message, Object... args) {
-        info((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     *
-     * @param exchange  ServerWebExchange 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void info(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isInfoEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.info(getFormatMessage(exchange, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void info(@NotNull String message, Throwable throwable, Object... args) {
-        info((ServerWebExchange) null, message, throwable, args);
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void info(WebSocketSession session, @NotNull String message, Object... args) {
-        info(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param exchange ServerWebExchange 對象
-     * @param message  日誌訊息
-     * @param args     日誌訊息的參數
-     */
-    public static void warn(ServerWebExchange exchange, @NotNull String message, Object... args) {
-        warn(exchange, message, null, args);
-    }
-
-
-    /**
-     * 輸出 INFO 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void info(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isInfoEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.info(getFormatMessage(session, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void warn(@NotNull String message, Object... args) {
-        warn((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     *
-     * @param exchange  ServerWebExchange 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void warn(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isWarnEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.warn(getFormatMessage(exchange, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void warn(@NotNull String message, Throwable throwable, Object... args) {
-        warn((ServerWebExchange) null, message, throwable, args);
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void warn(WebSocketSession session, @NotNull String message, Object... args) {
-        warn(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param exchange ServerWebExchange 對象
-     * @param message  日誌訊息
-     * @param args     日誌訊息的參數
-     */
-    public static void error(ServerWebExchange exchange, @NotNull String message, Object... args) {
-        error(exchange, message, null, args);
-    }
-
-
-    /**
-     * 輸出 WARN 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void warn(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isWarnEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.warn(getFormatMessage(session, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void error(@NotNull String message, Object... args) {
-        error((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     *
-     * @param exchange  ServerWebExchange 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void error(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isErrorEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.error(getFormatMessage(exchange, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void error(@NotNull String message, Throwable throwable, Object... args) {
-        error((ServerWebExchange) null, message, throwable, args);
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void error(WebSocketSession session, @NotNull String message, Object... args) {
-        error(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param exchange ServerWebExchange 對象
-     * @param message  日誌訊息
-     * @param args     日誌訊息的參數
-     */
-    public static void fatal(ServerWebExchange exchange, @NotNull String message, Object... args) {
-        fatal(exchange, message, null, args);
-    }
-
-
-    /**
-     * 輸出 ERROR 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void error(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isErrorEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.error(getFormatMessage(session, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void fatal(@NotNull String message, Object... args) {
-        fatal((ServerWebExchange) null, message, null, args);
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     *
-     * @param exchange  ServerWebExchange 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void fatal(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isFatalEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.fatal(getFormatMessage(exchange, message), throwable);
-        }
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
-     * 將自動設定成為伺服器端請求
-     *
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void fatal(@NotNull String message, Throwable throwable, Object... args) {
-        fatal((ServerWebExchange) null, message, throwable, args);
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     * 此為重載方法，表示不需要傳入 throwable 參數
-     *
-     * @param session  WebSocketSession 對象
-     * @param message 日誌訊息
-     * @param args    日誌訊息的參數
-     */
-    public static void fatal(WebSocketSession session, @NotNull String message, Object... args) {
-        fatal(session, message, null, args);
-    }
-
-
-    /**
-     * 輸出 FATAL 級別的日誌
-     *
-     * @param session    WebSocketSession 對象
-     * @param message   日誌訊息
-     * @param throwable 異常對象
-     * @param args      日誌訊息的參數
-     */
-    public static void fatal(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
-        if (log.isFatalEnabled()) {
-            if (args != null && args.length > 0) {
-                message = String.format(message, args);
-            }
-            log.fatal(getFormatMessage(session, message), throwable);
-        }
-    }
-
 
     /**
      * 獲取請求ID、請求者名稱和用戶ID
@@ -601,5 +96,474 @@ public class LogUnity {
             identify = "";
         }
         return String.format("[請求ID: %s] [請求IP: %s] %s| %s", requestId, requestIp, identify, message);
+    }
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Object... args) {
+        trace((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void trace(@NotNull String message, Throwable throwable, Object... args) {
+        trace((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void trace(WebSocketSession session, @NotNull String message, Object... args) {
+        trace(session, message, null, args);
+    }
+
+    /**
+     * 輸出 TRACE 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void trace(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isTraceEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.trace(getFormatMessage(session, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param exchange ServerWebExchange 對象
+     * @param message  日誌訊息
+     * @param args     日誌訊息的參數
+     */
+    public static void debug(ServerWebExchange exchange, @NotNull String message, Object... args) {
+        debug(exchange, message, null, args);
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     *
+     * @param exchange  ServerWebExchange 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isDebugEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.debug(getFormatMessage(exchange, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Object... args) {
+        debug((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(@NotNull String message, Throwable throwable, Object... args) {
+        debug((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void debug(WebSocketSession session, @NotNull String message, Object... args) {
+        debug(session, message, null, args);
+    }
+
+    /**
+     * 輸出 DEBUG 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void debug(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isDebugEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.debug(getFormatMessage(session, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param exchange ServerWebExchange 對象
+     * @param message  日誌訊息
+     * @param args     日誌訊息的參數
+     */
+    public static void info(ServerWebExchange exchange, @NotNull String message, Object... args) {
+        info(exchange, message, null, args);
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     *
+     * @param exchange  ServerWebExchange 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isInfoEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.info(getFormatMessage(exchange, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Object... args) {
+        info((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(@NotNull String message, Throwable throwable, Object... args) {
+        info((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void info(WebSocketSession session, @NotNull String message, Object... args) {
+        info(session, message, null, args);
+    }
+
+    /**
+     * 輸出 INFO 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void info(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isInfoEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.info(getFormatMessage(session, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param exchange ServerWebExchange 對象
+     * @param message  日誌訊息
+     * @param args     日誌訊息的參數
+     */
+    public static void warn(ServerWebExchange exchange, @NotNull String message, Object... args) {
+        warn(exchange, message, null, args);
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     *
+     * @param exchange  ServerWebExchange 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isWarnEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.warn(getFormatMessage(exchange, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Object... args) {
+        warn((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(@NotNull String message, Throwable throwable, Object... args) {
+        warn((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void warn(WebSocketSession session, @NotNull String message, Object... args) {
+        warn(session, message, null, args);
+    }
+
+    /**
+     * 輸出 WARN 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void warn(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isWarnEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.warn(getFormatMessage(session, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param exchange ServerWebExchange 對象
+     * @param message  日誌訊息
+     * @param args     日誌訊息的參數
+     */
+    public static void error(ServerWebExchange exchange, @NotNull String message, Object... args) {
+        error(exchange, message, null, args);
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     *
+     * @param exchange  ServerWebExchange 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isErrorEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.error(getFormatMessage(exchange, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Object... args) {
+        error((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(@NotNull String message, Throwable throwable, Object... args) {
+        error((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void error(WebSocketSession session, @NotNull String message, Object... args) {
+        error(session, message, null, args);
+    }
+
+    /**
+     * 輸出 ERROR 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void error(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isErrorEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.error(getFormatMessage(session, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param exchange ServerWebExchange 對象
+     * @param message  日誌訊息
+     * @param args     日誌訊息的參數
+     */
+    public static void fatal(ServerWebExchange exchange, @NotNull String message, Object... args) {
+        fatal(exchange, message, null, args);
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     *
+     * @param exchange  ServerWebExchange 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(ServerWebExchange exchange, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isFatalEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.fatal(getFormatMessage(exchange, message), throwable);
+        }
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 以及 throwable 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Object... args) {
+        fatal((ServerWebExchange) null, message, null, args);
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 ServerWebExchange 參數
+     * 將自動設定成為伺服器端請求
+     *
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(@NotNull String message, Throwable throwable, Object... args) {
+        fatal((ServerWebExchange) null, message, throwable, args);
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     * 此為重載方法，表示不需要傳入 throwable 參數
+     *
+     * @param session  WebSocketSession 對象
+     * @param message 日誌訊息
+     * @param args    日誌訊息的參數
+     */
+    public static void fatal(WebSocketSession session, @NotNull String message, Object... args) {
+        fatal(session, message, null, args);
+    }
+
+    /**
+     * 輸出 FATAL 級別的日誌
+     *
+     * @param session    WebSocketSession 對象
+     * @param message   日誌訊息
+     * @param throwable 異常對象
+     * @param args      日誌訊息的參數
+     */
+    public static void fatal(WebSocketSession session, @NotNull String message, Throwable throwable, Object... args) {
+        if (log.isFatalEnabled()) {
+            if (args != null && args.length > 0) {
+                message = String.format(message, args);
+            }
+            log.fatal(getFormatMessage(session, message), throwable);
+        }
     }
 }

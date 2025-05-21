@@ -218,23 +218,6 @@ public interface ResponseUnity {
         return sendErrorResponse(exchange, objectMapper, errorMessage, error.getCode(), error.getHttpStatus());
     }
 
-
-    /**
-     * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息並寫入響應
-     * 此為重寫方法，用於處理 ValidationException
-     *
-     * @param exchange     請求交換對象
-     * @param objectMapper 用於將 ApiResponseDTO 轉換為 JSON 的 ObjectMapper
-     * @param error        錯誤信息
-     * @param args         錯誤消息的參數
-     *
-     * @return Mono<Void>
-     */
-    default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, ValidationException.ErrorCode error, Object... args) {
-        return sendErrorResponse(exchange, objectMapper, String.format(error.getMessage(), args), error.getCode(), error.getHttpStatus());
-    }
-
-
     /**
      * 給定一個錯誤的狀態碼、錯誤消息和請求對象將其轉換成自定義的 ApiResponseDTO
      * 並將 JSON 格式的響應消息並寫入請求交換對象
@@ -272,5 +255,20 @@ public interface ResponseUnity {
             LogUnity.error(exchange, "資料轉換 JSON 格式失敗", ex);
             return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, ex));
         }
+    }
+
+    /**
+     * 將自定義的 ApiResponseDTO 轉換為 JSON 格式的響應消息並寫入響應
+     * 此為重寫方法，用於處理 ValidationException
+     *
+     * @param exchange     請求交換對象
+     * @param objectMapper 用於將 ApiResponseDTO 轉換為 JSON 的 ObjectMapper
+     * @param error        錯誤信息
+     * @param args         錯誤消息的參數
+     *
+     * @return Mono<Void>
+     */
+    default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, ValidationException.ErrorCode error, Object... args) {
+        return sendErrorResponse(exchange, objectMapper, String.format(error.getMessage(), args), error.getCode(), error.getHttpStatus());
     }
 }

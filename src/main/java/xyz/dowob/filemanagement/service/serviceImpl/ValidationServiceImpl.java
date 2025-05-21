@@ -10,6 +10,7 @@ import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -38,14 +39,13 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ValidationServiceImpl implements ValidationService {
     /**
-     * 用戶數據庫操作對象
-     */
-    private final UserRepository userRepository;
-
-    /**
      * 非法字符正則表達式，用於檢查文件名是否包含非法字符
      */
     private static final Pattern INVALID_CHARACTERS_PATTERN = Pattern.compile("[/\\\\|\"']");
+    /**
+     * 用戶數據庫操作對象
+     */
+    private final UserRepository userRepository;
 
     /**
      * 驗證用戶註冊數據類RegisterDTO中的數據是否合法
@@ -56,11 +56,13 @@ public class ValidationServiceImpl implements ValidationService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateRegisterDTO(RegisterDTO registerDTO) {
-        return validateNotNull(registerDTO)
-                .then(validatePasswordsMatch(registerDTO.getPassword(), registerDTO.getConfirmPassword()))
-                .then(validateUsernameNotExists(registerDTO))
-                .then(validateEmailNotExists(registerDTO))
-                .then(validatePasswordStrength(registerDTO.getPassword()));
+        return validateNotNull(registerDTO).then(Mono.defer(() -> {
+            return Mono.when(validatePasswordsMatch(registerDTO.getPassword(), registerDTO.getConfirmPassword()),
+                             validateUsernameNotExists(registerDTO.getUsername()),
+                             validateEmailNotExists(registerDTO.getEmail()),
+                             validatePasswordStrength(registerDTO.getPassword())
+            );
+        }));
     }
 
 
@@ -76,9 +78,11 @@ public class ValidationServiceImpl implements ValidationService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateResetPasswordDTO(ResetPasswordDTO resetPasswordDTO) {
-        return validateNotNull(resetPasswordDTO)
-                .then(validatePasswordsMatch(resetPasswordDTO.getNewPassword(), resetPasswordDTO.getConfirmPassword()))
-                .then(validatePasswordStrength(resetPasswordDTO.getNewPassword()));
+        return validateNotNull(resetPasswordDTO).then(Mono.defer(() -> {
+            return Mono.when(validatePasswordsMatch(resetPasswordDTO.getNewPassword(), resetPasswordDTO.getConfirmPassword()),
+                             validatePasswordStrength(resetPasswordDTO.getNewPassword())
+            );
+        }));
     }
 
 
@@ -86,13 +90,16 @@ public class ValidationServiceImpl implements ValidationService {
      * 驗證文件元數據DTO中的數據是否合法
      *
      * @param fileMetadataDTO 文件元數據DTO
+     * @param user            用戶
      */
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Void> validateFileMetadataDTO(FileMetadataDTO fileMetadataDTO, User user) {
-        return validateNotNull(fileMetadataDTO)
-                .then(validFileName(fileMetadataDTO.getFilename(), false))
-                .then(validateUserStorageLimit(user, fileMetadataDTO.getFileSize()));
+        return validateNotNull(fileMetadataDTO).then(Mono.defer(() -> {
+            return Mono.when(validFileName(fileMetadataDTO.getFilename(), false),
+                             validateUserStorageLimit(user.getStorageLimit(), user.getUsedStorage(), fileMetadataDTO.getFileSize())
+            );
+        }));
     }
 
 
@@ -199,6 +206,73 @@ public class ValidationServiceImpl implements ValidationService {
         return Mono.empty();
     }
 
+    /**
+     * 驗證授權傳輸對象中的數據是否合法
+     *
+     * @param authRequestDTO 授權請求對象
+     *
+     * @return Mono<Void>
+     */
+    @Override
+    public Mono<Void> validateAuthRequestDTO(AuthRequestDTO authRequestDTO) {
+        return validateNotNull(authRequestDTO).then(Mono.defer(() -> {
+            if (authRequestDTO.getUsername() == null || authRequestDTO.getUsername().isBlank()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "username"));
+            }
+
+            if (authRequestDTO.getPassword() == null || authRequestDTO.getPassword().isBlank()) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "password"));
+            }
+            return Mono.empty();
+        }));
+    }
+
+    /**
+     * 驗證檔案名稱是否出現非法字符
+     * 當檔案名稱為空、包含非法字符或者長度超過200時、檔案名稱不包含"."時，拋出ValidationException
+     * 當檔案為文件夾時，不檢查是否包含"."，但是檢查是否包含非法字符
+     *
+     * @param filename 檔案名稱
+     * @param isFolder 是否為文件夾
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> validFileName(String filename, boolean isFolder) {
+        if (filename == null || filename.isBlank() || (!isFolder && !filename.contains(".")) || INVALID_CHARACTERS_PATTERN.matcher(filename).find()) {
+            if (isFolder) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FOLDER_NAME));
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FILE_NAME));
+        }
+        if (filename.length() > 200) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.NAME_TOO_LONG));
+        }
+        return Mono.empty();
+    }
+
+    /**
+     * 檢查用戶是否有足夠的存儲空間來存儲文件，如果用戶的存儲限制為-1，則不進行檢查
+     * 當用戶存儲空間不足時，拋出ValidationException
+     *
+     * @param storageLimit 用戶的存儲限制
+     * @param alreadyUsed  用戶已經使用的存儲空間
+     * @param expectSize   預期存儲大小
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> validateUserStorageLimit(long storageLimit, long alreadyUsed, long expectSize) {
+        if (storageLimit == -1) {
+            return Mono.empty();
+        }
+        if (storageLimit < alreadyUsed + expectSize) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
+                                                      ByteEnum.toReadableSize(storageLimit),
+                                                      ByteEnum.toReadableSize(alreadyUsed),
+                                                      ByteEnum.toReadableSize(expectSize)
+            ));
+        }
+        return Mono.empty();
+    }
 
     /**
      * 驗證用戶密碼與確認密碼是否一致
@@ -208,6 +282,11 @@ public class ValidationServiceImpl implements ValidationService {
      * @param confirmPassword 確認密碼
      */
     private Mono<Void> validatePasswordsMatch(String password, String confirmPassword) {
+        if (password == null || confirmPassword == null) {
+            String message = password == null ? "password" : "confirmPassword";
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, message));
+        }
+
         return Mono.defer(() -> {
             if (!password.equals(confirmPassword)) {
                 return Mono.error(new ValidationException(ValidationException.ErrorCode.CONFIRM_PASSWORD_NOT_MATCH));
@@ -216,40 +295,44 @@ public class ValidationServiceImpl implements ValidationService {
         });
     }
 
-
     /**
      * 檢查用戶名稱是否合法
      * 須符合以下條件：
      * 1. 用戶名稱沒有被註冊過
      * 2. 用戶名稱只包含字母和數字
      *
-     * @param registerUserDTO 用戶註冊數據傳輸對象
+     * @param username 用戶名稱
      */
-    private Mono<Void> validateUsernameNotExists(RegisterDTO registerUserDTO) {
-        return userRepository.findByUsername(registerUserDTO.getUsername()).flatMap(user -> {
+    private Mono<Void> validateUsernameNotExists(String username) {
+        if (username == null || username.isBlank()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "username"));
+        }
+
+        return userRepository.findByUsername(username).flatMap(user -> {
             if (user != null) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, registerUserDTO.getUsername()));
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));
             }
             return Mono.empty();
-        }).then(alphanumericInspection(registerUserDTO.getUsername()));
+        }).then(alphanumericInspection(username));
     }
-
 
     /**
      * 檢查用戶信箱是否已存在
      * 當信箱已存在時，拋出ValidationException
      *
-     * @param registerUserDTO 用戶註冊數據傳輸對象
+     * @param email 信箱
      */
-    private Mono<Void> validateEmailNotExists(RegisterDTO registerUserDTO) {
-        return userRepository.findByEmail(registerUserDTO.getEmail()).flatMap(user -> {
+    private Mono<Void> validateEmailNotExists(String email) {
+        if (email == null || email.isBlank()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "email"));
+        }
+        return userRepository.findByEmail(email).flatMap(user -> {
             if (user != null) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.EMAIL_ALREADY_EXISTS, registerUserDTO.getEmail()));
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.EMAIL_ALREADY_EXISTS, email));
             }
             return Mono.empty();
         });
     }
-
 
     /**
      * 驗證用戶密碼強度
@@ -261,9 +344,29 @@ public class ValidationServiceImpl implements ValidationService {
      * @param password 密碼
      */
     private Mono<Void> validatePasswordStrength(String password) {
+        if (password == null || password.isBlank()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "password"));
+        }
         return palindromeInspection(password).then(upperLetterAndLowerLetterAndNumberInspection(password));
     }
 
+    /**
+     * 檢查是否只包含字母和數字
+     * 當檢測到非字母和數字時返回錯誤
+     *
+     * @param username 字符串
+     */
+    private Mono<Void> alphanumericInspection(String username) {
+        if (username == null || username.isBlank()) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.BLANK_FIELD, "username"));
+        }
+        return Mono.defer(() -> {
+            if (Pattern.matches("^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z0-9]*$", username)) {
+                return Mono.empty();
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));
+        });
+    }
 
     /**
      * 檢查是否為回文
@@ -282,7 +385,6 @@ public class ValidationServiceImpl implements ValidationService {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH));
         }).then();
     }
-
 
     /**
      * 檢查是否包含大寫字母、小寫字母和數字
@@ -316,69 +418,5 @@ public class ValidationServiceImpl implements ValidationService {
             }
             return Mono.error(new ValidationException(ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH));
         });
-    }
-
-
-    /**
-     * 檢查是否只包含字母和數字
-     * 當檢測到非字母和數字時返回錯誤
-     *
-     * @param username 字符串
-     */
-    private Mono<Void> alphanumericInspection(String username) {
-        return Mono.defer(() -> {
-            if (Pattern.matches("^(?=.*[a-zA-Z])(?=.*\\d)[a-zA-Z0-9]*$", username)) {
-                return Mono.empty();
-            }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_INVALID, username));
-        });
-    }
-
-
-    /**
-     * 驗證檔案名稱是否出現非法字符
-     * 當檔案名稱為空、包含非法字符或者長度超過200時、檔案名稱不包含"."時，拋出ValidationException
-     * 當檔案為文件夾時，不檢查是否包含"."，但是檢查是否包含非法字符
-     *
-     * @param filename 檔案名稱
-     * @param isFolder 是否為文件夾
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> validFileName(String filename, boolean isFolder) {
-        if (filename == null || filename.isBlank() || (!isFolder && !filename.contains(".")) || INVALID_CHARACTERS_PATTERN.matcher(filename).find()) {
-            if (isFolder) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FOLDER_NAME));
-            }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_FILE_NAME));
-        }
-        if (filename.length() > 200) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.NAME_TOO_LONG));
-        }
-        return Mono.empty();
-    }
-
-
-    /**
-     * 檢查用戶是否有足夠的存儲空間來存儲文件，如果用戶的存儲限制為-1，則不進行檢查
-     * 當用戶存儲空間不足時，拋出ValidationException
-     *
-     * @param user       用戶
-     * @param expectSize 預期存儲大小
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> validateUserStorageLimit(User user, long expectSize) {
-        if (user.getStorageLimit() == -1) {
-            return Mono.empty();
-        }
-        if (user.getStorageLimit() < user.getUsedStorage() + expectSize) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED,
-                                                      ByteEnum.toReadableSize(user.getStorageLimit()),
-                                                      ByteEnum.toReadableSize(user.getUsedStorage()),
-                                                      ByteEnum.toReadableSize(expectSize)
-            ));
-        }
-        return Mono.empty();
     }
 }

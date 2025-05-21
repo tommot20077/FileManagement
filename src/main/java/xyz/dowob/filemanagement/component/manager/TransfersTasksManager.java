@@ -89,6 +89,28 @@ public class TransfersTasksManager {
         });
     }
 
+    /**
+     * 用於獲取一個檔案的所有傳輸任務，可以根據任務狀態進行過濾
+     * 當檔案不存在時，返回空列表
+     *
+     * @param md5    檔案的 MD5 值
+     * @param status 任務狀態，當為 null 時，不進行過濾
+     *
+     * @return List<TransfersTask> 返回一個包含所有符合條件的傳輸任務的列表
+     */
+    public List<TransfersTask> getTransfersTask(String md5, TransfersStatusEnum status) {
+        if (activeTransfersTask.containsKey(md5)) {
+            Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(md5);
+            List<TransfersTask> result = new ArrayList<>();
+            transfersTaskMap.forEach((key, value) -> {
+                if (status == null || value.getStatus() == status) {
+                    result.add(value);
+                }
+            });
+            return result;
+        }
+        return Collections.emptyList();
+    }
 
     /**
      * 用於註冊一個新的轉換任務
@@ -102,7 +124,6 @@ public class TransfersTasksManager {
     public Mono<Void> createTransfersTask(FileMetadataDTO fileMetadataDTO, String transferTaskId, TransfersStatusEnum status) {
         return createTransfersTask(fileMetadataDTO, transferTaskId, null, null, status);
     }
-
 
     /**
      * 用於創建一個新的傳輸任務，當任務創建成功時，將任務存入 activeTransfersTask 中以及數據庫中
@@ -127,7 +148,6 @@ public class TransfersTasksManager {
         activeTransfersTask.put(fileMetadataDTO.getMd5(), Map.of(transferTaskId, transfersTask));
         return transfersTasksRepository.save(transfersTask).then();
     }
-
 
     /**
      * 用於更新一個傳輸任務的狀態
@@ -164,31 +184,6 @@ public class TransfersTasksManager {
             return Mono.empty();
         });
     }
-
-
-    /**
-     * 用於獲取一個檔案的所有傳輸任務，可以根據任務狀態進行過濾
-     * 當檔案不存在時，返回空列表
-     *
-     * @param md5    檔案的 MD5 值
-     * @param status 任務狀態，當為 null 時，不進行過濾
-     *
-     * @return List<TransfersTask> 返回一個包含所有符合條件的傳輸任務的列表
-     */
-    public List<TransfersTask> getTransfersTask(String md5, TransfersStatusEnum status) {
-        if (activeTransfersTask.containsKey(md5)) {
-            Map<String, TransfersTask> transfersTaskMap = activeTransfersTask.get(md5);
-            List<TransfersTask> result = new ArrayList<>();
-            transfersTaskMap.forEach((key, value) -> {
-                if (status == null || value.getStatus() == status) {
-                    result.add(value);
-                }
-            });
-            return result;
-        }
-        return Collections.emptyList();
-    }
-
 
     /**
      * 獲取當前可用的線程數量

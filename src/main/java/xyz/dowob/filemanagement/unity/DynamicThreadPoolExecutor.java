@@ -29,60 +29,50 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SuppressWarnings("all")
 public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
     /**
-     * 記錄當前線程池執行中的任務數量
-     */
-    private final AtomicInteger activeThreadCount = new AtomicInteger(0);
-
-    /**
-     * 線程池鎖，用於同步線程池的狀態
-     */
-    private final Object lock = new Object();
-
-    /**
-     * 可用的 CPU 線程數量 {@link Runtime#availableProcessors()}
-     */
-    private int totalAvailableProcessors;
-
-    /**
      * 低優先級時的 CPU 使用率（30%）
      */
     private static final double LOW_PRIORITY_CPU_USAGE = 0.3;
-
     /**
      * 高優先級時的 CPU 使用率（60%）
      */
     private static final double HIGH_PRIORITY_CPU_USAGE = 0.6;
-
     /**
-     * 最小線程池大小，預設至少 2 個線程
+     * 任務佇列使用率超過 80% 時擴展
      */
-    private int minPoolSize;
-
+    private static final double HIGH_TASK_THRESHOLD = 0.8;
     /**
-     * 最大線程池大小，基於 {@link HIGH_PRIORITY_CPU_USAGE} 計算
+     * 任務佇列使用率低於 20% 時縮減
      */
-    private int maxPoolSize;
-
+    private static final double LOW_TASK_THRESHOLD = 0.2;
     /**
-     * 理想的線程池大小，根據優先級動態調整
+     * 記錄當前線程池執行中的任務數量
      */
-    private int idealPoolSize;
-
+    private final AtomicInteger activeThreadCount = new AtomicInteger(0);
+    /**
+     * 線程池鎖，用於同步線程池的狀態
+     */
+    private final Object lock = new Object();
     /**
      * 任務佇列的總容量
      */
     @Getter
     private final int workQueueCapacity;
-
     /**
-     * 任務佇列使用率超過 80% 時擴展
+     * 可用的 CPU 線程數量 {@link Runtime#availableProcessors()}
      */
-    private static final double HIGH_TASK_THRESHOLD = 0.8;
-
+    private int totalAvailableProcessors;
     /**
-     * 任務佇列使用率低於 20% 時縮減
+     * 最小線程池大小，預設至少 2 個線程
      */
-    private static final double LOW_TASK_THRESHOLD = 0.2;
+    private int minPoolSize;
+    /**
+     * 最大線程池大小，基於 {@link HIGH_PRIORITY_CPU_USAGE} 計算
+     */
+    private int maxPoolSize;
+    /**
+     * 理想的線程池大小，根據優先級動態調整
+     */
+    private int idealPoolSize;
 
     /**
      * 創建動態線程池執行器，用於根據當前系統狀態和優先級調整線程池大小
@@ -108,6 +98,20 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
     }
 
     /**
+     * 取得佇列的總容量
+     *
+     * @param queue 任務佇列
+     *
+     * @return 佇列的總容量，若無法計算則回傳 -1
+     */
+    private static int getWorkQueueCapacity(BlockingQueue<Runnable> queue) {
+        if (queue instanceof ArrayBlockingQueue<?> || queue instanceof LinkedBlockingQueue<?>) {
+            return queue.size() + queue.remainingCapacity();
+        }
+        return -1;
+    }
+
+    /**
      * 提交任務，並根據當前系統狀況自動調整線程池大小
      *
      * @param task 要執行的任務
@@ -119,45 +123,6 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         adjustPoolSize();
         return super.submit(task);
     }
-
-
-    /**
-     * 執行任務，並根據當前系統狀況自動調整線程池大小
-     *
-     * @param command 要執行的任務
-     */
-    @Override
-    public void execute(@NotNull Runnable command) {
-        adjustPoolSize();
-        super.execute(command);
-    }
-
-
-    /**
-     * 執行任務前的回調，記錄當前執行中的線程數
-     *
-     * @param t 執行任務的線程
-     * @param r 即將執行的任務
-     */
-    @Override
-    protected void beforeExecute(Thread t, Runnable r) {
-        activeThreadCount.incrementAndGet();
-        super.beforeExecute(t, r);
-    }
-
-
-    /**
-     * 執行任務後的回調，減少當前執行中的線程數
-     *
-     * @param r 執行完畢的任務
-     * @param t 若任務執行時發生異常，則傳遞異常
-     */
-    @Override
-    protected void afterExecute(Runnable r, Throwable t) {
-        activeThreadCount.decrementAndGet();
-        super.afterExecute(r, t);
-    }
-
 
     /**
      * 調整線程池大小，根據當前系統資源與任務佇列進行自動擴展與縮減
@@ -216,6 +181,40 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
         }
     }
 
+    /**
+     * 執行任務，並根據當前系統狀況自動調整線程池大小
+     *
+     * @param command 要執行的任務
+     */
+    @Override
+    public void execute(@NotNull Runnable command) {
+        adjustPoolSize();
+        super.execute(command);
+    }
+
+    /**
+     * 執行任務前的回調，記錄當前執行中的線程數
+     *
+     * @param t 執行任務的線程
+     * @param r 即將執行的任務
+     */
+    @Override
+    protected void beforeExecute(Thread t, Runnable r) {
+        activeThreadCount.incrementAndGet();
+        super.beforeExecute(t, r);
+    }
+
+    /**
+     * 執行任務後的回調，減少當前執行中的線程數
+     *
+     * @param r 執行完畢的任務
+     * @param t 若任務執行時發生異常，則傳遞異常
+     */
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+        activeThreadCount.decrementAndGet();
+        super.afterExecute(r, t);
+    }
 
     /**
      * 更新線程池的優先級與 CPU 使用率
@@ -234,20 +233,5 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
             setCorePoolSize(idealPoolSize);
             setMaximumPoolSize(Math.max(idealPoolSize * 2, minPoolSize));
         }
-    }
-
-
-    /**
-     * 取得佇列的總容量
-     *
-     * @param queue 任務佇列
-     *
-     * @return 佇列的總容量，若無法計算則回傳 -1
-     */
-    private static int getWorkQueueCapacity(BlockingQueue<Runnable> queue) {
-        if (queue instanceof ArrayBlockingQueue<?> || queue instanceof LinkedBlockingQueue<?>) {
-            return queue.size() + queue.remainingCapacity();
-        }
-        return -1;
     }
 }

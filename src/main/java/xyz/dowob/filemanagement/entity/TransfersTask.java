@@ -77,6 +77,16 @@ public class TransfersTask {
     private TransfersStatusEnum status;
 
     /**
+     * 重寫hashCode方法，獲取對象的hashCode
+     *
+     * @return hashCode
+     */
+    @Override
+    public int hashCode() {
+        return id.hashCode();
+    }
+
+    /**
      * 重寫equals方法，判斷兩個對象是否相等
      *
      * @param o 對象
@@ -94,18 +104,6 @@ public class TransfersTask {
         TransfersTask that = (TransfersTask) o;
         return id.equals(that.id);
     }
-
-
-    /**
-     * 重寫hashCode方法，獲取對象的hashCode
-     *
-     * @return hashCode
-     */
-    @Override
-    public int hashCode() {
-        return id.hashCode();
-    }
-
 
     /**
      * 重寫toString方法，獲取對象的字符串表示

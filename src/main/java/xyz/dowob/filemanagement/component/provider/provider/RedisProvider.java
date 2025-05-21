@@ -29,20 +29,17 @@ import java.util.*;
 @SuppressWarnings("unused")
 public class RedisProvider {
     /**
+     * 隨機緩存過期時間比例上限，將會隨機生成一個過期時間，範圍為 [expireTime, expireTime * RANDOM_CACHE_EXPIRE_TIME_RATIO]
+     */
+    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 1.2f;
+    /**
      * RedisTemplate 用於操作 Redis 的模板，此模板為非阻塞的
      */
     private final ReactiveRedisTemplate<String, Object> redisTemplate;
-
-
     /**
      * ObjectMapper 用於對象的序列化和反序列化
      */
     private final ObjectMapper objectMapper;
-
-    /**
-     * 隨機緩存過期時間比例上限，將會隨機生成一個過期時間，範圍為 [expireTime, expireTime * RANDOM_CACHE_EXPIRE_TIME_RATIO]
-     */
-    private static final float RANDOM_CACHE_EXPIRE_TIME_RATIO = 1.2f;
 
     /**
      * 通過構造方法注入 RedisTemplate 和 ObjectMapper
@@ -85,19 +82,20 @@ public class RedisProvider {
         return redisTemplate.opsForValue().set(key, value).then();
     }
 
-
     /**
-     * 僅在鍵不存在的情況下設置值
+     * 設定過期時間，避免緩存雪崩的情況，會在原有的過期時間上增加隨機的過期時間
      *
-     * @param key   鍵
-     * @param value 值
+     * @param key        鍵
+     * @param expireTime 過期時間
      *
-     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     * @return 返回 Mono<Void> 對象
      */
-    public Mono<Boolean> setValueIfAbsent(String key, Object value) {
-        return redisTemplate.opsForValue().setIfAbsent(key, value);
+    private Mono<Void> setExpire(String key, Duration expireTime) {
+        Random random = new Random();
+        float randomRatio = 1.0f + random.nextFloat() * (RANDOM_CACHE_EXPIRE_TIME_RATIO - 1.0f);
+        Duration randomExpireTime = Duration.ofSeconds((long) (expireTime.getSeconds() * randomRatio));
+        return redisTemplate.expire(key, randomExpireTime).then();
     }
-
 
     /**
      * 僅在鍵不存在的情況下設置值，並設置過期時間
@@ -115,6 +113,17 @@ public class RedisProvider {
         return redisTemplate.opsForValue().setIfAbsent(key, value).flatMap(result -> setExpire(key, expireTime).thenReturn(result));
     }
 
+    /**
+     * 僅在鍵不存在的情況下設置值
+     *
+     * @param key   鍵
+     * @param value 值
+     *
+     * @return 返回 Mono<Boolean> 對象，當設置成功時返回 true，否則返回 false
+     */
+    public Mono<Boolean> setValueIfAbsent(String key, Object value) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value);
+    }
 
     /**
      * 根據鍵獲取數據
@@ -125,7 +134,6 @@ public class RedisProvider {
     public Mono<Object> getValue(String key) {
         return redisTemplate.opsForValue().get(key);
     }
-
 
     /**
      * 根據鍵獲取數據
@@ -138,7 +146,6 @@ public class RedisProvider {
         return redisTemplate.opsForValue().get(key).cast(clazz);
     }
 
-
     /**
      * 依照鍵刪除儲存類型為 Value 的數據
      *
@@ -149,7 +156,6 @@ public class RedisProvider {
     public Mono<Void> deleteValue(String key) {
         return redisTemplate.delete(key).then();
     }
-
 
     /**
      * 依照鍵刪除儲存類型為 Value 的數據
@@ -162,7 +168,6 @@ public class RedisProvider {
         return redisTemplate.delete(keys.toArray(new String[0])).then();
     }
 
-
     /**
      * 依照鍵刪除儲存類型為 Value 的數據
      *
@@ -173,7 +178,6 @@ public class RedisProvider {
     public Mono<Void> deleteValue(String... keys) {
         return redisTemplate.delete(keys).then();
     }
-
 
     /**
      * 獲取值並轉換為分頁響應
@@ -190,7 +194,6 @@ public class RedisProvider {
         });
     }
 
-
     /**
      * 獲取數據列表
      *
@@ -203,19 +206,27 @@ public class RedisProvider {
         return redisTemplate.opsForValue().get(key).flatMapMany(object -> convertObjectList(object, clazz));
     }
 
-
     /**
-     * 對數據進行自增操作
+     * 轉換數據為指定類型的列表
      *
-     * @param key   鍵
-     * @param delta 自增的數值
+     * @param objects 數據
+     * @param clazz   類型
+     * @param <T>     泛型
      *
-     * @return 返回 Mono<Long> 增加後的值
+     * @return 返回 Flux<T> 對象
      */
-    public Mono<Long> incrementDelta(String key, long delta) {
-        return redisTemplate.opsForValue().increment(key, delta);
+    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
+        if (!(objects instanceof List<?> list)) {
+            return Flux.empty();
+        }
+        List<T> finalList = list.stream().map(object -> {
+            if (clazz.isInstance(object)) {
+                return clazz.cast(object);
+            }
+            return objectMapper.convertValue(object, clazz);
+        }).toList();
+        return Flux.fromIterable(finalList);
     }
-
 
     /**
      * 對數據進行自增操作，並設置過期時間
@@ -230,6 +241,17 @@ public class RedisProvider {
         return incrementDelta(key, delta).flatMap(incrementResult -> setExpire(key, expireTime).thenReturn(incrementResult));
     }
 
+    /**
+     * 對數據進行自增操作
+     *
+     * @param key   鍵
+     * @param delta 自增的數值
+     *
+     * @return 返回 Mono<Long> 增加後的值
+     */
+    public Mono<Long> incrementDelta(String key, long delta) {
+        return redisTemplate.opsForValue().increment(key, delta);
+    }
 
     /**
      * 將數據存入 Redis 的 Hash 中，並設置過期時間
@@ -248,7 +270,6 @@ public class RedisProvider {
         return redisTemplate.opsForHash().put(hashKey, innerKey, value).then(setExpire(hashKey, expireTime));
     }
 
-
     /**
      * 將數據存入 Redis 的 Hash 中
      *
@@ -261,7 +282,6 @@ public class RedisProvider {
     public Mono<Void> setHashMap(String hashKey, String innerKey, Object value) {
         return redisTemplate.opsForHash().put(hashKey, innerKey, value).then();
     }
-
 
     /**
      * 將數據存入 Redis 的 Hash 中
@@ -278,7 +298,6 @@ public class RedisProvider {
         return redisTemplate.opsForHash().putAll(hashKey, value).then(setExpire(hashKey, expireTime));
     }
 
-
     /**
      * 將數據存入 Redis 的 Hash 中，此為批量設定
      *
@@ -290,7 +309,6 @@ public class RedisProvider {
     public Mono<Void> setHashMapAll(String hashKey, Map<String, Object> value) {
         return redisTemplate.opsForHash().putAll(hashKey, value).then();
     }
-
 
     /**
      * 根據 Hash 的鍵和內部的鍵獲取數據
@@ -304,7 +322,6 @@ public class RedisProvider {
         return redisTemplate.opsForHash().get(hashKey, innerKey);
     }
 
-
     /**
      * 根據 Hash 的鍵和內部的鍵獲取數據
      *
@@ -317,7 +334,6 @@ public class RedisProvider {
     public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
         return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
     }
-
 
     /**
      * 根據 Hash 的鍵和內部的鍵獲取數據，此適用於列表形式
@@ -344,7 +360,6 @@ public class RedisProvider {
         });
     }
 
-
     /**
      * 獲取指定Key 中的所有數據
      *
@@ -365,7 +380,6 @@ public class RedisProvider {
         });
     }
 
-
     /**
      * 對 Hash 中的數據進行自增操作
      *
@@ -378,7 +392,6 @@ public class RedisProvider {
     public Mono<Long> incrementHashMap(String hashKey, String innerKey, long delta) {
         return redisTemplate.opsForHash().increment(hashKey, innerKey, delta);
     }
-
 
     /**
      * 對 Hash 中的數據進行自增操作，並設置過期時間
@@ -397,7 +410,6 @@ public class RedisProvider {
                 .flatMap(incrementResult -> setExpire(hashKey, expireTime).thenReturn(incrementResult));
     }
 
-
     /**
      * 獲取 HashMap 中的查詢Key的所有數據
      *
@@ -408,7 +420,6 @@ public class RedisProvider {
     public Flux<Object> getHashMapAll(String hashKey) {
         return redisTemplate.opsForHash().values(hashKey);
     }
-
 
     /**
      * 獲取 HashMap 中的查詢Key的所有數據
@@ -421,7 +432,6 @@ public class RedisProvider {
     public <T> Flux<T> getHashMapAll(String hashKey, Class<T> clazz) {
         return redisTemplate.opsForHash().values(hashKey).cast(clazz);
     }
-
 
     /**
      * 依照通配符獲取 HashMap 中的數據
@@ -446,7 +456,6 @@ public class RedisProvider {
         });
     }
 
-
     /**
      * 刪除 Hash 中指定外部Key中內部Key的數據
      *
@@ -458,7 +467,6 @@ public class RedisProvider {
     public Mono<Void> deleteHash(String key, String innerKey) {
         return redisTemplate.opsForHash().remove(key, innerKey).then();
     }
-
 
     /**
      * 刪除 Hash 中指定外部Key中內部Key的數據，此為批量刪除
@@ -476,7 +484,6 @@ public class RedisProvider {
         return redisTemplate.opsForHash().remove(key, innerKey.toArray()).then();
     }
 
-
     /**
      * 刪除 Hash 指定Key中的所有數據
      *
@@ -487,7 +494,6 @@ public class RedisProvider {
     public Mono<Void> deleteHash(String key) {
         return redisTemplate.opsForHash().delete(key).then();
     }
-
 
     /**
      * 將數據存入 Redis 的 Set 中
@@ -505,7 +511,6 @@ public class RedisProvider {
         return redisTemplate.opsForSet().add(key, value).then(setExpire(key, expireTime));
     }
 
-
     /**
      * 將數據存入 Redis 的 Set 中
      *
@@ -518,7 +523,6 @@ public class RedisProvider {
         return redisTemplate.opsForSet().add(key, value).then();
     }
 
-
     /**
      * 取得 Set 中的數據
      *
@@ -529,7 +533,6 @@ public class RedisProvider {
     public Flux<Object> getSet(String key) {
         return redisTemplate.opsForSet().members(key);
     }
-
 
     /**
      * 取得 Set 中的數據
@@ -543,7 +546,6 @@ public class RedisProvider {
         return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
     }
 
-
     /**
      * 根據需要刪除的數值，刪除 Set 中的數據
      *
@@ -556,7 +558,6 @@ public class RedisProvider {
         return redisTemplate.opsForSet().remove(key, value).then();
     }
 
-
     /**
      * 刪除 Set 中的數據
      *
@@ -567,7 +568,6 @@ public class RedisProvider {
     public Mono<Void> deleteSet(String key) {
         return redisTemplate.opsForSet().delete(key).then();
     }
-
 
     /**
      * 將數據存入 Redis 的 List 中，並設置過期時間
@@ -585,7 +585,6 @@ public class RedisProvider {
         return redisTemplate.opsForList().rightPush(key, value).then(setExpire(key, expireTime));
     }
 
-
     /**
      * 插入額外的數據到 Set 中
      *
@@ -598,6 +597,17 @@ public class RedisProvider {
         return redisTemplate.opsForList().rightPush(key, value).then();
     }
 
+    /**
+     * 獲取 List 中的數據
+     *
+     * @param key 鍵
+     * @param clazz 類型
+     *
+     * @return 返回 Flux<T> 對象
+     */
+    public <T> Flux<T> getList(String key, Class<T> clazz) {
+        return getList(key).cast(clazz);
+    }
 
     /**
      * 獲取 List 中的數據
@@ -609,7 +619,6 @@ public class RedisProvider {
     public Flux<Object> getList(String key) {
         return getList(key, 0, -1);
     }
-
 
     /**
      * 獲取 List 中的數據
@@ -624,20 +633,6 @@ public class RedisProvider {
         return redisTemplate.opsForList().range(key, start, end);
     }
 
-
-    /**
-     * 獲取 List 中的數據
-     *
-     * @param key 鍵
-     * @param clazz 類型
-     *
-     * @return 返回 Flux<T> 對象
-     */
-    public <T> Flux<T> getList(String key, Class<T> clazz) {
-        return getList(key).cast(clazz);
-    }
-
-
     /**
      * 獲取 List 中的數據
      *
@@ -651,7 +646,6 @@ public class RedisProvider {
     public <T> Flux<T> getListContent(String key, long start, long end, Class<T> clazz) {
         return redisTemplate.opsForList().range(key, start, end).flatMap(object -> convertObjectList(object, clazz)).switchIfEmpty(Flux.empty());
     }
-
 
     /**
      * 將數據存入 Redis 的 List 中，並設置過期時間
@@ -670,7 +664,6 @@ public class RedisProvider {
         return insertList(key, value, isLeft).then(setExpire(key, expireTime));
     }
 
-
     /**
      * 將數據存入 Redis 的 List 中
      *
@@ -687,7 +680,6 @@ public class RedisProvider {
         return redisTemplate.opsForList().rightPush(key, value).then();
     }
 
-
     /**
      * 根據目標數值，刪除 List 中的數據
      *
@@ -700,7 +692,6 @@ public class RedisProvider {
         return redisTemplate.opsForList().remove(key, 1, value).then();
     }
 
-
     /**
      * 刪除 List 中的數據
      *
@@ -711,7 +702,6 @@ public class RedisProvider {
     public Mono<Void> deleteList(String key) {
         return redisTemplate.opsForList().delete(key).then();
     }
-
 
     /**
      * 新增數據到 Redis 的 Zset 中，並設置過期時間
@@ -730,7 +720,6 @@ public class RedisProvider {
         return setZset(key, value, score).then(setExpire(key, expireTime));
     }
 
-
     /**
      * 新增數據到 Redis 的 Zset 中
      *
@@ -744,7 +733,6 @@ public class RedisProvider {
         return redisTemplate.opsForZSet().add(key, value, score).then();
     }
 
-
     /**
      * 獲取 Zset 中的數據
      *
@@ -755,7 +743,6 @@ public class RedisProvider {
     public Flux<Object> getZset(String key) {
         return redisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(0L)).to(Range.Bound.unbounded()));
     }
-
 
     /**
      * 獲取 Zset 中的數據
@@ -769,7 +756,6 @@ public class RedisProvider {
     public Flux<Object> getZset(String key, long start, long end) {
         return redisTemplate.opsForZSet().range(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end)));
     }
-
 
     /**
      * 獲取 Zset 中的數據並轉換成分頁響應
@@ -793,7 +779,6 @@ public class RedisProvider {
         });
     }
 
-
     /**
      * 獲取 Zset 中的數據，並轉換成列表
      *
@@ -808,7 +793,6 @@ public class RedisProvider {
         return redisTemplate.opsForZSet().rangeByScore(key, Range.just((double) page)).next().flatMapMany(object -> convertObjectList(object, clazz));
     }
 
-
     /**
      * 根據目標數值，刪除 Zset 中的數據
      *
@@ -821,7 +805,6 @@ public class RedisProvider {
         return redisTemplate.opsForZSet().remove(key, value).then();
     }
 
-
     /**
      * 刪除 Zset 中的數據
      *
@@ -832,7 +815,6 @@ public class RedisProvider {
     public Mono<Void> deleteZset(String key) {
         return redisTemplate.opsForZSet().removeRange(key, Range.unbounded()).then();
     }
-
 
     /**
      * 根據目標數值，刪除 Zset 中的數據
@@ -847,7 +829,6 @@ public class RedisProvider {
         return redisTemplate.opsForZSet().removeRange(key, Range.from(Range.Bound.inclusive(start)).to(Range.Bound.inclusive(end))).then();
     }
 
-
     /**
      * 生成一個分塊集合，用於標記分塊的完成情況
      *
@@ -860,7 +841,6 @@ public class RedisProvider {
         return Flux.range(1, totalChunks).flatMap(index -> setSet(key, index)).then();
     }
 
-
     /**
      * 刪除 Redis 中的數據，此刪除方法會檢查所有的數據類型找出對應的鍵並刪除
      *
@@ -871,7 +851,6 @@ public class RedisProvider {
     public Mono<Void> delete(String key) {
         return redisTemplate.delete(key).then();
     }
-
 
     /**
      * 依照通配符刪除 Redis 中的數據
@@ -884,7 +863,6 @@ public class RedisProvider {
         return redisTemplate.keys(pattern).collectList().flatMap(keys -> redisTemplate.delete(keys.toArray(String[]::new)).then());
     }
 
-
     /**
      * 確認分塊是否尚未完成
      *
@@ -895,44 +873,5 @@ public class RedisProvider {
      */
     public Mono<Boolean> isChunkSetPending(String key, int chunkIndex) {
         return redisTemplate.opsForSet().isMember(key, chunkIndex);
-    }
-
-
-    /**
-     * 設定過期時間，避免緩存雪崩的情況，會在原有的過期時間上增加隨機的過期時間
-     *
-     * @param key        鍵
-     * @param expireTime 過期時間
-     *
-     * @return 返回 Mono<Void> 對象
-     */
-    private Mono<Void> setExpire(String key, Duration expireTime) {
-        Random random = new Random();
-        float randomRatio = 1.0f + random.nextFloat() * (RANDOM_CACHE_EXPIRE_TIME_RATIO - 1.0f);
-        Duration randomExpireTime = Duration.ofSeconds((long) (expireTime.getSeconds() * randomRatio));
-        return redisTemplate.expire(key, randomExpireTime).then();
-    }
-
-
-    /**
-     * 轉換數據為指定類型的列表
-     *
-     * @param objects 數據
-     * @param clazz   類型
-     * @param <T>     泛型
-     *
-     * @return 返回 Flux<T> 對象
-     */
-    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
-        if (!(objects instanceof List<?> list)) {
-            return Flux.empty();
-        }
-        List<T> finalList = list.stream().map(object -> {
-            if (clazz.isInstance(object)) {
-                return clazz.cast(object);
-            }
-            return objectMapper.convertValue(object, clazz);
-        }).toList();
-        return Flux.fromIterable(finalList);
     }
 }

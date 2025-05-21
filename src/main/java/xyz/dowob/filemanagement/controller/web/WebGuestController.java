@@ -58,21 +58,20 @@ public class WebGuestController extends BaseGuestController {
         return super.register(registerUserDTO, exchange);
     }
 
-
     /**
-     * 訪客登入 Web請求
+     * 確認當前用戶授權狀態，並返回用戶信息
+     * 用於檢查當前用戶是否已經授權，並返回用戶的基本信息。
+     * 如果用戶未授權，會返回401 Unauthorized錯誤。
      *
-     * @param authRequestDTO 登入請求數據
-     * @param exchange       當前請求對象
+     * @param exchange 請求對象，包含請求上下文
      *
-     * @return Mono<ResponseEntity < ?>> 登入結果
+     * @return Mono<ResponseEntity < ?>> 返回用戶授權狀態的結果
      */
-    @HideSensitive
-    @PostMapping("/login")
-    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
-        return super.login(authRequestDTO, exchange, true);
+    @SkipRecord
+    @GetMapping("/checkAuthenticationStatus")
+    public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
+        return super.checkAuthenticationStatus(exchange);
     }
-
 
     /**
      * 發送重置密碼郵件
@@ -103,19 +102,17 @@ public class WebGuestController extends BaseGuestController {
         return super.resetPassword(resetPasswordDTO, exchange);
     }
 
-
     /**
-     * 確認當前用戶授權狀態，並返回用戶信息
-     * 用於檢查當前用戶是否已經授權，並返回用戶的基本信息。
-     * 如果用戶未授權，會返回401 Unauthorized錯誤。
+     * 訪客登入 Web請求
      *
-     * @param exchange 請求對象，包含請求上下文
+     * @param authRequestDTO 登入請求數據
+     * @param exchange       當前請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回用戶授權狀態的結果
+     * @return Mono<ResponseEntity < ?>> 登入結果
      */
-    @SkipRecord
-    @GetMapping("/checkAuthenticationStatus")
-    public Mono<ResponseEntity<?>> checkAuthenticationStatus(ServerWebExchange exchange) {
-        return super.checkAuthenticationStatus(exchange);
+    @HideSensitive
+    @PostMapping("/login")
+    public Mono<ResponseEntity<?>> login(@Validated @RequestBody AuthRequestDTO authRequestDTO, ServerWebExchange exchange) {
+        return super.login(authRequestDTO, exchange, true);
     }
 }

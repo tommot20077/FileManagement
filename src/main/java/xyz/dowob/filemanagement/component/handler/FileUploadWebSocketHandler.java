@@ -146,6 +146,30 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                 .then();
     }
 
+    /**
+     * 處理分塊上傳任務，解析 JSON 資料並將交給檔案服務進行處理
+     * 最後返回上傳結果的響應
+     *
+     * @param session  WebSocket 會話
+     * @param jsonNode JSON 資料
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
+        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
+        return uploadChunkDTO
+                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
+                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
+                    String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
+                    response.setMessage(message);
+                    return sendMessage(session, response);
+                }))
+                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
+                .onErrorResume(Exception.class, e -> {
+                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
+                    return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
+                });
+    }
 
     /**
      * 處理初始化上傳任務，將文件元數據保存到數據庫
@@ -181,11 +205,8 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                         .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
                         .flatMap(transferResponseDTO -> {
                             ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                            if (transferResponseDTO.getIsFinished()) {
-                                response.setMessage("上傳任務完成");
-                            } else {
-                                response.setMessage("初始化上傳任務成功");
-                            }
+                            String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "初始化上傳任務成功";
+                            response.setMessage(message);
                             return sendMessage(session, response);
                         })
                         .doFinally(signalType -> userLimiter.release(user.getId()).subscribeOn(Schedulers.boundedElastic()).subscribe());
@@ -196,7 +217,6 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
             return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), responseCode, errorMessage, null));
         });
     }
-
 
     /**
      * 將 JSON 資料轉換為指定類型的物件
@@ -216,21 +236,6 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
             return Optional.empty();
         }
     }
-
-
-    /**
-     * 發送消息給指定用戶，依照用戶 ID 查找對應的 WebSocket 會話
-     *
-     * @param userId  用戶 ID
-     * @param message 消息
-     *
-     * @return Mono<Void>
-     */
-    public Mono<Void> sendMessage(String userId, Object message) {
-        WebSocketSession session = USER_SESSION_MAP.get(Long.parseLong(userId));
-        return sendMessage(session, message);
-    }
-
 
     /**
      * 發送消息給指定用戶，使用 WebSocket 會話
@@ -253,19 +258,6 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         return Mono.empty();
     }
 
-
-    /**
-     * 傳送訊息給所有連線的用戶
-     *
-     * @param message 訊息內容
-     *
-     * @return Mono<Void>
-     */
-    public Mono<Void> broadcast(Object message) {
-        return Flux.fromIterable(USER_SESSION_MAP.values()).filter(WebSocketSession::isOpen).flatMap(session -> sendMessage(session, message)).then();
-    }
-
-
     /**
      * 移除用戶 ID 對應的 WebSocket 會話
      *
@@ -278,32 +270,29 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         return session.close();
     }
 
-
     /**
-     * 處理分塊上傳任務，解析 JSON 資料並將交給檔案服務進行處理
-     * 最後返回上傳結果的響應
+     * 發送消息給指定用戶，依照用戶 ID 查找對應的 WebSocket 會話
      *
-     * @param session  WebSocket 會話
-     * @param jsonNode JSON 資料
+     * @param userId  用戶 ID
+     * @param message 消息
      *
      * @return Mono<Void>
      */
-    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
-        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
-        return uploadChunkDTO
-                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                    String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
-                    response.setMessage(message);
-                    return sendMessage(session, response);
-                }))
-                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
-                .onErrorResume(Exception.class, e -> {
-                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
-                    return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
-                });
+    public Mono<Void> sendMessage(String userId, Object message) {
+        WebSocketSession session = USER_SESSION_MAP.get(Long.parseLong(userId));
+        return sendMessage(session, message);
     }
 
+    /**
+     * 傳送訊息給所有連線的用戶
+     *
+     * @param message 訊息內容
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> broadcast(Object message) {
+        return Flux.fromIterable(USER_SESSION_MAP.values()).filter(WebSocketSession::isOpen).flatMap(session -> sendMessage(session, message)).then();
+    }
 
     /**
      * 將 JSON 字符串轉換為指定類型的物件

@@ -61,6 +61,16 @@ public class Token {
     private LocalDateTime resetVerificationCodeExpireTime;
 
     /**
+     * 生成JWT憑證版本
+     *
+     * @return String
+     */
+    public static String generateJwtTokenVersion() {
+        String uuid = UUID.randomUUID().toString();
+        return uuid.substring(0, 18);
+    }
+
+    /**
      * 重寫 hashCode 方法，用於計算憑證的 hashCode
      * @return int
      */
@@ -68,7 +78,6 @@ public class Token {
     public int hashCode() {
         return Long.hashCode(id);
     }
-
 
     /**
      * 重寫 equals 方法，用於比較憑證是否相同
@@ -89,7 +98,6 @@ public class Token {
         return id == token.id;
     }
 
-
     /**
      * 重寫 toString 方法，將憑證轉換為HashMap
      * @return String
@@ -100,16 +108,5 @@ public class Token {
         tokenMap.put("id", id);
         tokenMap.put("userId", userId);
         return tokenMap.toString();
-    }
-
-
-    /**
-     * 生成JWT憑證版本
-     *
-     * @return String
-     */
-    public static String generateJwtTokenVersion() {
-        String uuid = UUID.randomUUID().toString();
-        return uuid.substring(0, 18);
     }
 }

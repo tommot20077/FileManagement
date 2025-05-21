@@ -51,22 +51,6 @@ public class UploadChunkDTO {
     private Flux<DataBuffer> chunkDataFlux;
 
     /**
-     * 獲取分塊數據流，當 chunkDataFlux 不為空時，返回 chunkDataFlux
-     * 否則檢查 chunkData 是否為空，若不為空則將其包裝為 DataBuffer 並返回
-     * 否則返回空的 Flux
-     *
-     * @return 分塊數據流
-     */
-    public Flux<DataBuffer> getChunkDataFlux() {
-        if (chunkDataFlux != null) {
-            return chunkDataFlux;
-        } else if (chunkData != null) {
-            return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(chunkData));
-        }
-        return Flux.empty();
-    }
-
-    /**
      * 構造函數
      *
      * @param transferTaskId 任務ID
@@ -96,6 +80,21 @@ public class UploadChunkDTO {
         this.chunkDataFlux = chunkDataFlux;
     }
 
+    /**
+     * 獲取分塊數據流，當 chunkDataFlux 不為空時，返回 chunkDataFlux
+     * 否則檢查 chunkData 是否為空，若不為空則將其包裝為 DataBuffer 並返回
+     * 否則返回空的 Flux
+     *
+     * @return 分塊數據流
+     */
+    public Flux<DataBuffer> getChunkDataFlux() {
+        if (chunkDataFlux != null) {
+            return chunkDataFlux;
+        } else if (chunkData != null) {
+            return Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(chunkData));
+        }
+        return Flux.empty();
+    }
 
     /**
      * 將文件上傳分片的數據傳輸對象轉換為文件傳輸響應的數據傳輸對象

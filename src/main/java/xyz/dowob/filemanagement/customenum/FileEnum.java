@@ -72,11 +72,6 @@ public enum FileEnum {
     OTHER("其他");
 
     /**
-     * 文件類型
-     */
-    private final String type;
-
-    /**
      * MIME類型與文件類型的映射
      */
     private static final Map<String, FileEnum> MIME_TYPE_MAPPING = new HashMap<>();
@@ -91,6 +86,9 @@ public enum FileEnum {
      */
     private static final Tika TIKA = new Tika();
 
+    /**
+     * Microsoft Generic MIME 類型
+     */
     private static final String MICROSOFT_GENERIC = "application/x-tika-ooxml";
 
     static {
@@ -167,6 +165,10 @@ public enum FileEnum {
         FILE_ENUM_MAP.put(FileEnum.ZIP, zipMap);
     }
 
+    /**
+     * 文件類型
+     */
+    private final String type;
 
     /**
      * 根據 MIME 類型獲取文件類型，如果找不到對應的文件類型，則返回其他類型

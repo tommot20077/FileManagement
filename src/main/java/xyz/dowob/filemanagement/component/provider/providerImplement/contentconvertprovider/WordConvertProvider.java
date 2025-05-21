@@ -39,10 +39,13 @@ import java.util.Objects;
  **/
 public class WordConvertProvider implements ContentConvertProvider {
     /**
+     * Quill 中 JSON 斷言的分隔符
+     */
+    private static final String SENTENCE_SPLIT_LABEL = "\n";
+    /**
      * ObjectMapper 用於將 JSON 轉換為 Java 對象
      */
     private final ObjectMapper objectMapper;
-
     /**
      * 轉換配置
      * 用於配置轉換器的參數設定
@@ -60,80 +63,6 @@ public class WordConvertProvider implements ContentConvertProvider {
     }
 
     /**
-     * Quill 中 JSON 斷言的分隔符
-     */
-    private static final String SENTENCE_SPLIT_LABEL = "\n";
-
-
-    /**
-     * FormattingState 類，其包含了當前的格式化狀態
-     * 這些狀態是 Quill 編輯器的內部表示，包含了文本的格式化屬性等
-     * 在原始狀態下這些屬性就是預設值，在讀取 JSON 時會根據 JSON 的內容進行更新
-     */
-    private static class FormattingState {
-        /**
-         * 當前段落的對齊方式，預設為左對齊
-         */
-        ParagraphAlignment alignment = ParagraphAlignment.LEFT;
-
-        /**
-         * 當前段落的縮進級別，預設為 0
-         */
-        int indentLevel = 0;
-
-        /**
-         * 當前段落的列表類型，預設為 null
-         */
-        String listType = null;
-
-        /**
-         * 當前段落的列表編號 ID，預設為 null
-         */
-        BigInteger currentListNumId = null;
-
-        /**
-         * 是否為代碼區塊，預設為 false
-         */
-        boolean isCodeBlock = false;
-
-        /**
-         * 是否為引用區塊，預設為 false
-         */
-        boolean isBlockQuote = false;
-
-        /**
-         * 當前段落的標題級別，預設為 0
-         */
-        int headerLevel = 0;
-
-        /**
-         * 是否為表格，預設為 false
-         */
-        boolean isTable = false;
-
-        /**
-         * 當前表格的紀錄，預設為 null
-         */
-        XWPFTable currentTable = null;
-
-        /**
-         * 當前表格的行 ID，預設為 null
-         */
-        String currentTableRowId = null;
-
-        /**
-         * 當前表格的單元格索引，預設為 0
-         */
-        int currentCellIndex = 0;
-
-        /**
-         * 當前表格的單元格文本，預設為 null
-         */
-        String pendingTableCellText = null;
-    }
-
-
-    /**
      * 將 Quill 的 JSON 內容轉換為 Word 文檔並輸出為 InputStream
      *
      * @param content Quill 的 JSON 內容
@@ -149,7 +78,6 @@ public class WordConvertProvider implements ContentConvertProvider {
                 .as(Mono::from)
                 .map(DataBuffer::asInputStream));
     }
-
 
     /**
      * 將 Quill 的 JSON 內容轉換為 Word 文檔並輸出為 DataBuffer
@@ -170,26 +98,6 @@ public class WordConvertProvider implements ContentConvertProvider {
             return Mono.just(dataBufferRecord);
         });
     }
-
-
-    /**
-     * 給定一個 XWPFDocument 對象，將其轉換為 ByteArrayOutputStream
-     *
-     * @param document 要轉換的 XWPFDocument 對象
-     *
-     * @return Mono<ByteArrayOutputStream> 包含轉換後的 ByteArrayOutputStream
-     */
-    private Mono<ByteArrayOutputStream> convertToOutputStream(XWPFDocument document) {
-        return Mono.fromCallable(() -> {
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                document.write(outputStream);
-                return outputStream;
-            } catch (IOException e) {
-                throw Exceptions.propagate(e);
-            }
-        });
-    }
-
 
     /**
      * 將 Quill 的 JSON 內容轉換為 XWPFDocument 對象
@@ -212,6 +120,44 @@ public class WordConvertProvider implements ContentConvertProvider {
         });
     }
 
+    /**
+     * 給定一個 XWPFDocument 對象，將其轉換為 ByteArrayOutputStream
+     *
+     * @param document 要轉換的 XWPFDocument 對象
+     *
+     * @return Mono<ByteArrayOutputStream> 包含轉換後的 ByteArrayOutputStream
+     */
+    private Mono<ByteArrayOutputStream> convertToOutputStream(XWPFDocument document) {
+        return Mono.fromCallable(() -> {
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                document.write(outputStream);
+                return outputStream;
+            } catch (IOException e) {
+                throw Exceptions.propagate(e);
+            }
+        });
+    }
+
+    /**
+     * 確保編號定義存在，根據列表類型確保編號定義存在
+     * 根據列表類型進行檢查，如果當前的列表類型不為 null，則確保編號定義存在
+     *
+     * @param document 當前的 XWPFDocument 對象
+     */
+    private void ensureNumberingDefinitions(XWPFDocument document) {
+        XWPFNumbering numbering = document.getNumbering();
+        if (numbering == null) {
+            numbering = document.createNumbering();
+        }
+
+        if (numbering.getAbstractNum(config.getAbstractNumIdBullet()) == null) {
+            createAbstractNumbering(numbering, config.getAbstractNumIdBullet());
+        }
+
+        if (numbering.getAbstractNum(config.getAbstractNumIdDecimal()) == null) {
+            createAbstractNumbering(numbering, config.getAbstractNumIdDecimal());
+        }
+    }
 
     /**
      * 具體的轉換邏輯，分成幾個部分
@@ -403,78 +349,38 @@ public class WordConvertProvider implements ContentConvertProvider {
         }).onErrorResume(e -> Mono.error(new ProcessException(ProcessException.ErrorCode.CONVERT_JSON_TO_TARGET_FAILED, e, "docx")));
     }
 
-
     /**
-     * 清除段落的列表編號
-     * 當前段落為空且當前段落的列表類型不為 null 時，則清除列表編號
+     * 創建抽象編號，根據列表類型創建抽象編號
+     * 根據列表類型進行檢查，如果當前的列表類型不為 null，則創建抽象編號
      *
-     * @param state            當前的格式化狀態
-     * @param currentParagraph 當前的段落
+     * @param numbering     當前的 XWPFNumbering 對象
+     * @param abstractNumId 當前的抽象編號 ID
      */
-    private void cleanNumPr(FormattingState state, XWPFParagraph currentParagraph) {
-        boolean lastParaIsEmpty = currentParagraph.getRuns().isEmpty() && currentParagraph.getText().isEmpty();
-        if (lastParaIsEmpty && state.listType != null) {
-            CTPPr ppr = currentParagraph.getCTP().getPPr();
-            if (ppr != null && ppr.getNumPr() != null) {
-                if (ppr.getNumPr().isSetNumId() || ppr.getNumPr().isSetIlvl()) {
-                    ppr.unsetNumPr();
-                }
-            }
-        }
-    }
+    private void createAbstractNumbering(XWPFNumbering numbering, BigInteger abstractNumId) {
+        CTAbstractNum cTAbstractNum = CTAbstractNum.Factory.newInstance();
+        cTAbstractNum.setAbstractNumId(abstractNumId);
 
+        CTLvl cTLvl = cTAbstractNum.addNewLvl();
+        cTLvl.setIlvl(BigInteger.ZERO);
+        cTLvl.addNewStart().setVal(BigInteger.ONE);
 
-    /**
-     * 更新格式化狀態，當操作中帶有屬性時，則更新格式化狀態
-     * 如果操作中沒有屬性，則使用當前的格式化狀態
-     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新格式化狀態
-     *
-     * @param state      當前的格式化狀態
-     * @param attributes 當前操作的屬性
-     * @param document   當前的 XWPFDocument 對象
-     */
-    private void updateFormattingState(FormattingState state, Map<String, Object> attributes, XWPFDocument document) {
-        state.headerLevel = parseHeader(attributes.get("header"));
-        state.indentLevel = parseIndent(attributes.get("indent"));
-        state.isBlockQuote = Boolean.TRUE.equals(attributes.get("blockquote"));
-        state.isCodeBlock = Boolean.TRUE.equals(attributes.get("code-block"));
-
-
-        Object alignAttr = attributes.get("align");
-        if (alignAttr != null) {
-            state.alignment = parseAlignment(alignAttr);
-        }
-
-        String newListType = (String) attributes.get("list");
-        if (newListType != null) {
-            if (!newListType.equals(state.listType) || state.currentListNumId == null) {
-                state.currentListNumId = getOrCreateListNumId(document, newListType);
-            }
-            state.listType = newListType;
+        if (abstractNumId.equals(config.getAbstractNumIdBullet())) {
+            cTLvl.addNewNumFmt().setVal(STNumberFormat.BULLET);
+            cTLvl.addNewLvlText().setVal("•");
         } else {
-            state.listType = null;
-            state.currentListNumId = null;
+            cTLvl.addNewNumFmt().setVal(STNumberFormat.DECIMAL);
+            cTLvl.addNewLvlText().setVal("%1.");
         }
+        cTLvl.addNewLvlJc().setVal(STJc.LEFT);
 
-        String tableRowIdAttr = (String) attributes.get("table");
-        if (tableRowIdAttr != null) {
-            state.isTable = true;
-            if (attributes.get("align") != null) {
-                state.alignment = parseAlignment(attributes.get("align"));
-            } else {
-                state.alignment = ParagraphAlignment.LEFT;
-            }
+        CTPPrGeneral ppr = cTLvl.addNewPPr();
+        CTInd ind = ppr.addNewInd();
+        ind.setLeft(BigInteger.valueOf(config.getTwipsPerOneLevel() * 2L));
+        ind.setHanging(BigInteger.valueOf(config.getTwipsPerOneLevel()));
 
-            state.headerLevel = 0;
-            state.isBlockQuote = false;
-            state.isCodeBlock = false;
-            state.indentLevel = 0;
-            state.listType = null;
-            state.currentListNumId = null;
-
-        }
+        XWPFAbstractNum abstractNum = new XWPFAbstractNum(cTAbstractNum, numbering);
+        numbering.addAbstractNum(abstractNum);
     }
-
 
     /**
      * 應用段落格式化狀態，當屬性設定更新完成後，則應用段落格式化狀態
@@ -540,6 +446,87 @@ public class WordConvertProvider implements ContentConvertProvider {
         }
     }
 
+    /**
+     * 更新格式化狀態，當操作中帶有屬性時，則更新格式化狀態
+     * 如果操作中沒有屬性，則使用當前的格式化狀態
+     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新格式化狀態
+     *
+     * @param state      當前的格式化狀態
+     * @param attributes 當前操作的屬性
+     * @param document   當前的 XWPFDocument 對象
+     */
+    private void updateFormattingState(FormattingState state, Map<String, Object> attributes, XWPFDocument document) {
+        state.headerLevel = parseHeader(attributes.get("header"));
+        state.indentLevel = parseIndent(attributes.get("indent"));
+        state.isBlockQuote = Boolean.TRUE.equals(attributes.get("blockquote"));
+        state.isCodeBlock = Boolean.TRUE.equals(attributes.get("code-block"));
+
+
+        Object alignAttr = attributes.get("align");
+        if (alignAttr != null) {
+            state.alignment = parseAlignment(alignAttr);
+        }
+
+        String newListType = (String) attributes.get("list");
+        if (newListType != null) {
+            if (!newListType.equals(state.listType) || state.currentListNumId == null) {
+                state.currentListNumId = getOrCreateListNumId(document, newListType);
+            }
+            state.listType = newListType;
+        } else {
+            state.listType = null;
+            state.currentListNumId = null;
+        }
+
+        String tableRowIdAttr = (String) attributes.get("table");
+        if (tableRowIdAttr != null) {
+            state.isTable = true;
+            if (attributes.get("align") != null) {
+                state.alignment = parseAlignment(attributes.get("align"));
+            } else {
+                state.alignment = ParagraphAlignment.LEFT;
+            }
+
+            state.headerLevel = 0;
+            state.isBlockQuote = false;
+            state.isCodeBlock = false;
+            state.indentLevel = 0;
+            state.listType = null;
+            state.currentListNumId = null;
+
+        }
+    }
+
+    /**
+     * 解析標題級別，將屬性轉換為標題級別
+     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新標題級別
+     *
+     * @param headerAttr 當前操作的屬性
+     *
+     * @return int 當前的標題級別
+     */
+    private int parseHeader(Object headerAttr) {
+        if (headerAttr instanceof Number number) {
+            int level = number.intValue();
+            return Math.max(0, Math.min(level, 6));
+        }
+        return 0;
+    }
+
+    /**
+     * 解析段落縮進級別，將屬性轉換為段落縮進級別
+     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落縮進級別
+     *
+     * @param indentAttr 當前操作的屬性
+     *
+     * @return int 當前的段落縮進級別
+     */
+    private int parseIndent(Object indentAttr) {
+        if (indentAttr instanceof Number number) {
+            return Math.max(0, number.intValue());
+        }
+        return 0;
+    }
 
     /**
      * 應用運行屬性，當屬性設定更新完成後，則應用運行屬性
@@ -655,6 +642,40 @@ public class WordConvertProvider implements ContentConvertProvider {
         }
     }
 
+    /**
+     * 清除段落的列表編號
+     * 當前段落為空且當前段落的列表類型不為 null 時，則清除列表編號
+     *
+     * @param state            當前的格式化狀態
+     * @param currentParagraph 當前的段落
+     */
+    private void cleanNumPr(FormattingState state, XWPFParagraph currentParagraph) {
+        boolean lastParaIsEmpty = currentParagraph.getRuns().isEmpty() && currentParagraph.getText().isEmpty();
+        if (lastParaIsEmpty && state.listType != null) {
+            CTPPr ppr = currentParagraph.getCTP().getPPr();
+            if (ppr != null && ppr.getNumPr() != null) {
+                if (ppr.getNumPr().isSetNumId() || ppr.getNumPr().isSetIlvl()) {
+                    ppr.unsetNumPr();
+                }
+            }
+        }
+    }
+
+    /**
+     * 確保十六進制顏色的安全性，將顏色轉換為十六進制顏色
+     * 根據顏色進行檢查，如果當前的顏色不為 null，則轉換為十六進制顏色
+     *
+     * @param hex      當前的顏色
+     * @param fallback 預設的顏色
+     *
+     * @return String 當前的十六進制顏色
+     */
+    private String safeHexColor(String hex, String fallback) {
+        if (hex != null && hex.startsWith("#") && hex.length() == 7) {
+            return hex.substring(1);
+        }
+        return fallback;
+    }
 
     /**
      * 解析段落對齊方式，將屬性轉換為段落對齊方式
@@ -673,40 +694,6 @@ public class WordConvertProvider implements ContentConvertProvider {
             default -> ParagraphAlignment.LEFT;
         };
     }
-
-
-    /**
-     * 解析段落縮進級別，將屬性轉換為段落縮進級別
-     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落縮進級別
-     *
-     * @param indentAttr 當前操作的屬性
-     *
-     * @return int 當前的段落縮進級別
-     */
-    private int parseIndent(Object indentAttr) {
-        if (indentAttr instanceof Number number) {
-            return Math.max(0, number.intValue());
-        }
-        return 0;
-    }
-
-
-    /**
-     * 解析標題級別，將屬性轉換為標題級別
-     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新標題級別
-     *
-     * @param headerAttr 當前操作的屬性
-     *
-     * @return int 當前的標題級別
-     */
-    private int parseHeader(Object headerAttr) {
-        if (headerAttr instanceof Number number) {
-            int level = number.intValue();
-            return Math.max(0, Math.min(level, 6));
-        }
-        return 0;
-    }
-
 
     /**
      * 獲取或創建列表編號 ID，根據列表類型獲取或創建列表編號 ID
@@ -728,76 +715,70 @@ public class WordConvertProvider implements ContentConvertProvider {
         return numbering.addNum(abstractNumIdToUse);
     }
 
-
     /**
-     * 確保編號定義存在，根據列表類型確保編號定義存在
-     * 根據列表類型進行檢查，如果當前的列表類型不為 null，則確保編號定義存在
-     *
-     * @param document 當前的 XWPFDocument 對象
+     * FormattingState 類，其包含了當前的格式化狀態
+     * 這些狀態是 Quill 編輯器的內部表示，包含了文本的格式化屬性等
+     * 在原始狀態下這些屬性就是預設值，在讀取 JSON 時會根據 JSON 的內容進行更新
      */
-    private void ensureNumberingDefinitions(XWPFDocument document) {
-        XWPFNumbering numbering = document.getNumbering();
-        if (numbering == null) {
-            numbering = document.createNumbering();
-        }
+    private static class FormattingState {
+        /**
+         * 當前段落的對齊方式，預設為左對齊
+         */
+        ParagraphAlignment alignment = ParagraphAlignment.LEFT;
 
-        if (numbering.getAbstractNum(config.getAbstractNumIdBullet()) == null) {
-            createAbstractNumbering(numbering, config.getAbstractNumIdBullet());
-        }
+        /**
+         * 當前段落的縮進級別，預設為 0
+         */
+        int indentLevel = 0;
 
-        if (numbering.getAbstractNum(config.getAbstractNumIdDecimal()) == null) {
-            createAbstractNumbering(numbering, config.getAbstractNumIdDecimal());
-        }
-    }
+        /**
+         * 當前段落的列表類型，預設為 null
+         */
+        String listType = null;
 
+        /**
+         * 當前段落的列表編號 ID，預設為 null
+         */
+        BigInteger currentListNumId = null;
 
-    /**
-     * 創建抽象編號，根據列表類型創建抽象編號
-     * 根據列表類型進行檢查，如果當前的列表類型不為 null，則創建抽象編號
-     *
-     * @param numbering     當前的 XWPFNumbering 對象
-     * @param abstractNumId 當前的抽象編號 ID
-     */
-    private void createAbstractNumbering(XWPFNumbering numbering, BigInteger abstractNumId) {
-        CTAbstractNum cTAbstractNum = CTAbstractNum.Factory.newInstance();
-        cTAbstractNum.setAbstractNumId(abstractNumId);
+        /**
+         * 是否為代碼區塊，預設為 false
+         */
+        boolean isCodeBlock = false;
 
-        CTLvl cTLvl = cTAbstractNum.addNewLvl();
-        cTLvl.setIlvl(BigInteger.ZERO);
-        cTLvl.addNewStart().setVal(BigInteger.ONE);
+        /**
+         * 是否為引用區塊，預設為 false
+         */
+        boolean isBlockQuote = false;
 
-        if (abstractNumId.equals(config.getAbstractNumIdBullet())) {
-            cTLvl.addNewNumFmt().setVal(STNumberFormat.BULLET);
-            cTLvl.addNewLvlText().setVal("•");
-        } else {
-            cTLvl.addNewNumFmt().setVal(STNumberFormat.DECIMAL);
-            cTLvl.addNewLvlText().setVal("%1.");
-        }
-        cTLvl.addNewLvlJc().setVal(STJc.LEFT);
+        /**
+         * 當前段落的標題級別，預設為 0
+         */
+        int headerLevel = 0;
 
-        CTPPrGeneral ppr = cTLvl.addNewPPr();
-        CTInd ind = ppr.addNewInd();
-        ind.setLeft(BigInteger.valueOf(config.getTwipsPerOneLevel() * 2L));
-        ind.setHanging(BigInteger.valueOf(config.getTwipsPerOneLevel()));
+        /**
+         * 是否為表格，預設為 false
+         */
+        boolean isTable = false;
 
-        XWPFAbstractNum abstractNum = new XWPFAbstractNum(cTAbstractNum, numbering);
-        numbering.addAbstractNum(abstractNum);
-    }
+        /**
+         * 當前表格的紀錄，預設為 null
+         */
+        XWPFTable currentTable = null;
 
+        /**
+         * 當前表格的行 ID，預設為 null
+         */
+        String currentTableRowId = null;
 
-    /**
-     * 確保十六進制顏色的安全性，將顏色轉換為十六進制顏色
-     * 根據顏色進行檢查，如果當前的顏色不為 null，則轉換為十六進制顏色
-     *
-     * @param hex      當前的顏色
-     * @param fallback 預設的顏色
-     *
-     * @return String 當前的十六進制顏色
-     */
-    private String safeHexColor(String hex, String fallback) {
-        if (hex != null && hex.startsWith("#") && hex.length() == 7) {
-            return hex.substring(1);
-        }
-        return fallback;
+        /**
+         * 當前表格的單元格索引，預設為 0
+         */
+        int currentCellIndex = 0;
+
+        /**
+         * 當前表格的單元格文本，預設為 null
+         */
+        String pendingTableCellText = null;
     }
 }

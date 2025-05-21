@@ -68,16 +68,6 @@ public class FileFilterDTO {
     private Boolean includeShared;
 
     /**
-     * 判斷過濾條件是否為空
-     *
-     * @return 返回過濾條件是否為空
-     */
-    public boolean isFilterEmpty() {
-        return keyword == null && folderId == null && types.isEmpty() && startTime == null && endTime == null;
-    }
-
-
-    /**
      * 全參數構造函數，對部分參數進行了空值處理
      *
      * @param keyword   關鍵字
@@ -98,5 +88,14 @@ public class FileFilterDTO {
         this.pageSize = Objects.requireNonNullElse(pageSize, 100);
         this.includeDeleted = Objects.requireNonNullElse(includeDeleted, false);
         this.includeShared = Objects.requireNonNullElse(includeShared, false);
+    }
+
+    /**
+     * 判斷過濾條件是否為空
+     *
+     * @return 返回過濾條件是否為空
+     */
+    public boolean isFilterEmpty() {
+        return keyword == null && folderId == null && types.isEmpty() && startTime == null && endTime == null;
     }
 }

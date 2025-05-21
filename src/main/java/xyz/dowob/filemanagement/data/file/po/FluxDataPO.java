@@ -30,6 +30,23 @@ public class FluxDataPO<T> implements FluxContainer {
 
 
     /**
+     * 通過Flux對象構造FluxDataPO對象
+     *
+     * @param tFlux Flux對象
+     */
+    public FluxDataPO(@NotNull Flux<T> tFlux) {
+        this.tFlux = tFlux;
+    }
+
+
+    /**
+     * 無參構造方法
+     */
+    public FluxDataPO() {
+        this.tFlux = Flux.empty();
+    }
+
+    /**
      * 安全轉換輸入的Flux對象變成指定的類型
      *
      * @param flux        Flux對象
@@ -47,25 +64,6 @@ public class FluxDataPO<T> implements FluxContainer {
         this.tFlux = formatFlux;
         return formatFlux;
     }
-
-
-    /**
-     * 通過Flux對象構造FluxDataPO對象
-     *
-     * @param tFlux Flux對象
-     */
-    public FluxDataPO(@NotNull Flux<T> tFlux) {
-        this.tFlux = tFlux;
-    }
-
-
-    /**
-     * 無參構造方法
-     */
-    public FluxDataPO() {
-        this.tFlux = Flux.empty();
-    }
-
 
     /**
      * 獲取Flux對象

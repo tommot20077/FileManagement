@@ -30,6 +30,49 @@ public class ShareUserEditPO {
     @NotNull(message = "編輯類型不能為空")
     private EditTypeEnum editType;
 
+    /**
+     * 重寫hashCode方法
+     *
+     * @return 返回對象的hashCode
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hash(userId);
+    }
+
+    /**
+     * 重寫equals方法
+     *
+     * @param o 要比較的對象
+     *
+     * @return 返回比較結果
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ShareUserEditPO that = (ShareUserEditPO) o;
+        return userId.equals(that.userId);
+    }
+
+    /**
+     * 重寫toString方法
+     *
+     * @return 返回對象的字符串形式
+     */
+    @Override
+    public String toString() {
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("UserId", userId);
+        map.put("editType", editType);
+        return map.toString();
+    }
+
+
     public enum EditTypeEnum {
         /**
          * 添加新用戶
@@ -62,50 +105,5 @@ public class ShareUserEditPO {
             }
             return null;
         }
-    }
-
-
-    /**
-     * 重寫toString方法
-     *
-     * @return 返回對象的字符串形式
-     */
-    @Override
-    public String toString() {
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("UserId", userId);
-        map.put("editType", editType);
-        return map.toString();
-    }
-
-
-    /**
-     * 重寫equals方法
-     *
-     * @param o 要比較的對象
-     *
-     * @return 返回比較結果
-     */
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ShareUserEditPO that = (ShareUserEditPO) o;
-        return userId.equals(that.userId);
-    }
-
-
-    /**
-     * 重寫hashCode方法
-     *
-     * @return 返回對象的hashCode
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(userId);
     }
 }

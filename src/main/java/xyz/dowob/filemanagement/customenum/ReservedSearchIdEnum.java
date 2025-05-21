@@ -55,16 +55,21 @@ public enum ReservedSearchIdEnum {
         this.id = id;
     }
 
-
     /**
-     * 獲取預留的搜索 ID，此方法返回主要代表的 ID
+     * 格式化預留的搜索 ID
      *
-     * @return 返回預留的搜索 ID
+     * @param id 預留的搜索 ID
+     *
+     * @return 返回格式化後的預留的搜索 ID
      */
-    public Long getId() {
-        return this.id[0];
+    public static ReservedSearchIdEnum format(Long id) {
+        for (ReservedSearchIdEnum reservedSearchIdEnum : ReservedSearchIdEnum.values()) {
+            if (reservedSearchIdEnum.contain(id)) {
+                return reservedSearchIdEnum;
+            }
+        }
+        return null;
     }
-
 
     /**
      * 判斷是否包含指定的 ID
@@ -82,21 +87,13 @@ public enum ReservedSearchIdEnum {
         return false;
     }
 
-
     /**
-     * 格式化預留的搜索 ID
+     * 獲取預留的搜索 ID，此方法返回主要代表的 ID
      *
-     * @param id 預留的搜索 ID
-     *
-     * @return 返回格式化後的預留的搜索 ID
+     * @return 返回預留的搜索 ID
      */
-    public static ReservedSearchIdEnum format(Long id) {
-        for (ReservedSearchIdEnum reservedSearchIdEnum : ReservedSearchIdEnum.values()) {
-            if (reservedSearchIdEnum.contain(id)) {
-                return reservedSearchIdEnum;
-            }
-        }
-        return null;
+    public Long getId() {
+        return this.id[0];
     }
 
 }

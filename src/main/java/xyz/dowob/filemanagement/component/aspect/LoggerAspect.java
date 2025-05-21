@@ -259,6 +259,11 @@ public class LoggerAspect {
         })).subscribe();
     }
 
+    /**
+     * 日誌信息類，用於存儲日誌級別和日誌訊息
+     */
+    record LogInfo(LogLevelEnum logLevel, String message) {
+    }
 
     /**
      * 用戶請求信息類，用於存儲請求ID、請求者名稱和請求IP
@@ -278,12 +283,5 @@ public class LoggerAspect {
          * 請求IP
          */
         private String requestIp;
-    }
-
-
-    /**
-     * 日誌信息類，用於存儲日誌級別和日誌訊息
-     */
-    record LogInfo(LogLevelEnum logLevel, String message) {
     }
 }

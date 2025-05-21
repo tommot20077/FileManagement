@@ -72,6 +72,21 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
     }
 
     /**
+     * 獲取客戶端IP地址
+     * 根據請求交換對象獲取客戶端的IP地址
+     *
+     * @param exchange 請求交換對象
+     *
+     * @return 客戶端IP地址的Optional對象
+     */
+    public static Optional<String> getClientIpFromExchange(@Nullable ServerWebExchange exchange) {
+        if (exchange != null) {
+            return Optional.ofNullable((String) exchange.getAttributes().get(CLIENT_IP_ATTRIBUTE));
+        }
+        return CustomRequestContextHolder.getExchange().map(e -> Optional.ofNullable((String) e.getAttributes().get(CLIENT_IP_ATTRIBUTE))).block();
+    }
+
+    /**
      * 過濾器方法，處理請求並獲取客戶端IP地址並存儲在請求屬性中
      *
      * @param exchange 請求交換對象
@@ -88,7 +103,6 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
         LogUnity.trace(exchange, "獲取請求的客戶端IP地址: {}", clientIp);
         return chain.filter(exchange);
     }
-
 
     /**
      * 獲取客戶端IP地址
@@ -145,7 +159,6 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
         }
     }
 
-
     /**
      * 獲取轉發頭第一個IP地址
      *
@@ -159,21 +172,5 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
         }
         String[] ips = xForwardedFor.split(",");
         return ips.length > 0 ? ips[0].trim() : null;
-    }
-
-
-    /**
-     * 獲取客戶端IP地址
-     * 根據請求交換對象獲取客戶端的IP地址
-     *
-     * @param exchange 請求交換對象
-     *
-     * @return 客戶端IP地址的Optional對象
-     */
-    public static Optional<String> getClientIpFromExchange(@Nullable ServerWebExchange exchange) {
-        if (exchange != null) {
-            return Optional.ofNullable((String) exchange.getAttributes().get(CLIENT_IP_ATTRIBUTE));
-        }
-        return CustomRequestContextHolder.getExchange().map(e -> Optional.ofNullable((String) e.getAttributes().get(CLIENT_IP_ATTRIBUTE))).block();
     }
 }

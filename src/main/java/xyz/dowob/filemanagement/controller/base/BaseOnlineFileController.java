@@ -179,9 +179,9 @@ public class BaseOnlineFileController extends BaseFileController {
                 .flatMap(user -> {
                     List<Long> fileIds = new ArrayList<>();
                     List<Permission<UserFileMetadata>> rules = new ArrayList<>();
-
                     Long fileId = Long.parseLong(fileEditDTO.getFileId());
                     fileIds.add(fileId);
+
                     if (fileEditDTO.getParentFolderId() != null && fileEditDTO.getEditType() == EditTypeEnum.EDIT_METADATA) {
                         fileIds.add(fileEditDTO.getParentFolderId());
                         rules.add(filePermissionRuleManager.getAllowOwner());
@@ -191,14 +191,9 @@ public class BaseOnlineFileController extends BaseFileController {
                     }
 
                     FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
-                    return permissionService.validateUserPermission(user, fileIds, rules).collectList().flatMap(files -> {
-                        files.forEach(file -> {
-                            if (file.getId().equals(fileEditDTO.getParentFolderId())) {
-                                fileEditBO.setParentFolderFileMetadata(file);
-                            } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
-                                fileEditBO.setUserFileMetadata(file);
-                            }
-                        });
+                    return permissionService.validateUserPermission(user, fileIds, rules).flatMap(map -> {
+                        fileEditBO.setParentFolderFileMetadata(map.get(fileEditDTO.getParentFolderId()));
+                        fileEditBO.setUserFileMetadata(map.get(fileId));
                         return validationService
                                 .validateFileType(fileEditBO.getUserFileMetadata(), FileEnum.ONLINE_DOCUMENT)
                                 .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))

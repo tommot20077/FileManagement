@@ -5,6 +5,7 @@ import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.FileMetadataDTO;
+import xyz.dowob.filemanagement.data.user.dto.AuthRequestDTO;
 import xyz.dowob.filemanagement.data.user.dto.RegisterDTO;
 import xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO;
 import xyz.dowob.filemanagement.entity.User;
@@ -60,7 +61,7 @@ public interface ValidationService {
     /**
      * 驗證檔案類型是否合法
      *
-     * @param file   文件
+     * @param file     文件
      * @param fileType 規範的文件類型
      *
      * @return Mono<UserFileMetadata> 返回文件元數據
@@ -71,6 +72,8 @@ public interface ValidationService {
      * 驗證文件過濾DTO中的數據是否合法
      *
      * @param fileFilterDTO 文件過濾DTO
+     *
+     * @return Mono<Void>
      */
     Mono<Void> validateFileFilterDTO(FileFilterDTO fileFilterDTO);
 
@@ -78,14 +81,27 @@ public interface ValidationService {
      * 驗證用戶搜索列表是否合法
      *
      * @param searchList 搜索列表
+     *
+     * @return Mono<Void>
      */
     Mono<Void> validateUserSearchList(Collection<String> searchList);
+
+    /**
+     * 驗證授權傳輸對象中的數據是否合法
+     *
+     * @param authRequestDTO 授權請求對象
+     *
+     * @return Mono<Void>
+     */
+    Mono<Void> validateAuthRequestDTO(AuthRequestDTO authRequestDTO);
 
     /**
      * 驗證數據傳輸對象是否為空
      *
      * @param <T> 數據傳輸對象類型
      * @param dto 數據傳輸對象
+     *
+     * @return Mono<Void>
      */
     default <T> Mono<Void> validateNotNull(T dto) {
         return Mono.defer(() -> {

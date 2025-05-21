@@ -109,30 +109,6 @@ public class CronTaskManager {
         userRepository.findAll().flatMap(this::calculateUserStorageLimit).subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
 
-
-    /**
-     * 刪除過期的檔案並更新用戶的存儲使用量
-     * 每 1 小時執行一次
-     */
-    @Scheduled(cron = "0 0 */1 * * ?")
-    public void deleteExpiredFile() {
-        LocalDateTime now = LocalDateTime.now();
-        userRepository
-                .findAll()
-                .flatMap(user -> fileTrashRecordRepository
-                        .findAllByUserIdAndDeleteTimeBefore(user.getId(), now)
-                        .map(fileTrashRecord -> fileTrashRecord.getFileId().toString())
-                        .collectList()
-                        .flatMap(fileIdList -> {
-                            if (fileIdList.isEmpty()) {
-                                return Mono.empty();
-                            }
-                            return transactionalOperator.transactional(userFileMetaRepository.deleteAllById(fileIdList));
-                        }).then(calculateUserStorageLimit(user))).subscribeOn(Schedulers.boundedElastic())
-                .subscribe();
-    }
-
-
     /**
      * 計算用戶的存儲使用量
      *
@@ -167,6 +143,27 @@ public class CronTaskManager {
         });
     }
 
+    /**
+     * 刪除過期的檔案並更新用戶的存儲使用量
+     * 每 1 小時執行一次
+     */
+    @Scheduled(cron = "0 0 */1 * * ?")
+    public void deleteExpiredFile() {
+        LocalDateTime now = LocalDateTime.now();
+        userRepository
+                .findAll()
+                .flatMap(user -> fileTrashRecordRepository
+                        .findAllByUserIdAndDeleteTimeBefore(user.getId(), now)
+                        .map(fileTrashRecord -> fileTrashRecord.getFileId().toString())
+                        .collectList()
+                        .flatMap(fileIdList -> {
+                            if (fileIdList.isEmpty()) {
+                                return Mono.empty();
+                            }
+                            return transactionalOperator.transactional(userFileMetaRepository.deleteAllById(fileIdList));
+                        }).then(calculateUserStorageLimit(user))).subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
+    }
 
     /**
      * 清理過期的 CSRF 憑證

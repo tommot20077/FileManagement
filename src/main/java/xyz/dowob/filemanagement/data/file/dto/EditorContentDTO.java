@@ -36,24 +36,15 @@ public class EditorContentDTO {
         return delta == null || delta.isEmpty();
     }
 
-
     /**
-     * 編輯器內容的內容記錄數據傳輸對象，用於封裝編輯器內容的內容記錄數據
+     * 重寫哈希碼方法，返回對象的哈希碼
+     *
+     * @return 對象的哈希碼
      */
-    @Data
-    public static class DeltaDTO {
-        /**
-         * 編輯器內容的內容記錄
-         */
-        private String insert;
-
-        /**
-         * 編輯器內容的屬性記錄
-         */
-        @JsonInclude(JsonInclude.Include.NON_NULL)
-        private Map<String, Object> attributes;
+    @Override
+    public int hashCode() {
+        return Objects.hash(delta);
     }
-
 
     /**
      * 重寫比較方法，判斷兩個對象是否相等
@@ -76,14 +67,20 @@ public class EditorContentDTO {
         return Objects.equals(delta, that.delta);
     }
 
-
     /**
-     * 重寫哈希碼方法，返回對象的哈希碼
-     *
-     * @return 對象的哈希碼
+     * 編輯器內容的內容記錄數據傳輸對象，用於封裝編輯器內容的內容記錄數據
      */
-    @Override
-    public int hashCode() {
-        return Objects.hash(delta);
+    @Data
+    public static class DeltaDTO {
+        /**
+         * 編輯器內容的內容記錄
+         */
+        private String insert;
+
+        /**
+         * 編輯器內容的屬性記錄
+         */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private Map<String, Object> attributes;
     }
 }

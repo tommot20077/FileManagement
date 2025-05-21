@@ -181,20 +181,6 @@ public class WebFolderController extends BaseFolderController {
     }
 
     /**
-     * 創建資料夾
-     *
-     * @param fileEditDTO 資料夾資訊
-     * @param exchange    WebFlux 請求上下文
-     *
-     * @return 創建結果
-     */
-    @PostMapping
-    public Mono<ResponseEntity<?>> createFolder(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
-        return super.createFolder(fileEditDTO, exchange);
-    }
-
-
-    /**
      * 獲取資料夾的路徑，根據資料夾 ID 返回該資料夾的完整路徑信息。
      *
      * @param exchange 請求對象，包含請求上下文信息。
@@ -206,7 +192,6 @@ public class WebFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> getFolderPath(@PathVariable Long id, ServerWebExchange exchange) {
         return super.getFolderPath(exchange, id);
     }
-
 
     /**
      * 刪除資料夾及其內容
@@ -221,7 +206,6 @@ public class WebFolderController extends BaseFolderController {
         return super.deleteFolder(id, exchange);
     }
 
-
     /**
      * 編輯資料夾
      *
@@ -235,20 +219,30 @@ public class WebFolderController extends BaseFolderController {
         return super.editFolder(fileEditDTO, exchange);
     }
 
-
     /**
-     * 還原已刪除的資料夾
+     * 創建資料夾
      *
-     * @param id       資料夾 ID
-     * @param exchange WebFlux 請求上下文
+     * @param fileEditDTO 資料夾資訊
+     * @param exchange    WebFlux 請求上下文
      *
-     * @return 還原結果
+     * @return 創建結果
      */
-    @PostMapping("/restore/{id}")
-    public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
-        return super.restoreFile(exchange, id);
+    @PostMapping
+    public Mono<ResponseEntity<?>> createFolder(@RequestBody FileEditDTO fileEditDTO, ServerWebExchange exchange) {
+        return super.createFolder(fileEditDTO, exchange);
     }
 
+    /**
+     * 建立用戶資料夾樹，根據系統配置和用戶資料夾結構建立資料夾樹。
+     *
+     * @param exchange 請求對象，包含請求上下文信息。
+     *
+     * @return 返回建立資料夾樹的結果，成功返回 OK，失敗返回 BAD_REQUEST。
+     */
+    @PostMapping("/tree")
+    public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
+        return super.buildTree(exchange);
+    }
 
     /**
      * 移動資料夾到回收站
@@ -263,19 +257,18 @@ public class WebFolderController extends BaseFolderController {
         return super.removeFile(exchange, id);
     }
 
-
     /**
-     * 建立用戶資料夾樹，根據系統配置和用戶資料夾結構建立資料夾樹。
+     * 還原已刪除的資料夾
      *
-     * @param exchange 請求對象，包含請求上下文信息。
+     * @param id       資料夾 ID
+     * @param exchange WebFlux 請求上下文
      *
-     * @return 返回建立資料夾樹的結果，成功返回 OK，失敗返回 BAD_REQUEST。
+     * @return 還原結果
      */
-    @PostMapping("/tree")
-    public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
-        return super.buildTree(exchange);
+    @PostMapping("/restore/{id}")
+    public Mono<ResponseEntity<?>> restoreFile(ServerWebExchange exchange, @PathVariable String id) {
+        return super.restoreFile(exchange, id);
     }
-
 
     /**
      * 下載資料夾，將資料夾及其內容打包下載。

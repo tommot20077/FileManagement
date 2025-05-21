@@ -18,6 +18,7 @@ import xyz.dowob.filemanagement.repostiory.UserFileMetaRepository;
 import xyz.dowob.filemanagement.service.serviceInterface.PermissionService;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * 檔案權限服務實現類，分離檔案權限驗證邏輯
@@ -82,20 +83,44 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
      * @param fileIds 文件ID集合
      * @param rules   權限規則
      *
-     * @return UserFileMetadata 文件元數據
+     * @return Mono<Map < Long, UserFileMetadata>> 文件元數據集合
      */
     @Override
-    public Flux<UserFileMetadata> validateUserPermission(User user, Iterable<Long> fileIds,
-                                                         @Nullable Collection<Permission<UserFileMetadata>> rules) {
+    public Mono<Map<Long, UserFileMetadata>> validateUserPermission(User user, Iterable<Long> fileIds,
+                                                                    @Nullable Collection<Permission<UserFileMetadata>> rules) {
         if (fileIds == null || !fileIds.iterator().hasNext()) {
-            return Flux.empty();
+            return Mono.just(Map.of());
         }
         return Flux
                 .fromIterable(fileIds)
                 .flatMap(fileId -> userFileMetaRepository.findById(fileId.toString()).switchIfEmpty(reservedSearchMethod(user, fileId)))
-                .flatMap(file -> checkPermissions(user, file, rules));
+                .flatMap(file -> checkPermissions(user, file, rules))
+                .collectMap(UserFileMetadata::getId, file -> file);
     }
 
+    /**
+     * 保留值搜索方法，在搜索用戶檔案元數據時，如果找不到文件，則檢查輸入的文件ID是否是保留值
+     * 當文件ID是保留值時，則返回一個虛擬的文件元數據，否則拋出 ValidationException 異常
+     * 這虛擬的文件元數據用於後續驗證時進行檢查，在一般規則下不允許對保留值進行操作 {@link FilePermissionRuleManager.DefaultRule}
+     * 則拋出 ValidationException 異常
+     *
+     * @param user   用戶
+     * @param fileId 文件ID
+     *
+     * @return UserFileMetadata 文件元數據
+     */
+    private Mono<UserFileMetadata> reservedSearchMethod(User user, Long fileId) {
+        ReservedSearchIdEnum reservedSearchIdEnum = ReservedSearchIdEnum.format(fileId);
+        if (ReservedSearchIdEnum.format(fileId) != null) {
+            UserFileMetadata dummyData = new UserFileMetadata();
+            dummyData.setId(fileId);
+            dummyData.setUserId(user.getId());
+            dummyData.setIsDeleted(reservedSearchIdEnum == ReservedSearchIdEnum.RECYCLE_FILE_ID);
+            dummyData.setFileType(FileEnum.FOLDER);
+            return Mono.just(dummyData);
+        }
+        return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId));
+    }
 
     /**
      * 驗證用戶是否有權限，當沒有指定權限規則時，使用默認的權限規則(只允許擁有者訪問)
@@ -121,30 +146,5 @@ public class FilePermissionServiceImpl implements PermissionService<UserFileMeta
             }
             return Mono.error(errors.getFirst());
         });
-    }
-
-
-    /**
-     * 保留值搜索方法，在搜索用戶檔案元數據時，如果找不到文件，則檢查輸入的文件ID是否是保留值
-     * 當文件ID是保留值時，則返回一個虛擬的文件元數據，否則拋出 ValidationException 異常
-     * 這虛擬的文件元數據用於後續驗證時進行檢查，在一般規則下不允許對保留值進行操作 {@link FilePermissionRuleManager.DefaultRule}
-     * 則拋出 ValidationException 異常
-     *
-     * @param user   用戶
-     * @param fileId 文件ID
-     *
-     * @return UserFileMetadata 文件元數據
-     */
-    private Mono<UserFileMetadata> reservedSearchMethod(User user, Long fileId) {
-        ReservedSearchIdEnum reservedSearchIdEnum = ReservedSearchIdEnum.format(fileId);
-        if (ReservedSearchIdEnum.format(fileId) != null) {
-            UserFileMetadata dummyData = new UserFileMetadata();
-            dummyData.setId(fileId);
-            dummyData.setUserId(user.getId());
-            dummyData.setIsDeleted(reservedSearchIdEnum == ReservedSearchIdEnum.RECYCLE_FILE_ID);
-            dummyData.setFileType(FileEnum.FOLDER);
-            return Mono.just(dummyData);
-        }
-        return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId));
     }
 }

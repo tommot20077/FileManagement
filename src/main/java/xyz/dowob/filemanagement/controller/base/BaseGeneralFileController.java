@@ -119,6 +119,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
                         .validateFileMetadataDTO(fileMetadataDTO, user)
                         .thenMany(permissionService
                                           .validateUserPermission(user, fileIds)
+                                          .flatMapMany(map -> Flux.fromIterable(map.values()))
                                           .flatMap(fileMetadata -> validationService.validateFileType(fileMetadata, FileEnum.FOLDER)))
                         .then(fileServiceStrategy.getFileService().uploadFile(fileMetadataDTO, user).flatMap(transferResponseDTO -> {
                             ApiResponseDTO<?> apiResponse;
@@ -257,20 +258,17 @@ public abstract class BaseGeneralFileController extends BaseFileController {
                 .then(validationService.validSpecifyColumns(fileEditDTO, "fileId"))
                 .then(userService.getUser(exchange))
                 .flatMap(user -> {
-                    List<Long> fileIds = new ArrayList<>(List.of(Long.parseLong(fileEditDTO.getFileId())));
+                    Long fileId = Long.parseLong(fileEditDTO.getFileId());
+                    List<Long> fileIds = new ArrayList<>(List.of(fileId));
                     if (fileEditDTO.getParentFolderId() != null) {
                         fileIds.add(fileEditDTO.getParentFolderId());
                     }
 
-                    return permissionService.validateUserPermission(user, fileIds).collectList().flatMap(fileList -> {
+                    return permissionService.validateUserPermission(user, fileIds).flatMap(map -> {
                         FileEditBO fileEditBO = new FileEditBO(fileEditDTO);
-                        for (UserFileMetadata file : fileList) {
-                            if (file.getId().equals(fileEditDTO.getParentFolderId())) {
-                                fileEditBO.setParentFolderFileMetadata(file);
-                            } else if (file.getId().equals(Long.parseLong(fileEditDTO.getFileId()))) {
-                                fileEditBO.setUserFileMetadata(file);
-                            }
-                        }
+                        fileEditBO.setParentFolderFileMetadata(map.get(fileEditDTO.getParentFolderId()));
+                        fileEditBO.setUserFileMetadata(map.get(fileId));
+
                         return validationService
                                 .validateFileType(fileEditBO.getUserFileMetadata(), CUSTOM_FILE_TYPE)
                                 .then(validationService.validateFileType(fileEditBO.getParentFolderFileMetadata(), FileEnum.FOLDER))
@@ -303,54 +301,21 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         return Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "type"));
     }
 
-
     /**
-     * 將請求的數據轉換為 UploadChunkDTO 類型
+     * 獲取用戶選擇的上傳方式，如果伺服器配置為強制使用伺服器配置則使用伺服器配置
+     * 否則使用用戶選擇的上傳方式，如果用戶選擇的上傳方式為空則使用伺服器配置
      *
-     * @param exchange 請求對象
+     * @param uploadType 上傳方式
      *
-     * @return Mono<UploadChunkDTO> 返回 UploadChunkDTO 類型
+     * @return TransmissionEnum 返回上傳方式
      */
-    protected Mono<UploadChunkDTO> formatChunkData(ServerWebExchange exchange) {
-        return exchange.getRequest().getBody().collectList().flatMap(dataBuffers -> {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            dataBuffers.forEach(buffer -> {
-                byte[] bytes = new byte[buffer.readableByteCount()];
-                buffer.read(bytes);
-                DataBufferUtils.release(buffer);
-                baos.write(bytes, 0, bytes.length);
-            });
-
-            ObjectMapper objectMapper = new ObjectMapper();
-            try {
-                return Mono.just(objectMapper.readValue(baos.toByteArray(), UploadChunkDTO.class));
-            } catch (IOException e) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_JSON_CONTENT));
-            }
-        });
+    @SkipRecord
+    protected TransmissionEnum getChooseTransmissionType(String uploadType) {
+        if (isForceUseServerConfig) {
+            return defaultUploadType;
+        }
+        return Objects.requireNonNullElse(TransmissionEnum.fromType(uploadType), defaultUploadType);
     }
-
-
-    /**
-     * 此方法為分塊上傳的處理方法
-     *
-     * @param uploadChunkDTO 上傳文件分塊的元數據
-     * @param exchange       請求對象
-     *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
-     */
-    protected Mono<ResponseEntity<?>> handleChunkUpload(UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
-        return handleError(fileServiceStrategy.getFileService().uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
-            ApiResponseDTO<?> apiResponse;
-            if (transferResponseDTO.getIsSuccess()) {
-                apiResponse = createApiResponse(exchange, "上傳成功", transferResponseDTO);
-            } else {
-                apiResponse = createApiResponse(exchange, HttpStatus.BAD_REQUEST.value(), "上傳失敗", transferResponseDTO);
-            }
-            return createResponseEntity(apiResponse);
-        }), exchange);
-    }
-
 
     /**
      * 將請求的 Multipart 類型轉換獲取 文件的 ID 以及文件分塊
@@ -378,7 +343,6 @@ public abstract class BaseGeneralFileController extends BaseFileController {
         });
     }
 
-
     /**
      * 此方法為Multipart上傳的處理方法
      *
@@ -401,12 +365,59 @@ public abstract class BaseGeneralFileController extends BaseFileController {
             }
             return createResponseEntity(apiResponse);
         }).onErrorResume(ValidationException.class, e -> {
-            String errorMessage = String.format("上傳失敗: %s", e.getMessage());
-            int responseCode = e.getErrorCode().getCode();
-            return createResponseEntity(createApiResponse(exchange, responseCode, errorMessage, null));
+                             String errorMessage = String.format("上傳失敗: %s", e.getMessage());
+                             int responseCode = e.getErrorCode().getCode();
+                             return createResponseEntity(createApiResponse(exchange, responseCode, errorMessage, null));
+                         }
+        );
+    }
+
+    /**
+     * 將請求的數據轉換為 UploadChunkDTO 類型
+     *
+     * @param exchange 請求對象
+     *
+     * @return Mono<UploadChunkDTO> 返回 UploadChunkDTO 類型
+     */
+    protected Mono<UploadChunkDTO> formatChunkData(ServerWebExchange exchange) {
+        return exchange.getRequest().getBody().collectList().flatMap(dataBuffers -> {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            dataBuffers.forEach(buffer -> {
+                byte[] bytes = new byte[buffer.readableByteCount()];
+                buffer.read(bytes);
+                DataBufferUtils.release(buffer);
+                baos.write(bytes, 0, bytes.length);
+            });
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            try {
+                return Mono.just(objectMapper.readValue(baos.toByteArray(), UploadChunkDTO.class));
+            } catch (IOException e) {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_JSON_CONTENT));
+            }
         });
     }
 
+    /**
+     * 此方法為分塊上傳的處理方法
+     *
+     * @param uploadChunkDTO 上傳文件分塊的元數據
+     * @param exchange       請求對象
+     *
+     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     */
+    protected Mono<ResponseEntity<?>> handleChunkUpload(UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
+        return handleError(fileServiceStrategy.getFileService().uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
+                               ApiResponseDTO<?> apiResponse;
+                               if (transferResponseDTO.getIsSuccess()) {
+                                   apiResponse = createApiResponse(exchange, "上傳成功", transferResponseDTO);
+                               } else {
+                                   apiResponse = createApiResponse(exchange, HttpStatus.BAD_REQUEST.value(), "上傳失敗", transferResponseDTO);
+                               }
+                               return createResponseEntity(apiResponse);
+                           }), exchange
+        );
+    }
 
     /**
      * 獲取用戶文件列表的請求
@@ -424,23 +435,6 @@ public abstract class BaseGeneralFileController extends BaseFileController {
             }
         }).filter(Objects::nonNull).toList();
         return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, fileEnums);
-    }
-
-
-    /**
-     * 獲取用戶選擇的上傳方式，如果伺服器配置為強制使用伺服器配置則使用伺服器配置
-     * 否則使用用戶選擇的上傳方式，如果用戶選擇的上傳方式為空則使用伺服器配置
-     *
-     * @param uploadType 上傳方式
-     *
-     * @return TransmissionEnum 返回上傳方式
-     */
-    @SkipRecord
-    protected TransmissionEnum getChooseTransmissionType(String uploadType) {
-        if (isForceUseServerConfig) {
-            return defaultUploadType;
-        }
-        return Objects.requireNonNullElse(TransmissionEnum.fromType(uploadType), defaultUploadType);
     }
 }
 

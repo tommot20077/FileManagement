@@ -85,20 +85,11 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
      * 當設置為true時，會檢查請求的IP是否在禁止列表中
      */
     private final boolean isEnableBanIp;
-
-    /**
-     * 失敗次數，當請求次數超過這個值時，會禁止IP訪問
-     * 當設置為值小於等於 0 時，則使用預設值: 5
-     * 僅在啟用禁止IP時生效
-     */
-    private int failureCount = 5;
-
     /**
      * 禁止IP的封禁時間
      * 當設置為值小於等於 0 時，則使用預設值: 1小時
      */
     private final Duration banExpireDuration;
-
     /**
      * 禁止IP的計算時間
      * 當設置為值小於等於 0 時，則使用預設值: 10分鐘
@@ -106,18 +97,22 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
      * 僅在啟用禁止IP時生效
      */
     private final Duration banDuration;
-
     /**
      * Redis 請求限制器的代理管理器
      * 使用 Lettuce 實現的 Redis 客戶端
      * 這邊使用IP地址作為請求限制的鍵
      */
     private final ProxyManager<String> proxyManager;
-
     /**
      * Jackson ObjectMapper 實例，用於序列化和反序列化 JSON
      */
     private final ObjectMapper objectMapper;
+    /**
+     * 失敗次數，當請求次數超過這個值時，會禁止IP訪問
+     * 當設置為值小於等於 0 時，則使用預設值: 5
+     * 僅在啟用禁止IP時生效
+     */
+    private int failureCount = 5;
 
     /**
      * 構造函數，初始化 RedisRequestLimiterFilter

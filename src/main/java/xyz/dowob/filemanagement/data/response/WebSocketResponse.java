@@ -31,7 +31,7 @@ public class WebSocketResponse<T> {
     /**
      * 回應的類型
      */
-    private final T type;
+    private T type;
 
     /**
      * 返回的消息
@@ -41,5 +41,5 @@ public class WebSocketResponse<T> {
     /**
      * 返回的數據
      */
-    private final Object data;
+    private Object data;
 }

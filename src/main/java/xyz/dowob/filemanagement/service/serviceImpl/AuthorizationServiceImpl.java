@@ -54,6 +54,21 @@ public class AuthorizationServiceImpl implements AuthorizationService {
 
     /**
      * 根據用戶名和密碼進行授權
+     * 此方法為無請求對象的授權方法，不會將授權信息存入Session
+     * 當用戶名和密碼正確時，返回用戶對象
+     * 否則返回空
+     *
+     * @param authRequestDTO 用戶驗證請求對象
+     *
+     * @return 返回用戶對象
+     */
+    @RecordLevel(LogLevelEnum.INFO)
+    public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
+        return authenticate(authRequestDTO, null);
+    }
+
+    /**
+     * 根據用戶名和密碼進行授權
      * 當用戶名和密碼正確時，返回用戶對象
      * 當用戶名或密碼錯誤時，返回錯誤信息
      *
@@ -75,23 +90,6 @@ public class AuthorizationServiceImpl implements AuthorizationService {
                     return Mono.error(new ValidationException(ValidationException.ErrorCode.USERNAME_OR_PASSWORD_ERROR));
                 });
     }
-
-
-    /**
-     * 根據用戶名和密碼進行授權
-     * 此方法為無請求對象的授權方法，不會將授權信息存入Session
-     * 當用戶名和密碼正確時，返回用戶對象
-     * 否則返回空
-     *
-     * @param authRequestDTO 用戶驗證請求對象
-     *
-     * @return 返回用戶對象
-     */
-    @RecordLevel(LogLevelEnum.INFO)
-    public Mono<String> authenticate(AuthRequestDTO authRequestDTO) {
-        return authenticate(authRequestDTO, null);
-    }
-
 
     /**
      * 獲取CSRF Token

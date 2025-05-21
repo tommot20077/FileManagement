@@ -36,6 +36,7 @@ public class WebSocketConfig {
      * 為所有 WebSocket 路徑添加前綴
      */
     private final static String WEBSOCKET_PATH_PREFIX = "/ws";
+
     /**
      * 文件上傳 WebSocket 處理器
      */
