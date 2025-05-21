@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.UserLimiterType;
 import xyz.dowob.filemanagement.component.limiter.UserLimiter;
 import xyz.dowob.filemanagement.customenum.UserLimiterEnum;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.List;
  * @ClassName UserLimiterStrategy
  * @create 2025/1/20
  * @Version 1.0
- **/
+ */
 @Component
 public class UserLimiterStrategy {
     /**
@@ -32,15 +33,33 @@ public class UserLimiterStrategy {
      */
     public UserLimiterStrategy(List<UserLimiter> userLimiters) {
         userLimiterEnumMap = new EnumMap<>(UserLimiterEnum.class);
+        if (userLimiters == null) {
+            return;
+        }
 
         for (UserLimiter userLimiter : userLimiters) {
-            UserLimiterType userLimiterType = AnnotatedElementUtils.findMergedAnnotation(userLimiter.getClass(), UserLimiterType.class);
-            if (userLimiterType != null) {
-                userLimiterEnumMap.put(userLimiterType.value(), userLimiter);
+            UserLimiterType userLimiterTypeAnnotation = AnnotatedElementUtils.findMergedAnnotation(userLimiter.getClass(), UserLimiterType.class);
+
+            if (userLimiterTypeAnnotation != null) {
+                UserLimiterEnum typeEnum = userLimiterTypeAnnotation.value();
+                LogUnity.trace("檢查限制器: %s, 註解: %s", userLimiter.getClass().getName(), typeEnum);
+
+                if (userLimiterEnumMap.containsKey(typeEnum)) {
+                    String msg = String.format("用戶限流器類型重複: %s ， %s 嘗試註冊，但已經被 %s 註冊",
+                                               typeEnum,
+                                               userLimiter.getClass().getName(),
+                                               userLimiterEnumMap.get(typeEnum).getClass().getName()
+                    );
+                    throw new IllegalArgumentException(msg);
+                } else {
+                    userLimiterEnumMap.put(typeEnum, userLimiter);
+                    LogUnity.debug("註冊限制器: %s, 類型: %s", userLimiter.getClass().getName(), typeEnum);
+                }
+            } else {
+                LogUnity.debug("限制器: %s 沒有註解 UserLimiterType，不會被註冊", userLimiter.getClass().getName());
             }
         }
     }
-
 
     /**
      * 根據用戶限流器類型獲取用戶限流器

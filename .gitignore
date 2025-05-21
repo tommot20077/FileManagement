@@ -42,3 +42,5 @@ build/
 /config/
 /.xcodemap/config/xcodemap-class-filter.yaml
 /src/main/resources/rebel.xml
+/.clinerules/測試要點.md
+/.clinerules/test-unit.md

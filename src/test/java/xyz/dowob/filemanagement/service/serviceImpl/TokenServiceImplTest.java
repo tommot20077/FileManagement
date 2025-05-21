@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 
 @SuppressWarnings("all")
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TokenServiceImpl 憑證服務處理測試")
+@DisplayName("TokenService 邏輯處理測試")
 class TokenServiceImplTest {
     @Mock
     private TokenStrategy mockTokenStrategy;

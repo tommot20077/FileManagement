@@ -28,7 +28,7 @@ import java.util.Optional;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("FilePermissionServiceImpl 檔案權限檢測測試")
+@DisplayName("FilePermissionServiceImpl 邏輯處理測試")
 class FilePermissionServiceImplTest {
 
     @Mock
@@ -141,7 +141,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("使用者擁有檔案權限，符合預設規則，驗證成功")
+    @DisplayName("使用者擁有檔案權限，符合預設規則 - 驗證成功 - 預期驗證成功")
     void testNormalFileId_UserHasPermission_DefaultRules_Passes() {
         Long fileId = fileMetadata.getId();
         when(mockUserFileMetaRepository.findById(fileId.toString())).thenReturn(Mono.just(fileMetadata));
@@ -156,7 +156,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("使用者無檔案權限，符合預設規則，拋出 FILE_PERMISSION_DENIED")
+    @DisplayName("使用者無檔案權限，符合預設規則 - 拋出 FILE_PERMISSION_DENIED - 預期拋出 FILE_PERMISSION_DENIED")
     void testNormalFileId_UserLacksPermission_DefaultRules_ThrowsPermissionDenied() {
         Long fileId = fileMetadata.getId();
         when(mockUserFileMetaRepository.findById(fileId.toString())).thenReturn(Mono.just(fileMetadata));
@@ -171,7 +171,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("檔案已被刪除，使用者擁有權限，符合預設規則，拋出 ALREADY_DELETED_FILE")
+    @DisplayName("檔案已被刪除，使用者擁有權限，符合預設規則 - 拋出 ALREADY_DELETED_FILE - 預期拋出 ALREADY_DELETED_FILE")
     void testNormalFileId_UserLacksPermission_DefaultRules_ThrowsAlreadyDelete() {
         Long fileId = fileMetadata.getId();
         fileMetadata.setIsDeleted(true);
@@ -187,7 +187,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("查無檔案紀錄，拋出 NOT_EXISTING_USER_FILE")
+    @DisplayName("查無檔案紀錄 - 拋出 NOT_EXISTING_USER_FILE")
     void testNormalFileId_FileDoesNotExist_ThrowsNotExistingUserFile() {
         Long fileId = 999L;
         when(mockUserFileMetaRepository.findById(fileId.toString())).thenReturn(Mono.empty());
@@ -202,7 +202,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("非保留ID且查無檔案紀錄，拋出 NOT_EXISTING_USER_FILE")
+    @DisplayName("非保留ID且查無檔案紀錄 - 拋出 NOT_EXISTING_USER_FILE")
     void testReservedId_NonReservedIdNotInQuery_ThrowsNotExistingUserFile() {
         Long nonReservedId = -999L;
         when(mockUserFileMetaRepository.findById(nonReservedId.toString())).thenReturn(Mono.empty());
@@ -217,7 +217,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("保留ID查無檔案紀錄，拋出 NOT_EXISTING_USER_FILE")
+    @DisplayName("保留ID查無檔案紀錄 - 拋出 NOT_EXISTING_USER_FILE")
     void testReservedId_DefaultRules_ThrowsNotExistingUserFile() {
         Long reservedFileId = ReservedSearchIdEnum.ALL_FILE_ID.getId();
         when(mockUserFileMetaRepository.findById(reservedFileId.toString())).thenReturn(Mono.empty());
@@ -232,7 +232,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("保留ID為回收筒，無搜尋限制，拋出 ALREADY_DELETED_FILE")
+    @DisplayName("保留ID為回收筒，無搜尋限制 - 拋出 ALREADY_DELETED_FILE")
     void testReservedId_RecycleFileId_NoSearchRestriction_ThrowsAlreadyDeletedFile() {
         Long reservedFileId = ReservedSearchIdEnum.RECYCLE_FILE_ID.getId();
         when(mockUserFileMetaRepository.findById(reservedFileId.toString())).thenReturn(Mono.empty());
@@ -247,7 +247,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("保留ID為非回收筒，無搜尋限制，回傳虛擬檔案資料")
+    @DisplayName("保留ID為非回收筒，無搜尋限制 - 回傳虛擬檔案資料")
     void testReservedId_NonRecycleFileId_NoSearchRestriction_Passes() {
         Long reservedFileId = ReservedSearchIdEnum.ALL_FILE_ID.getId();
         when(mockUserFileMetaRepository.findById(reservedFileId.toString())).thenReturn(Mono.empty());
@@ -264,7 +264,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("保留ID為回收筒，無搜尋與刪除限制，回傳虛擬回收筒資料")
+    @DisplayName("保留ID為回收筒，無搜尋與刪除限制 - 回傳虛擬回收筒資料")
     void testReservedId_RecycleFileId_NoSearchAndNoDeleteRestriction_Passes() {
         Long reservedFileId = ReservedSearchIdEnum.RECYCLE_FILE_ID.getId();
         when(mockUserFileMetaRepository.findById(reservedFileId.toString())).thenReturn(Mono.empty());
@@ -282,7 +282,7 @@ class FilePermissionServiceImplTest {
 
 
     @Test
-    @DisplayName("保留ID為非回收筒，無搜尋與刪除限制，回傳虛擬檔案資料")
+    @DisplayName("保留ID為非回收筒，無搜尋與刪除限制 - 回傳虛擬檔案資料")
     void testReservedId_NonRecycleFileId_NoSearchAndNoDeleteRestriction_Passes() {
         Long reservedFileId = ReservedSearchIdEnum.ROOT_FOLDER_ID.getId();
         when(mockUserFileMetaRepository.findById(reservedFileId.toString())).thenReturn(Mono.empty());
@@ -299,7 +299,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("檔案公開分享，非擁有者可存取，驗證成功")
+    @DisplayName("檔案公開分享，非擁有者可存取 - 驗證成功")
     void testAllowShared_PublicShareType_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.PUBLIC);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -314,7 +314,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("檔案無分享設定，非擁有者存取，拋出 FILE_PERMISSION_DENIED")
+    @DisplayName("檔案無分享設定，非擁有者存取 - 拋出 FILE_PERMISSION_DENIED")
     void testAllowShared_NoneShareType_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.NONE);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -329,7 +329,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("檔案私人分享，且有分享紀錄，非擁有者可存取，驗證成功")
+    @DisplayName("檔案私人分享，且有分享紀錄，非擁有者可存取 - 驗證成功")
     void testAllowShared_PrivateShareType_WithShareRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.PRIVATE);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -346,7 +346,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("檔案私人分享，無分享紀錄，非擁有者存取，拋出 FILE_PERMISSION_DENIED")
+    @DisplayName("檔案私人分享，無分享紀錄，非擁有者存取 - 拋出 FILE_PERMISSION_DENIED")
     void testAllowShared_PrivateShareType_NoShareRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.PRIVATE);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -363,7 +363,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("預設分享設定，父層為公開且有分享紀錄，非擁有者可存取，驗證成功")
+    @DisplayName("預設分享設定，父層為公開且有分享紀錄，非擁有者可存取 - 驗證成功")
     void testAllowShared_DefaultShareType_ParentPublic_WithParentRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         fileMetadata.setParentFolderId(100L);
@@ -386,7 +386,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("預設分享設定，父層為私人且無分享紀錄，非擁有者存取，拋出 FILE_PERMISSION_DENIED")
+    @DisplayName("預設分享設定，父層為私人且無分享紀錄，非擁有者存取 - 拋出 FILE_PERMISSION_DENIED")
     void testAllowShared_DefaultShareType_ParentRootPrivate_WithParentRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -403,7 +403,7 @@ class FilePermissionServiceImplTest {
 
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 有父資料夾(Private) + 有父層分享紀錄 + 非擁有者 -> 通過")
+    @DisplayName("DEFAULT分享類型 + 有父資料夾(Private) + 有父層分享紀錄 + 非擁有者 - 通過")
     void testAllowShared_DefaultShareType_ParentFolderPrivate_WithParentRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         fileMetadata.setParentFolderId(100L);
@@ -426,7 +426,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 無父資料夾 + 有父層分享紀錄 + 非擁有者 -> 拒絕")
+    @DisplayName("DEFAULT分享類型 + 無父資料夾 + 有父層分享紀錄 + 非擁有者 - 拒絕")
     void testAllowShared_DefaultShareType_ParentNone_WithParentRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -443,7 +443,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 有父資料夾(Default) + 有父層分享紀錄 + 非擁有者 -> 通過")
+    @DisplayName("DEFAULT分享類型 + 有父資料夾(Default) + 有父層分享紀錄 + 非擁有者 - 通過")
     void testAllowShared_DefaultShareType_ParentFolderDefault_WithParentRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         fileMetadata.setParentFolderId(100L);
@@ -466,7 +466,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 父資料夾為空 + 有父層分享紀錄 + 非擁有者 -> 拒絕")
+    @DisplayName("DEFAULT分享類型 + 父資料夾為空 + 有父層分享紀錄 + 非擁有者 - 拒絕")
     void testAllowShared_DefaultShareType_ParentEmpty_WithParentRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -483,7 +483,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 有父資料夾(Public) + 無父層分享紀錄 + 非擁有者 -> 通過")
+    @DisplayName("DEFAULT分享類型 + 有父資料夾(Public) + 無父層分享紀錄 + 非擁有者 - 通過")
     void testAllowShared_DefaultShareType_ParentFolderPublic_NoParentRecord_NonOwner_Passes() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         fileMetadata.setParentFolderId(100L);
@@ -504,7 +504,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 父資料夾為Private + 無父層分享紀錄 + 非擁有者 -> 拒絕")
+    @DisplayName("DEFAULT分享類型 + 父資料夾為Private + 無父層分享紀錄 + 非擁有者 - 拒絕")
     void testAllowShared_DefaultShareType_ParentPrivate_NoParentRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -521,7 +521,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 無父資料夾 + 無父層分享紀錄 + 非擁有者 -> 拒絕")
+    @DisplayName("DEFAULT分享類型 + 無父資料夾 + 無父層分享紀錄 + 非擁有者 - 拒絕")
     void testAllowShared_DefaultShareType_ParentNone_NoParentRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));
@@ -538,7 +538,7 @@ class FilePermissionServiceImplTest {
     }
 
     @Test
-    @DisplayName("DEFAULT分享類型 + 父資料夾為Default + 無父層分享紀錄 + 非擁有者 -> 拒絕")
+    @DisplayName("DEFAULT分享類型 + 父資料夾為Default + 無父層分享紀錄 + 非擁有者 - 拒絕")
     void testAllowShared_DefaultShareType_ParentDefault_NoParentRecord_NonOwner_ThrowsPermissionDenied() {
         fileMetadata.setShareType(FileShareTypeEnum.DEFAULT);
         when(mockUserFileMetaRepository.findById(fileMetadata.getId().toString())).thenReturn(Mono.just(fileMetadata));

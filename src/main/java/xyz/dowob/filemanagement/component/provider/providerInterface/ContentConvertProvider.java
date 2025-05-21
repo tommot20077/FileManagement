@@ -3,6 +3,8 @@ package xyz.dowob.filemanagement.component.provider.providerInterface;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
+import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 
 import java.io.InputStream;
 
@@ -48,5 +50,22 @@ public interface ContentConvertProvider {
      * @param size       大小
      */
     record DataBufferRecord(Flux<DataBuffer> dataBuffer, long size) {
+    }
+
+    /**
+     * 獲取轉換器類型
+     *
+     * @return 轉換器類型
+     */
+    ConvertProviderEnum getType();
+
+    /**
+     * 獲取轉換設定
+     * 預設為不支援獲取，而交由實作類別來決定
+     *
+     * @return 轉換設定
+     */
+    default ConvertConfig getConvertConfig() {
+        return null;
     }
 }

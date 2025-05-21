@@ -32,6 +32,7 @@ public class ContentConvertProviderFactory {
             config = new ConvertConfig();
         }
         return switch (type) {
+            case null -> throw new IllegalArgumentException("轉換器類型不能為空");
             default -> new WordConvertProvider(config);
         };
     }

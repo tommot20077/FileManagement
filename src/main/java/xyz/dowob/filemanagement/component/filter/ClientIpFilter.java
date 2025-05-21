@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.component.filter;
 
 import com.google.common.net.InetAddresses;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;

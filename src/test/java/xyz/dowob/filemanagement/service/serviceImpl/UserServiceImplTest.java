@@ -45,7 +45,7 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("all")
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("UserServiceImpl 處理用戶相關方法測試")
+@DisplayName("UserService 邏輯處理測試")
 class UserServiceImplTest {
 
     @Mock
@@ -82,7 +82,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("register: 正常情況 - 輸入有效使用者資料時，應成功儲存使用者並回傳 Mono<Void>")
+    @DisplayName("測試註冊: 正常情況 - 輸入有效使用者資料時，應成功儲存使用者並回傳 Mono<Void>")
     void register_normalCase_shouldSaveUserAndReturnMonoVoid() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("testuser");
@@ -101,7 +101,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("register: 異常情況 - 使用者名稱或信箱已存在時，應該丟出資料庫違反唯一約束錯誤")
+    @DisplayName("測試註冊: 異常情況 - 使用者名稱或信箱已存在時，應該丟出資料庫違反唯一約束錯誤")
     void register_abnormalCase_shouldThrowUniqueConstraintViolation() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("existinguser");
@@ -120,13 +120,13 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("register: 異常情況 - registerUserDTO 為 null，應丟出 NullPointerException")
+    @DisplayName("測試註冊: 異常情況 - registerUserDTO 為 null，應丟出 NullPointerException")
     void register_abnormalCase_nullDto_shouldThrowNullPointerException() {
         StepVerifier.create(userServiceImplUnderTest.register(null)).expectError(NullPointerException.class).verify();
     }
 
     @Test
-    @DisplayName("register: 邊界條件 - 最短長度使用者名稱與密碼，應成功儲存使用者")
+    @DisplayName("測試註冊: 邊界條件 - 最短長度使用者名稱與密碼，應成功儲存使用者")
     void register_edgeCase_minLengthUsernameAndPassword_shouldSaveUser() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("a");
@@ -145,7 +145,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("register: 邊界條件 - 信箱格式為最小有效格式，應成功儲存使用者")
+    @DisplayName("測試註冊: 邊界條件 - 信箱格式為最小有效格式，應成功儲存使用者")
     void register_edgeCase_minValidEmailFormat_shouldSaveUser() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("testuser");
@@ -165,7 +165,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 正常情況 - 使用正確帳號密碼登入成功，返回 Token 並釋放限流資源")
+    @DisplayName("測試登入: 正常情況 - 使用正確帳號密碼登入成功，返回 Token 並釋放限流資源")
     void login_normalCase_shouldReturnTokenAndReleaseLimiter() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("testuser", "password123");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -182,7 +182,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 異常情況 - 使用者密碼錯誤，應丟出 USERNAME_OR_PASSWORD_ERROR")
+    @DisplayName("測試登入: 異常情況 - 使用者密碼錯誤，應丟出 USERNAME_OR_PASSWORD_ERROR")
     void login_abnormalCase_incorrectPassword_shouldThrowUsernameOrPasswordError() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("testuser", "wrongpassword");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -201,7 +201,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 異常情況 - 使用者帳號不存在，應丟出 USERNAME_OR_PASSWORD_ERROR")
+    @DisplayName("測試登入: 異常情況 - 使用者帳號不存在，應丟出 USERNAME_OR_PASSWORD_ERROR")
     void login_abnormalCase_userNotFound_shouldThrowUsernameOrPasswordError() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("nonexistentuser", "password123");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -220,7 +220,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 異常情況 - 達到登入限流上限，拋出 LimitationException")
+    @DisplayName("測試登入: 異常情況 - 達到登入限流上限，拋出 LimitationException")
     void login_abnormalCase_rateLimitExceeded_shouldThrowLimitationException() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("testuser", "password123");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -233,7 +233,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 異常情況 - 認證服務內部拋出錯誤")
+    @DisplayName("測試登入: 異常情況 - 認證服務內部拋出錯誤")
     void login_abnormalCase_authenticationServiceError_shouldPropagateError() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("testuser", "password123");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -248,7 +248,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 邊界條件 - 空字串使用者名稱與密碼")
+    @DisplayName("測試登入: 邊界條件 - 空字串使用者名稱與密碼")
     void login_edgeCase_emptyUsernameAndPassword() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("", "");
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -267,7 +267,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 邊界條件 - 極長的使用者名稱與密碼")
+    @DisplayName("測試登入: 邊界條件 - 極長的使用者名稱與密碼")
     void login_edgeCase_veryLongUsernameAndPassword() {
         String longString = "a".repeat(256);
         AuthRequestDTO authRequestDTO = new AuthRequestDTO(longString, longString);
@@ -287,7 +287,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("login: 邊界條件 - 請求物件為 null，應丟出 NullPointerException")
+    @DisplayName("測試登入: 邊界條件 - 請求物件為 null，應丟出 NullPointerException")
     void login_edgeCase_nullRequest_shouldThrowNullPointerException() {
         AuthRequestDTO authRequestDTO = new AuthRequestDTO("testuser", "password123");
 
@@ -295,7 +295,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("logout: 正常情況 - 正常使用者登出並撤銷 Token，Session 成功被清除")
+    @DisplayName("測試登出: 正常情況 - 正常使用者登出並撤銷 Token，Session 成功被清除")
     void logout_normalCase_shouldRevokeTokenAndInvalidateSession() {
         Long userId = 1L;
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -316,7 +316,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("logout: 異常情況 - userId 不存在於資料庫中，應丟出異常")
+    @DisplayName("測試登出: 異常情況 - userId 不存在於資料庫中，應丟出異常")
     void logout_abnormalCase_userNotFound_shouldThrowException() {
         Long userId = 1L;
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -335,7 +335,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("logout: 異常情況 - 無法從 exchange 取得 session，應丟出異常")
+    @DisplayName("測試登出: 異常情況 - 無法從 exchange 取得 session，應丟出異常")
     void logout_abnormalCase_cannotGetSession_shouldThrowException() {
         Long userId = 1L;
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -350,7 +350,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("logout: 邊界條件 - userId 為 0（訪客身分），應完成但不執行登出操作")
+    @DisplayName("測試登出: 邊界條件 - userId 為 0（訪客身分），應完成但不執行登出操作")
     void logout_edgeCase_guestUserId_shouldCompleteWithoutError() {
         Long userId = 0L;
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
@@ -363,7 +363,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("logout: 邊界條件 - exchange 為 null，應丟出 NullPointerException")
+    @DisplayName("測試登出: 邊界條件 - exchange 為 null，應丟出 NullPointerException")
     void logout_edgeCase_nullExchange_shouldThrowNullPointerException() {
         Long userId = 1L;
 
@@ -371,7 +371,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 正常情況 - 成功發送重設密碼郵件給已註冊的使用者")
+    @DisplayName("測試發送重置密碼郵件: 正常情況 - 成功發送重設密碼郵件給已註冊的使用者")
     void sendResetPasswordMail_normalCase_shouldSendEmail() {
         UserEmailDTO userEmailDTO = new UserEmailDTO();
         userEmailDTO.setEmail("test@example.com");
@@ -391,7 +391,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 異常情況 - 使用者信箱不存在，拋出 USER_NOT_FOUND")
+    @DisplayName("測試發送重置密碼郵件: 異常情況 - 使用者信箱不存在，拋出 USER_NOT_FOUND")
     void sendResetPasswordMail_abnormalCase_userNotFound_shouldThrowUserNotFound() {
         UserEmailDTO userEmailDTO = new UserEmailDTO();
         userEmailDTO.setEmail("nonexistent@example.com");
@@ -406,7 +406,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 異常情況 - emailProvider 不存在，拋出 UNSUPPORTED_OPERATION")
+    @DisplayName("測試發送重置密碼郵件: 異常情況 - emailProvider 不存在，拋出 UNSUPPORTED_OPERATION")
     void sendResetPasswordMail_abnormalCase_emailProviderNotFound_shouldThrowUnsupportedOperation() {
         UserServiceImpl userServiceImplWithoutEmailProvider = new UserServiceImpl(mockUserRepository,
                                                                                   mockAuthorizationService,
@@ -428,7 +428,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 異常情況 - 發送郵件失敗")
+    @DisplayName("測試發送重置密碼郵件: 異常情況 - 發送郵件失敗")
     void sendResetPasswordMail_abnormalCase_sendEmailFailed_shouldPropagateError() {
         UserEmailDTO userEmailDTO = new UserEmailDTO();
         userEmailDTO.setEmail("test@example.com");
@@ -447,7 +447,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 邊界條件 - 空信箱，應丟出異常")
+    @DisplayName("測試發送重置密碼郵件: 邊界條件 - 空信箱，應丟出異常")
     void sendResetPasswordMail_edgeCase_emptyEmail_shouldThrowException() {
         UserEmailDTO userEmailDTO = new UserEmailDTO();
         userEmailDTO.setEmail("");
@@ -461,7 +461,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendResetPasswordMail: 邊界條件 - 非法信箱格式，應丟出異常")
+    @DisplayName("測試發送重置密碼郵件: 邊界條件 - 非法信箱格式，應丟出異常")
     void sendResetPasswordMail_edgeCase_invalidEmailFormat_shouldThrowException() {
         UserEmailDTO userEmailDTO = new UserEmailDTO();
         userEmailDTO.setEmail("invalid-email");
@@ -475,7 +475,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 正常情況 - 憑證驗證成功後更新密碼並撤銷原憑證")
+    @DisplayName("測試重置密碼: 正常情況 - 憑證驗證成功後更新密碼並撤銷原憑證")
     void resetPassword_normalCase_shouldUpdatePasswordAndRevokeToken() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setEmail("test@example.com");
@@ -505,7 +505,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 異常情況 - 無該信箱之使用者，應丟出 USER_NOT_FOUND")
+    @DisplayName("測試重置密碼: 異常情況 - 無該信箱之使用者，應丟出 USER_NOT_FOUND")
     void resetPassword_abnormalCase_userNotFound_shouldThrowUserNotFound() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setEmail("nonexistent@example.com");
@@ -522,7 +522,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 異常情況 - 驗證碼錯誤或過期，應丟出 VERIFICATION_CODE_ERROR")
+    @DisplayName("測試重置密碼: 異常情況 - 驗證碼錯誤或過期，應丟出 VERIFICATION_CODE_ERROR")
     void resetPassword_abnormalCase_invalidVerificationCode_shouldThrowVerificationCodeError() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setEmail("test@example.com");
@@ -545,7 +545,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 異常情況 - 資料庫更新失敗")
+    @DisplayName("測試重置密碼: 異常情況 - 資料庫更新失敗")
     void resetPassword_abnormalCase_databaseUpdateFailed_shouldPropagateError() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setEmail("test@example.com");
@@ -568,7 +568,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 邊界條件 - 極短密碼，應成功更新密碼")
+    @DisplayName("測試重置密碼: 邊界條件 - 極短密碼，應成功更新密碼")
     void resetPassword_edgeCase_shortPassword_shouldUpdatePassword() {
         ResetPasswordDTO shortPasswordDTO = new ResetPasswordDTO();
         shortPasswordDTO.setEmail("test@example.com");
@@ -596,7 +596,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 邊界條件 - 極長密碼，應成功更新密碼")
+    @DisplayName("測試重置密碼: 邊界條件 - 極長密碼，應成功更新密碼")
     void resetPassword_edgeCase_longPassword_shouldUpdatePassword() {
         String longPassword = "a".repeat(256);
         ResetPasswordDTO longPasswordDTO = new ResetPasswordDTO();
@@ -625,7 +625,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("resetPassword: 邊界條件 - 憑證為空或格式不符，應丟出 VERIFICATION_CODE_ERROR")
+    @DisplayName("測試重置密碼: 邊界條件 - 憑證為空或格式不符，應丟出 VERIFICATION_CODE_ERROR")
     void resetPassword_edgeCase_emptyOrInvalidCredential_shouldThrowVerificationCodeError() {
         ResetPasswordDTO emptyCredentialDTO = new ResetPasswordDTO();
         emptyCredentialDTO.setEmail("test@example.com");
@@ -667,7 +667,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getUser: 正常情況 - 已登入使用者成功取得對應 User")
+    @DisplayName("測試獲取使用者: 正常情況 - 已登入使用者成功取得對應 User")
     void getUser_normalCase_shouldReturnUser() {
         Long userId = 1L;
         User mockUser = mock(User.class);
@@ -703,7 +703,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getUser: 異常情況 - SecurityContext 為空，應拋出 UNAUTHORIZED")
+    @DisplayName("測試獲取使用者: 異常情況 - SecurityContext 為空，應拋出 UNAUTHORIZED")
     void getUser_abnormalCase_emptySecurityContext_shouldThrowUnauthorized() {
         ServerWebExchange mockExchange = mock(ServerWebExchange.class);
         StepVerifier
@@ -715,7 +715,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getUser: 邊界條件 - exchange 為 null，應丟出 NullPointerException")
+    @DisplayName("測試獲取使用者: 邊界條件 - exchange 為 null，應丟出 NullPointerException")
     void getUser_edgeCase_nullExchange_shouldThrowNullPointerException() {
         StepVerifier
                 .create(userServiceImplUnderTest.getUser(null))
@@ -724,7 +724,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getUser: 正常情况 - 正常 ID 查询成功，并命中或建立缓存")
+    @DisplayName("測試獲取使用者: 正常情况 - 正常 ID 查询成功，并命中或建立缓存")
     void getUser_normalCase_shouldReturnUserAndUseCache() {
         Long userId = 1L;
         User mockUser = mock(User.class);
@@ -742,7 +742,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getById: 異常情況 - ID 為 null，應丟出 USER_NOT_FOUND")
+    @DisplayName("測試通過ID獲取使用者: 異常情況 - ID 為 null，應丟出 USER_NOT_FOUND")
     void getById_abnormalCase_nullId_shouldThrowUserNotFound() {
         StepVerifier
                 .create(userServiceImplUnderTest.getById(null))
@@ -751,7 +751,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getById: 異常情況 - 資料庫查無此人，應丟出 USER_NOT_FOUND")
+    @DisplayName("測試通過ID獲取使用者: 異常情況 - 資料庫查無此人，應丟出 USER_NOT_FOUND")
     void getById_abnormalCase_userNotFoundInDb_shouldThrowUserNotFound() {
         Long userId = 1L;
         String cacheKey = userId.toString();
@@ -774,7 +774,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getById: 邊界條件 - ID 為 0，應回傳 guestUser")
+    @DisplayName("測試通過ID獲取使用者: 邊界條件 - ID 為 0，應回傳 guestUser")
     void getById_edgeCase_zeroId_shouldReturnGuestUser() {
         Long userId = 0L;
 
@@ -791,7 +791,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getById: 邊界條件 - ID 為負數或極大值，應丟出異常情況")
+    @DisplayName("測試通過ID獲取使用者: 邊界條件 - ID 為負數或極大值，應丟出異常情況")
     void getById_edgeCase_negativeOrVeryLargeId_shouldThrowException() {
         Long negativeUserId = -1L;
         String negativeCacheKey = negativeUserId.toString();
@@ -833,7 +833,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAll: 正常情況 - 擁有 MANAGE 權限者成功回傳所有使用者清單")
+    @DisplayName("測試獲取所有使用者: 正常情況 - 擁有 MANAGE 權限者成功回傳所有使用者清單")
     void getAll_normalCase_shouldReturnAllUsers() {
         User mockUser1 = mock(User.class);
         User mockUser2 = mock(User.class);
@@ -846,7 +846,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAllByParams: 異常情況 - type 為 null 或無效值，應丟出異常情況")
+    @DisplayName("測試通過參數獲取所有使用者: 異常情況 - type 為 null 或無效值，應丟出異常情況")
     void getAllByParams_abnormalCase_nullOrInvalidType_shouldThrowException() {
         String nullType = null;
         Object[] args = {"user1"};
@@ -866,7 +866,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAllByParams: 異常情況 - args 全部為無效資料，應丟出異常情況")
+    @DisplayName("測試通過參數獲取所有使用者: 異常情況 - args 全部為無效資料，應丟出異常情況")
     void getAllByParams_abnormalCase_allInvalidArgs_shouldThrowException() {
         String typeId = "ID";
         Object[] invalidIdArgs = {"abc", "def"};
@@ -888,7 +888,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAllByParams: 邊界條件 - args 為空陣列，應丟出異常情況")
+    @DisplayName("測試通過參數獲取所有使用者: 邊界條件 - args 為空陣列，應丟出異常情況")
     void getAllByParams_edgeCase_emptyArgs_shouldThrowException() {
         String type = "ID";
         Object[] args = {};
@@ -900,7 +900,7 @@ class UserServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAllByParams: 邊界條件 - 含大量 ID 或使用者名稱查詢")
+    @DisplayName("測試通過參數獲取所有使用者: 邊界條件 - 含大量 ID 或使用者名稱查詢")
     void getAllByParams_edgeCase_largeNumberOfArgs() {
         String typeId = "ID";
         Object[] args = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};

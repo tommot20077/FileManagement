@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.component.handler;
 
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;

@@ -1,8 +1,7 @@
 package xyz.dowob.filemanagement.unity;
 
-import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,13 +36,13 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
      */
     private static final double HIGH_PRIORITY_CPU_USAGE = 0.6;
     /**
-     * 任務佇列使用率超過 80% 時擴展
+     * 任務佇列使用率超過 70% 時擴展
      */
-    private static final double HIGH_TASK_THRESHOLD = 0.8;
+    private static final double HIGH_TASK_THRESHOLD = 0.7;
     /**
-     * 任務佇列使用率低於 20% 時縮減
+     * 任務佇列使用率低於 30% 時縮減
      */
-    private static final double LOW_TASK_THRESHOLD = 0.2;
+    private static final double LOW_TASK_THRESHOLD = 0.3;
     /**
      * 記錄當前線程池執行中的任務數量
      */
@@ -55,7 +54,6 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
     /**
      * 任務佇列的總容量
      */
-    @Getter
     private final int workQueueCapacity;
     /**
      * 可用的 CPU 線程數量 {@link Runtime#availableProcessors()}
@@ -84,29 +82,30 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
      * @param unit            存活時間的單位
      * @param workQueue       任務佇列
      */
-    public DynamicThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int keepAliveTime,
-                                     @NotNull TimeUnit unit, @NotNull BlockingQueue<Runnable> workQueue) {
+    public DynamicThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int keepAliveTime, @NotNull TimeUnit unit, @NotNull BlockingQueue<Runnable> workQueue) {
         super(corePoolSize, maximumPoolSize, keepAliveTime <= 0 ? 30 : keepAliveTime, unit, workQueue);
         this.workQueueCapacity = getWorkQueueCapacity(workQueue);
         this.totalAvailableProcessors = Runtime.getRuntime().availableProcessors();
         this.minPoolSize = Math.max(2, (int) (totalAvailableProcessors * 0.1));
-        this.idealPoolSize = (int) (totalAvailableProcessors * LOW_PRIORITY_CPU_USAGE);
         this.maxPoolSize = (int) (totalAvailableProcessors * HIGH_PRIORITY_CPU_USAGE);
+        this.idealPoolSize = (int) (totalAvailableProcessors * LOW_PRIORITY_CPU_USAGE);
         setCorePoolSize(idealPoolSize);
         setMaximumPoolSize(maxPoolSize);
         allowCoreThreadTimeOut(true);
     }
 
     /**
-     * 取得佇列的總容量
+     * 取得佇列的總容量，若該佇列不支援或是無限佇列則返回 -1
      *
      * @param queue 任務佇列
      *
-     * @return 佇列的總容量，若無法計算則回傳 -1
+     * @return 佇列的總容量
      */
-    private static int getWorkQueueCapacity(BlockingQueue<Runnable> queue) {
+    static int getWorkQueueCapacity(BlockingQueue<Runnable> queue) {
         if (queue instanceof ArrayBlockingQueue<?> || queue instanceof LinkedBlockingQueue<?>) {
-            return queue.size() + queue.remainingCapacity();
+            if (queue.remainingCapacity() + queue.size() != Integer.MAX_VALUE) {
+                return queue.size() + queue.remainingCapacity();
+            }
         }
         return -1;
     }
@@ -144,13 +143,21 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
 
             double queueLoadRatio = (double) taskQueueSize / workQueueCapacity;
 
+            LogUnity.trace("當前線程池大小: %s, 當前任務數量: %s, 當前佇列大小: %s, 當前系統可用線程數: %s, 當前系統剩餘線程數: %s",
+                           currentPoolSize,
+                           activeThreads,
+                           taskQueueSize,
+                           availableProcessors,
+                           remainingSystemThreads
+            );
 
             if (taskQueueSize > workQueueCapacity * HIGH_TASK_THRESHOLD && remainingSystemThreads > 2) {
                 int newPoolSize = Math.min(maxPoolSize, currentPoolSize + 1);
                 String percentage = String.format("%.2f", queueLoadRatio * 100);
                 LogUnity.info("當前任務隊列負載較高 ( %s %%)，增加線程池大小: " + currentPoolSize + " -> " + newPoolSize, percentage);
-                setCorePoolSize(newPoolSize);
+
                 setMaximumPoolSize(newPoolSize);
+                setCorePoolSize(newPoolSize);
                 return;
             }
 
@@ -224,14 +231,26 @@ public class DynamicThreadPoolExecutor extends ThreadPoolExecutor {
      */
     public void updatePriority(boolean highPriority, @Nullable Double cpuUsagePercentage) {
         double chooseCpuUsage = cpuUsagePercentage == null ? (highPriority ? HIGH_PRIORITY_CPU_USAGE : LOW_PRIORITY_CPU_USAGE) : cpuUsagePercentage;
+
         if (chooseCpuUsage < 0 || chooseCpuUsage > 1) {
             throw new IllegalArgumentException("CPU 使用率必須在 0 到 1 之間");
         }
+
         idealPoolSize = (int) (totalAvailableProcessors * chooseCpuUsage);
+        int targetMaxPoolSize = Math.max(idealPoolSize * 2, minPoolSize);
 
         if (getPoolSize() > idealPoolSize) {
             setCorePoolSize(idealPoolSize);
-            setMaximumPoolSize(Math.max(idealPoolSize * 2, minPoolSize));
+            setMaximumPoolSize(targetMaxPoolSize);
+        } else {
+            if (idealPoolSize < getCorePoolSize()) {
+                setCorePoolSize(idealPoolSize);
+            }
+
+            setMaximumPoolSize(targetMaxPoolSize);
+            if (idealPoolSize > getCorePoolSize()) {
+                setCorePoolSize(idealPoolSize);
+            }
         }
     }
 }

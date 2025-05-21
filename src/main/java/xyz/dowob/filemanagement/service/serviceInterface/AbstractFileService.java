@@ -413,30 +413,6 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 過濾所需的檔案元素並分頁
-     *
-     * @param flux<UserFileListDTO> 檔案列表流
-     * @param fileFilterDTO         文件過濾DTO
-     *
-     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
-     */
-    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
-        List<FileEnum> type = fileFilterDTO.getTypes();
-        int currentPage = fileFilterDTO.getPage();
-        int pageSize = fileFilterDTO.getPageSize();
-        if (type != null && !type.isEmpty()) {
-            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
-        }
-        return flux.collectList().map(list -> {
-            int size = list.size();
-            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
-            int end = Math.min(start + pageSize, size);
-            List<UserFileListDTO> subList = list.subList(start, end);
-            return Tuples.of(size, subList);
-        });
-    }
-
-    /**
      * 搜索用戶文件
      *
      * @return Mono<PagedResponseDTO < UserFileListDTO>> 用戶文件列表
@@ -464,6 +440,30 @@ public abstract class AbstractFileService implements FileService {
             pagedResponseDTO.setCurrentPage(currentPage);
             pagedResponseDTO.setTotalPages((int) Math.ceil((double) tuple.getT1() / pageSize));
             return Mono.just(pagedResponseDTO);
+        });
+    }
+
+    /**
+     * 過濾所需的檔案元素並分頁
+     *
+     * @param flux<UserFileListDTO> 檔案列表流
+     * @param fileFilterDTO         文件過濾DTO
+     *
+     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
+     */
+    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
+        List<FileEnum> type = fileFilterDTO.getTypes();
+        int currentPage = fileFilterDTO.getPage();
+        int pageSize = fileFilterDTO.getPageSize();
+        if (type != null && !type.isEmpty()) {
+            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
+        }
+        return flux.collectList().map(list -> {
+            int size = list.size();
+            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
+            int end = Math.min(start + pageSize, size);
+            List<UserFileListDTO> subList = list.subList(start, end);
+            return Tuples.of(size, subList);
         });
     }
 

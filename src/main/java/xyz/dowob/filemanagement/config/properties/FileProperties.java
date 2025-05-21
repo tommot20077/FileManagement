@@ -36,7 +36,7 @@ public class FileProperties {
     /**
      * 建立全局配置
      */
-    private global global = new global();
+    private Global global = new Global();
 
     /**
      * 建立備份配置
@@ -140,7 +140,7 @@ public class FileProperties {
      * 全局配置
      */
     @Data
-    public static class global {
+    public static class Global {
         /**
          * 是否啟用用戶文件列表樹，默認為 true
          * 建議啟用，可以有效提升檔案路徑查詢效率。

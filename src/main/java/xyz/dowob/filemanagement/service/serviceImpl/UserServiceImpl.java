@@ -325,17 +325,6 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 根據ID獲取一個實體
-     *
-     * @param userId 實體ID
-     *
-     * @return 返回一個Optional對象
-     */
-    private Mono<User> getByIdWithDB(Long userId) {
-        return userRepository.findById(userId);
-    }
-
-    /**
      * 獲取所有實體
      */
 
@@ -411,6 +400,17 @@ public class UserServiceImpl implements UserService {
                                                                     List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
         );
         return cacheUserFlux.concatWith(userRepositoryFlux);
+    }
+
+    /**
+     * 根據ID獲取一個實體
+     *
+     * @param userId 實體ID
+     *
+     * @return 返回一個Optional對象
+     */
+    private Mono<User> getByIdWithDB(Long userId) {
+        return userRepository.findById(userId);
     }
 
 

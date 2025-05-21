@@ -1,7 +1,7 @@
 package xyz.dowob.filemanagement.controller.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.jetbrains.annotations.Nullable;
+import jakarta.annotation.Nullable;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;

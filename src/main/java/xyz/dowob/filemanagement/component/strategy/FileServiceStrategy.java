@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.FileHandlerType;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.service.serviceInterface.FileService;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -43,6 +44,7 @@ public class FileServiceStrategy {
                 if (fileStrategies.containsKey(annotation.value())) {
                     throw new IllegalArgumentException("檔案處理方法重複，請檢查是否有添加 FileHandlerType 注解");
                 }
+                LogUnity.debug("註冊檔案處理方法: %s, 類型: %s", service.getClass().getName(), annotation.value());
                 fileStrategies.put(annotation.value(), service);
             }
         }

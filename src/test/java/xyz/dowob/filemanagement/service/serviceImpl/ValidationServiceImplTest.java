@@ -21,7 +21,7 @@ import xyz.dowob.filemanagement.repostiory.UserRepository;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
-@DisplayName("ValidationServiceImpl 處理驗證測試")
+@DisplayName("ValidationServiceI 邏輯處理測試")
 @ExtendWith(MockitoExtension.class)
 class ValidationServiceImplTest {
 
@@ -36,6 +36,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
+    @DisplayName("驗證 RegisterDTO - DTO 為 null - 拋出 ValidationException")
     void testValidateRegisterDTO_DTONull_ThrowsValidationException() {
         Mono<Void> result = validationServiceImplUnderTest.validateRegisterDTO(null);
 
@@ -47,7 +48,7 @@ class ValidationServiceImplTest {
 
 
     @Test
-    @DisplayName("當密碼與確認密碼不一致時應拋出 CONFIRM_PASSWORD_NOT_MATCH")
+    @DisplayName("驗證 RegisterDTO - 密碼與確認密碼不一致 - 拋出 CONFIRM_PASSWORD_NOT_MATCH")
     void testValidateRegisterDTO_PasswordsNotMatch_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -67,7 +68,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當使用者名稱已存在時應拋出 USERNAME_INVALID")
+    @DisplayName("驗證 RegisterDTO - 使用者名稱已存在 - 拋出 USERNAME_INVALID")
     void testValidateRegisterDTO_UsernameExists_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("existingUser");
@@ -90,7 +91,7 @@ class ValidationServiceImplTest {
 
 
     @Test
-    @DisplayName("當使用者名稱包含非法字元時應拋出 USERNAME_INVALID")
+    @DisplayName("驗證 RegisterDTO - 使用者名稱包含非法字元 - 拋出 USERNAME_INVALID")
     void testValidateRegisterDTO_UsernameInvalidCharacters_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("user@name");
@@ -110,7 +111,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當信箱已存在時應拋出 EMAIL_ALREADY_EXISTS")
+    @DisplayName("驗證 RegisterDTO - 信箱已存在 - 拋出 EMAIL_ALREADY_EXISTS")
     void testValidateRegisterDTO_EmailExists_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -132,7 +133,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當密碼為回文時應拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    @DisplayName("驗證 RegisterDTO - 密碼為回文 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
     void testValidateRegisterDTO_PasswordIsPalindrome_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -152,7 +153,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當密碼缺少大寫字母時應拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    @DisplayName("驗證 RegisterDTO - 密碼缺少大寫字母 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
     void testValidateRegisterDTO_PasswordNoUppercase_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -172,7 +173,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當輸入合法時驗證成功")
+    @DisplayName("驗證 RegisterDTO - 輸入合法 - 驗證成功")
     void testValidateRegisterDTO_ValidInput_Success() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -189,7 +190,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當查詢使用者名稱時發生錯誤應拋出例外")
+    @DisplayName("驗證 RegisterDTO - 查詢使用者名稱時發生錯誤 - 拋出例外")
     void testValidateRegisterDTO_UsernameQueryError_ThrowsException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -209,7 +210,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當查詢信箱時發生錯誤應拋出例外")
+    @DisplayName("驗證 RegisterDTO - 查詢信箱時發生錯誤 - 拋出例外")
     void testValidateRegisterDTO_EmailQueryError_ThrowsException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -229,7 +230,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當使用者名稱為空時應拋出 BLANK_FIELD")
+    @DisplayName("驗證 RegisterDTO - 使用者名稱為空 - 拋出 BLANK_FIELD")
     void testValidateRegisterDTO_EmptyUsername_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("");
@@ -248,7 +249,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當密碼為空時應拋出 BLANK_FIELD")
+    @DisplayName("驗證 RegisterDTO - 密碼為空 - 拋出 BLANK_FIELD")
     void testValidateRegisterDTO_EmptyPassword_ThrowsValidationException() {
         RegisterDTO registerDTO = new RegisterDTO();
         registerDTO.setUsername("validUser123");
@@ -269,7 +270,7 @@ class ValidationServiceImplTest {
 
 
     @Test
-    @DisplayName("當重設密碼輸入合法時驗證成功")
+    @DisplayName("驗證 ResetPasswordDTO - 輸入合法 - 驗證成功")
     void testValidateResetPasswordDTO_ValidInput_Success() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setNewPassword("NewPass123");
@@ -281,7 +282,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當 ResetPasswordDTO 為 null 時應拋出 NULL_DTO")
+    @DisplayName("驗證 ResetPasswordDTO - DTO 為 null - 拋出 NULL_DTO")
     void testValidateResetPasswordDTO_DTONull_ThrowsValidationException() {
         Mono<Void> result = validationServiceImplUnderTest.validateResetPasswordDTO(null);
 
@@ -292,7 +293,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當新密碼與確認密碼不一致時應拋出 CONFIRM_PASSWORD_NOT_MATCH")
+    @DisplayName("驗證 ResetPasswordDTO - 新密碼與確認密碼不一致 - 拋出 CONFIRM_PASSWORD_NOT_MATCH")
     void testValidateResetPasswordDTO_PasswordsNotMatch_ThrowsValidationException() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setNewPassword("NewPass123");
@@ -307,7 +308,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當新密碼為回文時應拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    @DisplayName("驗證 ResetPasswordDTO - 新密碼為回文 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
     void testValidateResetPasswordDTO_PasswordIsPalindrome_ThrowsValidationException() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setNewPassword("deked");
@@ -322,7 +323,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當新密碼缺少大寫字母時應拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    @DisplayName("驗證 ResetPasswordDTO - 新密碼缺少大寫字母 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
     void testValidateResetPasswordDTO_PasswordNoUppercase_ThrowsValidationException() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setNewPassword("newpass123");
@@ -337,7 +338,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當新密碼為空時應拋出 BLANK_FIELD")
+    @DisplayName("驗證 ResetPasswordDTO - 新密碼為空 - 拋出 BLANK_FIELD")
     void testValidateResetPasswordDTO_EmptyPassword_ThrowsValidationException() {
         ResetPasswordDTO resetPasswordDTO = new ResetPasswordDTO();
         resetPasswordDTO.setNewPassword("");
@@ -353,7 +354,7 @@ class ValidationServiceImplTest {
 
 
     @Test
-    @DisplayName("當上傳檔案資料合法時驗證成功")
+    @DisplayName("驗證 FileMetadataDTO - 上傳檔案資料合法 - 驗證成功")
     void testValidateFileMetadataDTO_ValidInput_Success() {
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
         fileMetadataDTO.setFilename("document.txt");
@@ -368,7 +369,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當 FileMetadataDTO 為 null 時應拋出 NULL_DTO")
+    @DisplayName("驗證 FileMetadataDTO - DTO 為 null - 拋出 NULL_DTO")
     void testValidateFileMetadataDTO_DTONull_ThrowsValidationException() {
         User user = new User();
         FileMetadataDTO userFileMetadata = null;
@@ -382,7 +383,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當檔案名稱含非法字元時應拋出 INVALID_FILE_NAME")
+    @DisplayName("驗證 FileMetadataDTO - 檔案名稱含非法字元 - 拋出 INVALID_FILE_NAME")
     void testValidateFileMetadataDTO_InvalidFileName_ThrowsValidationException() {
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
         fileMetadataDTO.setFilename("doc/ument.txt");
@@ -401,7 +402,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當檔案名稱過長時應拋出 NAME_TOO_LONG")
+    @DisplayName("驗證 FileMetadataDTO - 檔案名稱過長 - 拋出 NAME_TOO_LONG")
     void testValidateFileMetadataDTO_FileNameTooLong_ThrowsValidationException() {
         String longFileName = "a".repeat(201);
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
@@ -420,7 +421,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當檔案大小超出使用者空間限制時應拋出 STORAGE_LIMIT_EXCEEDED")
+    @DisplayName("驗證 FileMetadataDTO - 檔案大小超出使用者空間限制 - 拋出 STORAGE_LIMIT_EXCEEDED")
     void testValidateFileMetadataDTO_FileSizeExceedsStorageLimit_ThrowsValidationException() {
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
         fileMetadataDTO.setFilename("document.txt");
@@ -439,7 +440,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當檔案名稱長度剛好為上限時驗證成功")
+    @DisplayName("驗證 FileMetadataDTO - 檔案名稱長度剛好為上限 - 驗證成功")
     void testValidateFileMetadataDTO_BorderlineFileNameLength_Success() {
         String borderlineFileName = "a".repeat(196);
         FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
@@ -456,7 +457,7 @@ class ValidationServiceImplTest {
 
 
     @Test
-    @DisplayName("當編輯檔案中繼資料且檔案名稱合法時驗證成功")
+    @DisplayName("驗證 EditFileDTO - 編輯檔案中繼資料且檔案名稱合法 - 驗證成功")
     void testValidateEditFileDTO_EditMetadataValidFile_Success() {
         FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setEditType(EditTypeEnum.EDIT_METADATA);
@@ -468,7 +469,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當編輯資料夾中繼資料且名稱合法時驗證成功")
+    @DisplayName("驗證 EditFileDTO - 編輯資料夾中繼資料且名稱合法 - 驗證成功")
     void testValidateEditFileDTO_EditMetadataValidFolder_Success() {
         FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setEditType(EditTypeEnum.EDIT_METADATA);
@@ -480,7 +481,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當 FileEditDTO 為 null 時應拋出 NULL_DTO")
+    @DisplayName("驗證 EditFileDTO - DTO 為 null - 拋出 NULL_DTO")
     void testValidateEditFileDTO_DTONull_ThrowsValidationException() {
         Mono<Void> result = validationServiceImplUnderTest.validateEditFileDTO(null, false);
 
@@ -491,7 +492,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當編輯類型為 null 時應拋出 REQUEST_IS_INVALID")
+    @DisplayName("驗證 EditFileDTO - 編輯類型為 null - 拋出 REQUEST_IS_INVALID")
     void testValidateEditFileDTO_EditTypeNull_ThrowsValidationException() {
         FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setEditType(null);
@@ -505,7 +506,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當檔案名稱中含非法字元時應拋出 INVALID_FILE_NAME")
+    @DisplayName("驗證 EditFileDTO - 檔案名稱中含非法字元 - 拋出 INVALID_FILE_NAME")
     void testValidateEditFileDTO_EditMetadataInvalidFileName_ThrowsValidationException() {
         FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setEditType(EditTypeEnum.EDIT_METADATA);
@@ -520,7 +521,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當內容超過長度限制時應拋出 FIELD_LENGTH_TOO_LONG")
+    @DisplayName("驗證 EditFileDTO - 內容超過長度限制 - 拋出 FIELD_LENGTH_TOO_LONG")
     void testValidateEditFileDTO_EditContentTooLong_ThrowsValidationException() {
         EditorContentDTO editorContentDTO = new EditorContentDTO();
         EditorContentDTO.DeltaDTO deltaDTO = new EditorContentDTO.DeltaDTO();
@@ -541,7 +542,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當建立歷史記錄時內容與備註合法應驗證成功")
+    @DisplayName("驗證 EditFileDTO - 建立歷史記錄時內容與備註合法 - 驗證成功")
     void testValidateEditFileDTO_BuildHistoryRecordValid_Success() {
         EditorContentDTO editorContentDTO = new EditorContentDTO();
         EditorContentDTO.DeltaDTO deltaDTO = new EditorContentDTO.DeltaDTO();
@@ -559,7 +560,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當建立歷史記錄備註過長時應拋出 FIELD_LENGTH_TOO_LONG")
+    @DisplayName("驗證 EditFileDTO - 建立歷史記錄備註過長 - 拋出 FIELD_LENGTH_TOO_LONG")
     void testValidateEditFileDTO_BuildHistoryRecordNoteTooLong_ThrowsValidationException() {
         EditorContentDTO editorContentDTO = new EditorContentDTO();
         EditorContentDTO.DeltaDTO deltaDTO = new EditorContentDTO.DeltaDTO();
@@ -579,7 +580,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當執行回復歷史紀錄時驗證成功")
+    @DisplayName("驗證 EditFileDTO - 執行回復歷史紀錄 - 驗證成功")
     void testValidateEditFileDTO_RevertHistoryRecord_Success() {
         FileEditDTO fileEditDTO = new FileEditDTO();
         fileEditDTO.setEditType(EditTypeEnum.REVERT_HISTORY_RECORD);
@@ -590,7 +591,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("當編輯內容剛好為長度上限時驗證成功")
+    @DisplayName("驗證 EditFileDTO - 編輯內容剛好為長度上限 - 驗證成功")
     void testValidateEditFileDTO_BorderlineContentLength_Success() {
         EditorContentDTO editorContentDTO = new EditorContentDTO();
         EditorContentDTO.DeltaDTO deltaDTO = new EditorContentDTO.DeltaDTO();
@@ -605,4 +606,3 @@ class ValidationServiceImplTest {
         StepVerifier.create(result).verifyComplete();
     }
 }
-

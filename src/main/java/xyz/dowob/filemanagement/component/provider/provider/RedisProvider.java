@@ -10,6 +10,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
+import xyz.dowob.filemanagement.exception.ProcessException;
 
 import java.time.Duration;
 import java.util.*;
@@ -129,6 +130,7 @@ public class RedisProvider {
      * 根據鍵獲取數據
      *
      * @param key 鍵
+     *
      * @return 查詢到的數據對象
      */
     public Mono<Object> getValue(String key) {
@@ -138,8 +140,9 @@ public class RedisProvider {
     /**
      * 根據鍵獲取數據
      *
-     * @param key 鍵
+     * @param key   鍵
      * @param clazz 類型
+     *
      * @return 查詢到的數據對象
      */
     public <T> Mono<T> getValue(String key, Class<T> clazz) {
@@ -184,6 +187,7 @@ public class RedisProvider {
      *
      * @param key   鍵
      * @param clazz 類型
+     *
      * @return 返回 分頁回應傳輸對象
      */
     @HideOverLength
@@ -207,25 +211,16 @@ public class RedisProvider {
     }
 
     /**
-     * 轉換數據為指定類型的列表
+     * 根據 Hash 的鍵和內部的鍵獲取數據
      *
-     * @param objects 數據
-     * @param clazz   類型
-     * @param <T>     泛型
+     * @param hashKey  Hash 的鍵
+     * @param innerKey Hash 內部的鍵
+     * @param clazz    類型
      *
-     * @return 返回 Flux<T> 對象
+     * @return 返回 Mono<T> 對象
      */
-    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
-        if (!(objects instanceof List<?> list)) {
-            return Flux.empty();
-        }
-        List<T> finalList = list.stream().map(object -> {
-            if (clazz.isInstance(object)) {
-                return clazz.cast(object);
-            }
-            return objectMapper.convertValue(object, clazz);
-        }).toList();
-        return Flux.fromIterable(finalList);
+    public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
+        return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
     }
 
     /**
@@ -323,16 +318,15 @@ public class RedisProvider {
     }
 
     /**
-     * 根據 Hash 的鍵和內部的鍵獲取數據
+     * 取得 Set 中的數據
      *
-     * @param hashKey  Hash 的鍵
-     * @param innerKey Hash 內部的鍵
-     * @param clazz   類型
+     * @param key   鍵
+     * @param clazz 類型
      *
      * @return 返回 Mono<T> 對象
      */
-    public <T> Mono<T> getHashMap(String hashKey, String innerKey, Class<T> clazz) {
-        return redisTemplate.opsForHash().get(hashKey, innerKey).cast(clazz);
+    public <T> Flux<T> getSet(String key, Class<T> clazz) {
+        return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
     }
 
     /**
@@ -535,15 +529,35 @@ public class RedisProvider {
     }
 
     /**
-     * 取得 Set 中的數據
+     * 轉換數據為指定類型的列表
      *
-     * @param key 鍵
-     * @param clazz 類型
+     * @param objects 數據
+     * @param clazz   類型
+     * @param <T>     泛型
      *
-     * @return 返回 Mono<T> 對象
+     * @return 返回 Flux<T> 對象
      */
-    public <T> Flux<T> getSet(String key, Class<T> clazz) {
-        return redisTemplate.opsForSet().members(key).flatMap(object -> convertObjectList(object, clazz));
+    private <T> Flux<T> convertObjectList(Object objects, Class<T> clazz) {
+        if (objects == null) {
+            return Flux.empty();
+        }
+
+        return Flux
+                .defer(() -> {
+                    if ((objects instanceof Collection<?> collection)) {
+                        List<T> finalList = collection.stream().map(object -> {
+                            if (clazz.isInstance(object)) {
+                                return clazz.cast(object);
+                            }
+                            return objectMapper.convertValue(object, clazz);
+                        }).toList();
+                        return Flux.fromIterable(finalList);
+                    }
+                    T convertedObject = clazz.isInstance(objects) ? clazz.cast(objects) : objectMapper.convertValue(objects, clazz);
+                    return Flux.just(convertedObject);
+                })
+                .switchIfEmpty(Flux.empty())
+                .onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.CONVERT_JSON_TO_TARGET_FAILED, e, clazz.getName()));
     }
 
     /**
@@ -600,7 +614,7 @@ public class RedisProvider {
     /**
      * 獲取 List 中的數據
      *
-     * @param key 鍵
+     * @param key   鍵
      * @param clazz 類型
      *
      * @return 返回 Flux<T> 對象
@@ -636,7 +650,7 @@ public class RedisProvider {
     /**
      * 獲取 List 中的數據
      *
-     * @param key 鍵
+     * @param key   鍵
      * @param start 起始序號
      * @param end   結束序號
      * @param clazz 類型
@@ -769,10 +783,6 @@ public class RedisProvider {
     @HideOverLength
     public <T> Mono<PagedResponseDTO<T>> getPagedResponseFromZset(String key, int page, Class<T> clazz) {
         return redisTemplate.opsForZSet().rangeByScore(key, Range.just((double) page)).next().flatMap(obj -> {
-            if (obj == null) {
-                return Mono.empty();
-            }
-
             JavaType type = objectMapper.getTypeFactory().constructParametricType(PagedResponseDTO.class, clazz);
             PagedResponseDTO<T> pagedResponseDTO = objectMapper.convertValue(obj, type);
             return Mono.just(pagedResponseDTO);
