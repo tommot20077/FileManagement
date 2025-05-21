@@ -1,7 +1,7 @@
 package xyz.dowob.filemanagement.unity;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;

@@ -3,7 +3,7 @@ package xyz.dowob.filemanagement.component.filter.requestlimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bucket;
 import jakarta.annotation.PreDestroy;
-import org.jetbrains.annotations.NotNull;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;

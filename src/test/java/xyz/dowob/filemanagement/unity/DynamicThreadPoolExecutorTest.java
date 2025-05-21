@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * DynamicThreadPoolExecutor 的單元測試
  */
+@DisplayName("DynamicThreadPoolExecutor 邏輯處理測試")
 class DynamicThreadPoolExecutorTest {
 
     private static final int QUEUE_CAPACITY = 10;
@@ -42,7 +43,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testGetWorkQueueCapacity_ArrayBlockingQueue_預期返回正確容量")
+    @DisplayName("測試工作隊列容量計算(ArrayBlockingQueue) - 預期返回正確容量")
     void testGetWorkQueueCapacity_ArrayBlockingQueue_ReturnsCorrectCapacity() {
         ArrayBlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         int capacity = DynamicThreadPoolExecutor.getWorkQueueCapacity(queue);
@@ -50,7 +51,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testGetWorkQueueCapacity_LinkedBlockingQueue有界_預期返回正確容量")
+    @DisplayName("測試工作隊列容量計算(有界LinkedBlockingQueue) - 預期返回正確容量")
     void testGetWorkQueueCapacity_BoundedLinkedBlockingQueue_ReturnsCorrectCapacity() {
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
         int capacity = DynamicThreadPoolExecutor.getWorkQueueCapacity(queue);
@@ -58,7 +59,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testGetWorkQueueCapacity_LinkedBlockingQueue無界_預期返回 -1")
+    @DisplayName("測試工作隊列容量計算(無界LinkedBlockingQueue) - 預期返回 -1")
     void testGetWorkQueueCapacity_UnboundedLinkedBlockingQueue_ReturnsNegativeOne() {
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
         int capacity = DynamicThreadPoolExecutor.getWorkQueueCapacity(queue);
@@ -66,7 +67,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testGetWorkQueueCapacity_其他Queue類型_預期返回 -1")
+    @DisplayName("測試工作隊列容量計算(其他Queue類型) - 預期返回 -1")
     void testGetWorkQueueCapacity_OtherQueueType_ReturnsNegativeOne() {
         SynchronousQueue<Runnable> queue = new SynchronousQueue<>();
         int capacity = DynamicThreadPoolExecutor.getWorkQueueCapacity(queue);
@@ -74,7 +75,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testConstructor_正常初始化_預期成功建立執行緒池並允許核心超時")
+    @DisplayName("測試構造函數正常初始化 - 預期成功建立執行緒池並允許核心超時")
     void testConstructor_NormalInitialization_CreatesPoolAndAllowsCoreTimeout() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertNotNull(executor, "執行緒池不應為 null");
@@ -111,31 +112,31 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testConstructor_無效Queue_預期拋出IllegalArgumentException")
-    void testConstructor_NullQueue_ThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
+    @DisplayName("測試構造函數使用空隊列 - 預期拋出NullPointerException")
+    void testConstructor_NullQueue_ThrowsNullPointerException() {
+        assertThrows(NullPointerException.class, () -> {
                          executor = new DynamicThreadPoolExecutor(TEST_CORE_POOL_SIZE, TEST_MAX_POOL_SIZE, KEEP_ALIVE_TIME_MS, MILLISECONDS, null);
-                     }, "使用 null queue 應拋出 IllegalArgumentException"
+                     }, "使用 null queue 應拋出 NullPointerException"
         );
     }
 
     @Test
-    @DisplayName("testConstructor_無效TimeUnit_預期拋出IllegalArgumentException")
-    void testConstructor_NullTimeUnit_ThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
+    @DisplayName("測試構造函數使用空時間單位 - 預期拋出NullPointerException")
+    void testConstructor_NullTimeUnit_ThrowsNullPointerException() {
+        assertThrows(NullPointerException.class, () -> {
                          executor = new DynamicThreadPoolExecutor(TEST_CORE_POOL_SIZE,
                                                                   TEST_MAX_POOL_SIZE,
                                                                   KEEP_ALIVE_TIME_MS,
                                                                   null,
                                                                   new ArrayBlockingQueue<>(QUEUE_CAPACITY)
                          );
-                     }, "使用 null TimeUnit 應拋出 IllegalArgumentException"
+                     }, "使用 null TimeUnit 應拋出 NullPointerException"
         );
     }
 
 
     @Test
-    @DisplayName("testExecute_單一任務_預期任務成功執行")
+    @DisplayName("測試執行單一任務 - 預期任務成功執行")
     void testExecute_SingleTask_ExecutesSuccessfully() throws InterruptedException {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -151,7 +152,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testSubmit_單一任務_預期返回Future且任務成功執行")
+    @DisplayName("測試提交單一任務 - 預期返回Future且任務成功執行")
     void testSubmit_SingleTask_ReturnsFutureAndExecutesSuccessfully() throws ExecutionException, InterruptedException, TimeoutException {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -171,7 +172,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testExecute_多個任務_預期所有任務成功執行")
+    @DisplayName("測試執行多個任務 - 預期所有任務成功執行")
     void testExecute_MultipleTasks_AllExecuteSuccessfully() throws InterruptedException {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY * 2));
         int taskCount = TEST_MAX_POOL_SIZE + QUEUE_CAPACITY;
@@ -196,7 +197,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testExecute_任務拋出異常_預期執行緒池繼續運行")
+    @DisplayName("測試任務拋出異常 - 預期執行緒池繼續運行")
     void testExecute_TaskThrowsException_PoolContinuesRunning() throws InterruptedException {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         CountDownLatch latch1 = new CountDownLatch(1);
@@ -222,12 +223,12 @@ class DynamicThreadPoolExecutorTest {
 
 
     @Test
-    @DisplayName("testAdjustPoolSize_高隊列負載_預期增加線程池大小")
+    @DisplayName("測試調整線程池大小(高隊列負載) - 預期增加線程池大小")
     void testAdjustPoolSize_HighQueueLoad_IncreasesPoolSize() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertEquals(TEST_CORE_POOL_SIZE, executor.getCorePoolSize());
 
-        int tasksToSubmit = TEST_CORE_POOL_SIZE + (int) (QUEUE_CAPACITY * 0.8) + 5;
+        int tasksToSubmit = TEST_CORE_POOL_SIZE + (int) (QUEUE_CAPACITY * 0.8) + 2;
         CountDownLatch taskLatch = new CountDownLatch(tasksToSubmit);
         CountDownLatch startProcessingLatch = new CountDownLatch(TEST_CORE_POOL_SIZE);
 
@@ -270,7 +271,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testAdjustPoolSize_低隊列負載且空閒_預期減少線程池大小")
+    @DisplayName("測試調整線程池大小(低隊列負載且空閒) - 預期減少線程池大小")
     void testAdjustPoolSize_LowQueueLoadAndIdle_DecreasesPoolSize() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertEquals(TEST_CORE_POOL_SIZE, executor.getCorePoolSize());
@@ -310,7 +311,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testAdjustPoolSize_隊列為空且無活動線程_預期核心線程數降至0")
+    @DisplayName("測試調整線程池大小(隊列為空且無活動線程) - 預期核心線程數降至0")
     void testAdjustPoolSize_EmptyQueueAndNoActiveThreads_ReducesCorePoolToZero() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertEquals(TEST_CORE_POOL_SIZE, executor.getCorePoolSize());
@@ -347,7 +348,7 @@ class DynamicThreadPoolExecutorTest {
 
 
     @Test
-    @DisplayName("testAdjustPoolSize_無界隊列_預期線程池大小不因隊列負載調整")
+    @DisplayName("測試調整線程池大小(無界隊列) - 預期線程池大小不因隊列負載調整")
     void testAdjustPoolSize_UnboundedQueue_PoolSizeDoesNotAdjustBasedOnQueue() {
         executor = createExecutorWithTestDefaults(new LinkedBlockingQueue<>());
 
@@ -390,7 +391,7 @@ class DynamicThreadPoolExecutorTest {
 
 
     @Test
-    @DisplayName("testUpdatePriority_設置高優先級_預期調整線程池大小")
+    @DisplayName("測試更新優先級為高優先級 - 預期調整線程池大小")
     void testUpdatePriority_SetHighPriority_AdjustsPoolSize() throws NoSuchFieldException, IllegalAccessException {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         Field minPoolSizeField = DynamicThreadPoolExecutor.class.getDeclaredField("minPoolSize");
@@ -419,7 +420,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_設置低優先級_預期調整線程池大小")
+    @DisplayName("測試更新優先級為低優先級 - 預期調整線程池大小")
     void testUpdatePriority_SetLowPriority_AdjustsPoolSize() throws Exception {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
 
@@ -453,7 +454,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_設置自定義CPU使用率_預期調整線程池大小")
+    @DisplayName("測試更新優先級(自定義CPU使用率) - 預期調整線程池大小")
     void testUpdatePriority_SetCustomCpuUsage_AdjustsPoolSize() throws Exception {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
 
@@ -488,7 +489,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_無效CPU使用率負數_預期拋出IllegalArgumentException")
+    @DisplayName("測試更新優先級(CPU使用率為負數) - 預期拋出IllegalArgumentException")
     void testUpdatePriority_InvalidNegativeCpuUsage_ThrowsIllegalArgumentException() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertThrows(IllegalArgumentException.class, () -> {
@@ -498,7 +499,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_無效CPU使用率大於一_預期拋出IllegalArgumentException")
+    @DisplayName("測試更新優先級(CPU使用率大於1) - 預期拋出IllegalArgumentException")
     void testUpdatePriority_InvalidCpuUsageGreaterThanOne_ThrowsIllegalArgumentException() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         assertThrows(IllegalArgumentException.class, () -> {
@@ -508,7 +509,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_邊界CPU使用率零_預期成功設置")
+    @DisplayName("測試更新優先級(CPU使用率為0) - 預期成功設置")
     void testUpdatePriority_BoundaryCpuUsageZero_SetsSuccessfully() {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
         executor.updatePriority(false, 0.0);
@@ -519,7 +520,7 @@ class DynamicThreadPoolExecutorTest {
     }
 
     @Test
-    @DisplayName("testUpdatePriority_邊界CPU使用率一_預期成功設置")
+    @DisplayName("測試更新優先級(CPU使用率為1) - 預期成功設置")
     void testUpdatePriority_BoundaryCpuUsageOne_SetsSuccessfully() throws Exception {
         executor = createExecutorWithTestDefaults(new ArrayBlockingQueue<>(QUEUE_CAPACITY));
 

@@ -1,8 +1,8 @@
 package xyz.dowob.filemanagement.unity;
 
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.log4j.Log4j2;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import xyz.dowob.filemanagement.component.filter.ClientIpFilter;

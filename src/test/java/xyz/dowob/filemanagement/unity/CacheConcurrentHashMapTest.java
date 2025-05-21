@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * CacheConcurrentHashMap 的單元測試類。
  */
+@DisplayName("CacheConcurrentHashMap 邏輯處理測試")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CacheConcurrentHashMapTest {
 
@@ -54,7 +55,7 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試構造函數：啟用清理功能且清理間隔有效")
+@DisplayName("測試構造函數 - 啟用清理功能且清理間隔有效 - Scheduler 初始化成功")
     void constructor_whenEnableCleanupWithValidInterval_thenSchedulerInitialized() {
         CacheConcurrentHashMap<String, String> cleanupCache = null;
         try {
@@ -68,7 +69,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試構造函數：啟用清理功能但清理間隔無效（<=0）")
+@DisplayName("測試構造函數 - 啟用清理功能但清理間隔無效（<=0） - 拋出 IllegalArgumentException")
     void constructor_whenEnableCleanupWithInvalidInterval_thenThrowException() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                                                               CacheConcurrentHashMap<String, String> cleanupCache = null;
@@ -98,7 +99,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試構造函數：初始容量無效（<=0）")
+@DisplayName("測試構造函數 - 初始容量無效（<=0） - 拋出 IllegalArgumentException")
     void constructor_whenInvalidInitialCapacity_thenThrowException() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                                                               new CacheConcurrentHashMap<>(0, false);
@@ -114,7 +115,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試構造函數：過期時間或最大保留時間無效（<=0）使用預設值")
+    @DisplayName("測試構造函數 - 過期時間或最大保留時間無效（<=0）使用預設值")
     void constructor_whenInvalidDurations_thenUseDefaults() {
         CacheConcurrentHashMap<String, String> testCache = new CacheConcurrentHashMap<>(64,
                                                                                         Duration.ZERO,
@@ -134,14 +135,14 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 set 方法：正常設置鍵值對，使用預設過期時間")
+    @DisplayName("測試 set 方法 - 正常設置鍵值對，使用預設過期時間")
     void set_whenNormalKeyAndValue_thenStoredSuccessfully() {
         cache.set("key1", "value1");
         assertEquals("value1", cache.check("key1"), "設置後應能立即獲取值");
     }
 
     @Test
-    @DisplayName("測試 set 方法：設置 null 鍵")
+    @DisplayName("測試 set 方法 - 設置 null 鍵")
     void set_whenKeyIsNull_thenThrowException() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                                                               cache.set(null, "value");
@@ -151,7 +152,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 set 方法：設置 null 值")
+    @DisplayName("測試 set 方法 - 設置 null 值")
     void set_whenValueIsNull_thenStoredSuccessfully() {
         cache.set("keyNull", null);
         assertNull(cache.check("keyNull"), "設置 null 值後應能獲取 null");
@@ -159,7 +160,7 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 set 方法：使用無效過期時間（<=0）")
+    @DisplayName("測試 set 方法 - 使用無效過期時間（<=0）")
     void set_whenInvalidExpireTime_thenThrowException() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                                                               cache.set("key", "value", Duration.ZERO);
@@ -175,7 +176,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 set 方法：使用無效最大保留時間（<=0）")
+    @DisplayName("測試 set 方法 - 使用無效最大保留時間（<=0）")
     void set_whenInvalidMaxRemainTime_thenThrowException() {
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                                                               cache.set("key", "value", MEDIUM_EXPIRY, Duration.ZERO);
@@ -191,7 +192,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 set 方法：過期時間超過最大保留時間")
+    @DisplayName("測試 set 方法 - 過期時間超過最大保留時間")
     void set_whenExpireTimeExceedsMaxRemain_thenUseMaxRemain() throws InterruptedException {
         cache.set("keyLimited", "valueLimited", LONG_EXPIRY, SHORT_EXPIRY);
         assertEquals("valueLimited", cache.check("keyLimited"), "設置後應能立即獲取值");
@@ -202,7 +203,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 set 方法：重複設置同一個鍵")
+    @DisplayName("測試 set 方法 - 重複設置同一個鍵")
     void set_whenSettingSameKeyMultipleTimes_thenValueIsOverwritten() {
         cache.set("keyRepeat", "value1");
         assertEquals("value1", cache.check("keyRepeat"));
@@ -212,7 +213,7 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 get 方法：獲取存在的鍵，應返回值並刷新過期時間")
+    @DisplayName("測試 get 方法 - 獲取存在的鍵，應返回值並刷新過期時間")
     void get_whenKeyExists_thenReturnValuAndRefreshExpiry() throws InterruptedException {
         cache.set("keyGet", "valueGet", SHORT_EXPIRY);
         assertEquals("valueGet", cache.check("keyGet"), "設置後應能立即獲取值");
@@ -230,13 +231,13 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 get 方法：獲取不存在的鍵")
+    @DisplayName("測試 get 方法 - 獲取不存在的鍵")
     void get_whenKeyDoesNotExist_thenReturnNull() {
         assertNull(cache.get("nonExistentKey"), "獲取不存在的鍵時應返回 null");
     }
 
     @Test
-    @DisplayName("測試 get 方法：獲取已過期的鍵")
+    @DisplayName("測試 get 方法 - 獲取已過期的鍵")
     void get_whenKeyIsExpired_thenReturnNull() throws InterruptedException {
         cache.set("keyExpired", "valueExpired", SHORT_EXPIRY);
         assertEquals("valueExpired", cache.check("keyExpired"));
@@ -248,7 +249,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 get 方法：使用自訂過期時間刷新")
+    @DisplayName("測試 get 方法 - 使用自訂過期時間刷新")
     void get_whenUsingCustomExpiryOnGet_thenRefreshesWithCustomExpiry() throws InterruptedException {
         Duration customRefreshExpiry = Duration.ofSeconds(2);
         cache.set("keyCustomGet", "valueCustomGet", SHORT_EXPIRY);
@@ -268,7 +269,7 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 check 方法：檢查存在的鍵，應返回值且不刷新過期時間")
+    @DisplayName("測試 check 方法 - 檢查存在的鍵，應返回值且不刷新過期時間")
     void check_whenKeyExists_thenReturnValuWithoutRefreshingExpiry() throws InterruptedException {
         cache.set("keyCheck", "valueCheck", SHORT_EXPIRY);
         assertEquals("valueCheck", cache.check("keyCheck"), "check() 應返回值");
@@ -279,13 +280,13 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 check 方法：檢查不存在的鍵")
+    @DisplayName("測試 check 方法 - 檢查不存在的鍵")
     void check_whenKeyDoesNotExist_thenReturnNull() {
         assertNull(cache.check("nonExistentKeyCheck"), "檢查不存在的鍵時應返回 null");
     }
 
     @Test
-    @DisplayName("測試 check 方法：檢查已過期的鍵")
+    @DisplayName("測試 check 方法 - 檢查已過期的鍵")
     void check_whenKeyIsExpired_thenReturnNull() throws InterruptedException {
         cache.set("keyCheckExpired", "valueCheckExpired", SHORT_EXPIRY);
         assertEquals("valueCheckExpired", cache.check("keyCheckExpired"));
@@ -297,20 +298,20 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 checkOrDefault 方法：檢查存在的鍵")
+    @DisplayName("測試 checkOrDefault 方法 - 檢查存在的鍵")
     void checkOrDefault_whenKeyExists_thenReturnActualValue() {
         cache.set("keyCheckDef", "actualValue");
         assertEquals("actualValue", cache.checkOrDefault("keyCheckDef", "defaultValue"), "存在時應返回實際值");
     }
 
     @Test
-    @DisplayName("測試 checkOrDefault 方法：檢查不存在的鍵")
+    @DisplayName("測試 checkOrDefault 方法 - 檢查不存在的鍵")
     void checkOrDefault_whenKeyDoesNotExist_thenReturnDefaultValue() {
         assertEquals("defaultValue", cache.checkOrDefault("nonExistentCheckDef", "defaultValue"), "不存在時應返回預設值");
     }
 
     @Test
-    @DisplayName("測試 checkOrDefault 方法：檢查已過期的鍵")
+    @DisplayName("測試 checkOrDefault 方法 - 檢查已過期的鍵")
     void checkOrDefault_whenKeyIsExpired_thenReturnDefaultValue() throws InterruptedException {
         cache.set("keyCheckDefExpired", "actualValue", SHORT_EXPIRY);
         assertEquals("actualValue", cache.check("keyCheckDefExpired"));
@@ -322,7 +323,7 @@ class CacheConcurrentHashMapTest {
 
 
     @Test
-    @DisplayName("測試 remove 方法：移除存在的鍵")
+    @DisplayName("測試 remove 方法 - 移除存在的鍵")
     void remove_whenKeyExists_thenRemovesSuccessfully() {
         cache.set("keyRemove", "valueRemove");
         assertEquals("valueRemove", cache.check("keyRemove"));
@@ -331,7 +332,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 remove 方法：移除不存在的鍵")
+    @DisplayName("測試 remove 方法 - 移除不存在的鍵")
     void remove_whenKeyDoesNotExist_thenDoesNothing() {
         assertNull(cache.check("nonExistentRemove"));
         assertDoesNotThrow(() -> cache.remove("nonExistentRemove"), "移除不存在的鍵不應拋出異常");
@@ -339,7 +340,7 @@ class CacheConcurrentHashMapTest {
     }
 
     @Test
-    @DisplayName("測試 remove 方法：移除 null 鍵")
+    @DisplayName("測試 remove 方法 - 移除 null 鍵")
     void remove_whenKeyIsNull_thenThrowsException() {
         assertThrows(NullPointerException.class, () -> {
                                                           cache.remove(null);

@@ -5,13 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-@DisplayName("FileManagementApplication 測試")
+@DisplayName("FileManagementApplication 邏輯處理測試")
 class FileManagementApplicationTests {
 
     @Test
-    @DisplayName("上下文加載測試")
+    @DisplayName("上下文加載測試 - 成功加載")
     void contextLoads() {
     }
 
 }
-

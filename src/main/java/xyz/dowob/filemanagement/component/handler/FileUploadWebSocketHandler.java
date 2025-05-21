@@ -147,22 +147,28 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     }
 
     /**
-     * 將 JSON 資料轉換為指定類型的物件
-     * 當 JSON 資料無法轉換時，返回空的 Optional
+     * 處理分塊上傳任務，解析 JSON 資料並將交給檔案服務進行處理
+     * 最後返回上傳結果的響應
      *
-     * @param node  JSON 資料
-     * @param clazz 類型
-     * @param <T>   類型
+     * @param session  WebSocket 會話
+     * @param jsonNode JSON 資料
      *
-     * @return Optional<T> 轉換後的 Optional 物件
+     * @return Mono<Void>
      */
-    @SkipRecord
-    private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
-        try {
-            return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
-        } catch (JsonProcessingException e) {
-            return Optional.empty();
-        }
+    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
+        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
+        return uploadChunkDTO
+                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
+                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
+                    String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
+                    response.setMessage(message);
+                    return sendMessage(session, response);
+                }))
+                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
+                .onErrorResume(Exception.class, e -> {
+                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
+                    return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
+                });
     }
 
     /**
@@ -213,28 +219,22 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     }
 
     /**
-     * 處理分塊上傳任務，解析 JSON 資料並將交給檔案服務進行處理
-     * 最後返回上傳結果的響應
+     * 將 JSON 資料轉換為指定類型的物件
+     * 當 JSON 資料無法轉換時，返回空的 Optional
      *
-     * @param session  WebSocket 會話
-     * @param jsonNode JSON 資料
+     * @param node  JSON 資料
+     * @param clazz 類型
+     * @param <T>   類型
      *
-     * @return Mono<Void>
+     * @return Optional<T> 轉換後的 Optional 物件
      */
-    private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
-        Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
-        return uploadChunkDTO
-                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                    String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
-                    response.setMessage(message);
-                    return sendMessage(session, response);
-                }))
-                .orElseGet(() -> Mono.error(new ValidationException(ValidationException.ErrorCode.REQUEST_IS_INVALID, "data")))
-                .onErrorResume(Exception.class, e -> {
-                    String errorMessage = String.format("分塊上傳失敗: %s", e.getMessage());
-                    return sendMessage(session, createApiResponse(session.getHandshakeInfo().getUri().getPath(), 400, errorMessage, null));
-                });
+    @SkipRecord
+    private <T> Optional<T> convertJsonToObject(JsonNode node, Class<T> clazz) {
+        try {
+            return Optional.ofNullable(objectMapper.treeToValue(node, clazz));
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
     }
 
     /**

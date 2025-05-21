@@ -287,28 +287,6 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 根據ID獲取一個實體
-     *
-     * @param userId 實體ID
-     *
-     * @return 返回一個Optional對象
-     */
-    private Mono<User> getByIdWithDB(Long userId) {
-        return userRepository.findById(userId);
-    }
-
-    /**
-     * 此方法之後為CrudService接口中的方法實現
-     * 創建一個新的實體
-     *
-     * @return 返回一個新的實體對象
-     */
-    @Override
-    public Mono<User> create() {
-        return Mono.empty();
-    }
-
-    /**
      * 根據用戶ID獲取用戶對象
      * 如果用戶ID為null，則返回錯誤
      * 如果用戶ID為0，則返回遊客用戶對象
@@ -336,6 +314,17 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 此方法之後為CrudService接口中的方法實現
+     * 創建一個新的實體
+     *
+     * @return 返回一個新的實體對象
+     */
+    @Override
+    public Mono<User> create() {
+        return Mono.empty();
+    }
+
+    /**
      * 獲取所有實體
      */
 
@@ -345,7 +334,6 @@ public class UserServiceImpl implements UserService {
     public Flux<User> getAll() {
         return userRepository.findAll();
     }
-
 
     /**
      * 根據參數獲取所有實體
@@ -357,8 +345,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Flux<User> getAllByParams(String type, Object... args) {
-
-
         if (args == null || args.length == 0) {
             return Flux.error(new ValidationException(ValidationException.ErrorCode.SEARCH_CRITERIA_EMPTY));
         }
@@ -380,28 +366,26 @@ public class UserServiceImpl implements UserService {
             userInfoList.remove(userType);
         });
 
-
         if (userInfoList.isEmpty()) {
             return cacheUserFlux;
         }
 
-
         Flux<User> userRepositoryChooseFlux;
         if (isId) {
-            List<Long> validIds = userInfoList.stream().filter(id -> id != null && id.matches("\\d+"))
-
-                                              .map(Long::parseLong).collect(Collectors.toList());
-
-
+            List<Long> validIds = userInfoList
+                    .stream()
+                    .filter(id -> id != null && id.matches("\\d+"))
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
             if (validIds.isEmpty()) {
                 return Flux.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "提供的ID均無效"));
             }
             userRepositoryChooseFlux = userRepository.findAllByIdIn(validIds);
         } else {
-            List<String> validUsernames = userInfoList.stream().filter(username -> username != null && !username.trim().isEmpty())
-
-                                                      .collect(Collectors.toList());
-
+            List<String> validUsernames = userInfoList
+                    .stream()
+                    .filter(username -> username != null && !username.trim().isEmpty())
+                    .collect(Collectors.toList());
 
             if (validUsernames.isEmpty()) {
                 return Flux.error(new ValidationException(ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA, "提供的使用者名稱均無效"));
@@ -409,18 +393,24 @@ public class UserServiceImpl implements UserService {
             userRepositoryChooseFlux = userRepository.findAllByUsernameIn(validUsernames);
         }
 
-
         Flux<User> userRepositoryFlux = cacheManager.runAndSetCache(userInfoList,
-
-
                                                                     User.class,
                                                                     CacheProviderEnum.USER_CACHE,
                                                                     userRepositoryChooseFlux,
                                                                     List.of(USER_ID_CACHE_RULE, USERNAME_CACHE_RULE)
         );
-
-
         return cacheUserFlux.concatWith(userRepositoryFlux);
+    }
+
+    /**
+     * 根據ID獲取一個實體
+     *
+     * @param userId 實體ID
+     *
+     * @return 返回一個Optional對象
+     */
+    private Mono<User> getByIdWithDB(Long userId) {
+        return userRepository.findById(userId);
     }
 
 

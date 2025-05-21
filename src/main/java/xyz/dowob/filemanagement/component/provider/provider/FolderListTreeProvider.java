@@ -157,7 +157,7 @@ public class FolderListTreeProvider {
      * @param userFileMetadata 資料夾元數據
      * @param editDTO          文件編輯DTO
      */
-    public void updateFolder(Long userId, UserFileMetadata userFileMetadata, FileEditDTO editDTO) throws ValidationException {
+    public void updateFolder(Long userId, UserFileMetadata userFileMetadata, FileEditDTO editDTO) throws ValidationException, ProcessException {
         boolean isMoveFolder = !Objects.equals(editDTO.getParentFolderId(), userFileMetadata.getParentFolderId());
         FolderTree folderTree = userFileListTree.get(userId);
         if (folderTree != null) {
@@ -360,7 +360,7 @@ public class FolderListTreeProvider {
             }
 
             parentFolderId = Objects.requireNonNullElse(parentFolderId, 0L);
-            if (hasCircularReference(parentFolderId)) {
+            if (hasCircularReference(parentFolderId, folderId)) {
                 throw new ProcessException(ProcessException.ErrorCode.FOLDER_TREE_EXISTING_CYCLE);
             }
 
@@ -387,63 +387,32 @@ public class FolderListTreeProvider {
             }
         }
 
-
         /**
-         * 更新資料夾樹
+         * 檢查是否存在循環引用
          *
-         * @param isFolder     是否為資料夾
-         * @param folderId     資料夾ID
-         * @param filename     資料夾名稱
-         * @param newParentId  新的父資料夾ID
-         * @param isMoveFolder 是否移動資料夾
+         * @param newParentId     移動或新增的父資料夾ID
+         * @param currentFolderId 當前資料夾ID
          *
-         * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
+         * @return 是否存在循環引用
          */
-        private void updateFolder(Boolean isFolder, Long folderId, String filename, Long newParentId, boolean isMoveFolder) throws ValidationException {
-            FolderNode node = folderMap.get(folderId);
-            if (node == null || !isFolder) {
-                return;
-            }
-
-            if (!isMoveFolder) {
-                node.setName(filename);
-                return;
-            }
-
+        private boolean hasCircularReference(Long newParentId, Long currentFolderId) {
+            Set<Long> visited = new HashSet<>();
             newParentId = Objects.requireNonNullElse(newParentId, 0L);
-            FolderNode newParent = folderMap.get(newParentId);
+            currentFolderId = Objects.requireNonNullElse(currentFolderId, 0L);
+            visited.add(currentFolderId);
 
-            if (newParent != null) {
-                int potentialDepth = newParent.getCurrentDepth() + 1 + node.getMaxSubTreeDepth();
-                if (maxFolderDepthLimit > 0 && potentialDepth > maxFolderDepthLimit) {
-                    throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, potentialDepth);
+            long currentId = newParentId;
+            while (currentId != 0L) {
+                if (!visited.add(currentId)) {
+                    return true;
                 }
-            }
-
-            node.setName(filename);
-
-            if (node.getChildren() != null) {
-                for (FolderNode child : node.getChildren().values()) {
-                    child.setParentFolder(node);
+                FolderNode parent = folderMap.get(currentId);
+                if (parent == null) {
+                    return false;
                 }
+                currentId = parent.getParentFolder() != null ? parent.getParentFolder().getFolderId() : 0L;
             }
-
-            FolderNode oldParent = node.getParentFolder();
-            if (oldParent != null) {
-                oldParent.getChildren().remove(folderId);
-            }
-
-            if (newParent != null) {
-                linkNodes(newParent, node);
-            } else {
-                pendingNodes.computeIfAbsent(newParentId, k -> new ArrayList<>()).add(node);
-            }
-
-            List<FolderNode> children = pendingNodes.remove(node.getFolderId());
-            if (children != null) {
-                children.forEach(child -> linkNodes(node, child));
-            }
-            threadPoolExecutor.submit(() -> synchronizeTree(node));
+            return false;
         }
 
 
@@ -527,28 +496,66 @@ public class FolderListTreeProvider {
             }
         }
 
-
         /**
-         * 檢查是否存在循環引用
+         * 更新資料夾樹
          *
-         * @param parentId 父資料夾ID
+         * @param isFolder     是否為資料夾
+         * @param folderId     資料夾ID
+         * @param filename     資料夾名稱
+         * @param newParentId  新的父資料夾ID
+         * @param isMoveFolder 是否移動資料夾
          *
-         * @return 是否存在循環引用
+         * @throws ValidationException 當資料夾深度超過最大深度時，拋出此異常
          */
-        private boolean hasCircularReference(long parentId) {
-            Set<Long> visited = new HashSet<>();
-            long currentId = parentId;
-            while (currentId != 0L) {
-                if (!visited.add(currentId)) {
-                    return true;
-                }
-                FolderNode parent = folderMap.get(currentId);
-                if (parent == null) {
-                    return false;
-                }
-                currentId = parent.getParentFolder() != null ? parent.getParentFolder().getFolderId() : 0L;
+        private void updateFolder(Boolean isFolder, Long folderId, String filename, Long newParentId, boolean isMoveFolder) throws ValidationException, ProcessException {
+            FolderNode node = folderMap.get(folderId);
+            if (node == null || !isFolder) {
+                return;
             }
-            return false;
+
+            if (!isMoveFolder) {
+                node.setName(filename);
+                return;
+            }
+
+            newParentId = Objects.requireNonNullElse(newParentId, 0L);
+            FolderNode newParent = folderMap.get(newParentId);
+
+            if (newParent != null) {
+                if (hasCircularReference(newParent.getFolderId(), folderId)) {
+                    throw new ProcessException(ProcessException.ErrorCode.FOLDER_TREE_EXISTING_CYCLE);
+                }
+
+                int potentialDepth = newParent.getCurrentDepth() + 1 + node.getMaxSubTreeDepth();
+                if (maxFolderDepthLimit > 0 && potentialDepth > maxFolderDepthLimit) {
+                    throw new ValidationException(ValidationException.ErrorCode.EXCEED_MAX_FOLDER_DEPTH, maxFolderDepthLimit, potentialDepth);
+                }
+            }
+
+            node.setName(filename);
+
+            if (node.getChildren() != null) {
+                for (FolderNode child : node.getChildren().values()) {
+                    child.setParentFolder(node);
+                }
+            }
+
+            FolderNode oldParent = node.getParentFolder();
+            if (oldParent != null) {
+                oldParent.getChildren().remove(folderId);
+            }
+
+            if (newParent != null) {
+                linkNodes(newParent, node);
+            } else {
+                pendingNodes.computeIfAbsent(newParentId, k -> new ArrayList<>()).add(node);
+            }
+
+            List<FolderNode> children = pendingNodes.remove(node.getFolderId());
+            if (children != null) {
+                children.forEach(child -> linkNodes(node, child));
+            }
+            threadPoolExecutor.submit(() -> synchronizeTree(node));
         }
 
 

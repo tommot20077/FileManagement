@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.component.provider.factory.config.ConvertConfig;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
+import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.po.QuillContentPO;
 import xyz.dowob.filemanagement.exception.ProcessException;
@@ -97,6 +98,26 @@ public class WordConvertProvider implements ContentConvertProvider {
             DataBufferRecord dataBufferRecord = new DataBufferRecord(Flux.just(dataBuffer), size);
             return Mono.just(dataBufferRecord);
         });
+    }
+
+    /**
+     * 獲取轉換器類型
+     *
+     * @return 轉換器類型
+     */
+    @Override
+    public ConvertProviderEnum getType() {
+        return ConvertProviderEnum.DOCX;
+    }
+
+    /**
+     * 獲取轉換設定
+     *
+     * @return 轉換設定
+     */
+    @Override
+    public ConvertConfig getConvertConfig() {
+        return this.config;
     }
 
     /**
@@ -498,38 +519,34 @@ public class WordConvertProvider implements ContentConvertProvider {
     }
 
     /**
-     * 清除段落的列表編號
-     * 當前段落為空且當前段落的列表類型不為 null 時，則清除列表編號
+     * 解析標題級別，將屬性轉換為標題級別
+     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新標題級別
      *
-     * @param state            當前的格式化狀態
-     * @param currentParagraph 當前的段落
+     * @param headerAttr 當前操作的屬性
+     *
+     * @return int 當前的標題級別
      */
-    private void cleanNumPr(FormattingState state, XWPFParagraph currentParagraph) {
-        boolean lastParaIsEmpty = currentParagraph.getRuns().isEmpty() && currentParagraph.getText().isEmpty();
-        if (lastParaIsEmpty && state.listType != null) {
-            CTPPr ppr = currentParagraph.getCTP().getPPr();
-            if (ppr != null && ppr.getNumPr() != null) {
-                if (ppr.getNumPr().isSetNumId() || ppr.getNumPr().isSetIlvl()) {
-                    ppr.unsetNumPr();
-                }
-            }
+    private int parseHeader(Object headerAttr) {
+        if (headerAttr instanceof Number number) {
+            int level = number.intValue();
+            return Math.max(0, Math.min(level, 6));
         }
+        return 0;
     }
 
     /**
-     * 確保十六進制顏色的安全性，將顏色轉換為十六進制顏色
-     * 根據顏色進行檢查，如果當前的顏色不為 null，則轉換為十六進制顏色
+     * 解析段落縮進級別，將屬性轉換為段落縮進級別
+     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落縮進級別
      *
-     * @param hex      當前的顏色
-     * @param fallback 預設的顏色
+     * @param indentAttr 當前操作的屬性
      *
-     * @return String 當前的十六進制顏色
+     * @return int 當前的段落縮進級別
      */
-    private String safeHexColor(String hex, String fallback) {
-        if (hex != null && hex.startsWith("#") && hex.length() == 7) {
-            return hex.substring(1);
+    private int parseIndent(Object indentAttr) {
+        if (indentAttr instanceof Number number) {
+            return Math.max(0, number.intValue());
         }
-        return fallback;
+        return 0;
     }
 
     /**
@@ -647,34 +664,38 @@ public class WordConvertProvider implements ContentConvertProvider {
     }
 
     /**
-     * 解析標題級別，將屬性轉換為標題級別
-     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新標題級別
+     * 清除段落的列表編號
+     * 當前段落為空且當前段落的列表類型不為 null 時，則清除列表編號
      *
-     * @param headerAttr 當前操作的屬性
-     *
-     * @return int 當前的標題級別
+     * @param state            當前的格式化狀態
+     * @param currentParagraph 當前的段落
      */
-    private int parseHeader(Object headerAttr) {
-        if (headerAttr instanceof Number number) {
-            int level = number.intValue();
-            return Math.max(0, Math.min(level, 6));
+    private void cleanNumPr(FormattingState state, XWPFParagraph currentParagraph) {
+        boolean lastParaIsEmpty = currentParagraph.getRuns().isEmpty() && currentParagraph.getText().isEmpty();
+        if (lastParaIsEmpty && state.listType != null) {
+            CTPPr ppr = currentParagraph.getCTP().getPPr();
+            if (ppr != null && ppr.getNumPr() != null) {
+                if (ppr.getNumPr().isSetNumId() || ppr.getNumPr().isSetIlvl()) {
+                    ppr.unsetNumPr();
+                }
+            }
         }
-        return 0;
     }
 
     /**
-     * 解析段落縮進級別，將屬性轉換為段落縮進級別
-     * 根據屬性進行檢查，如果當前的屬性不為 null，則更新段落縮進級別
+     * 確保十六進制顏色的安全性，將顏色轉換為十六進制顏色
+     * 根據顏色進行檢查，如果當前的顏色不為 null，則轉換為十六進制顏色
      *
-     * @param indentAttr 當前操作的屬性
+     * @param hex      當前的顏色
+     * @param fallback 預設的顏色
      *
-     * @return int 當前的段落縮進級別
+     * @return String 當前的十六進制顏色
      */
-    private int parseIndent(Object indentAttr) {
-        if (indentAttr instanceof Number number) {
-            return Math.max(0, number.intValue());
+    private String safeHexColor(String hex, String fallback) {
+        if (hex != null && hex.startsWith("#") && hex.length() == 7) {
+            return hex.substring(1);
         }
-        return 0;
+        return fallback;
     }
 
     /**

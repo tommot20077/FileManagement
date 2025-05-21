@@ -1,9 +1,11 @@
 package xyz.dowob.filemanagement.service.serviceInterface;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import jakarta.annotation.PostConstruct;
@@ -346,27 +348,6 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 過濾所需的檔案元素並分頁
-     *
-     * @param list 檔案列表
-     *
-     * @return Mono<PagedResponseDTO < UserFileListDTO>> 檔案總數和分頁後的檔案列表
-     */
-    private Mono<PagedResponseDTO<UserFileListDTO>> filterAndPageResponse(List<UserFileListDTO> list, FileFilterDTO fileFilterDTO) {
-        return filterPageElements(Flux.fromIterable(list), fileFilterDTO).flatMap(tuple -> {
-            int pageSize = fileFilterDTO.getPageSize();
-            int currentPage = fileFilterDTO.getPage();
-            PagedResponseDTO<UserFileListDTO> pagedResponseDTO = new PagedResponseDTO<>();
-            pagedResponseDTO.setData(tuple.getT2());
-            pagedResponseDTO.setTotalElements(tuple.getT1());
-            pagedResponseDTO.setPageSize(pageSize);
-            pagedResponseDTO.setCurrentPage(currentPage);
-            pagedResponseDTO.setTotalPages((int) Math.ceil((double) tuple.getT1() / pageSize));
-            return Mono.just(pagedResponseDTO);
-        });
-    }
-
-    /**
      * 格式化用戶文件元數據為列表DTO
      * 此方法會批量獲取服務器文件元數據並將其與用戶文件元數據進行合併成UserFileListDTO
      *
@@ -390,30 +371,6 @@ public abstract class AbstractFileService implements FileService {
                             }
                             return new UserFileListDTO(serverFileMetadata, userFileMetadata, shareUserMap.get(userFileMetadata.getId()));
                         }));
-    }
-
-    /**
-     * 過濾所需的檔案元素並分頁
-     *
-     * @param flux<UserFileListDTO> 檔案列表流
-     * @param fileFilterDTO         文件過濾DTO
-     *
-     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
-     */
-    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
-        List<FileEnum> type = fileFilterDTO.getTypes();
-        int currentPage = fileFilterDTO.getPage();
-        int pageSize = fileFilterDTO.getPageSize();
-        if (type != null && !type.isEmpty()) {
-            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
-        }
-        return flux.collectList().map(list -> {
-            int size = list.size();
-            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
-            int end = Math.min(start + pageSize, size);
-            List<UserFileListDTO> subList = list.subList(start, end);
-            return Tuples.of(size, subList);
-        });
     }
 
     /**
@@ -463,6 +420,51 @@ public abstract class AbstractFileService implements FileService {
     public Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
         Flux<UserFileMetadata> fileMetadataFlux = userFileMetaRepository.findAllByUserIdAndFilterDTO(user.getId(), fileFilterDTO, entityOperations);
         return formatUserFileMetaToListDto(fileMetadataFlux).collectList().flatMap(dbList -> filterAndPageResponse(dbList, fileFilterDTO));
+    }
+
+    /**
+     * 過濾所需的檔案元素並分頁
+     *
+     * @param list 檔案列表
+     *
+     * @return Mono<PagedResponseDTO < UserFileListDTO>> 檔案總數和分頁後的檔案列表
+     */
+    private Mono<PagedResponseDTO<UserFileListDTO>> filterAndPageResponse(List<UserFileListDTO> list, FileFilterDTO fileFilterDTO) {
+        return filterPageElements(Flux.fromIterable(list), fileFilterDTO).flatMap(tuple -> {
+            int pageSize = fileFilterDTO.getPageSize();
+            int currentPage = fileFilterDTO.getPage();
+            PagedResponseDTO<UserFileListDTO> pagedResponseDTO = new PagedResponseDTO<>();
+            pagedResponseDTO.setData(tuple.getT2());
+            pagedResponseDTO.setTotalElements(tuple.getT1());
+            pagedResponseDTO.setPageSize(pageSize);
+            pagedResponseDTO.setCurrentPage(currentPage);
+            pagedResponseDTO.setTotalPages((int) Math.ceil((double) tuple.getT1() / pageSize));
+            return Mono.just(pagedResponseDTO);
+        });
+    }
+
+    /**
+     * 過濾所需的檔案元素並分頁
+     *
+     * @param flux<UserFileListDTO> 檔案列表流
+     * @param fileFilterDTO         文件過濾DTO
+     *
+     * @return Mono<Tuple2 < Integer, List < UserFileListDTO>>> 檔案總數和分頁後的檔案列表
+     */
+    private Mono<Tuple2<Integer, List<UserFileListDTO>>> filterPageElements(Flux<UserFileListDTO> flux, FileFilterDTO fileFilterDTO) {
+        List<FileEnum> type = fileFilterDTO.getTypes();
+        int currentPage = fileFilterDTO.getPage();
+        int pageSize = fileFilterDTO.getPageSize();
+        if (type != null && !type.isEmpty()) {
+            flux = flux.filter(userFileListDTO -> type.contains(userFileListDTO.getFileType()));
+        }
+        return flux.collectList().map(list -> {
+            int size = list.size();
+            int start = Math.min(Math.max((currentPage - 1), 0) * pageSize, size);
+            int end = Math.min(start + pageSize, size);
+            List<UserFileListDTO> subList = list.subList(start, end);
+            return Tuples.of(size, subList);
+        });
     }
 
     /**
@@ -641,52 +643,6 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
-     * 處理檔案元數據的共享用戶的變更方法
-     *
-     * @param userFileMetadatas 用戶檔案元數據
-     * @param fileEditDTO       檔案編輯DTO
-     *
-     * @return Flux<UserFileMetadata> 處理後的用戶檔案元數據
-     */
-    protected Flux<UserFileMetadata> processShareUser(Collection<UserFileMetadata> userFileMetadatas, FileEditDTO fileEditDTO) {
-        List<UserFileShareRecord> removeRecords = new ArrayList<>();
-        List<UserFileShareRecord> editRecords = new ArrayList<>();
-        return Flux.fromIterable(userFileMetadatas).flatMap(userFileMetadata -> {
-            Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO
-                    .getShareUsers()
-                    .stream()
-                    .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
-            if (editUsers.isEmpty()) {
-                return Mono.just(userFileMetadata);
-            }
-
-            return userFIleShareRecordRepository.findAllByUserIdInAndFileId(editUsers.keySet(), userFileMetadata.getId()).flatMap(record -> {
-                ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
-                switch (editType) {
-                    case REMOVE -> removeRecords.add(record);
-                    case UPDATE -> editRecords.add(record);
-                }
-                return Mono.just(userFileMetadata);
-            }).then(Mono.defer(() -> {
-                if (!editUsers.isEmpty()) {
-                    editUsers.forEach((userId, editType) -> {
-                        UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
-                        editRecords.add(record);
-                    });
-                }
-                return Mono.just(userFileMetadata);
-            }));
-        }).collectList().flatMapMany(metadataList -> {
-            if (removeRecords.isEmpty() && editRecords.isEmpty()) {
-                return Flux.fromIterable(metadataList);
-            }
-            return Mono
-                    .when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
-                    .thenMany(Flux.fromIterable(metadataList));
-        });
-    }
-
-    /**
      * 更新文件擁有者的共通實現
      * 若文件只有一個擁有者，則將文件的擁有者列表中移除用戶ID
      *
@@ -745,72 +701,6 @@ public abstract class AbstractFileService implements FileService {
                 .map(serverFileMetadata -> serverFileMetadata.getFileSize() * serverFileIdMap.get(serverFileMetadata.getId()))
                 .reduce(0L, Long::sum)
                 .flatMap(totalSize -> handleUserStorage(user, totalSize, true));
-    }
-
-    /**
-     * 獲取標頭中的範圍，若無則返回文件大小的範圍
-     *
-     * @param rangeHeader 範圍標頭
-     * @param fileSize    文件大小
-     *
-     * @return 返回範圍數組
-     */
-    @SkipRecord
-    private long[] getRangeFromHeader(String rangeHeader, long fileSize) {
-        long start = 0;
-        long end = -1;
-        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
-            String[] ranges = rangeHeader.replace("bytes=", "").split("-");
-            start = Long.parseLong(ranges[0]);
-            if (ranges.length > 1 && !ranges[1].isEmpty() && ranges[1].matches("\\d+")) {
-                long endRange = Long.parseLong(ranges[1]);
-                end = endRange < fileSize ? endRange : -1;
-            }
-        }
-        return new long[]{start, end};
-    }
-
-    /**
-     * 更新用戶文件元數據的MimeType
-     * 此為版本補丁方法，用於補全舊版本的文件元數據數據
-     *
-     * @param serverFileMetadata 服務器文件元數據
-     * @param fileDataBO         用戶文件數據
-     *
-     * @return Mono<UserFileDataBO> 更新後的用戶文件數據
-     */
-    protected Mono<UserFileDataBO> updateUserFileMetaMimeType(ServerFileMetadata serverFileMetadata, UserFileDataBO fileDataBO) {
-        if (serverFileMetadata.getMimeType() != null) {
-            return Mono.just(fileDataBO);
-        }
-        return FileEnum.getMediaType(fileDataBO.getDataBufferFlux(), fileDataBO.getFilename()).flatMap(record -> {
-            serverFileMetadata.setMimeType(record.mimeType());
-            serverFileMetadata.setLastAccessTime(LocalDateTime.now());
-
-            fileDataBO.setDataBufferFlux(record.dataBufferFlux());
-            fileDataBO.setMimeType(record.mimeType());
-            return serverFileMetaRepository.save(serverFileMetadata).subscribeOn(Schedulers.boundedElastic()).thenReturn(fileDataBO);
-        });
-    }
-
-    /**
-     * 將檔案輸入流轉換為數據流
-     *
-     * @param dataBufferFlux 文件輸入流
-     * @param start          開始位置
-     * @param end            結束位置
-     *
-     * @return 返回數據流
-     */
-    @SkipRecord
-    protected Flux<DataBuffer> streamFileFromGridFS(Flux<DataBuffer> dataBufferFlux, long start, long end) {
-        return Flux.defer(() -> {
-            Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferFlux, start);
-            if (end == -1L || end == Long.MAX_VALUE) {
-                return skippedFlux;
-            }
-            return DataBufferUtils.takeUntilByteCount(skippedFlux, end - start + 1);
-        });
     }
 
     /**
@@ -919,6 +809,118 @@ public abstract class AbstractFileService implements FileService {
     }
 
     /**
+     * 處理檔案元數據的共享用戶的變更方法
+     *
+     * @param userFileMetadatas 用戶檔案元數據
+     * @param fileEditDTO       檔案編輯DTO
+     *
+     * @return Flux<UserFileMetadata> 處理後的用戶檔案元數據
+     */
+    protected Flux<UserFileMetadata> processShareUser(Collection<UserFileMetadata> userFileMetadatas, FileEditDTO fileEditDTO) {
+        List<UserFileShareRecord> removeRecords = new ArrayList<>();
+        List<UserFileShareRecord> editRecords = new ArrayList<>();
+        return Flux.fromIterable(userFileMetadatas).flatMap(userFileMetadata -> {
+            Map<Long, ShareUserEditPO.EditTypeEnum> editUsers = fileEditDTO
+                    .getShareUsers()
+                    .stream()
+                    .collect(Collectors.toMap(ShareUserEditPO::getUserId, ShareUserEditPO::getEditType));
+            if (editUsers.isEmpty()) {
+                return Mono.just(userFileMetadata);
+            }
+
+            return userFIleShareRecordRepository.findAllByUserIdInAndFileId(editUsers.keySet(), userFileMetadata.getId()).flatMap(record -> {
+                ShareUserEditPO.EditTypeEnum editType = editUsers.remove(record.getUserId());
+                switch (editType) {
+                    case REMOVE -> removeRecords.add(record);
+                    case UPDATE -> editRecords.add(record);
+                }
+                return Mono.just(userFileMetadata);
+            }).then(Mono.defer(() -> {
+                if (!editUsers.isEmpty()) {
+                    editUsers.forEach((userId, editType) -> {
+                        UserFileShareRecord record = new UserFileShareRecord(userId, userFileMetadata.getId());
+                        editRecords.add(record);
+                    });
+                }
+                return Mono.just(userFileMetadata);
+            }));
+        }).collectList().flatMapMany(metadataList -> {
+            if (removeRecords.isEmpty() && editRecords.isEmpty()) {
+                return Flux.fromIterable(metadataList);
+            }
+            return Mono
+                    .when(userFIleShareRecordRepository.deleteAll(removeRecords), userFIleShareRecordRepository.saveAll(editRecords))
+                    .thenMany(Flux.fromIterable(metadataList));
+        });
+    }
+
+    /**
+     * 獲取標頭中的範圍，若無則返回文件大小的範圍
+     *
+     * @param rangeHeader 範圍標頭
+     * @param fileSize    文件大小
+     *
+     * @return 返回範圍數組
+     */
+    @SkipRecord
+    private long[] getRangeFromHeader(String rangeHeader, long fileSize) {
+        long start = 0;
+        long end = -1;
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String[] ranges = rangeHeader.replace("bytes=", "").split("-");
+            start = Long.parseLong(ranges[0]);
+            if (ranges.length > 1 && !ranges[1].isEmpty() && ranges[1].matches("\\d+")) {
+                long endRange = Long.parseLong(ranges[1]);
+                end = endRange < fileSize ? endRange : -1;
+            }
+        }
+        return new long[]{start, end};
+    }
+
+    /**
+     * 更新用戶文件元數據的MimeType
+     * 此為版本補丁方法，用於補全舊版本的文件元數據數據
+     *
+     * @param serverFileMetadata 服務器文件元數據
+     * @param fileDataBO         用戶文件數據
+     *
+     * @return Mono<UserFileDataBO> 更新後的用戶文件數據
+     */
+    protected Mono<UserFileDataBO> updateUserFileMetaMimeType(ServerFileMetadata serverFileMetadata, UserFileDataBO fileDataBO) {
+        if (serverFileMetadata.getMimeType() != null) {
+            return Mono.just(fileDataBO);
+        }
+        return FileEnum.getMediaType(fileDataBO.getDataBufferFlux(), fileDataBO.getFilename()).flatMap(record -> {
+            serverFileMetadata.setMimeType(record.mimeType());
+            serverFileMetadata.setLastAccessTime(LocalDateTime.now());
+
+            fileDataBO.setDataBufferFlux(record.dataBufferFlux());
+            fileDataBO.setMimeType(record.mimeType());
+            return serverFileMetaRepository.save(serverFileMetadata).subscribeOn(Schedulers.boundedElastic()).thenReturn(fileDataBO);
+        });
+    }
+
+    /**
+     * 將檔案輸入流轉換為數據流
+     *
+     * @param dataBufferFlux 文件輸入流
+     * @param start          開始位置
+     * @param end            結束位置
+     *
+     * @return 返回數據流
+     */
+    @SkipRecord
+    protected Flux<DataBuffer> streamFileFromGridFS(Flux<DataBuffer> dataBufferFlux, long start, long end) {
+        return Flux.defer(() -> {
+            Flux<DataBuffer> skippedFlux = DataBufferUtils.skipUntilByteCount(dataBufferFlux, start);
+            if (end == -1L || end == Long.MAX_VALUE) {
+                return skippedFlux;
+            }
+            return DataBufferUtils.takeUntilByteCount(skippedFlux, end - start + 1);
+        });
+    }
+
+    /**
      * 合併分塊數據的共通實現
      *
      * @param byteArrays 分塊數據
@@ -987,16 +989,22 @@ public abstract class AbstractFileService implements FileService {
      * @return Mono<byte [ ]> 合併後的數據
      */
     protected Mono<byte[]> combineChunks(String transferTaskId, int totalChunks) {
+        RateLimiter rateLimiter = RateLimiter.of("combineChunk", this.rateLimiterConfig);
+        CircuitBreaker chunkCircuitBreaker = CircuitBreaker.of("gridFsChunkReader", this.circuitBreakerConfig);
         record ChunkData(int index, byte[] data) {
             static Comparator<ChunkData> comparator() {
                 return Comparator.comparingInt(ChunkData::index);
             }
         }
+        Retry retryPolicy = Retry
+                .backoff(5, Duration.ofSeconds(1))
+                .filter(e -> e instanceof LimitationException)
+                .maxBackoff(Duration.ofSeconds(5))
+                .jitter(0.3);
+
 
         return Mono.defer(() -> {
-            RateLimiter rateLimiter = RateLimiter.of("combineChunk", this.rateLimiterConfig);
             Flux<ChunkData> chunkFiles = Flux.range(1, totalChunks).flatMapSequential(index -> {
-
                 Mono<ChunkData> chunkOperation = this.gridFsProvider
                         .findFileByFileName(transferTaskId + "_chunk_" + index)
                         .flatMap(this.gridFsProvider::getResource)
@@ -1012,24 +1020,18 @@ public abstract class AbstractFileService implements FileService {
                             } finally {
                                 DataBufferUtils.release(dataBuffer);
                             }
-                        });
-
-                return Mono
-                        .defer(() -> {
-                            if (rateLimiter.acquirePermission()) {
-                                return chunkOperation;
-                            }
-                            return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT,
-                                                                      "上傳檔案超出了請求限制，請稍後再試"
-                            ));
                         })
-                        .retryWhen(Retry
-                                           .backoff(5, Duration.ofSeconds(1))
-                                           .filter(e -> e instanceof LimitationException)
-                                           .maxBackoff(Duration.ofSeconds(5))
-                                           .jitter(0.3));
-            });
+                        .transformDeferred(CircuitBreakerOperator.of(chunkCircuitBreaker));
 
+                return Mono.defer(() -> {
+                    if (rateLimiter.acquirePermission()) {
+                        return chunkOperation;
+                    }
+                    return Mono.error(new LimitationException(LimitationException.ErrorCode.FILE_CHUNK_EXCEED_LIMIT,
+                                                              "上傳檔案超出了請求限制，請稍後再試"
+                    ));
+                }).retryWhen(retryPolicy);
+            });
             return chunkFiles.sort(ChunkData.comparator()).map(ChunkData::data).collectList().flatMap(this::combineBytes);
         });
     }

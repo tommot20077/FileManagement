@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.annotation.CsrfRepositoryType;
 import xyz.dowob.filemanagement.config.properties.SecurityProperties;
 import xyz.dowob.filemanagement.repostiory.ServerCsrfToken.CustomServerCsrfTokenRepository;
+import xyz.dowob.filemanagement.unity.LogUnity;
 
 import java.util.List;
 
@@ -41,7 +42,13 @@ public class CsrfTokenRepositoryStrategy {
     public CsrfTokenRepositoryStrategy(List<CustomServerCsrfTokenRepository> csrfTokenRepositories, SecurityProperties securityProperties) {
         this.csrfTokenRepository = csrfTokenRepositories.stream().filter(csrfTokenRepository -> {
             CsrfRepositoryType type = AnnotatedElementUtils.findMergedAnnotation(csrfTokenRepository.getClass(), CsrfRepositoryType.class);
-            return type != null && type.value().equals(securityProperties.getCsrf().getCsrfTokenRepository());
+            LogUnity.trace("檢查 CsrfTokenRepository: %s, 註解: %s", csrfTokenRepository.getClass().getName(), type);
+            if (type != null && type.value().equals(securityProperties.getCsrf().getCsrfTokenRepository())) {
+                LogUnity.debug("註冊 CsrfTokenRepository: %s, 類型: %s", csrfTokenRepository.getClass().getName(), type.value());
+                return true;
+            }
+            LogUnity.trace("CsrfTokenRepository 不匹配: %s, 類型: %s", csrfTokenRepository.getClass().getName(), type != null ? type.value() : "無");
+            return false;
         }).findFirst().orElseThrow(() -> new IllegalArgumentException("找不到對應的 CsrfTokenRepository"));
     }
 

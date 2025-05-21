@@ -60,7 +60,6 @@ public class CacheConcurrentHashMap<K, V> {
     private final ConcurrentHashMap<K, CacheInfo<V>> cacheMap;
 
     /**
-     * /**
      * 用於辨識的標籤
      */
     @Setter

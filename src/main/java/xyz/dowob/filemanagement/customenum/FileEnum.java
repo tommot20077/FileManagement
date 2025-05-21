@@ -75,14 +75,20 @@ public enum FileEnum {
      * MIME類型與文件類型的映射
      */
     private static final Map<String, FileEnum> MIME_TYPE_MAPPING = new HashMap<>();
+
     /**
      * 文件類型與擴展名的映射
      */
     private static final Map<FileEnum, Map<String, String>> FILE_ENUM_MAP = new HashMap<>();
+
     /**
      * Tika 實例
      */
     private static final Tika TIKA = new Tika();
+
+    /**
+     * Microsoft Generic MIME 類型
+     */
     private static final String MICROSOFT_GENERIC = "application/x-tika-ooxml";
 
     static {

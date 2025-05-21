@@ -103,7 +103,10 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         super(serverFileMetaRepository,
               userFileMetaRepository,
               userOnlineFileRepository,
-              userRepository, redisProvider, gridFsProvider, fileScanProvider,
+              userRepository,
+              redisProvider,
+              gridFsProvider,
+              fileScanProvider,
               transfersTasksManager,
               fileProperties,
               circuitBreakerConfig,
@@ -209,7 +212,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             if (folderListTreeProvider != null) {
                 try {
                     folderListTreeProvider.updateFolder(user.getId(), userFileMetadata, fileEditDTO);
-                } catch (ValidationException e) {
+                } catch (ValidationException | ProcessException e) {
                     return Mono.error(e);
                 }
             }
@@ -543,7 +546,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      */
     private Flux<Pair<Flux<DataBuffer>, UserFileMetadata>> getGeneralFileResource(List<UserFileMetadata> files) {
         Map<Long, List<UserFileMetadata>> userMetadatasByServerId = files
-                .stream().filter(file -> file.getServerFileId() != null).collect(Collectors.groupingBy(UserFileMetadata::getServerFileId));
+                .stream()
+                .filter(file -> file.getServerFileId() != null)
+                .collect(Collectors.groupingBy(UserFileMetadata::getServerFileId));
 
         if (userMetadatasByServerId.isEmpty()) {
             return Flux.empty();
@@ -692,7 +697,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * @return Mono<List < UserFileMetadata>> 檔案列表
      */
     private Mono<List<UserFileMetadata>> findFilesWithSameParentFolderIds(Long parentFolderId, User shareUser) {
-        return userFileMetaRepository.findAllByParentFolderIdWithShare(parentFolderId, shareUser, entityOperations)
+        return userFileMetaRepository
+                .findAllByParentFolderIdWithShare(parentFolderId, shareUser, entityOperations)
                 .collectList()
                 .switchIfEmpty(Mono.just(Collections.emptyList()));
     }
