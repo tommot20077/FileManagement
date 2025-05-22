@@ -6,24 +6,20 @@ import lombok.NonNull;
 import lombok.Setter;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 /**
- * 一個基於HashMap的緩存實現，支持過期時間和最大保留時間的設置。
- * 封裝了HashMap，提供了方法來設置、獲取和刪除緩存項。
+ * 一個基於 ConcurrentHashMap 的緩存實現，支持過期時間和最大保留時間的設置。
+ * 封裝了 ConcurrentHashMap ，提供了方法來設置、獲取和刪除緩存項。
  * 並且支持定時清理過期項目。
- * 會將用戶儲存的數據和過期時間封裝成CacheInfo對象，並存儲在HashMap中。
- * 整個緩存的設計是線程安全的，使用了synchronized和ReentrantLock來保證多線程環境下的安全性。
+ * 會將用戶儲存的數據和過期時間封裝成CacheInfo對象，並存儲在 ConcurrentHashMap 中。
+ * 整個緩存的設計是線程安全的，使用了synchronized來保證多線程環境下的安全性。
  *
  * @author yuan
  * @program FileManagement
@@ -61,14 +57,10 @@ public class CacheConcurrentHashMap<K, V> {
     /**
      * 用於存儲緩存項的HashMap
      */
-    private final HashMap<K, CacheInfo<V>> cacheMap;
+    private final ConcurrentHashMap<K, CacheInfo<V>> cacheMap;
 
     /**
-     * 用於存儲每個鍵的鎖的ConcurrentHashMap
-     */
-    private final ConcurrentHashMap<K, ReentrantLock> lockMap;
-
-    /**
+     * /**
      * 用於辨識的標籤
      */
     @Setter
@@ -120,8 +112,7 @@ public class CacheConcurrentHashMap<K, V> {
         if (initialCapacity <= 0) {
             throw new IllegalArgumentException("初始化容量必須大於0");
         }
-        this.cacheMap = new HashMap<>(initialCapacity);
-        this.lockMap = new ConcurrentHashMap<>(initialCapacity);
+        this.cacheMap = new ConcurrentHashMap<>(initialCapacity);
         this.expireTime = expireTime.isPositive() ? expireTime : DEFAULT_EXPIRE_DURATION;
         this.maxRemainTime = maxRemainTime.isPositive() ? maxRemainTime : DEFAULT_REMAIN_TIME_DURATION;
 
@@ -161,22 +152,19 @@ public class CacheConcurrentHashMap<K, V> {
      */
     public Runnable getCleanupTask() {
         return () -> {
-            LogUnity.debug("%s: 清理過期緩存資料", tag);
-            synchronized (cacheMap) {
-                long currentTime = System.currentTimeMillis();
-                Set<K> expiredKeys = cacheMap
-                        .entrySet()
-                        .stream()
-                        .filter(entry -> entry.getValue().getExpireTimeMillis() < currentTime)
-                        .map(Map.Entry::getKey)
-                        .collect(Collectors.toSet());
-                expiredKeys.forEach(key -> {
-                    cacheMap.remove(key);
-                    ReentrantLock lock = lockMap.get(key);
-                    if (lock != null && lock.getQueueLength() == 0 && !lock.isLocked()) {
-                        lockMap.remove(key);
+            long now = System.currentTimeMillis();
+            LogUnity.debug("%s: 清理過期緩存資料 at %d", tag != null ? tag : DEFAULT_TAG, now);
+
+            Set<K> keysSnapshot = new HashSet<>(cacheMap.keySet());
+
+            for (K key : keysSnapshot) {
+                CacheInfo<V> cacheInfo = cacheMap.get(key);
+                if (cacheInfo != null && now > cacheInfo.getExpireTimeMillis()) {
+                    boolean removed = cacheMap.remove(key, cacheInfo);
+                    if (removed) {
+                        LogUnity.trace("%s: 已移除過期鍵 %s", tag != null ? tag : DEFAULT_TAG, key);
                     }
-                });
+                }
             }
         };
     }
@@ -250,28 +238,8 @@ public class CacheConcurrentHashMap<K, V> {
             throw new IllegalArgumentException("最大保留時間必須大於0");
         }
 
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            long expireTime = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemain.toMillis());
-            cacheMap.put(key, new CacheInfo<>(value, expireTime));
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
-    }
-
-    /**
-     * 清理鎖
-     * 當鎖的排隊長度為0且鎖未被鎖定，並且緩存項不存在時，則移除鎖
-     *
-     * @param key  鍵
-     * @param lock 鎖
-     */
-    private void cleanupLock(K key, ReentrantLock lock) {
-        if (lock.getQueueLength() == 0 && !lock.isLocked() && cacheMap.get(key) == null) {
-            lockMap.remove(key);
-        }
+        long expireTimeMillis = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemain.toMillis());
+        cacheMap.put(key, new CacheInfo<>(value, expireTimeMillis));
     }
 
     /**
@@ -324,22 +292,21 @@ public class CacheConcurrentHashMap<K, V> {
      * @param expire 過期時間
      */
     private CacheInfo<V> getAndRefresh(K key, Duration expire) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                cacheMap.remove(key);
-                lockMap.remove(key);
+        if (key == null) {
+            return null;
+        }
+
+        BiFunction<? super K, CacheInfo<V>, CacheInfo<V>> action = (k, existingInfo) -> {
+            long now = System.currentTimeMillis();
+            if (now > existingInfo.getExpireTimeMillis()) {
                 return null;
             }
-            long newExpireTime = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
-            cacheInfo.setExpireTimeMillis(newExpireTime);
-            return cacheInfo;
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
+            long newExpireTimeMillis = now + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            existingInfo.setExpireTimeMillis(newExpireTimeMillis);
+            return existingInfo;
+        };
+
+        return cacheMap.computeIfPresent(key, action);
     }
 
     /**
@@ -363,19 +330,14 @@ public class CacheConcurrentHashMap<K, V> {
      * @return 緩存項的值
      */
     public V check(K key) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                cacheMap.remove(key);
+        return Optional.ofNullable(key).map(k -> cacheMap.get(key)).map(cacheInfo -> {
+            long now = System.currentTimeMillis();
+            if (now > cacheInfo.getExpireTimeMillis()) {
+                cacheMap.remove(key, cacheInfo);
                 return null;
             }
             return cacheInfo.getValue();
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
+        }).orElse(null);
     }
 
     /**
@@ -478,19 +440,14 @@ public class CacheConcurrentHashMap<K, V> {
      * @return 緩存項的封裝紀錄
      */
     public CacheInfo<V> checkInfo(K key) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                cacheMap.remove(key);
+        return Optional.ofNullable(key).map(k -> cacheMap.get(key)).map(cacheInfo -> {
+            long now = System.currentTimeMillis();
+            if (now > cacheInfo.getExpireTimeMillis()) {
+                cacheMap.remove(key, cacheInfo);
                 return null;
             }
             return cacheInfo;
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
+        }).orElse(null);
     }
 
     /**
@@ -530,25 +487,24 @@ public class CacheConcurrentHashMap<K, V> {
             throw new IllegalArgumentException("過期時間必須大於0");
         }
 
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            V value;
-            long expireTimeMillis = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+        BiFunction<? super K, CacheInfo<V>, CacheInfo<V>> action = (k, existingInfo) -> {
+            long now = System.currentTimeMillis();
+            long expireTimeMillis = now + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            V valueToStore;
 
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                value = initValue;
+            if (existingInfo == null || now > existingInfo.getExpireTimeMillis()) {
+                valueToStore = initValue;
             } else {
-                value = computeFunction.apply(key, cacheInfo.getValue());
+                valueToStore = computeFunction.apply(k, existingInfo.getValue());
             }
+            if (valueToStore == null) {
+                return null;
+            }
+            return new CacheInfo<>(valueToStore, expireTimeMillis);
+        };
 
-            cacheMap.put(key, new CacheInfo<>(value, expireTimeMillis));
-            return value;
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
-        }
+        CacheInfo<V> computedInfo = cacheMap.compute(key, action);
+        return computedInfo != null ? computedInfo.getValue() : null;
     }
 
     /**
@@ -576,23 +532,28 @@ public class CacheConcurrentHashMap<K, V> {
      * @return 更新後的緩存值
      */
     public V computeIfPresent(K key, Duration expire, BiFunction<? super K, ? super V, V> computeFunction) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            CacheInfo<V> cacheInfo = cacheMap.get(key);
-            if (cacheInfo == null || System.currentTimeMillis() > cacheInfo.getExpireTimeMillis()) {
-                cacheMap.remove(key);
-                return null;
-            }
-            V newValue = computeFunction.apply(key, cacheInfo.getValue());
-            long expireTimeMillis = System.currentTimeMillis() + Math.min(expire.toMillis(), maxRemainTime.toMillis());
-            cacheMap.put(key, new CacheInfo<>(newValue, expireTimeMillis));
-            return newValue;
-        } finally {
-            lock.unlock();
-            cleanupLock(key, lock);
+        if (key == null) {
+            throw new IllegalArgumentException("鍵不能為null");
+        }
+        if (expire.toMillis() <= 0) {
+            throw new IllegalArgumentException("過期時間必須大於0");
         }
 
+        BiFunction<? super K, CacheInfo<V>, CacheInfo<V>> action = (k, existingInfo) -> {
+            long now = System.currentTimeMillis();
+            if (now > existingInfo.getExpireTimeMillis()) {
+                return null;
+            }
+            V newValue = computeFunction.apply(k, existingInfo.getValue());
+            if (newValue == null) {
+                return null;
+            }
+            long expireTimeMillis = now + Math.min(expire.toMillis(), maxRemainTime.toMillis());
+            return new CacheInfo<>(newValue, expireTimeMillis);
+        };
+
+        CacheInfo<V> computedInfo = cacheMap.computeIfPresent(key, action);
+        return (computedInfo != null) ? computedInfo.getValue() : null;
     }
 
     /**
@@ -610,14 +571,7 @@ public class CacheConcurrentHashMap<K, V> {
      * @param key 鍵
      */
     public void remove(@NonNull K key) {
-        ReentrantLock lock = lockMap.computeIfAbsent(key, k -> new ReentrantLock());
-        lock.lock();
-        try {
-            cacheMap.remove(key);
-            lockMap.remove(key);
-        } finally {
-            lock.unlock();
-        }
+        cacheMap.remove(key);
     }
 
     /**
@@ -625,11 +579,7 @@ public class CacheConcurrentHashMap<K, V> {
      * 將清除所有緩存項，並關閉ScheduledExecutorService
      */
     public void destroy() {
-        LogUnity.info("%s: 銷毀緩存表資料", this.tag);
-        synchronized (cacheMap) {
-            cacheMap.clear();
-        }
-        lockMap.clear();
+        LogUnity.info("%s: 銷毀緩存表資料", this.tag != null ? tag : DEFAULT_TAG);
         if (scheduler != null) {
             scheduler.shutdown();
             try {
@@ -641,6 +591,7 @@ public class CacheConcurrentHashMap<K, V> {
                 Thread.currentThread().interrupt();
             }
         }
+        cacheMap.clear();
     }
 
 
