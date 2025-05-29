@@ -66,6 +66,7 @@ public class FolderListTreeManager implements ApplicationRunner {
      */
     private DynamicThreadPoolExecutor dynamicThreadPoolExecutor;
 
+
     /**
      * 初始化用戶的檔案列表樹
      *
@@ -74,7 +75,7 @@ public class FolderListTreeManager implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         LogUnity.info("初始化用戶的檔案列表樹");
-        dynamicThreadPoolExecutor = new DynamicThreadPoolExecutor(2, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(1));
+        dynamicThreadPoolExecutor = new DynamicThreadPoolExecutor(2, 10, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(1024));
         initializeTree();
     }
 

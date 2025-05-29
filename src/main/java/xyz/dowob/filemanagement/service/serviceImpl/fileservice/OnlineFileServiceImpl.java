@@ -123,6 +123,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         this.userOnlineFileHistoryRepository = userOnlineFileHistoryRepository;
     }
 
+
     /**
      * 上傳指定文件。
      * 根據給定的文件元數據創建文件元數據並保存，然後上傳文件內容。如果操作成功，將返回上傳結果。
@@ -164,6 +165,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+
     /**
      * 下載指定文件。
      * 根據文件元數據查找用戶文件，並返回文件內容。如果文件內容轉換為DTO對象失敗，將會返回錯誤。
@@ -203,6 +205,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+
     /**
      * 刪除指定文件。
      * <p>
@@ -241,6 +244,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         });
     }
 
+
     /**
      * 更新用戶文件元數據
      * 此方法用於更新用戶文件的元數據。它會更新 lastAccessTime 並將新的元數據保存到數據庫中。
@@ -256,6 +260,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+
     /**
      * 根據文件ID查找用戶在線文件。
      * <p>
@@ -270,6 +275,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 .findById(fileId)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, fileId)));
     }
+
 
     /**
      * 獲取指定文件的版本列表。
@@ -310,6 +316,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                 }));
     }
 
+
     /**
      * 創建指定文件的初始歷史記錄。
      * <p>
@@ -333,6 +340,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         history.setNote(fileEditDTO.getNote());
         return userOnlineFileHistoryRepository.save(history);
     }
+
 
     /**
      * 保存編輯後的文件內容。
@@ -361,6 +369,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             });
         }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
     }
+
 
     /**
      * 根據文件編輯內容創建新的歷史記錄。
@@ -442,6 +451,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                         .then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile))));
     }
 
+
     /**
      * 將指定的歷史紀錄轉換成完整的文件內容。
      * <p>
@@ -457,13 +467,17 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return findHistoryChainRecursive(targetHistory, historyStack);
         }).flatMap(historyChain -> {
             if (historyChain.isEmpty() || !historyChain.getLast().getIsSnapshot()) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_HISTORY_CHAIN));
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_HISTORY_CHAIN,
+                                                          targetHistory.getFileId(),
+                                                          targetHistory.getId()
+                ));
             }
 
             String baseContent = historyChain.getLast().getSnapshotContent();
             return formatJsonToEditorContentJsonDTO(baseContent).flatMap(editorContentDTO -> applyPatchToContent(editorContentDTO, historyChain));
         });
     }
+
 
     /**
      * 遞歸查找並構建歷史紀錄鏈。
@@ -483,13 +497,17 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }
 
         if (currentHistory.getPreviousVersion() == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_VERSION_CHAIN));
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_VERSION_CHAIN,
+                                                      currentHistory.getVersion(),
+                                                      String.format("檔案: %d 沒有前一版本", currentHistory.getFileId())
+            ));
         }
 
         return userOnlineFileHistoryRepository
                 .findByFileIdAndVersion(currentHistory.getFileId(), currentHistory.getPreviousVersion())
                 .flatMap(previousHistory -> findHistoryChainRecursive(previousHistory, chain));
     }
+
 
     /**
      * 還原歷史記錄
@@ -521,6 +539,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         }).then(Mono.when(updateUserFileMetadata(fileEditBO.getUserFileMetadata()), deleteExcessHistoryRecord(userOnlineFile)));
     }
 
+
     /**
      * 計算兩個文件內容的差異。
      * <p>
@@ -540,6 +559,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             return objectMapper.writeValueAsString(customPath);
         }).onErrorMap(e -> new ProcessException(ProcessException.ErrorCode.CALCULATE_CONTENT_DIFFERENCE_FAILED, e));
     }
+
 
     /**
      * 應用還原差異
@@ -561,6 +581,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
         Patch<String> patch = patchDTO.toPatch();
         return DiffUtils.patch(contents, patch);
     }
+
 
     /**
      * 格式化對象為JSON
@@ -597,6 +618,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
             }
         }).toList();
     }
+
 
     /**
      * 將JSON格式的字符串轉換為EditorContentJsonDTO對象。

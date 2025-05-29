@@ -48,10 +48,12 @@ public class FolderListTreeProvider {
                                                                                                       TimeUnit.SECONDS,
                                                                                                       new LinkedBlockingQueue<>(1024)
     );
+
     /**
      * 用戶檔案列表樹映射，用於存儲用戶的檔案列表樹
      */
     private final Map<Long, FolderTree> userFileListTree;
+
     /**
      * 最大資料夾深度
      */
@@ -68,6 +70,7 @@ public class FolderListTreeProvider {
         this.maxFolderDepth = fileProperties.getGlobal().getMaxFolderDepth();
         this.userFileListTree = new ConcurrentHashMap<>();
     }
+
 
     /**
      * 添加新的資料夾到用戶的檔案列表樹中
@@ -258,6 +261,7 @@ public class FolderListTreeProvider {
          */
         private int maxSubTreeDepth = 0;
 
+
         /**
          * FolderNode 構造方法
          *
@@ -269,6 +273,7 @@ public class FolderListTreeProvider {
             this.name = name;
             this.children = new ConcurrentHashMap<>();
         }
+
 
         /**
          * FolderNode 構造方法
@@ -328,6 +333,7 @@ public class FolderListTreeProvider {
          */
         private final int maxFolderDepthLimit;
 
+
         /**
          * FolderTree 構造方法
          *
@@ -374,7 +380,6 @@ public class FolderListTreeProvider {
             FolderNode folderNode = new FolderNode(folderId, filename);
             folderMap.put(folderId, folderNode);
 
-
             if (parentFolder != null) {
                 linkNodes(parentFolder, folderNode);
             } else {
@@ -386,6 +391,7 @@ public class FolderListTreeProvider {
                 children.forEach(child -> linkNodes(folderNode, child));
             }
         }
+
 
         /**
          * 檢查是否存在循環引用
@@ -495,6 +501,7 @@ public class FolderListTreeProvider {
                 threadPoolExecutor.submit(() -> synchronizeTree(root));
             }
         }
+
 
         /**
          * 更新資料夾樹

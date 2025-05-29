@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
+import xyz.dowob.filemanagement.data.file.dao.UserFileMetaWithDataDAO;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.entity.UserOnlineFile;
@@ -96,6 +97,17 @@ public class UserFileListDTO {
     private Boolean isDeleted = false;
 
     /**
+     * 文件擁有者名稱
+     */
+    private String ownerUsername;
+
+    /**
+     * 文件的MIME類型
+     */
+    private String mimeType;
+
+
+    /**
      * 用戶文件列表數據傳輸對象構造函數
      *
      * @param serverFileMetadata 服務器文件元數據對象
@@ -114,6 +126,7 @@ public class UserFileListDTO {
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
         this.shareType = userFileMetadata.getShareType();
+        this.mimeType = serverFileMetadata.getMimeType();
 
         if (shareUsers != null) {
             this.shareUsers.addAll(shareUsers);
@@ -160,6 +173,34 @@ public class UserFileListDTO {
         this.isStar = userFileMetadata.getIsStar();
         this.isDeleted = userFileMetadata.getIsDeleted();
         this.shareType = userFileMetadata.getShareType();
+        if (shareUsers != null) {
+            this.shareUsers.addAll(shareUsers);
+        }
+    }
+
+
+    /**
+     * 用戶文件列表數據傳輸對象構造函數
+     *
+     * @param userFileMetaWithDataDAO 用戶文件元數據與數據對象
+     * @param shareUsers              共享用戶ID集合
+     */
+    public UserFileListDTO(UserFileMetaWithDataDAO userFileMetaWithDataDAO, Collection<Long> shareUsers) {
+        this.id = userFileMetaWithDataDAO.getUfmId();
+        this.filename = userFileMetaWithDataDAO.getUfmFilename();
+        this.parentFolderId = userFileMetaWithDataDAO.getUfmParentFolderId();
+        this.createTime = userFileMetaWithDataDAO.getUfmUploadTime();
+        this.lastAccessTime = userFileMetaWithDataDAO.getUfmLastAccessTime();
+        this.isStar = userFileMetaWithDataDAO.getUfmIsStar();
+        this.fileSize = userFileMetaWithDataDAO.getSfmFileSize();
+        this.fileType = userFileMetaWithDataDAO.getUfmFileType();
+        this.shareType = userFileMetaWithDataDAO.getUfmShareType();
+        this.gridFsId = userFileMetaWithDataDAO.getSfmGridFsId();
+        this.md5 = userFileMetaWithDataDAO.getSfmMd5();
+        this.isDeleted = userFileMetaWithDataDAO.getUfmIsDeleted();
+        this.ownerUsername = userFileMetaWithDataDAO.getOwnerUsername();
+        this.mimeType = userFileMetaWithDataDAO.getSfmMimeType();
+
         if (shareUsers != null) {
             this.shareUsers.addAll(shareUsers);
         }

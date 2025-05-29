@@ -21,6 +21,7 @@ public class ValidationException extends Exception {
      */
     private final ErrorCode errorCode;
 
+
     public ValidationException(ErrorCode errorCode, Object... args) {
         super(String.format(errorCode.getMessage(), args));
         this.errorCode = errorCode;
@@ -268,7 +269,7 @@ public class ValidationException extends Exception {
          * HTTP狀態碼: 400
          * 錯誤信息: 歷程記錄鏈錯誤
          */
-        INVALID_HISTORY_CHAIN(1134, "歷程記錄鏈錯誤，當前歷程記錄ID: %s，上一歷程記錄ID: %s"),
+        INVALID_HISTORY_CHAIN(1134, "歷程記錄鏈錯誤，當前檔案ID: %s，歷程記錄ID: %s"),
 
         /**
          * 錯誤碼: 1135
@@ -421,6 +422,7 @@ public class ValidationException extends Exception {
          */
         private final String message;
 
+
         /**
          * ErrorCode建構子
          *
@@ -433,6 +435,7 @@ public class ValidationException extends Exception {
             this.httpStatus = httpStatus;
             this.message = message;
         }
+
 
         /**
          * ErrorCode建構子，默認HTTP狀態碼為400

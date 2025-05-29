@@ -96,6 +96,7 @@ public class CacheConcurrentHashMap<K, V> {
         this(DEFAULT_INITIAL_CAPACITY, DEFAULT_EXPIRE_DURATION, DEFAULT_REMAIN_TIME_DURATION, DEFAULT_CLEANUP_INTERVAL, enableCleanup);
     }
 
+
     /**
      * CacheConcurrentHashMap的構造函數
      *
@@ -130,6 +131,7 @@ public class CacheConcurrentHashMap<K, V> {
         }
     }
 
+
     /**
      * 定時清理過期項目的啟動方法
      *
@@ -144,6 +146,7 @@ public class CacheConcurrentHashMap<K, V> {
         scheduler.scheduleAtFixedRate(this::getCleanupTask, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
     }
 
+
     /**
      * 獲取清理過期項目的任務
      *
@@ -151,11 +154,10 @@ public class CacheConcurrentHashMap<K, V> {
      */
     public Runnable getCleanupTask() {
         return () -> {
-            long now = System.currentTimeMillis();
-            LogUnity.debug("%s: 清理過期緩存資料 at %d", tag != null ? tag : DEFAULT_TAG, now);
+            LogUnity.debug("時間: %s: 清理過期緩存資料", tag != null ? tag : DEFAULT_TAG);
 
             Set<K> keysSnapshot = new HashSet<>(cacheMap.keySet());
-
+            long now = System.currentTimeMillis();
             for (K key : keysSnapshot) {
                 CacheInfo<V> cacheInfo = cacheMap.get(key);
                 if (cacheInfo != null && now > cacheInfo.getExpireTimeMillis()) {
@@ -206,6 +208,7 @@ public class CacheConcurrentHashMap<K, V> {
         this(initialCapacity, expireTime, maxRemainTime, DEFAULT_CLEANUP_INTERVAL, true);
     }
 
+
     /**
      * 設定緩存並使用預設的過期時間和最大保留時間
      *
@@ -215,6 +218,7 @@ public class CacheConcurrentHashMap<K, V> {
     public void set(K key, V value) {
         this.set(key, value, expireTime, maxRemainTime);
     }
+
 
     /**
      * 設置緩存項的值和過期時間
@@ -241,6 +245,7 @@ public class CacheConcurrentHashMap<K, V> {
         cacheMap.put(key, new CacheInfo<>(value, expireTimeMillis));
     }
 
+
     /**
      * 設置緩存項的值和過期時間
      *
@@ -251,6 +256,7 @@ public class CacheConcurrentHashMap<K, V> {
     public void set(K key, V value, Duration expire) {
         this.set(key, value, expire, maxRemainTime);
     }
+
 
     /**
      * 批量設置緩存項的值和過期時間
@@ -263,6 +269,7 @@ public class CacheConcurrentHashMap<K, V> {
         kvMap.forEach((key, value) -> this.set(key, value, expire, maxRemain));
     }
 
+
     /**
      * 批量設置緩存項的值和過期時間，並使用預設的最大保留時間
      *
@@ -272,6 +279,7 @@ public class CacheConcurrentHashMap<K, V> {
     public void setAll(Map<K, V> kvMap, Duration expire) {
         kvMap.forEach((key, value) -> this.set(key, value, expire, maxRemainTime));
     }
+
 
     /**
      * 獲取封裝紀錄並刷新過期時間
@@ -283,6 +291,7 @@ public class CacheConcurrentHashMap<K, V> {
     public CacheInfo<V> getInfo(K key) {
         return getAndRefresh(key, expireTime);
     }
+
 
     /**
      * 批量設置緩存項的值和過期時間，並使用預設的過期時間和最大保留時間
@@ -308,6 +317,7 @@ public class CacheConcurrentHashMap<K, V> {
         return cacheMap.computeIfPresent(key, action);
     }
 
+
     /**
      * 獲取緩存項的值，當前緩存項不存在或過期時，返回預設值
      *
@@ -320,6 +330,7 @@ public class CacheConcurrentHashMap<K, V> {
         V value = this.check(key);
         return value == null ? defaultValue : value;
     }
+
 
     /**
      * 獲取緩存項的值但不刷新過期時間
@@ -339,6 +350,7 @@ public class CacheConcurrentHashMap<K, V> {
         }).orElse(null);
     }
 
+
     /**
      * 批量獲取緩存項的值
      *
@@ -350,6 +362,7 @@ public class CacheConcurrentHashMap<K, V> {
         return keys.stream().map(this::get).collect(Collectors.toList());
     }
 
+
     /**
      * 獲取緩存項的值並刷新過期時間
      *
@@ -360,6 +373,7 @@ public class CacheConcurrentHashMap<K, V> {
     public V get(K key) {
         return this.get(key, expireTime);
     }
+
 
     /**
      * 獲取緩存項的值並指定緩存的過期時間
@@ -374,6 +388,7 @@ public class CacheConcurrentHashMap<K, V> {
         return cacheInfo == null ? null : cacheInfo.getValue();
     }
 
+
     /**
      * 批量獲取緩存項的值並指定緩存的過期時間
      *
@@ -386,6 +401,7 @@ public class CacheConcurrentHashMap<K, V> {
         return keys.stream().map(key -> this.get(key, expire)).collect(Collectors.toList());
     }
 
+
     /**
      * 批量獲取緩存項的封裝紀錄並指定緩存的過期時間
      *
@@ -396,6 +412,7 @@ public class CacheConcurrentHashMap<K, V> {
     public List<CacheInfo<V>> getAllInfo(List<K> keys, Duration expire) {
         return keys.stream().map(key -> this.getInfo(key, expire)).collect(Collectors.toList());
     }
+
 
     /**
      * 獲取封裝紀錄並指定緩存的過期時間
@@ -409,6 +426,7 @@ public class CacheConcurrentHashMap<K, V> {
         return getAndRefresh(key, expire);
     }
 
+
     /**
      * 獲取緩存項的值並不刷新過期時間
      *
@@ -420,6 +438,7 @@ public class CacheConcurrentHashMap<K, V> {
         return keys.stream().map(this::check).collect(Collectors.toList());
     }
 
+
     /**
      * 獲取緩存項的封裝紀錄並不刷新過期時間
      *
@@ -430,6 +449,7 @@ public class CacheConcurrentHashMap<K, V> {
     public List<CacheInfo<V>> checkAllInfo(List<K> keys) {
         return keys.stream().map(this::checkInfo).collect(Collectors.toList());
     }
+
 
     /**
      * 獲取緩存項的封裝紀錄但不刷新過期時間
@@ -449,6 +469,7 @@ public class CacheConcurrentHashMap<K, V> {
         }).orElse(null);
     }
 
+
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值；否則使用 initValue 初始化。
@@ -463,6 +484,7 @@ public class CacheConcurrentHashMap<K, V> {
     public V computeIfPresentOrDefault(K key, V initValue, BiFunction<? super K, ? super V, V> computeFunction) {
         return computeIfPresentOrDefault(key, initValue, expireTime, computeFunction);
     }
+
 
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
@@ -506,6 +528,7 @@ public class CacheConcurrentHashMap<K, V> {
         return computedInfo != null ? computedInfo.getValue() : null;
     }
 
+
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
      * 如果鍵存在且未過期，則應用 computeFunction 更新值，此方法不會初始化不存在的值
@@ -519,6 +542,7 @@ public class CacheConcurrentHashMap<K, V> {
     public V computeIfPresent(K key, BiFunction<? super K, ? super V, V> computeFunction) {
         return computeIfPresent(key, expireTime, computeFunction);
     }
+
 
     /**
      * 原子性地對指定鍵的緩存值進行計算或初始化。
@@ -555,6 +579,7 @@ public class CacheConcurrentHashMap<K, V> {
         return (computedInfo != null) ? computedInfo.getValue() : null;
     }
 
+
     /**
      * 批量刪除緩存項
      *
@@ -564,6 +589,7 @@ public class CacheConcurrentHashMap<K, V> {
         keys.forEach(this::remove);
     }
 
+
     /**
      * 刪除緩存項
      *
@@ -572,6 +598,7 @@ public class CacheConcurrentHashMap<K, V> {
     public void remove(@NonNull K key) {
         cacheMap.remove(key);
     }
+
 
     /**
      * 銷毀緩存提供的資源

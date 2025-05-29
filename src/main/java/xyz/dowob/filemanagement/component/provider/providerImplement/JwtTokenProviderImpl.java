@@ -63,6 +63,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
      */
     private SecretKey key;
 
+
     /**
      * 初始化方法，用於將 secret 解碼後生成 key
      */
@@ -86,7 +87,7 @@ public class JwtTokenProviderImpl implements TokenProvider {
     @HideSensitive
     public Mono<String> generateToken(User user) {
         if (user == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND));
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "空的用戶實體"));
         }
 
         Mono<Token> tokenMono = tokenRepository.findByUserId(user.getId()).switchIfEmpty(Mono.defer(() -> {

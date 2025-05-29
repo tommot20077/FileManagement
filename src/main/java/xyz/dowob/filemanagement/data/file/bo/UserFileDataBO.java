@@ -111,19 +111,19 @@ public class UserFileDataBO {
      * 數據流 dataBuffer
      */
     @JsonIgnore
-    private Flux<DataBuffer> dataBufferFlux;
+    private transient Flux<DataBuffer> dataBufferFlux;
 
     /**
      * 數據流 byte[]
      */
     @JsonIgnore
-    private Mono<byte[]> dataBufferByte;
+    private transient Mono<byte[]> dataBufferByte;
 
     /**
      * 字符串內容
      */
     @JsonIgnore
-    private EditorContentDTO content;
+    private transient EditorContentDTO content;
 
     /**
      * 最後修改者
