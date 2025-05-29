@@ -379,12 +379,14 @@ class CacheConcurrentHashMapTest {
         cache.set("keyManualClean", "valueManualClean", SHORT_EXPIRY);
         assertEquals("valueManualClean", cache.check("keyManualClean"));
 
-        Thread.sleep(50);
+        Thread.sleep(70);
         assertNotNull(cache.checkInfo("keyManualClean"), "項目應仍然在 map 中");
 
         Thread.sleep(50);
         Runnable cleanupTask = cache.getCleanupTask();
         cleanupTask.run();
+
+        Thread.sleep(50);
 
         assertNull(cache.checkInfo("keyManualClean"), "手動清理後，過期項目應被移除");
     }

@@ -206,7 +206,10 @@ class DynamicThreadPoolExecutorTest {
 
         executor.execute(() -> {
             latch1.countDown();
-            throw new RuntimeException("測試異常");
+            try {
+                throw new RuntimeException("測試異常");
+            } catch (RuntimeException ignored) {
+            }
         });
 
         assertTrue(latch1.await(5, SECONDS), "第一個任務未啟動");

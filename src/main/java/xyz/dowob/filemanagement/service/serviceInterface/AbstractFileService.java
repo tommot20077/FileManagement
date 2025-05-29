@@ -236,6 +236,96 @@ public abstract class AbstractFileService implements FileService {
 
 
     /**
+     * 獲取用戶文件列表路徑的共通實現
+     *
+     * @param file 文件
+     * @param user 用戶信息
+     *
+     * @return Mono<List < FolderListTreeProvider.FolderNode>> 用戶文件路徑節點
+     */
+    public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(UserFileMetadata file, User user) {
+        if (!Objects.equals(file.getUserId(), user.getId())) {
+            List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
+            return Mono.just(list);
+        }
+
+        return Mono.just(file).flatMap(userFileMetadata -> {
+            if (folderListTreeProvider != null) {
+                LogUnity.trace("使用 FolderListTreeProvider 獲取用戶文件路徑");
+                List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), file.getId());
+                return Mono.just(path);
+            }
+
+            LogUnity.trace("使用 UserFileMetaRepository 獲取用戶文件路徑");
+            return Flux
+                    .just(userFileMetadata)
+                    .expand(metadata -> Optional
+                            .ofNullable(metadata.getParentFolderId())
+                            .map(folderId -> userFileMetaRepository.findById(folderId.toString()))
+                            .orElse(Mono.empty()))
+                    .map(FolderListTreeProvider.FolderNode::new)
+                    .collectList()
+                    .map(list -> {
+                        if (file.getId() != 0L) {
+                            list.add(new FolderListTreeProvider.FolderNode(null, "root"));
+                        }
+                        return list;
+                    });
+        }).switchIfEmpty(Mono.defer(() -> {
+            if (file.getId() <= 0) {
+                List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
+                return Mono.just(list);
+            }
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, file.getId()));
+        }));
+    }
+
+
+    /**
+     * 搜索用戶文件，會從資料庫查詢對應的數據並轉換成 用戶文件列表DTO。
+     * 最後經過過濾和分頁處理，返回符合條件的用戶文件列表。
+     *
+     * @param user          用戶信息
+     * @param fileFilterDTO 文件過濾條件
+     *
+     * @return Mono<PagedResponseDTO < UserFileListDTO>> 用戶文件列表分頁響應對象
+     */
+    public Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
+        if (fileFilterDTO.getPageSize() == null || fileFilterDTO.getPageSize() < 1) {
+            fileFilterDTO.setPageSize(fileProperties.getGlobal().getPageSize());
+        }
+
+        if (fileFilterDTO.getPage() == null || fileFilterDTO.getPage() < 1) {
+            fileFilterDTO.setPage(1);
+        }
+
+        Flux<UserFileMetaWithDataDAO> dataFlux = userFileMetaRepository.findAllByUserIdAndFilterDTO(user.getId(), fileFilterDTO, entityOperations);
+        return filterAndPageResponse(formatUnifiedDaoToDto(dataFlux), fileFilterDTO);
+    }
+
+
+    /**
+     * 獲取用戶文件列表的緩存鍵
+     * 如果搜索ID為空，則使用根文件夾ID
+     * 當搜索ID為根文件夾ID時，使用用戶ID作為緩存鍵名 {@code fileList_folder:0_user:%s}
+     * 否則使用搜索ID作為緩存鍵名 {@code fileList_folder:%s}
+     *
+     * @param userId   用戶ID
+     * @param searchId 搜索ID
+     *
+     * @return 緩存鍵名
+     */
+    @SkipRecord
+    protected String getUserFileListBaseKey(Long userId, Long searchId) {
+        Long chooseId = Objects.requireNonNullElse(searchId, ReservedSearchIdEnum.ROOT_FOLDER_ID.getId());
+        if (chooseId.equals(ReservedSearchIdEnum.ROOT_FOLDER_ID.getId())) {
+            return String.format(ROOT_PAGE_KEY_FORMAT, userId);
+        }
+        return String.format(GENERAL_PAGE_KEY_FORMAT, searchId);
+    }
+
+
+    /**
      * 將獲取當查詢後的檔案數據並查詢分享用戶信息，最後將其轉換為用戶文件列表DTO流。
      *
      * @param unifiedDaoFlux 統一的DAO流
@@ -337,96 +427,6 @@ public abstract class AbstractFileService implements FileService {
             List<UserFileListDTO> subList = list.subList(start, end);
             return Tuples.of(size, subList);
         });
-    }
-
-
-    /**
-     * 獲取用戶文件列表路徑的共通實現
-     *
-     * @param file 文件
-     * @param user 用戶信息
-     *
-     * @return Mono<List < FolderListTreeProvider.FolderNode>> 用戶文件路徑節點
-     */
-    public Mono<List<FolderListTreeProvider.FolderNode>> getUserFilePaths(UserFileMetadata file, User user) {
-        if (!Objects.equals(file.getUserId(), user.getId())) {
-            List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
-            return Mono.just(list);
-        }
-
-        return Mono.just(file).flatMap(userFileMetadata -> {
-            if (folderListTreeProvider != null) {
-                LogUnity.trace("使用 FolderListTreeProvider 獲取用戶文件路徑");
-                List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), file.getId());
-                return Mono.just(path);
-            }
-
-            LogUnity.trace("使用 UserFileMetaRepository 獲取用戶文件路徑");
-            return Flux
-                    .just(userFileMetadata)
-                    .expand(metadata -> Optional
-                            .ofNullable(metadata.getParentFolderId())
-                            .map(folderId -> userFileMetaRepository.findById(folderId.toString()))
-                            .orElse(Mono.empty()))
-                    .map(FolderListTreeProvider.FolderNode::new)
-                    .collectList()
-                    .map(list -> {
-                        if (file.getId() != 0L) {
-                            list.add(new FolderListTreeProvider.FolderNode(null, "root"));
-                        }
-                        return list;
-                    });
-        }).switchIfEmpty(Mono.defer(() -> {
-            if (file.getId() <= 0) {
-                List<FolderListTreeProvider.FolderNode> list = Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root"));
-                return Mono.just(list);
-            }
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.NOT_EXISTING_USER_FILE, file.getId()));
-        }));
-    }
-
-
-    /**
-     * 獲取用戶文件列表的緩存鍵
-     * 如果搜索ID為空，則使用根文件夾ID
-     * 當搜索ID為根文件夾ID時，使用用戶ID作為緩存鍵名 {@code fileList_folder:0_user:%s}
-     * 否則使用搜索ID作為緩存鍵名 {@code fileList_folder:%s}
-     *
-     * @param userId   用戶ID
-     * @param searchId 搜索ID
-     *
-     * @return 緩存鍵名
-     */
-    @SkipRecord
-    protected String getUserFileListBaseKey(Long userId, Long searchId) {
-        Long chooseId = Objects.requireNonNullElse(searchId, ReservedSearchIdEnum.ROOT_FOLDER_ID.getId());
-        if (chooseId.equals(ReservedSearchIdEnum.ROOT_FOLDER_ID.getId())) {
-            return String.format(ROOT_PAGE_KEY_FORMAT, userId);
-        }
-        return String.format(GENERAL_PAGE_KEY_FORMAT, searchId);
-    }
-
-
-    /**
-     * 搜索用戶文件，會從資料庫查詢對應的數據並轉換成 用戶文件列表DTO。
-     * 最後經過過濾和分頁處理，返回符合條件的用戶文件列表。
-     *
-     * @param user          用戶信息
-     * @param fileFilterDTO 文件過濾條件
-     *
-     * @return Mono<PagedResponseDTO < UserFileListDTO>> 用戶文件列表分頁響應對象
-     */
-    public Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
-        if (fileFilterDTO.getPageSize() == null || fileFilterDTO.getPageSize() < 1) {
-            fileFilterDTO.setPageSize(fileProperties.getGlobal().getPageSize());
-        }
-
-        if (fileFilterDTO.getPage() == null || fileFilterDTO.getPage() < 1) {
-            fileFilterDTO.setPage(1);
-        }
-
-        Flux<UserFileMetaWithDataDAO> dataFlux = userFileMetaRepository.findAllByUserIdAndFilterDTO(user.getId(), fileFilterDTO, entityOperations);
-        return filterAndPageResponse(formatUnifiedDaoToDto(dataFlux), fileFilterDTO);
     }
 
 
