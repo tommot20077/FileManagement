@@ -85,6 +85,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.uploadFile(fileMetadataDTO, exchange);
     }
 
+
     /**
      * 下載文件的 Web 請求，根據文件 ID 下載文件並提供預覽或是下載
      * 預設為預覽
@@ -102,6 +103,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.downloadFile(action, id, exchange).onErrorResume(ValidationException.class, e -> handleDownloadValidationError(e, exchange));
     }
 
+
     /**
      * 刪除文件的 Web 請求，根據文件 ID 刪除文件
      *
@@ -114,6 +116,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
         return super.deleteFile(id, exchange);
     }
+
 
     /**
      * 編輯文件的 Web 請求，根據文件 ID 編輯文件
@@ -128,6 +131,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.editFile(fileEditDTO, exchange);
     }
 
+
     /**
      * 上傳文件分塊的 Web 請求，根據文件 ID 上傳文件分塊
      * 會依照用戶的選擇的上傳方式來進行上傳
@@ -141,6 +145,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
             @RequestParam(name = "type", required = false) String transmissionType, ServerWebExchange exchange) {
         return handleError(super.uploadFileData(transmissionType, exchange), exchange);
     }
+
 
     /**
      * 獲取用戶文件列表的Web請求
@@ -158,6 +163,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
         return super.getUserFileList(exchange, page, size, types);
     }
 
+
     /**
      * 獲取文件的信息的 API 請求，根據文件 ID 獲取文件的信息
      *
@@ -170,6 +176,7 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     public Mono<ResponseEntity<?>> getFileInfo(@PathVariable Long id, ServerWebExchange exchange) {
         return super.getFileType(id, exchange);
     }
+
 
     /**
      * 將檔案移動到回收站的 Web 請求
@@ -219,15 +226,15 @@ public class WebGeneralFileController extends BaseGeneralFileController {
     public Mono<ResponseEntity<?>> search(ServerWebExchange exchange,
                                           @RequestParam(value = "keyword", required = false) String keyword,
                                           @RequestParam(value = "folder", required = false) Long folderId,
-                                          @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
-                                          @RequestParam(value = "size", required = false) Integer size,
                                           @RequestParam(value = "type", required = false) List<String> types,
-                                          @RequestParam(value = "deleted", required = false) Boolean deleted,
-                                          @RequestParam(value = "shared", required = false) Boolean shared,
+                                          @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+                                          @RequestParam(value = "size", required = false, defaultValue = "0") Integer size,
+                                          @RequestParam(value = "deleted", required = false, defaultValue = "false") Boolean deleted,
+                                          @RequestParam(value = "shared", required = false, defaultValue = "false") Boolean shared,
                                           @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                              LocalDateTime startDate,
+                                          LocalDateTime startDate,
                                           @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                                              LocalDateTime endDate) {
+                                          LocalDateTime endDate) {
         FileFilterDTO fileFilterDTO = new FileFilterDTO(keyword, folderId, getFileEnums(types), page, size, startDate, endDate, deleted, shared);
         return super.searchFile(exchange, fileFilterDTO);
     }

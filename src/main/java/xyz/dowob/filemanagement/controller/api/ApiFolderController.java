@@ -61,7 +61,11 @@ public class ApiFolderController extends BaseFolderController {
         super(userService,
               permissionService,
               fileServiceStrategy,
-              fileProperties, validationService, folderService, objectMapper, filePermissionRuleManager,
+              fileProperties,
+              validationService,
+              folderService,
+              objectMapper,
+              filePermissionRuleManager,
               folderListTreeManager
         );
     }
@@ -85,11 +89,12 @@ public class ApiFolderController extends BaseFolderController {
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type, ServerWebExchange exchange) {
         return handleError(Mono.defer(() -> {
-            if (id < 0) {
-                return Mono.error(new ValidationException(ValidationException.ErrorCode.PATH_NOT_FOUND));
-            }
-            return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
-        }), exchange);
+                               if (id < 0) {
+                                   return Mono.error(new ValidationException(ValidationException.ErrorCode.PATH_NOT_FOUND));
+                               }
+                               return super.getUserFileList(exchange, id, page, size, getFileEnums(type));
+                           }), exchange
+        );
     }
 
 
@@ -124,6 +129,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECENT_FILE_ID.getId(), 1, null, getFileEnums(type));
     }
 
+
     /**
      * 獲取回收站檔案列表
      *
@@ -140,6 +146,7 @@ public class ApiFolderController extends BaseFolderController {
                                                    @RequestParam(required = false) Integer size, @RequestParam(required = false) List<String> type) {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.RECYCLE_FILE_ID.getId(), page, size, getFileEnums(type));
     }
+
 
     /**
      * 獲取用戶所有檔案列表
@@ -158,6 +165,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.ALL_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
+
     /**
      * 獲取分享檔案列表
      *
@@ -175,6 +183,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.getUserFileList(exchange, ReservedSearchIdEnum.SHARE_FILE_ID.getId(), page, size, getFileEnums(type));
     }
 
+
     /**
      * 刪除資料夾及其內容
      *
@@ -187,6 +196,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> deleteFolder(@PathVariable String id, ServerWebExchange exchange) {
         return super.deleteFolder(id, exchange);
     }
+
 
     /**
      * 編輯資料夾
@@ -201,6 +211,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.editFolder(fileEditDTO, exchange);
     }
 
+
     /**
      * 創建資料夾
      *
@@ -214,6 +225,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.createFolder(fileEditDTO, exchange);
     }
 
+
     /**
      * 建立用戶資料夾樹，根據系統配置和用戶資料夾結構建立資料夾樹。
      *
@@ -225,6 +237,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<?>> buildTree(ServerWebExchange exchange) {
         return super.buildTree(exchange);
     }
+
 
     /**
      * 移動資料夾到回收站
@@ -239,6 +252,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.removeFile(exchange, id);
     }
 
+
     /**
      * 還原已刪除的資料夾
      *
@@ -252,6 +266,7 @@ public class ApiFolderController extends BaseFolderController {
         return super.restoreFile(exchange, id);
     }
 
+
     /**
      * 下載資料夾，將資料夾及其內容打包下載。
      *
@@ -264,6 +279,7 @@ public class ApiFolderController extends BaseFolderController {
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFolder(@PathVariable Long id, ServerWebExchange exchange) {
         return super.downloadFolder(id, exchange);
     }
+
 
     /**
      * 獲取資料夾的路徑，根據資料夾 ID 返回該資料夾的完整路徑信息。

@@ -17,13 +17,15 @@ import xyz.dowob.filemanagement.component.manager.FilePermissionRuleManager;
 import xyz.dowob.filemanagement.component.provider.provider.FolderListTreeProvider;
 import xyz.dowob.filemanagement.component.strategy.FileServiceStrategy;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.*;
+import xyz.dowob.filemanagement.customenum.DownloadActionEnum;
+import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileFilterDTO;
 import xyz.dowob.filemanagement.data.file.dto.UserFileListDTO;
 import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.response.PagedResponseDTO;
-import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.functionInterface.Permission;
@@ -57,35 +59,43 @@ public abstract class BaseFileController implements ResponseUnity {
      * 自定義文件類型，表示支持的文件類型枚舉，包含圖片、視頻、音樂、文檔等。
      */
     protected static final FileEnum[] CUSTOM_FILE_TYPE = new FileEnum[]{IMAGE, VIDEO, MUSIC, DOCUMENT, ZIP, OTHER, ONLINE_DOCUMENT};
+
     /**
      * 用戶業務層對象，用於操作用戶資料。
      */
     protected final UserService userService;
+
     /**
      * 檔案策略，用於決定不同的文件處理策略。
      */
     protected final FileServiceStrategy fileServiceStrategy;
+
     /**
      * 檔案屬性，提供文件配置和屬性信息。
      */
     protected final FileProperties fileProperties;
+
     /**
      * 驗證服務，用於文件相關的數據驗證。
      */
     protected final ValidationService validationService;
+
     /**
      * 權限服務，負責處理文件的訪問控制和權限驗證。
      * 用戶和文件的操作權限校驗。
      */
     protected final PermissionService<UserFileMetadata> permissionService;
+
     /**
      * 對象轉換工具，用於將 Java 對象與 JSON 之間進行轉換。
      */
     protected final ObjectMapper objectMapper;
+
     /**
      * 文件權限規則管理器，用於管理文件的權限規則。
      */
     protected final FilePermissionRuleManager filePermissionRuleManager;
+
 
     /**
      * 獲取用戶文件列表，根據資料夾 ID 獲取該資料夾下的文件列表。
@@ -101,7 +111,7 @@ public abstract class BaseFileController implements ResponseUnity {
      * @return 返回用戶文件列表，包含文件基本信息及文件路徑。
      */
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Long folderId, Integer page, Integer size, List<FileEnum> types) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
+        Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
 
             List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowShared()));
@@ -114,20 +124,16 @@ public abstract class BaseFileController implements ResponseUnity {
 
                 Mono<PagedResponseDTO<UserFileListDTO>> fileListMono = fileService.getUserFileList(user, fileFilterDTO);
                 Mono<List<FolderListTreeProvider.FolderNode>> filePathsMono = fileService.getUserFilePaths(folder, user);
-                Mono<String> ownerMono = userService.getAllByParams(UserInfoTypeEnum.ID.name(), folder.getUserId()).next().map(User::getUsername);
-                if (user.getId().equals(0L) && folder.getUserId().equals(ReservedSearchIdEnum.ROOT_FOLDER_ID.getId())) {
-                    ownerMono = Mono.just("Guest");
-                }
 
-                return validationService.validateFileType(folder, FOLDER).then(Mono.zip(fileListMono, filePathsMono, ownerMono).flatMap(tuple -> {
+                return validationService.validateFileType(folder, FOLDER).then(Mono.zip(fileListMono, filePathsMono).flatMap(tuple -> {
                     HashMap<String, Object> result = new HashMap<>();
                     result.put("files", tuple.getT1());
                     result.put("filePaths", tuple.getT2());
-                    result.put("owner", tuple.getT3());
                     return createResponseEntity(createApiResponse(exchange, "獲取用戶文件列表成功", result));
                 }));
             });
-        }), exchange);
+        });
+        return handleError(action, exchange);
     }
 
 
@@ -141,7 +147,7 @@ public abstract class BaseFileController implements ResponseUnity {
      * @return 返回符合條件的文件列表。
      */
     protected Mono<ResponseEntity<?>> searchFile(ServerWebExchange exchange, FileFilterDTO fileFilterDTO) {
-        return handleError(userService.getUser(exchange).flatMap(user -> {
+        Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
             FileService fileService = fileServiceStrategy.getFileService();
             return validationService.validateFileFilterDTO(fileFilterDTO).then(fileService.searchUserFile(user, fileFilterDTO).flatMap(files -> {
                 HashMap<String, Object> result = new HashMap<>();
@@ -151,7 +157,9 @@ public abstract class BaseFileController implements ResponseUnity {
                 result.put("filePaths", Collections.singletonList(new FolderListTreeProvider.FolderNode(null, "root")));
                 return createResponseEntity(createApiResponse(exchange, "搜索文件成功", result));
             }));
-        }), exchange);
+        });
+
+        return handleError(action, exchange);
     }
 
 
@@ -178,7 +186,8 @@ public abstract class BaseFileController implements ResponseUnity {
                     int status = result ? HttpStatus.OK.value() : HttpStatus.BAD_REQUEST.value();
                     ApiResponseDTO<?> apiResponse = createApiResponse(exchange, status, message, null);
                     return createResponseEntity(apiResponse);
-                })), exchange);
+                })), exchange
+        );
     }
 
 
@@ -206,7 +215,8 @@ public abstract class BaseFileController implements ResponseUnity {
                 .then(Mono.defer(() -> {
                     ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "還原檔案成功", null);
                     return createResponseEntity(apiResponse);
-                }))), exchange);
+                }))), exchange
+        );
     }
 
 

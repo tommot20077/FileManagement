@@ -20,6 +20,7 @@ public class ProcessException extends Exception {
      */
     private final ErrorCode errorCode;
 
+
     /**
      * 自定義錯誤類型
      *
@@ -59,6 +60,7 @@ public class ProcessException extends Exception {
         }
         return baseMessage;
     }
+
 
     @Getter
     @AllArgsConstructor
@@ -187,7 +189,7 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1221
          * 錯誤信息: 連接掃描服務器失敗
          */
-        CONNECT_SCAN_SERVER_FAILED(1221, "連接掃描服務器失敗 %s"),
+        CONNECT_SCAN_SERVER_FAILED(1221, "連接掃描服務器失敗"),
 
         /**
          * 錯誤碼: 1222

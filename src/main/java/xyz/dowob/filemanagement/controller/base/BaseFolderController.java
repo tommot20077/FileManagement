@@ -58,6 +58,7 @@ public abstract class BaseFolderController extends BaseFileController {
      */
     protected final FolderService folderService;
 
+
     /**
      * 依賴注入的構造方法，用於初始化資料夾控制器。
      *
@@ -171,18 +172,18 @@ public abstract class BaseFolderController extends BaseFileController {
      * @return 返回資料夾路徑信息，成功返回 OK，失敗返回 BAD_REQUEST。
      */
     public Mono<ResponseEntity<?>> getFolderPath(ServerWebExchange exchange, Long fileId) {
-        return handleError(userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
-                               HashMap<String, Object> result = new HashMap<>();
-                               return permissionService
-                                       .validateUserPermission(user, fileId, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
-                                       .flatMap(file -> validationService
-                                               .validateFileType(file, FileEnum.FOLDER)
-                                               .then(folderService.getUserFilePaths(file, user).flatMap(list -> {
-                                                   result.put("filePaths", list);
-                                                   return Mono.just(result);
-                                               })));
-                           }).flatMap(result -> createResponseEntity(createApiResponse(exchange, "獲取用戶檔案路徑成功", result)))), exchange
-        );
+        Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> Mono.defer(() -> {
+            HashMap<String, Object> result = new HashMap<>();
+            return permissionService
+                    .validateUserPermission(user, fileId, FilePermissionRuleManager.DefaultRule.WITH_SHARED.getRules(filePermissionRuleManager))
+                    .flatMap(file -> validationService
+                            .validateFileType(file, FileEnum.FOLDER)
+                            .then(folderService.getUserFilePaths(file, user).flatMap(list -> {
+                                result.put("filePaths", list);
+                                return Mono.just(result);
+                            })));
+        }).flatMap(result -> createResponseEntity(createApiResponse(exchange, "獲取用戶檔案路徑成功", result))));
+        return handleError(action, exchange);
     }
 
 

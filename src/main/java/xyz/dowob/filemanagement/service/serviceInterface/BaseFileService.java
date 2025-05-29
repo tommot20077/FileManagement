@@ -75,6 +75,4 @@ public interface BaseFileService {
     default Mono<PagedResponseDTO<UserFileListDTO>> searchUserFile(User user, FileFilterDTO fileFilterDTO) {
         return Mono.empty();
     }
-
-
 }

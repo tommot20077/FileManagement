@@ -54,14 +54,14 @@ CREATE TABLE IF NOT EXISTS user_file_metadata
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (server_file_id) REFERENCES server_file_metadata (id) ON DELETE CASCADE,
     FOREIGN KEY (parent_folder_id) REFERENCES user_file_metadata (id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
     INDEX idx_parent_folder_id (parent_folder_id),
-    INDEX idx_user_type (user_id, file_type),
     INDEX idx_user_star (user_id, is_star),
-    INDEX idx_user_delete (user_id, is_deleted),
-    INDEX idx_user_access (user_id, last_access_time),
+    INDEX idx_user_access (user_id, last_access_time desc),
+    INDEX idx_user_deleted_parent (user_id, is_deleted, parent_folder_id),
+    INDEX idx_user_deleted_filetype_filename (user_id, is_deleted, file_type, filename),
     FULLTEXT INDEX idx_filename (filename) WITH PARSER ngram
 );
+
 CREATE TABLE IF NOT EXISTS transfers_task
 (
     id               BIGINT AUTO_INCREMENT PRIMARY KEY,

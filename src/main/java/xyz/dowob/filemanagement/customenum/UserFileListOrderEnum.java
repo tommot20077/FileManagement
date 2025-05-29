@@ -12,7 +12,6 @@ import lombok.Getter;
  * 4. {@link #GENERAL_FILE}：一般檔案
  * 5. {@link #LAST}：最後面
  *
- *
  * @author yuan
  * @program FileManagement
  * @ClassName UserFileListOrderEnum
@@ -52,6 +51,7 @@ public enum UserFileListOrderEnum {
      */
     private final Integer order;
 
+
     /**
      * 用於定義用戶文件列表排序類型的排序
      *
@@ -67,5 +67,28 @@ public enum UserFileListOrderEnum {
      */
     UserFileListOrderEnum() {
         this.order = this.ordinal() * 100;
+    }
+
+
+    /**
+     * 根據文件類型獲取對應的排序值
+     * 若文件類型為 null，則返回 LAST 的排序值
+     * 若文件類型不在枚舉中，則返回 GENERAL_FILE 的排序值
+     *
+     * @param fileEnum 文件類型枚舉
+     *
+     * @return 對應的排序值
+     */
+    public static int getOrder(FileEnum fileEnum) {
+        if (fileEnum == null) {
+            return LAST.getOrder();
+        }
+
+        for (UserFileListOrderEnum orderEnum : UserFileListOrderEnum.values()) {
+            if (orderEnum.name().equals(fileEnum.name())) {
+                return orderEnum.getOrder();
+            }
+        }
+        return GENERAL_FILE.getOrder();
     }
 }

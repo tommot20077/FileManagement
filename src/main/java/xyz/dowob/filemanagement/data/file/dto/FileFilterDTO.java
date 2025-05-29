@@ -35,17 +35,20 @@ public class FileFilterDTO {
     /**
      * 文件類型限制
      */
-    private List<FileEnum> types;
+    @Builder.Default
+    private List<FileEnum> types = new ArrayList<>();
 
     /**
      * 分頁頁碼
      */
-    private Integer page;
+    @Builder.Default
+    private Integer page = 1;
 
     /**
-     * 分頁大小
+     * 分頁大小，默認為 0 會使用系統默認的分頁大小
      */
-    private Integer pageSize;
+    @Builder.Default
+    private Integer pageSize = 0;
 
     /**
      * 開始時間
@@ -60,12 +63,15 @@ public class FileFilterDTO {
     /**
      * 是否包含已刪除的文件
      */
-    private Boolean includeDeleted;
+    @Builder.Default
+    private boolean includeDeleted = false;
 
     /**
      * 是否包含已共享的文件
      */
-    private Boolean includeShared;
+    @Builder.Default
+    private boolean includeShared = false;
+
 
     /**
      * 全參數構造函數，對部分參數進行了空值處理
@@ -89,6 +95,7 @@ public class FileFilterDTO {
         this.includeDeleted = Objects.requireNonNullElse(includeDeleted, false);
         this.includeShared = Objects.requireNonNullElse(includeShared, false);
     }
+
 
     /**
      * 判斷過濾條件是否為空
