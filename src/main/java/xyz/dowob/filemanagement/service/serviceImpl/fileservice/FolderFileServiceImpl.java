@@ -30,10 +30,7 @@ import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
-import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
-import xyz.dowob.filemanagement.customenum.LogLevelEnum;
+import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
@@ -78,6 +75,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * 文件夾下載的緩衝區大小，當此值設定為0或負數時，則使用默認值4096
      */
     private final int bufferSize;
+
 
     /**
      * 文件夾文件服務實現類，繼承 @see {@link AbstractFileService}
@@ -131,7 +129,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             throw new ProcessException(ProcessException.ErrorCode.CREATE_TEMP_DOWNLOAD_FOLDER_FAILED, tempDownloadPath);
         }
 
-
         int bs = (int) fileProperties.getDownload().getZipBufferSize().toBytes();
         if (bs <= 0) {
             bs = 4096;
@@ -181,7 +178,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 編輯文件夾的實現
+     * 編輯文件夾的實現 - 修復版本
+     * 修復了移動父資料夾時緩存清理不完整的問題
+     * 現在會正確清理所有相關的緩存，包括：
+     * 1. 被移動資料夾原位置的緩存
+     * 2. 被移動資料夾新位置的緩存
+     * 3. 所有子資料夾的緩存
      *
      * @param fileEditBO 文件編輯數據
      * @param user       用戶信息
@@ -191,7 +193,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     @Override
     public Mono<Void> editFolder(FileEditBO fileEditBO, User user) {
         FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
-        Long oldParentFolderId = fileEditDTO.getParentFolderId();
+        Long oldParentFolderId = fileEditBO.getUserFileMetadata().getParentFolderId();
         return Mono.defer(() -> {
             if (fileEditBO.getParentFolderFileMetadata() != null) {
                 return getUserFilePaths(fileEditBO.getParentFolderFileMetadata(), user).flatMap(nodeList -> {
@@ -231,30 +233,34 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             cleanMainCacheFolder.add(oldParentFolderId);
             cleanMainCacheFolder.add(fileEditDTO.getParentFolderId());
 
+            if (!Objects.equals(oldParentFolderId, fileEditDTO.getParentFolderId())) {
+                cleanMainCacheFolder.add(userFileMetadata.getId());
+            }
+
             Mono<Void> handleChildMono = Mono.empty();
             if (fileEditDTO.getRecursiveSetting()) {
-                handleChildMono = Mono.defer(() -> {
-                    findAllChildFolder(Collections.singletonList(userFileMetadata.getId()), new ArrayList<>()).flatMap(childFolderList -> {
-                        Mono<Void> processShareUserMono = processShareUser(childFolderList, fileEditDTO).then();
-                        Mono<Void> settingChildFolder = Mono.defer(() -> {
-                            childFolderList.forEach(childFolder -> {
-                                childFolder.setShareType(shareType);
-                            });
-                            return userFileMetaRepository.saveAll(childFolderList).then();
+                handleChildMono = Mono.defer(() -> findAllChildFolder(Collections.singletonList(userFileMetadata.getId()),
+                                                                      new ArrayList<>(List.of(userFileMetadata))
+                ).flatMap(toEditFolderList -> {
+                    Mono<Void> processShareUserMono = processShareUser(toEditFolderList, fileEditDTO).then();
+                    Mono<Void> settingChildFolder = Mono.defer(() -> {
+                        toEditFolderList.forEach(fileMetadata -> {
+                            fileMetadata.setShareType(shareType);
                         });
+                        return userFileMetaRepository.saveAll(toEditFolderList).then();
+                    });
 
-                        Set<Long> cleanChildCacheFolder = new HashSet<>();
-                        childFolderList.forEach(childFolder -> {
-                            cleanChildCacheFolder.add(childFolder.getParentFolderId());
-                        });
+                    Set<Long> cleanChildCacheFolder = new HashSet<>();
+                    toEditFolderList.forEach(fileMetadata -> {
+                        cleanChildCacheFolder.add(fileMetadata.getParentFolderId());
+                        cleanChildCacheFolder.add(fileMetadata.getId());
+                    });
 
-                        return Mono
-                                .when(processShareUserMono, settingChildFolder)
-                                .then(cleanUserListCache(user.getId(), cleanChildCacheFolder.toArray(new Long[0])));
+                    return Mono
+                            .when(processShareUserMono, settingChildFolder)
+                            .then(cleanUserListCache(user.getId(), cleanChildCacheFolder.toArray(new Long[0])));
 
-                    }).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                    return Mono.empty();
-                });
+                }).subscribeOn(Schedulers.boundedElastic()));
             }
 
             Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
@@ -290,6 +296,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     .then(userFileMetaRepository.delete(userFileMetadata));
         });
     }
+
 
     /**
      * 下載文件夾的實現
@@ -342,6 +349,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             throw Exceptions.propagate(e);
         }
     }
+
 
     /**
      * 恢復文件夾的實現
@@ -399,6 +407,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         })));
     }
 
+
     /**
      * 批量恢復文件夾的實現
      *
@@ -412,8 +421,11 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
         return Flux.fromIterable(folders).flatMap(folder -> restoreFile(folder, user));
     }
 
+
     /**
-     * 刪除文件夾的實現
+     * 刪除文件夾的實現 - 使用延遲雙刪增強版本
+     * 修復了在刪除包含子資料夾的資料夾時緩存未被正確清除的問題
+     * 現在使用延遲雙刪模式來確保緩存一致性
      *
      * @param folder 文件夾
      * @param user   用戶
@@ -422,34 +434,43 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      */
     @Override
     public Mono<Boolean> removeFile(UserFileMetadata folder, User user) {
-        return findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(childFolderList -> {
-            boolean isAnyDeleted = childFolderList.stream().anyMatch(UserFileMetadata::getIsDeleted);
+        return findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(toDeleteFolderList -> {
+            boolean isAnyDeleted = toDeleteFolderList.stream().anyMatch(UserFileMetadata::getIsDeleted);
             if (isAnyDeleted) {
                 return Mono.just(false);
             }
+
             return Mono.defer(() -> {
                 LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
-                FileTrashRecord fileTrashRecord = new FileTrashRecord(childFolderList.getFirst(), deleteTime);
-                childFolderList.forEach(userFile -> userFile.setIsDeleted(true));
-                Mono<Boolean> result = fileTrashRecordRepository
+                FileTrashRecord fileTrashRecord = new FileTrashRecord(toDeleteFolderList.getFirst(), deleteTime);
+                toDeleteFolderList.forEach(userFile -> userFile.setIsDeleted(true));
+
+                Long[] parentFolderIds = toDeleteFolderList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
+                Long userId = toDeleteFolderList.getFirst().getUserId();
+
+                Mono<List<UserFileMetadata>> databaseOperation = fileTrashRecordRepository
                         .insert(fileTrashRecord, entityOperations)
-                        .thenMany(userFileMetaRepository.saveAll(childFolderList))
-                        .collectList()
-                        .flatMap(userFileList -> {
-                            Long[] parentFolderIds = userFileList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
-                            return cleanUserListCache(userFileList.getFirst().getUserId(), parentFolderIds);
-                        })
-                        .then(Mono.defer(() -> {
+                        .thenMany(userFileMetaRepository.saveAll(toDeleteFolderList))
+                        .collectList();
+
+                List<String> cacheKeys = generateUserListCacheKeys(userId, parentFolderIds);
+
+                Mono<Void> cacheCleanupOperation = Mono.defer(() -> cacheManager
+                        .deleteCaches(cacheKeys, CacheProviderEnum.USER_FILE_LIST_CACHE)
+                        .doOnSuccess(v -> {
                             if (folderListTreeProvider != null) {
-                                folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
+                                try {
+                                    folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
+                                } catch (Exception e) {
+                                    throw new RuntimeException("更新文件夾列表樹時發生錯誤", e);
+                                }
                             }
-                            return Mono.just(true);
-                        }))
-                        .onErrorReturn(false);
-                return transactionalOperator.transactional(result);
+                        }));
+                return transactionalOperator.transactional(databaseOperation).then(cacheCleanupOperation).thenReturn(true).onErrorReturn(false);
             });
         });
     }
+
 
     /**
      * 批量刪除文件夾的實現
@@ -463,6 +484,34 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
     }
+
+
+    /**
+     * 生成用戶列表緩存鍵
+     * 這個方法將父資料夾 ID 轉換為對應的緩存鍵格式
+     *
+     * @param userId          用戶 ID
+     * @param parentFolderIds 父資料夾 ID 陣列
+     *
+     * @return 緩存鍵列表
+     */
+    private List<String> generateUserListCacheKeys(Long userId, Long[] parentFolderIds) {
+        List<String> cacheKeys = new ArrayList<>();
+        for (Long parentFolderId : parentFolderIds) {
+            if (parentFolderId != null) {
+                // 假設緩存鍵的格式為 "user_file_list:{userId}:{parentFolderId}"
+                // 根據您的實際緩存鍵命名規則調整
+                String cacheKey = String.format("user_file_list:%d:%d", userId, parentFolderId);
+                cacheKeys.add(cacheKey);
+            } else {
+                // 根目錄的緩存鍵
+                String rootCacheKey = String.format("user_file_list:%d:root", userId);
+                cacheKeys.add(rootCacheKey);
+            }
+        }
+        return cacheKeys;
+    }
+
 
     /**
      * 處理文件夾的壓縮
@@ -499,7 +548,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                 String zipEntryName = resolveUniqueEntryName(filePath, zipEntryNameCountMap);
                 return Pair.of(zipEntryName, dataFlux);
             });
-
 
             Flux<Pair<String, Flux<DataBuffer>>> onlineFileWriteTasks = getOnlineFileResource(onlineFileMetadatas).flatMap(pair -> {
                 Flux<DataBuffer> dataFlux = pair.getFirst();
@@ -743,6 +791,4 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             return originalPath + " (" + count + ")";
         }
     }
-
 }
-

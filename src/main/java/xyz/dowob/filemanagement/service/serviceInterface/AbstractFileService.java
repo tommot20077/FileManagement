@@ -251,12 +251,12 @@ public abstract class AbstractFileService implements FileService {
 
         return Mono.just(file).flatMap(userFileMetadata -> {
             if (folderListTreeProvider != null) {
-                LogUnity.trace("使用 FolderListTreeProvider 獲取用戶文件路徑");
+                LogUnity.trace("使用 FolderListTreeProvider 獲取用戶: %s 檔案路徑", user.getUsername());
                 List<FolderListTreeProvider.FolderNode> path = folderListTreeProvider.getPath(user.getId(), file.getId());
                 return Mono.just(path);
             }
 
-            LogUnity.trace("使用 UserFileMetaRepository 獲取用戶文件路徑");
+            LogUnity.trace("使用 UserFileMetaRepository 獲取用戶: %s 檔案路徑", user.getUsername());
             return Flux
                     .just(userFileMetadata)
                     .expand(metadata -> Optional
@@ -588,25 +588,23 @@ public abstract class AbstractFileService implements FileService {
     public Mono<Void> editFile(FileEditBO fileEditBO, User user) {
         FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
         UserFileMetadata userFileMetadata = fileEditBO.getUserFileMetadata();
+        List<Long> cleanCacheList = new ArrayList<>(List.of(userFileMetadata.getParentFolderId(), fileEditDTO.getParentFolderId()));
         Mono<UserFileMetadata> processShareUserMono = processShareUser(Collections.singletonList(userFileMetadata), fileEditDTO).next();
-        Mono<UserFileMetadata> processFileMono = cacheManager
-                .deleteCache(getUserFileListBaseKey(user.getId(), userFileMetadata.getParentFolderId()), CacheProviderEnum.USER_FILE_LIST_CACHE)
-                .then(Mono.defer(() -> {
-                    userFileMetadata.setFilename(fileEditDTO.getFilename());
-                    userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
-                    userFileMetadata.setLastAccessTime(LocalDateTime.now());
+        Mono<UserFileMetadata> processFileMono = Mono.defer(() -> {
+            userFileMetadata.setFilename(fileEditDTO.getFilename());
+            userFileMetadata.setParentFolderId(fileEditDTO.getParentFolderId());
+            userFileMetadata.setLastAccessTime(LocalDateTime.now());
 
-                    FileShareTypeEnum shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
-                    userFileMetadata.setShareType(shareType);
+            FileShareTypeEnum shareType = Objects.requireNonNullElse(fileEditDTO.getShareType(), userFileMetadata.getShareType());
+            userFileMetadata.setShareType(shareType);
 
-                    Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
-                    userFileMetadata.setIsStar(isStar);
-                    return userFileMetaRepository.save(userFileMetadata);
-                }));
+            Boolean isStar = Objects.requireNonNullElse(fileEditDTO.getIsStar(), userFileMetadata.getIsStar());
+            userFileMetadata.setIsStar(isStar);
 
-        return Mono
-                .zip(processShareUserMono, processFileMono)
-                .flatMap(tuple2 -> cleanUserListCache(user.getId(), tuple2.getT2().getParentFolderId()));
+            return userFileMetaRepository.save(userFileMetadata);
+        });
+
+        return Mono.zip(processShareUserMono, processFileMono).then(cleanUserListCache(user.getId(), cleanCacheList.toArray(new Long[0])));
     }
 
 

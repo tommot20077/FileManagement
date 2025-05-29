@@ -197,6 +197,12 @@ public class ProcessException extends Exception {
          */
         HANDLE_WEBSOCKET_FAILED(1222, "處理WebSocket連線失敗 %s"),
 
+        /**
+         * 錯誤碼: 1223
+         * 錯誤信息: 更新文件夾樹失敗
+         */
+        UPDATE_FOLDER_TREE_FAILED(1223, "更新文件夾樹失敗, 用戶ID: %s, 文件夾ID: %s")
+
         ;
 
 

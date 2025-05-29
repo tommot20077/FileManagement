@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * @program FileManagement
  * @ClassName CacheManager
  * @create 2025/3/15
- * @Version 1.1
+ * @Version 1.3
  **/
 @Component
 @SuppressWarnings("unused")
@@ -41,22 +41,32 @@ public class CacheManager {
      * Redis鎖的前綴
      */
     private static final String LOCK_PREFIX = "cache_lock:";
-    /**
-     * Redis鎖的過期時間，設定為1分鐘
-     */
-    private static final Duration DEFAULT_EXPIRE_TIME = Duration.ofMinutes(1);
+
     /**
      * Redis鎖的值
      */
     private static final String LOCK_VALUE = "locked";
+
+    /**
+     * Redis鎖的過期時間，設定為 1 分鐘
+     */
+    private static final Duration DEFAULT_EXPIRE_TIME = Duration.ofMinutes(1);
+
+    /**
+     * 延遲雙刪的默認延遲時間，設定為 3 秒
+     */
+    private static final Duration DEFAULT_DELAYED_DELETE_TIME = Duration.ofSeconds(3);
+
     /**
      * 緩存提供者的Map，用於存儲不同類型的緩存提供者
      */
     private static final EnumMap<CacheProviderEnum, CacheProvider> cacheProviderMap = new EnumMap<>(CacheProviderEnum.class);
+
     /**
      * Redis 操作提供者
      */
     private final RedisProvider redisProvider;
+
 
     /**
      * 緩存管理器的構造方法，用於初始化緩存提供者列表
@@ -131,6 +141,7 @@ public class CacheManager {
                 .orElseGet(Flux::empty);
     }
 
+
     /**
      * 獲取緩存，根據key獲取緩存數據，此為批量查詢
      * 回傳值為Map，key為查詢的key，value為查詢的結果
@@ -149,6 +160,7 @@ public class CacheManager {
                 .orElseGet(Mono::empty);
     }
 
+
     /**
      * 獲取緩存，根據key獲取緩存數據，此為批量查詢
      * 將所有查詢結果合併為一個Flux
@@ -165,6 +177,7 @@ public class CacheManager {
                 .flatMapMany(map -> Flux.fromIterable(map.values()));
     }
 
+
     /**
      * 獲取緩存，根據key獲取緩存數據，此為批量查詢
      * 回傳值為Map，key為查詢的key，value為查詢的結果
@@ -178,6 +191,7 @@ public class CacheManager {
     public <R> Mono<Map<String, R>> getCaches(Collection<String> keys, Class<R> clazz, CacheProviderEnum cacheProviderEnum) {
         return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> provider.getAllAsMap(keys, clazz)).orElseGet(Mono::empty);
     }
+
 
     /**
      * 設置緩存，根據key設置緩存數據
@@ -206,82 +220,10 @@ public class CacheManager {
     public Mono<Void> setCache(String key, Object value, CacheProviderEnum cacheProviderEnum, Duration expire) {
         return Optional
                 .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> tryAcquireRedisLock(key, cacheProviderEnum).flatMap(acquired -> {
-                    if (Boolean.TRUE.equals(acquired)) {
-                        return provider
-                                .set(key, value, expire)
-                                .publishOn(Schedulers.boundedElastic())
-                                .doFinally(signal -> releaseRedisLock(key, cacheProviderEnum).subscribe());
-                    }
-                    return Mono.empty();
-                }))
+                .map(provider -> executeWithLock(Collections.singletonList(key), cacheProviderEnum, acquiredKeys -> provider.set(key, value, expire)))
                 .orElseGet(Mono::empty);
     }
 
-    /**
-     * 嘗試獲取單個 Redis 鎖
-     *
-     * @param key               業務 key (不含 prefix)
-     * @param cacheProviderEnum 用於生成完整 lock key
-     *
-     * @return Mono<Boolean> 如果成功獲取鎖，則返回 true，否則返回 false
-     */
-    private Mono<Boolean> tryAcquireRedisLock(String key, CacheProviderEnum cacheProviderEnum) {
-        String lockKey = LOCK_PREFIX + cacheProviderEnum.name() + ":" + key;
-        return redisProvider.setValueIfAbsent(lockKey, LOCK_VALUE, CacheManager.DEFAULT_EXPIRE_TIME).onErrorResume(e -> {
-            LogUnity.warn("無法獲取 Redis 鎖: %s", e, lockKey);
-            return Mono.just(false);
-        });
-    }
-
-    /**
-     * 釋放 Redis 鎖
-     *
-     * @param key               業務 key (不含 prefix)
-     * @param cacheProviderEnum 用於生成完整 lock key
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> releaseRedisLock(String key, CacheProviderEnum cacheProviderEnum) {
-        return releaseRedisLock(Collections.singletonList(key), cacheProviderEnum);
-    }
-
-    /**
-     * 釋放多個 Redis 鎖
-     *
-     * @param keys              業務 key 集合
-     * @param cacheProviderEnum 用於生成完整 lock key
-     *
-     * @return Mono<Long>
-     */
-    private Mono<Void> releaseRedisLock(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
-        if (keys == null || keys.isEmpty()) {
-            return Mono.empty();
-        }
-        List<String> lockKeyList = keys
-                .stream()
-                .map(key -> LOCK_PREFIX + cacheProviderEnum.name() + ":" + key)
-                .distinct()
-                .collect(Collectors.toList());
-        return releaseRedisLocksInternal(lockKeyList);
-    }
-
-    /**
-     * 釋放多個 Redis 鎖
-     *
-     * @param lockKeys 完整的 lock key 集合 (包含 prefix)
-     *
-     * @return Mono<Long> 返回成功刪除的 key 的數量
-     */
-    private Mono<Void> releaseRedisLocksInternal(Collection<String> lockKeys) {
-        if (lockKeys == null || lockKeys.isEmpty()) {
-            return Mono.empty();
-        }
-        return redisProvider.deleteValue(lockKeys).onErrorResume(e -> {
-            LogUnity.warn("無法釋放 Redis 鎖: %s", e, lockKeys);
-            return Mono.empty();
-        });
-    }
 
     /**
      * 設置緩存，根據key-value設置緩存數據，此為批量設置
@@ -295,72 +237,45 @@ public class CacheManager {
         return setCaches(keyValues, cacheProviderEnum, null);
     }
 
+
     /**
-     * 設置緩存，根據key-value設置緩存數據，此為批量設置，並設置過期時間
+     * 使用鎖執行操作的通用方法 - 修復版本
+     * 確保鎖的正確獲取、釋放，避免死鎖和鎖丟失問題
      *
-     * @param keyValues         key-value集合
-     * @param cacheProviderEnum 緩存提供者的類型
-     * @param expire            過期時間
+     * @param keys              業務 key 集合
+     * @param cacheProviderEnum 緩存提供者類型
+     * @param operation         需要執行的操作
      *
      * @return Mono<Void>
      */
-    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
-        return Optional
-                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> tryAcquireRedisLocks(keyValues.keySet(), cacheProviderEnum).flatMap(acquired -> {
-                    if (Boolean.TRUE.equals(acquired)) {
-                        return provider
-                                .setAll(keyValues, expire)
-                                .publishOn(Schedulers.boundedElastic())
-                                .doFinally(signal -> releaseRedisLock(keyValues.keySet(), cacheProviderEnum).subscribe());
-                    }
-                    return Mono.empty();
-                }))
-                .orElseGet(Mono::empty);
-    }
-
-    /**
-     * 嘗試獲取多個 Redis 鎖
-     * 依次嘗試獲取所有鎖，如果中途失敗，則回滾釋放已獲取的鎖。
-     *
-     * @param keys              業務 key 集合 (不含 prefix)
-     * @param cacheProviderEnum 用於生成完整 lock key
-     *
-     * @return Mono<Boolean> 如果成功獲取所有鎖，則返回 true，否則返回 false
-     */
-    private Mono<Boolean> tryAcquireRedisLocks(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+    private Mono<Void> executeWithLock(Collection<String> keys, CacheProviderEnum cacheProviderEnum, Function<Collection<String>, Mono<Void>> operation) {
         if (keys == null || keys.isEmpty()) {
-            return Mono.just(true);
+            return Mono.empty();
         }
-        List<String> lockKeyList = keys
+
+        List<String> lockKeys = keys
                 .stream()
                 .map(key -> LOCK_PREFIX + cacheProviderEnum.name() + ":" + key)
                 .sorted()
                 .distinct()
                 .collect(Collectors.toList());
 
-        List<String> acquiredLocks = new ArrayList<>();
-
-        return Flux
-                .fromIterable(lockKeyList)
-                .concatMap(lockKey -> redisProvider.setValueIfAbsent(lockKey, LOCK_VALUE, CacheManager.DEFAULT_EXPIRE_TIME).doOnSuccess(acquired -> {
-                    if (Boolean.TRUE.equals(acquired)) {
-                        acquiredLocks.add(lockKey);
-                    }
-                }).onErrorResume(e -> {
-                    LogUnity.warn("無法獲取 Redis 鎖: %s", e, lockKey);
-                    return Mono.just(false);
-                }))
-                .all(acquired -> acquired)
-                .flatMap(allAcquired -> {
-                    if (Boolean.TRUE.equals(allAcquired)) {
-                        return Mono.just(true);
-                    } else {
-                        LogUnity.debug("無法獲取全部所需要的鎖 [%s], 釋放已經獲取的鎖 : [%s]", keys, acquiredLocks);
-                        return releaseRedisLocksInternal(acquiredLocks).thenReturn(false);
-                    }
-                });
+        return Mono.usingWhen(tryAcquireAllLocks(lockKeys), acquiredLocks -> {
+                                  if (acquiredLocks.isEmpty()) {
+                                      LogUnity.debug("無法獲取鎖，跳過操作。緩存鍵: %s", keys);
+                                      return Mono.empty();
+                                  }
+                                  return operation.apply(keys);
+                              }, acquiredLocks -> releaseRedisLocksInternal(acquiredLocks).doOnSuccess(v -> {
+                                  LogUnity.debug("成功釋放鎖: %s", acquiredLocks);
+                              }), (acquiredLocks, throwable) -> releaseRedisLocksInternal(acquiredLocks).doOnSuccess(v -> {
+                                  LogUnity.debug("錯誤情況下成功釋放鎖: %s", acquiredLocks);
+                              }), acquiredLocks -> releaseRedisLocksInternal(acquiredLocks).doOnSuccess(v -> {
+                                  LogUnity.debug("取消情況下成功釋放鎖: %s", acquiredLocks);
+                              })
+        );
     }
+
 
     /**
      * 刪除緩存，根據key刪除緩存數據，此為同步刪除
@@ -374,29 +289,43 @@ public class CacheManager {
         return deleteCache(key, cacheProviderEnum, false);
     }
 
+
     /**
-     * 刪除緩存，根據key刪除緩存數據，可以設置是否異步
+     * 嘗試獲取所有鎖 - 修復版本
+     * 使用全有或全無的策略，如果無法獲取所有鎖，則釋放已獲取的鎖
      *
-     * @param key               key
-     * @param cacheProviderEnum 緩存提供者的類型
-     * @param isAsync           是否異步
+     * @param lockKeys 鎖鍵列表
      *
-     * @return Mono<Void>
+     * @return Mono<List < String>> 成功獲取的鎖鍵列表
      */
-    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
-        return Optional
-                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> tryAcquireRedisLock(key, cacheProviderEnum).flatMap(acquired -> {
+    private Mono<List<String>> tryAcquireAllLocks(List<String> lockKeys) {
+        List<String> acquiredLocks = new ArrayList<>();
+
+        return Flux
+                .fromIterable(lockKeys)
+                .concatMap(lockKey -> redisProvider.setValueIfAbsent(lockKey, LOCK_VALUE, DEFAULT_EXPIRE_TIME).doOnSuccess(acquired -> {
                     if (Boolean.TRUE.equals(acquired)) {
-                        return Mono.defer(() -> {
-                            Mono<Void> action = provider.delete(key);
-                            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
-                        }).publishOn(Schedulers.boundedElastic()).doFinally(signal -> releaseRedisLock(key, cacheProviderEnum).subscribe());
+                        acquiredLocks.add(lockKey);
+                        LogUnity.trace("成功獲取鎖: %s", lockKey);
+                    } else {
+                        LogUnity.trace("鎖已被佔用: %s", lockKey);
                     }
-                    return Mono.empty();
+                }).onErrorResume(e -> {
+                    LogUnity.warn("獲取鎖時發生錯誤: %s", e, lockKey);
+                    return Mono.just(false);
                 }))
-                .orElseGet(Mono::empty);
+                .all(Boolean.TRUE::equals)
+                .flatMap(allAcquired -> {
+                    if (Boolean.TRUE.equals(allAcquired)) {
+                        LogUnity.debug("成功獲取所有鎖: %s", acquiredLocks);
+                        return Mono.just(acquiredLocks);
+                    } else {
+                        LogUnity.debug("無法獲取全部鎖，釋放已獲取的鎖: %s", acquiredLocks);
+                        return releaseRedisLocksInternal(acquiredLocks).thenReturn(Collections.emptyList());
+                    }
+                });
     }
+
 
     /**
      * 刪除緩存，根據key刪除緩存數據，此為批量刪除，此為同步刪除
@@ -410,6 +339,67 @@ public class CacheManager {
         return deleteCaches(keys, cacheProviderEnum, false);
     }
 
+
+    /**
+     * 釋放多個 Redis 鎖 - 修復版本
+     *
+     * @param lockKeys 完整的 lock key 集合 (包含 prefix)
+     *
+     * @return Mono<Void>
+     */
+    private Mono<Void> releaseRedisLocksInternal(Collection<String> lockKeys) {
+        if (lockKeys == null || lockKeys.isEmpty()) {
+            return Mono.empty();
+        }
+
+        return redisProvider.deleteValue(lockKeys).doOnSuccess(deletedCount -> {
+            if (deletedCount > 0) {
+                LogUnity.trace("成功釋放 %d 個鎖: %s", deletedCount, lockKeys);
+            }
+        }).onErrorResume(e -> {
+            LogUnity.warn("釋放鎖時發生錯誤: %s，鎖鍵: %s", e, lockKeys);
+            return Mono.empty();
+        }).then();
+    }
+
+
+    /**
+     * 設置緩存，根據key-value設置緩存數據，此為批量設置，並設置過期時間
+     *
+     * @param keyValues         key-value集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param expire            過期時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> executeWithLock(keyValues.keySet(), cacheProviderEnum, acquiredKeys -> provider.setAll(keyValues, expire)))
+                .orElseGet(Mono::empty);
+    }
+
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，可以設置是否異步
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param isAsync           是否異步
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            return executeWithLock(Collections.singletonList(key), cacheProviderEnum, acquiredKeys -> {
+                                       Mono<Void> action = provider.delete(key);
+                                       return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
+                                   }
+            );
+        }).orElseGet(Mono::empty);
+    }
+
+
     /**
      * 刪除緩存，根據key刪除緩存數據，此為批量刪除，並且可以設置是否異步
      *
@@ -420,20 +410,180 @@ public class CacheManager {
      * @return Mono<Void>
      */
     public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum, boolean isAsync) {
-        return Optional
-                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> tryAcquireRedisLocks(keys, cacheProviderEnum).flatMap(acquired -> {
-                    if (Boolean.TRUE.equals(acquired)) {
-                        return Mono.defer(() -> {
-                            Mono<Void> action = provider.deleteAll(keys);
-                            return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
-                        }).publishOn(Schedulers.boundedElastic()).doFinally(signal -> releaseRedisLock(keys, cacheProviderEnum).subscribe());
-                    }
-                    return Mono.empty();
-                }))
-                .orElseGet(Mono::empty);
-
+        return Optional.ofNullable(cacheProviderMap.get(cacheProviderEnum)).map(provider -> {
+            return executeWithLock(keys, cacheProviderEnum, acquiredKeys -> {
+                                       Mono<Void> action = provider.deleteAll(keys);
+                                       return isAsync ? action.subscribeOn(Schedulers.boundedElastic()) : action;
+                                   }
+            );
+        }).orElseGet(Mono::empty);
     }
+
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，使用延遲雙刪模式（默認延遲3秒）
+     * 延遲雙刪模式：立即刪除一次 -> 延遲指定時間 -> 再次刪除
+     * 這種模式可以有效防止緩存與數據庫的不一致問題
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCacheWithDelayedDoubleDelete(String key, CacheProviderEnum cacheProviderEnum) {
+        return deleteCacheWithDelayedDoubleDelete(key, cacheProviderEnum, DEFAULT_DELAYED_DELETE_TIME);
+    }
+
+
+    /**
+     * 刪除緩存，根據key刪除緩存數據，使用延遲雙刪模式（自定義延遲時間）
+     * 延遲雙刪模式：立即刪除一次 -> 延遲指定時間 -> 再次刪除
+     * 這種模式可以有效防止緩存與數據庫的不一致問題
+     *
+     * @param key               key
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param delayTime         延遲時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCacheWithDelayedDoubleDelete(String key, CacheProviderEnum cacheProviderEnum, Duration delayTime) {
+        return deleteCacheWithDelayedDoubleDelete(Collections.singletonList(key), cacheProviderEnum, delayTime);
+    }
+
+
+    /**
+     * 批量刪除緩存，使用延遲雙刪模式（自定義延遲時間）- 修復版本
+     * 延遲雙刪模式：立即刪除一次 -> 延遲指定時間 -> 再次刪除
+     * 這種模式可以有效防止緩存與數據庫的不一致問題
+     * <p>
+     * 修復問題：
+     * 1. 同步釋放 Redis 鎖，避免鎖丟失
+     * 2. 確保鎖的正確獲取和釋放
+     * 3. 改進錯誤處理機制
+     *
+     * @param keys              key集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param delayTime         延遲時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCacheWithDelayedDoubleDelete(Collection<String> keys, CacheProviderEnum cacheProviderEnum, Duration delayTime) {
+        if (keys == null || keys.isEmpty()) {
+            return Mono.empty();
+        }
+
+        CacheProvider provider = cacheProviderMap.get(cacheProviderEnum);
+        if (provider == null) {
+            return Mono.empty();
+        }
+
+        Mono<Void> firstDelete = executeWithLock(keys, cacheProviderEnum, acquiredLockKeys -> {
+                                                     LogUnity.trace("執行延遲雙刪第一次刪除，緩存鍵: %s，獲取到的鎖: %s", keys, acquiredLockKeys);
+                                                     return provider.deleteAll(keys).onErrorResume(e -> {
+                                                         LogUnity.info("延遲雙刪第一次刪除失敗，緩存鍵: %s", e, keys);
+                                                         return Mono.empty();
+                                                     });
+                                                 }
+        ).doOnError(e -> LogUnity.info("延遲雙刪第一次刪除無法獲取鎖，緩存鍵: %s", keys)).onErrorResume(e -> Mono.empty());
+
+        Mono<Void> delayedDelete = Mono
+                .delay(delayTime, Schedulers.boundedElastic())
+                .then(executeWithLock(keys, cacheProviderEnum, acquiredLockKeys -> {
+                                          LogUnity.trace("執行延遲雙刪第二次刪除（延遲 %s 毫秒），緩存鍵: %s，獲取到的鎖: %s", delayTime.toMillis(), keys, acquiredLockKeys);
+                                          return provider.deleteAll(keys).onErrorResume(e -> {
+                                              LogUnity.info("延遲雙刪第二次刪除失敗，緩存鍵: %s", e, keys);
+                                              return Mono.empty();
+                                          });
+                                      }
+                ))
+                .doOnError(e -> LogUnity.info("延遲雙刪第二次刪除無法獲取鎖，緩存鍵: %s", keys))
+                .onErrorResume(e -> Mono.empty())
+                .subscribeOn(Schedulers.boundedElastic());
+
+        return firstDelete.doOnTerminate(delayedDelete::subscribe);
+    }
+
+
+    /**
+     * 批量刪除緩存，使用延遲雙刪模式（默認延遲3秒）
+     * 延遲雙刪模式：立即刪除一次 -> 延遲指定時間 -> 再次刪除
+     * 這種模式可以有效防止緩存與數據庫的不一致問題
+     *
+     * @param keys              key集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCachesWithDelayedDoubleDelete(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        return deleteCacheWithDelayedDoubleDelete(keys, cacheProviderEnum, DEFAULT_DELAYED_DELETE_TIME);
+    }
+
+
+    /**
+     * 嘗試獲取單個 Redis 鎖 - 已棄用，保留用於向後兼容
+     *
+     * @deprecated 使用 executeWithLock 替代
+     */
+    @Deprecated
+    private Mono<Boolean> tryAcquireRedisLock(String key, CacheProviderEnum cacheProviderEnum) {
+        String lockKey = LOCK_PREFIX + cacheProviderEnum.name() + ":" + key;
+        return redisProvider.setValueIfAbsent(lockKey, LOCK_VALUE, DEFAULT_EXPIRE_TIME).onErrorResume(e -> {
+            LogUnity.warn("無法獲取 Redis 鎖: %s", e, lockKey);
+            return Mono.just(false);
+        });
+    }
+
+
+    /**
+     * 釋放 Redis 鎖 - 已棄用，保留用於向後兼容
+     *
+     * @deprecated 使用 executeWithLock 替代
+     */
+    @Deprecated
+    private Mono<Void> releaseRedisLock(String key, CacheProviderEnum cacheProviderEnum) {
+        return releaseRedisLock(Collections.singletonList(key), cacheProviderEnum);
+    }
+
+
+    /**
+     * 釋放多個 Redis 鎖 - 已棄用，保留用於向後兼容
+     *
+     * @deprecated 使用 executeWithLock 替代
+     */
+    @Deprecated
+    private Mono<Void> releaseRedisLock(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        if (keys == null || keys.isEmpty()) {
+            return Mono.empty();
+        }
+        List<String> lockKeyList = keys
+                .stream()
+                .map(key -> LOCK_PREFIX + cacheProviderEnum.name() + ":" + key)
+                .distinct()
+                .collect(Collectors.toList());
+        return releaseRedisLocksInternal(lockKeyList);
+    }
+
+
+    /**
+     * 嘗試獲取多個 Redis 鎖 - 已棄用，保留用於向後兼容
+     *
+     * @deprecated 使用 executeWithLock 替代
+     */
+    @Deprecated
+    private Mono<Boolean> tryAcquireRedisLocks(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        if (keys == null || keys.isEmpty()) {
+            return Mono.just(true);
+        }
+        List<String> lockKeyList = keys
+                .stream()
+                .map(key -> LOCK_PREFIX + cacheProviderEnum.name() + ":" + key)
+                .sorted()
+                .distinct()
+                .collect(Collectors.toList());
+
+        return tryAcquireAllLocks(lockKeyList).map(acquiredLocks -> !acquiredLocks.isEmpty());
+    }
+
 
     /**
      * 獲取Mono的緩存，如果緩存不存在則執行source並將結果存入緩存
@@ -452,6 +602,7 @@ public class CacheManager {
         return runAndSetCache(key, clazz, cacheProviderEnum, source, cacheRules, null);
     }
 
+
     /**
      * 獲取Mono的緩存，如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
      *
@@ -469,15 +620,13 @@ public class CacheManager {
         return Optional
                 .ofNullable(cacheProviderMap.get(cacheProviderEnum))
                 .map(provider -> provider.get(key, clazz).switchIfEmpty(Mono.defer(() -> source.doOnNext(value -> {
-                    tryAcquireRedisLock(key, cacheProviderEnum)
-                            .filter(Boolean.TRUE::equals)
-                            .flatMap(acquired -> applyCacheRule(cacheRules, value, expire))
-                            .doFinally(signal -> releaseRedisLock(key, cacheProviderEnum).subscribe())
+                    executeWithLock(Collections.singletonList(key), cacheProviderEnum, acquiredKeys -> applyCacheRule(cacheRules, value, expire))
                             .subscribeOn(Schedulers.boundedElastic())
                             .subscribe();
                 }))))
                 .orElseGet(() -> source.cast(clazz));
     }
+
 
     /**
      * 應用緩存規則，將緩存規則應用到需要緩存的值上
@@ -504,6 +653,7 @@ public class CacheManager {
         return Mono.when(cacheRules.stream().map(rule -> rule.apply(value, expire)).toList()).subscribeOn(Schedulers.boundedElastic());
     }
 
+
     /**
      * 獲取Flux的緩存，此方法為批量查詢並返回一個結果流
      * 如果緩存不存在則執行source並將結果存入緩存
@@ -521,6 +671,7 @@ public class CacheManager {
     public <R> Flux<R> runAndSetCache(Collection<String> keys, Class<R> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends R> source, List<CacheRule<R>> cacheRules) {
         return runAndSetCache(keys, clazz, cacheProviderEnum, source, cacheRules, null);
     }
+
 
     /**
      * 獲取Flux的緩存，此方法為批量查詢並返回一個結果流
@@ -542,20 +693,15 @@ public class CacheManager {
                 return Flux.fromIterable(map.values());
             }
             return Flux.defer(() -> source.collectList().flatMapMany(valueList -> {
-                return tryAcquireRedisLocks(keys, cacheProviderEnum).flatMapMany(acquired -> {
-                    if (Boolean.TRUE.equals(acquired)) {
-                        return Flux
-                                .fromIterable(valueList)
-                                .doOnNext(value -> applyCacheRule(cacheRules, value, expire)
-                                        .doFinally(signal -> releaseRedisLock(keys, cacheProviderEnum).subscribe())
-                                        .subscribeOn(Schedulers.boundedElastic())
-                                        .subscribe());
-                    }
-                    return Flux.fromIterable(valueList);
-                });
+                executeWithLock(keys,
+                                cacheProviderEnum,
+                                acquiredKeys -> Flux.fromIterable(valueList).flatMap(value -> applyCacheRule(cacheRules, value, expire)).then()
+                ).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                return Flux.fromIterable(valueList);
             }));
         })).orElseGet(() -> source.cast(clazz));
     }
+
 
     /**
      * 獲取Mono的Map緩存，如果緩存不存在則執行source並將結果存入緩存
@@ -575,6 +721,7 @@ public class CacheManager {
         return runAndSetCaches(keys, clazz, cacheProviderEnum, source, cacheRules, null);
     }
 
+
     /**
      * 獲取Mono的Map緩存，如果緩存不存在則執行source並將結果存入緩存
      * 適用於批量查詢，會將結果依照key存入Map
@@ -592,21 +739,18 @@ public class CacheManager {
         return Optional
                 .ofNullable(cacheProviderMap.get(cacheProviderEnum))
                 .map(provider -> provider.getAllAsMap(keys, clazz).switchIfEmpty(Mono.defer(() -> source.apply(keys).doOnNext(resultMap -> {
-                    tryAcquireRedisLocks(keys, cacheProviderEnum).flatMap(acquired -> {
-                        if (Boolean.TRUE.equals(acquired)) {
-                            return Mono.when(resultMap.entrySet().stream().map(entry -> {
-                                String key = entry.getKey();
-                                R value = entry.getValue();
-                                return applyCacheRule(cacheRules, value, expire).doFinally(signal -> releaseRedisLock(key, cacheProviderEnum)
-                                        .subscribeOn(Schedulers.boundedElastic())
-                                        .subscribe());
-                            }).toList());
-                        }
-                        return Mono.empty();
-                    }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                    executeWithLock(keys,
+                                    cacheProviderEnum,
+                                    acquiredKeys -> Mono.when(resultMap
+                                                                      .entrySet()
+                                                                      .stream()
+                                                                      .map(entry -> applyCacheRule(cacheRules, entry.getValue(), expire))
+                                                                      .toList())
+                    ).subscribeOn(Schedulers.boundedElastic()).subscribe();
                 }))))
                 .orElseGet(() -> source.apply(keys));
     }
+
 
     /**
      * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存
@@ -623,6 +767,7 @@ public class CacheManager {
     public <R> Flux<R> runAndSetCache(String key, Class<R> clazz, CacheProviderEnum cacheProviderEnum, Flux<? extends R> source, List<CacheRule<R>> cacheRules) {
         return runAndSetCache(key, clazz, cacheProviderEnum, source, cacheRules, null);
     }
+
 
     /**
      * 獲取Flux的緩存，如果緩存不存在則執行source並將結果存入緩存，並設置過期時間
@@ -643,20 +788,18 @@ public class CacheManager {
                     .getAsList(key, clazz)
                     .flatMapMany(Flux::fromIterable)
                     .switchIfEmpty(Flux.defer(() -> source.collectList().flatMapMany(valueList -> {
-                        return tryAcquireRedisLock(key, cacheProviderEnum).flatMapMany(acquired -> {
-                            if (Boolean.TRUE.equals(acquired)) {
-                                return Flux
-                                        .fromIterable(valueList)
-                                        .doOnNext(value -> applyCacheRule(cacheRules, value, expire)
-                                                .doFinally(signal -> releaseRedisLock(key, cacheProviderEnum).subscribe())
-                                                .subscribeOn(Schedulers.boundedElastic())
-                                                .subscribe());
-                            }
-                            return Flux.fromIterable(valueList);
-                        });
+                        executeWithLock(Collections.singletonList(key),
+                                        cacheProviderEnum,
+                                        acquiredKeys -> Flux
+                                                .fromIterable(valueList)
+                                                .flatMap(value -> applyCacheRule(cacheRules, value, expire))
+                                                .then()
+                        ).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                        return Flux.fromIterable(valueList);
                     })));
         }).orElseGet(() -> source.cast(clazz));
     }
+
 
     /**
      * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定回傳值的某項屬性作為key
@@ -677,6 +820,7 @@ public class CacheManager {
                     .orElseGet(Mono::empty);
         };
     }
+
 
     /**
      * 生成緩存規則，用於將緩存規則封裝成CacheRule，並且指定key

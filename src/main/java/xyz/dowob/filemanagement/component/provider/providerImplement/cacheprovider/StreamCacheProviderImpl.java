@@ -59,10 +59,11 @@ public class StreamCacheProviderImpl implements CacheProvider {
      */
     private final int CHUNK_SIZE;
 
+
     /**
      * 文件流緩存提供者實現類的構造方法
      *
-     * @param redisProvider Redis操作提供者
+     * @param redisProvider   Redis操作提供者
      * @param cacheProperties 緩存配置
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
@@ -248,6 +249,7 @@ public class StreamCacheProviderImpl implements CacheProvider {
         });
     }
 
+
     /**
      * 刪除未完成的緩存
      *
@@ -261,8 +263,9 @@ public class StreamCacheProviderImpl implements CacheProvider {
         for (int i = 1; i <= totalChunks; i++) {
             keysToDelete.add(key + "_" + i);
         }
-        return redisProvider.deleteHash(CACHE_PREFIX, keysToDelete).retryWhen(Retry.backoff(3, Duration.ofMinutes(1)));
+        return redisProvider.deleteHash(CACHE_PREFIX, keysToDelete).retryWhen(Retry.backoff(3, Duration.ofMinutes(1))).then();
     }
+
 
     /**
      * 將base64格式的字符串轉換為流
