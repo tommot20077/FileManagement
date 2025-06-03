@@ -13,6 +13,8 @@ import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenPro
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.exception.ProcessException;
+import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +39,7 @@ public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
      */
     private final TokenStrategy tokenStrategy;
 
+
     /**
      * 實現 ReactiveAuthenticationManager 的 authenticate 方法
      *
@@ -49,15 +52,25 @@ public class JwtAuthenticationManager implements ReactiveAuthenticationManager {
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<Authentication> authenticate(Authentication authentication) {
-        String token = authentication.getCredentials().toString();
-        JwtTokenProviderImpl jwtTokenProvider = (JwtTokenProviderImpl) tokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
+        if (authentication == null || authentication.getCredentials() == null) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.AUTHENTICATION_FAILED));
+        }
+
         return Mono.defer(() -> {
+            String token = authentication.getCredentials().toString();
+            JwtTokenProviderImpl jwtTokenProvider = (JwtTokenProviderImpl) tokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
+
             Mono<Long> userId = jwtTokenProvider.validateToken(token, null);
             return userId.flatMap(id -> jwtTokenProvider.getClaimsFromToken(token).map(claims -> claims.get("role")).map(roles -> {
                 List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority((String) roles));
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(id, token, authorities);
                 return (Authentication) auth;
             }));
+        }).onErrorResume(e -> {
+            if (e instanceof ValidationException) {
+                return Mono.error(e);
+            }
+            return Mono.error(new ProcessException(ProcessException.ErrorCode.AUTHENTICATION_ERROR, e));
         });
     }
 }

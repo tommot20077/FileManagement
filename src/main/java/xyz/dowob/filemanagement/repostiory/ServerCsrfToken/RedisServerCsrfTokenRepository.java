@@ -35,6 +35,7 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
      */
     private final RedisProvider redisProvider;
 
+
     /**
      * 初始化屬性
      */
@@ -88,7 +89,8 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
         if (userToken == null) {
             return Mono.error(new ValidationException(ValidationException.ErrorCode.MISSING_CSRF_TOKEN));
         }
-        return redisProvider.getHashMap(csrfTokenHeader, userToken, Integer.class)
+        return redisProvider
+                .getHashMap(csrfTokenHeader, userToken, Integer.class)
                 .switchIfEmpty(Mono.error(new ValidationException(ValidationException.ErrorCode.INVALID_CSRF_TOKEN)))
                 .flatMap(time -> {
                     if (time < Instant.now().getEpochSecond()) {
@@ -106,12 +108,15 @@ public class RedisServerCsrfTokenRepository extends AbstractServerCsrfTokenRepos
     public Mono<Void> deleteToken(CsrfToken token) {
         Long expireTime = Instant.now().getEpochSecond();
         if (token != null && token.getToken() != null) {
-            return redisProvider.deleteHash(csrfTokenHeader, token.getToken());
+            return redisProvider.deleteHash(csrfTokenHeader, token.getToken()).then();
         }
 
-        return redisProvider.getAllHashMap(csrfTokenHeader, String.class, Long.class)
+        return redisProvider
+                .getAllHashMap(csrfTokenHeader, String.class, Long.class)
                 .filter(entry -> entry.getValue() < expireTime)
                 .map(Map.Entry::getKey)
-                .collectList().flatMap(expireTokens -> redisProvider.deleteHash(csrfTokenHeader, expireTokens));
+                .collectList()
+                .flatMap(expireTokens -> redisProvider.deleteHash(csrfTokenHeader, expireTokens))
+                .then();
     }
 }

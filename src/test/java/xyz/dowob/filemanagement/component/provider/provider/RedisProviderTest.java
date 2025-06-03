@@ -196,9 +196,8 @@ class RedisProviderTest {
     void deleteByPattern_noMatches_completes() {
         String pattern = "test*";
         when(mockRedisTemplate.keys(pattern)).thenReturn(Flux.empty());
-        when(mockRedisTemplate.delete(any(String[].class))).thenReturn(Mono.just(0L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteByPattern(pattern)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteByPattern(pattern)).expectFusion(0);
     }
 
     @Test
@@ -218,7 +217,7 @@ class RedisProviderTest {
         Collection<String> keys = Arrays.asList("key1", "key2", "nonexistent");
         when(mockRedisTemplate.delete(any(String[].class))).thenReturn(Mono.just(2L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteValue(keys)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteValue(keys)).expectFusion(2);
     }
 
     @Test
@@ -319,7 +318,7 @@ class RedisProviderTest {
         when(mockRedisTemplate.opsForList()).thenReturn(listOps);
         when(listOps.remove(eq(key), eq(1L), eq(value))).thenReturn(Mono.just(1L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteList(key, value)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteList(key, value)).expectFusion(1);
     }
 
     @Test
@@ -347,7 +346,7 @@ class RedisProviderTest {
         when(mockRedisTemplate.opsForZSet()).thenReturn(zSetOps);
         when(zSetOps.removeRange(eq(key), any(Range.class))).thenReturn(Mono.just(2L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteZset(key, start, end)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteZset(key, start, end)).expectFusion(2);
     }
 
     @Test
@@ -377,7 +376,7 @@ class RedisProviderTest {
         when(mockRedisTemplate.opsForSet()).thenReturn(setOps);
         when(setOps.remove(eq(key), eq(value))).thenReturn(Mono.just(1L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteSet(key, value)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteSet(key, value)).expectFusion(1);
     }
 
     @Test
@@ -440,9 +439,8 @@ class RedisProviderTest {
     void deleteByPattern_invalidPattern_returnsEmpty() {
         String pattern = "[invalid";
         when(mockRedisTemplate.keys(pattern)).thenReturn(Flux.empty());
-        when(mockRedisTemplate.delete(any(String[].class))).thenReturn(Mono.just(0L));
 
-        StepVerifier.create(redisProviderUnderTest.deleteByPattern(pattern)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteByPattern(pattern)).expectFusion(0);
     }
 
     @Test
@@ -556,7 +554,7 @@ class RedisProviderTest {
         List<String> keys = Arrays.asList("key1", "key2", "key3", "key4");
         when(mockRedisTemplate.delete(any(String[].class))).thenReturn(Mono.just((long) keys.size()));
 
-        StepVerifier.create(redisProviderUnderTest.deleteValue(keys)).verifyComplete();
+        StepVerifier.create(redisProviderUnderTest.deleteValue(keys)).expectFusion(4);
     }
 
     @Test

@@ -50,6 +50,7 @@ public class RedisUserLoginLimiter implements UserLimiter {
      */
     private final String KEY_PREFIX = "user-login-limiter:";
 
+
     /**
      * 用戶登錄限流器構造方法
      * 獲取配置文件中的登入限制器的最大失敗次數和鎖定時間
@@ -64,6 +65,7 @@ public class RedisUserLoginLimiter implements UserLimiter {
         this.LOCK_TIME = securityProperties.getLogin().getLockTime();
         this.redisProvider = redisProvider;
     }
+
 
     /**
      * 嘗試獲取用戶的限流器，根據設定的限制數量，判斷是否可以獲取
@@ -88,6 +90,7 @@ public class RedisUserLoginLimiter implements UserLimiter {
         });
     }
 
+
     /**
      * 釋放用戶的限流器
      *
@@ -98,6 +101,6 @@ public class RedisUserLoginLimiter implements UserLimiter {
     @Override
     public Mono<Void> release(Object key) {
         String cacheKey = KEY_PREFIX + key.toString();
-        return redisProvider.delete(cacheKey);
+        return redisProvider.delete(cacheKey).then();
     }
 }

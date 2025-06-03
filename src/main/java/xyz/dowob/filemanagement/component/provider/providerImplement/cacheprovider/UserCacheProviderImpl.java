@@ -139,7 +139,7 @@ public class UserCacheProviderImpl implements CacheProvider {
      */
     @Override
     public Mono<Void> delete(String hashKey) {
-        return redisProvider.deleteHash(CACHE_PREFIX, hashKey);
+        return redisProvider.deleteHash(CACHE_PREFIX, hashKey).then();
     }
 
 
@@ -153,9 +153,9 @@ public class UserCacheProviderImpl implements CacheProvider {
     @Override
     public Mono<Void> deleteAll(Collection<String> hashKeys) {
         if (hashKeys == null || hashKeys.isEmpty()) {
-            return redisProvider.deleteHash(CACHE_PREFIX);
+            return redisProvider.deleteHash(CACHE_PREFIX).then();
         }
-        return redisProvider.deleteHash(CACHE_PREFIX, hashKeys.stream().toList());
+        return redisProvider.deleteHash(CACHE_PREFIX, hashKeys.stream().toList()).then();
     }
 
 
