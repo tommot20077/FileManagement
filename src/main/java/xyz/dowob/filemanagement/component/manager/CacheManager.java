@@ -278,19 +278,6 @@ public class CacheManager {
 
 
     /**
-     * 刪除緩存，根據key刪除緩存數據，此為同步刪除
-     *
-     * @param key               key
-     * @param cacheProviderEnum 緩存提供者的類型
-     *
-     * @return Mono<Void>
-     */
-    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum) {
-        return deleteCache(key, cacheProviderEnum, false);
-    }
-
-
-    /**
      * 嘗試獲取所有鎖 - 修復版本
      * 使用全有或全無的策略，如果無法獲取所有鎖，則釋放已獲取的鎖
      *
@@ -328,19 +315,6 @@ public class CacheManager {
 
 
     /**
-     * 刪除緩存，根據key刪除緩存數據，此為批量刪除，此為同步刪除
-     *
-     * @param keys              key集合
-     * @param cacheProviderEnum 緩存提供者的類型
-     *
-     * @return Mono<Void>
-     */
-    public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
-        return deleteCaches(keys, cacheProviderEnum, false);
-    }
-
-
-    /**
      * 釋放多個 Redis 鎖 - 修復版本
      *
      * @param lockKeys 完整的 lock key 集合 (包含 prefix)
@@ -357,26 +331,22 @@ public class CacheManager {
                 LogUnity.trace("成功釋放 %d 個鎖: %s", deletedCount, lockKeys);
             }
         }).onErrorResume(e -> {
-            LogUnity.warn("釋放鎖時發生錯誤: %s，鎖鍵: %s", e, lockKeys);
+            LogUnity.warn("釋放鎖: %s 時發生錯誤: ", e, lockKeys);
             return Mono.empty();
         }).then();
     }
 
 
     /**
-     * 設置緩存，根據key-value設置緩存數據，此為批量設置，並設置過期時間
+     * 刪除緩存，根據key刪除緩存數據，此為同步刪除
      *
-     * @param keyValues         key-value集合
+     * @param key               key
      * @param cacheProviderEnum 緩存提供者的類型
-     * @param expire            過期時間
      *
      * @return Mono<Void>
      */
-    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
-        return Optional
-                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
-                .map(provider -> executeWithLock(keyValues.keySet(), cacheProviderEnum, acquiredKeys -> provider.setAll(keyValues, expire)))
-                .orElseGet(Mono::empty);
+    public Mono<Void> deleteCache(String key, CacheProviderEnum cacheProviderEnum) {
+        return deleteCache(key, cacheProviderEnum, false);
     }
 
 
@@ -401,6 +371,19 @@ public class CacheManager {
 
 
     /**
+     * 刪除緩存，根據key刪除緩存數據，此為批量刪除，此為同步刪除
+     *
+     * @param keys              key集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> deleteCaches(Collection<String> keys, CacheProviderEnum cacheProviderEnum) {
+        return deleteCaches(keys, cacheProviderEnum, false);
+    }
+
+
+    /**
      * 刪除緩存，根據key刪除緩存數據，此為批量刪除，並且可以設置是否異步
      *
      * @param keys              key集合
@@ -417,6 +400,23 @@ public class CacheManager {
                                    }
             );
         }).orElseGet(Mono::empty);
+    }
+
+
+    /**
+     * 設置緩存，根據key-value設置緩存數據，此為批量設置，並設置過期時間
+     *
+     * @param keyValues         key-value集合
+     * @param cacheProviderEnum 緩存提供者的類型
+     * @param expire            過期時間
+     *
+     * @return Mono<Void>
+     */
+    public Mono<Void> setCaches(Map<String, Object> keyValues, CacheProviderEnum cacheProviderEnum, Duration expire) {
+        return Optional
+                .ofNullable(cacheProviderMap.get(cacheProviderEnum))
+                .map(provider -> executeWithLock(keyValues.keySet(), cacheProviderEnum, acquiredKeys -> provider.setAll(keyValues, expire)))
+                .orElseGet(Mono::empty);
     }
 
 

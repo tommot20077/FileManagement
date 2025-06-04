@@ -30,7 +30,10 @@ import xyz.dowob.filemanagement.component.provider.provider.RedisProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.ContentConvertProvider;
 import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider;
 import xyz.dowob.filemanagement.config.properties.FileProperties;
-import xyz.dowob.filemanagement.customenum.*;
+import xyz.dowob.filemanagement.customenum.ConvertProviderEnum;
+import xyz.dowob.filemanagement.customenum.FileEnum;
+import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
+import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dto.FileEditDTO;
@@ -453,19 +456,15 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         .thenMany(userFileMetaRepository.saveAll(toDeleteFolderList))
                         .collectList();
 
-                List<String> cacheKeys = generateUserListCacheKeys(userId, parentFolderIds);
-
-                Mono<Void> cacheCleanupOperation = Mono.defer(() -> cacheManager
-                        .deleteCaches(cacheKeys, CacheProviderEnum.USER_FILE_LIST_CACHE)
-                        .doOnSuccess(v -> {
-                            if (folderListTreeProvider != null) {
-                                try {
-                                    folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
-                                } catch (Exception e) {
-                                    throw new RuntimeException("更新文件夾列表樹時發生錯誤", e);
-                                }
-                            }
-                        }));
+                Mono<Void> cacheCleanupOperation = cleanUserListCache(userId, parentFolderIds).doOnSuccess(v -> {
+                    if (folderListTreeProvider != null) {
+                        try {
+                            folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
+                        } catch (Exception e) {
+                            throw new RuntimeException("更新文件夾列表樹時發生錯誤", e);
+                        }
+                    }
+                });
                 return transactionalOperator.transactional(databaseOperation).then(cacheCleanupOperation).thenReturn(true).onErrorReturn(false);
             });
         });
@@ -483,33 +482,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
     @Override
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
         return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
-    }
-
-
-    /**
-     * 生成用戶列表緩存鍵
-     * 這個方法將父資料夾 ID 轉換為對應的緩存鍵格式
-     *
-     * @param userId          用戶 ID
-     * @param parentFolderIds 父資料夾 ID 陣列
-     *
-     * @return 緩存鍵列表
-     */
-    private List<String> generateUserListCacheKeys(Long userId, Long[] parentFolderIds) {
-        List<String> cacheKeys = new ArrayList<>();
-        for (Long parentFolderId : parentFolderIds) {
-            if (parentFolderId != null) {
-                // 假設緩存鍵的格式為 "user_file_list:{userId}:{parentFolderId}"
-                // 根據您的實際緩存鍵命名規則調整
-                String cacheKey = String.format("user_file_list:%d:%d", userId, parentFolderId);
-                cacheKeys.add(cacheKey);
-            } else {
-                // 根目錄的緩存鍵
-                String rootCacheKey = String.format("user_file_list:%d:root", userId);
-                cacheKeys.add(rootCacheKey);
-            }
-        }
-        return cacheKeys;
     }
 
 

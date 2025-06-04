@@ -201,7 +201,13 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1223
          * 錯誤信息: 更新文件夾樹失敗
          */
-        UPDATE_FOLDER_TREE_FAILED(1223, "更新文件夾樹失敗, 用戶ID: %s, 文件夾ID: %s")
+        UPDATE_FOLDER_TREE_FAILED(1223, "更新文件夾樹失敗, 用戶ID: %s, 文件夾ID: %s"),
+
+        /**
+         * 錯誤碼: 1224
+         * 錯誤信息: 認證憑證時發生意外錯誤
+         */
+        AUTHENTICATION_ERROR(1224, "認證憑證時發生意外錯誤")
 
         ;
 
