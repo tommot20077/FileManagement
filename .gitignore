@@ -44,3 +44,7 @@ build/
 /src/main/resources/rebel.xml
 /.clinerules/測試要點.md
 /.clinerules/test-unit.md
+/.claude/
+/CLAUDE.md
+/GEMINI.md
+/.env

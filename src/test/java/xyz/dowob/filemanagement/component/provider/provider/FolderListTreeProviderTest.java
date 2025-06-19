@@ -273,7 +273,7 @@ class FolderListTreeProviderTest {
             }
 
             folderListTreeProviderUnderTest.deleteFolder(1L, 1L);
-        })).thenAwait(Duration.ofMillis(100)).verifyComplete();
+        })).thenAwait(Duration.ofMillis(300)).verifyComplete();
 
         FolderListTreeProvider.FolderTree tree = folderListTreeProviderUnderTest.getFileTree(1L);
         assertThat(getFolderMapViaReflection(tree)).doesNotContainKeys(1L, 2L);

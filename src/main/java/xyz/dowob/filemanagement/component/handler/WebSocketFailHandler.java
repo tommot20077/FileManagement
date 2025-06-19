@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.component.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.WebsocketResponseType;
 import xyz.dowob.filemanagement.data.response.WebSocketResponse;
+import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.unity.LogUnity;
 import xyz.dowob.filemanagement.unity.ResponseUnity;
@@ -46,6 +48,7 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
      */
     private final ObjectMapper objectMapper;
 
+
     /**
      * handle方法用於處理WebSocket連接失敗的情況
      * 當WebSocket連接失敗時，將錯誤內容轉換為JSON格式，並返回給客戶端
@@ -65,16 +68,21 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
 
         WebSocketResponse<?> response = createWebSocketResponse(WebsocketResponseType.CONNECTION_ERROR, errorCode.getMessage(), null);
 
-        return Mono
-                .fromCallable(() -> objectMapper.writeValueAsString(response))
-                .doOnNext(s -> LogUnity.info(session, "用戶WebSocket連接失敗，關閉連線，session: %s", session))
-                .flatMap(jsonString -> session.send(Mono.just(session.textMessage(jsonString))).then().onErrorResume(e -> {
-                    LogUnity.error(session, "處理WebSocket連線失敗時發生意外的錯誤", e);
-                    return Mono.empty();
-                }))
-                .doFinally(signalType -> {
-                    CloseStatus status = (signalType == SignalType.ON_ERROR || signalType == SignalType.CANCEL) ? CloseStatus.SERVER_ERROR : CloseStatus.NORMAL;
-                    session.close(status).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                });
+        return Mono.defer(() -> {
+            try {
+                String jsonString = objectMapper.writeValueAsString(response);
+                LogUnity.info(session, "用戶WebSocket連接失敗，準備發送錯誤訊息: %s", jsonString);
+                return session
+                        .send(Mono.just(session.textMessage(jsonString)))
+                        .then()
+                        .doOnError(e -> LogUnity.error(session, "處理WebSocket連線失敗時，發送訊息時發生錯誤", e));
+            } catch (JsonProcessingException e) {
+                return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
+            }
+        }).doFinally(signalType -> {
+            CloseStatus status = (signalType == SignalType.ON_ERROR || signalType == SignalType.CANCEL) ? CloseStatus.SERVER_ERROR : CloseStatus.NORMAL;
+            LogUnity.info(session, "WebSocketFailHandler 正在關閉 session，狀態: %s，信號類型: %s", status, signalType);
+            session.close(status).subscribeOn(Schedulers.boundedElastic()).subscribe();
+        }).then();
     }
 }

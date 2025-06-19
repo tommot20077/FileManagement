@@ -217,8 +217,7 @@ class JwtWebSocketHandlerAdapterTest {
         when(mockUserService.getById(0L)).thenReturn(Mono.just(guestUser));
         when(mockFileUploadWebSocketHandler.handle(argThat(session -> session instanceof CustomWebSocketSession))).thenReturn(Mono.empty());
 
-        when(mockSecurityContext.getAuthentication()).thenReturn(null); // Ensure this is what switchIfEmpty sees if context is present but auth is null
-
+        when(mockSecurityContext.getAuthentication()).thenReturn(null);
         StepVerifier
                 .create(jwtWebSocketHandlerAdapterUnderTest
                                 .handleRequest(exchange, mock(WebSocketHandler.class))
@@ -247,8 +246,6 @@ class JwtWebSocketHandlerAdapterTest {
         when(mockWebSocketFailHandler.handle(argThat(session -> session instanceof CustomWebSocketSession && ValidationException.ErrorCode.UNAUTHORIZED
                 .name()
                 .equals(((CustomWebSocketSession) session).getAttribute("X-WebSocket-Error"))))).thenReturn(Mono.empty());
-
-        // The ReactiveSecurityContextHolder will be empty, triggering switchIfEmpty
 
         StepVerifier
                 .create(jwtWebSocketHandlerAdapterUnderTest
@@ -389,7 +386,7 @@ class JwtWebSocketHandlerAdapterTest {
                 .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        exchange.getResponse().setComplete(); // Mark response as committed
+        exchange.getResponse().setComplete();
 
         when(mockSecurityContext.getAuthentication()).thenReturn(mockAuthentication);
         when(mockAuthentication.isAuthenticated()).thenReturn(true);

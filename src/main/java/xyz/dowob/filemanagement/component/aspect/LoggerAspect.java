@@ -48,6 +48,7 @@ public class LoggerAspect {
      */
     private static final Logger log = LogManager.getLogger(LoggerAspect.class);
 
+
     /**
      * 定義 ServiceInterface 層切入點
      */
@@ -150,7 +151,7 @@ public class LoggerAspect {
 
         if (method.isAnnotationPresent(RecordLevel.class)) {
             logLevelEnum = method.getAnnotation(RecordLevel.class).value();
-        } else if (declaringClass.isAnnotationPresent(RecordLevel.class)) {
+        } else if (declaringClass != null && declaringClass.isAnnotationPresent(RecordLevel.class)) {
             logLevelEnum = declaringClass.getAnnotation(RecordLevel.class).value();
         }
 
@@ -214,8 +215,9 @@ public class LoggerAspect {
 
                 LogUnity.debug(exchange, String.format(format, args));
             } else if (!isValidationException && log.isErrorEnabled()) {
-                String formattedArgs = Arrays
-                        .stream(joinPoint.getArgs())
+                Object[] argsArray = joinPoint.getArgs();
+                String formattedArgs = (argsArray == null || argsArray.length == 0) ? "" : Arrays
+                        .stream(argsArray)
                         .map(arg -> arg != null ? arg.toString() : "null")
                         .map(argStr -> argStr.length() > 500 ? argStr.substring(0, 500) + "..." : argStr)
                         .collect(Collectors.joining(", "));
@@ -242,6 +244,7 @@ public class LoggerAspect {
         }
     }
 
+
     /**
      * 此方法為處理一般狀況下的日誌輸出，因為無法直接獲取 ServerWebExchange 對象
      * 所以需要進行判斷，如果為空則直接輸出日誌，否則獲取 ServerWebExchange 對象進行日誌輸出
@@ -258,6 +261,7 @@ public class LoggerAspect {
             return Mono.empty();
         })).subscribe();
     }
+
 
     /**
      * 日誌信息類，用於存儲日誌級別和日誌訊息

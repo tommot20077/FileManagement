@@ -158,9 +158,9 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
     private Mono<Void> handleBufferUpload(WebSocketSession session, JsonNode jsonNode) {
         Optional<UploadChunkDTO> uploadChunkDTO = convertJsonToObject(jsonNode.get("data"), UploadChunkDTO.class);
         return uploadChunkDTO
-                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(transferResponseDTO -> {
-                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                    String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
+                .map(chunkDTO -> fileServiceStrategy.getFileService().uploadFileChunk(chunkDTO).flatMap(uploadResponseDTO -> {
+                    ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, uploadResponseDTO);
+                    String message = uploadResponseDTO.getIsFinished() ? "上傳任務完成" : "分塊上傳成功";
                     response.setMessage(message);
                     return sendMessage(session, response);
                 }))
@@ -203,9 +203,9 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
                 return validationService
                         .validateFileMetadataDTO(fileMetadata, user)
                         .then(fileServiceStrategy.getFileService().uploadFile(fileMetadata, user))
-                        .flatMap(transferResponseDTO -> {
-                            ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, transferResponseDTO);
-                            String message = transferResponseDTO.getIsFinished() ? "上傳任務完成" : "初始化上傳任務成功";
+                        .flatMap(uploadResponseDTO -> {
+                            ApiResponseDTO<?> response = createApiResponse(session.getHandshakeInfo().getUri().getPath(), null, uploadResponseDTO);
+                            String message = uploadResponseDTO.getIsFinished() ? "上傳任務完成" : "初始化上傳任務成功";
                             response.setMessage(message);
                             return sendMessage(session, response);
                         })
@@ -326,4 +326,3 @@ public class FileUploadWebSocketHandler implements WebSocketHandler, ResponseUni
         return map;
     }
 }
-

@@ -153,7 +153,7 @@ class JwtAuthenticationManagerTest {
         String token = "valid.jwt.token";
         Long userId = 123L;
         Authentication authentication = new TestingAuthenticationToken(null, token);
-        Claims claims = Jwts.claims().add("role", 123).build(); // Invalid role type
+        Claims claims = Jwts.claims().add("role", 123).build();
 
         when(mockJwtTokenProvider.validateToken(eq(token), any())).thenReturn(Mono.just(userId));
         when(mockJwtTokenProvider.getClaimsFromToken(token)).thenReturn(Mono.just(claims));

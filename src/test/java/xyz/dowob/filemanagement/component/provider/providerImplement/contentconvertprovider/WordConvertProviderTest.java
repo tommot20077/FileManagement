@@ -102,7 +102,7 @@ class WordConvertProviderTest {
     @Test
     @DisplayName("convertToInputStream 格式錯誤的 JSON 內容 - 拋出 ProcessException")
     void convertToInputStream_invalidJsonContent_throwsProcessException() {
-        String invalidJsonContent = "{\"delta\":[{\"insert\":\"Hello World\""; // Malformed JSON
+        String invalidJsonContent = "{\"delta\":[{\"insert\":\"Hello World\"";
 
         StepVerifier.create(wordConvertProviderUnderTest.convertToInputStream(invalidJsonContent))
                 .expectErrorMatches(throwable -> throwable instanceof ProcessException &&
