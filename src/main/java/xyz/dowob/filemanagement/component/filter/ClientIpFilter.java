@@ -83,7 +83,7 @@ public class ClientIpFilter implements WebFilter, ResponseUnity {
         if (exchange != null) {
             return Optional.ofNullable((String) exchange.getAttributes().get(CLIENT_IP_ATTRIBUTE));
         }
-        return CustomRequestContextHolder.getExchange().map(e -> Optional.ofNullable((String) e.getAttributes().get(CLIENT_IP_ATTRIBUTE))).block();
+        return CustomRequestContextHolder.getExchange().map(e -> Optional.ofNullable((String) e.getAttributes().get(CLIENT_IP_ATTRIBUTE))).blockOptional().orElse(Optional.empty());
     }
 
     /**

@@ -18,7 +18,6 @@ import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.lang.reflect.Field;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -272,8 +271,8 @@ class FolderListTreeProviderTest {
                 throw new RuntimeException(e);
             }
 
-            folderListTreeProviderUnderTest.deleteFolder(1L, 1L);
-        })).thenAwait(Duration.ofMillis(300)).verifyComplete();
+            folderListTreeProviderUnderTest.deleteFolderSync(1L, 1L);
+        })).verifyComplete();
 
         FolderListTreeProvider.FolderTree tree = folderListTreeProviderUnderTest.getFileTree(1L);
         assertThat(getFolderMapViaReflection(tree)).doesNotContainKeys(1L, 2L);

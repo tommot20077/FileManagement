@@ -189,6 +189,20 @@ public class FolderListTreeProvider {
 
 
     /**
+     * 同步刪除資料夾 - 確保刪除操作立即完成
+     *
+     * @param userId           用戶ID
+     * @param folderMetadataId 資料夾元數據ID
+     */
+    public void deleteFolderSync(Long userId, Long folderMetadataId) {
+        FolderTree folderTree = userFileListTree.get(userId);
+        if (folderTree != null) {
+            folderTree.deleteFolderSync(folderMetadataId);
+        }
+    }
+
+
+    /**
      * 獲取資料夾的路徑
      *
      * @param userId   用戶ID
@@ -445,6 +459,29 @@ public class FolderListTreeProvider {
                     removeSubtree(current, toDelete);
                 }
             });
+        }
+
+
+        /**
+         * 同步刪除資料夾 - 立即執行刪除操作，不使用線程池
+         *
+         * @param folderId 資料夾元數據ID
+         */
+        private void deleteFolderSync(Long folderId) {
+            FolderNode node = folderMap.get(folderId);
+            if (node == null) {
+                return;
+            }
+            ConcurrentLinkedQueue<FolderNode> toDelete = new ConcurrentLinkedQueue<>();
+            toDelete.offer(node);
+
+            while (!toDelete.isEmpty()) {
+                FolderNode current = toDelete.poll();
+                if (current == null) {
+                    continue;
+                }
+                removeSubtree(current, toDelete);
+            }
         }
 
 
