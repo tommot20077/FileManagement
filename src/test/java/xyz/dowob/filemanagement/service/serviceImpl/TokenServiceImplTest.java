@@ -163,4 +163,118 @@ class TokenServiceImplTest {
         verify(mockTokenStrategy, times(1)).getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
         verify(mockProvider, times(1)).revokeToken(null);
     }
+
+    @Test
+    @DisplayName("產生 RESET_PASSWORD_TOKEN - 傳入有效 User 應回傳 token")
+    void generateToken_validUser_returnsResetPasswordToken() {
+        User user = new User();
+        String expectedToken = "reset-password-token";
+        TokenProvider mockProvider = mock(TokenProvider.class);
+
+        doReturn(mockProvider).when(mockTokenStrategy).getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN);
+        doReturn(Mono.just(expectedToken)).when(mockProvider).generateToken(user);
+
+        StepVerifier
+                .create(tokenServiceImplUnderTest.generateToken(user, TokenEnum.RESET_PASSWORD_TOKEN))
+                .expectNext(expectedToken)
+                .verifyComplete();
+
+        verify(mockProvider).generateToken(user);
+        verify(mockTokenStrategy).getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN);
+    }
+
+    @Test
+    @DisplayName("驗證 RESET_PASSWORD_TOKEN - 傳入有效 token 應回傳 userId")
+    void validateToken_validResetPasswordToken_returnsUserId() {
+        String token = "valid-reset-token";
+        Long userId = 456L;
+        TokenProvider mockProvider = mock(TokenProvider.class);
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN)).thenReturn(mockProvider);
+        when(mockProvider.validateToken(token, userId)).thenReturn(Mono.just(userId));
+
+        StepVerifier
+                .create(tokenServiceImplUnderTest.validateToken(token, userId, TokenEnum.RESET_PASSWORD_TOKEN))
+                .expectNext(userId)
+                .verifyComplete();
+
+        verify(mockTokenStrategy, times(1)).getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN);
+        verify(mockProvider, times(1)).validateToken(token, userId);
+    }
+
+    @Test
+    @DisplayName("撤銷 RESET_PASSWORD_TOKEN - 傳入有效 userId 應正常完成")
+    void revokeToken_validUserId_completesSuccessfullyForResetPasswordToken() {
+        Long userId = 789L;
+        TokenProvider mockProvider = mock(TokenProvider.class);
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN)).thenReturn(mockProvider);
+        when(mockProvider.revokeToken(userId)).thenReturn(Mono.empty());
+
+        StepVerifier.create(tokenServiceImplUnderTest.revokeToken(userId, TokenEnum.RESET_PASSWORD_TOKEN))
+                .verifyComplete();
+
+        verify(mockTokenStrategy, times(1)).getTokenProvider(TokenEnum.RESET_PASSWORD_TOKEN);
+        verify(mockProvider, times(1)).revokeToken(userId);
+    }
+
+    @Test
+    @DisplayName("撤銷 Token - 使用無效的 TokenEnum 應拋出 IllegalArgumentException")
+    void revokeToken_invalidTokenEnum_propagatesException() {
+        Long userId = 123L;
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenThrow(new IllegalArgumentException("無法找到對應的憑證處理方法"));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                                                          () -> tokenServiceImplUnderTest.revokeToken(userId, TokenEnum.JWT_AUTHORIZATION_TOKEN)
+        );
+
+        assertEquals("無法找到對應的憑證處理方法", exception.getMessage());
+        verify(mockTokenStrategy).getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
+    }
+
+    @Test
+    @DisplayName("create - 應回傳空的 Mono")
+    void create_returnsEmptyMono() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.create())
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("getById - 傳入任何 ID 應回傳空的 Mono")
+    void getById_anyId_returnsEmptyMono() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.getById(1L))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("getAll - 應回傳空的 Flux")
+    void getAll_returnsEmptyFlux() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.getAll())
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("getAllByParams - 傳入任何參數應回傳空的 Flux")
+    void getAllByParams_anyParams_returnsEmptyFlux() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.getAllByParams("type", "param1", "param2"))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("update - 傳入任何 Token 應回傳空的 Mono")
+    void update_anyToken_returnsEmptyMono() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.update(new xyz.dowob.filemanagement.entity.Token()))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("delete - 傳入任何 Token 應回傳空的 Mono")
+    void delete_anyToken_returnsEmptyMono() {
+        StepVerifier
+                .create(tokenServiceImplUnderTest.delete(new xyz.dowob.filemanagement.entity.Token()))
+                .verifyComplete();
+    }
 }

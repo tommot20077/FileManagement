@@ -605,4 +605,216 @@ class ValidationServiceImplTest {
 
         StepVerifier.create(result).verifyComplete();
     }
+
+    @Test
+    @DisplayName("驗證檔案名稱 - 包含非法字符 - 拋出 INVALID_FILE_NAME")
+    void testValidateFileName_InvalidCharacters_ThrowsValidationException() {
+        FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
+        fileMetadataDTO.setFilename("file/name");
+        fileMetadataDTO.setFileSize(1024L);
+
+        User user = new User();
+        user.setStorageLimit(10485760L);
+        user.setUsedStorage(0L);
+
+        Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO, user);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.INVALID_FILE_NAME)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證存儲限制 - 超出用戶存儲限制 - 拋出 STORAGE_LIMIT_EXCEEDED")
+    void testValidateStorageLimit_ExceedsLimit_ThrowsValidationException() {
+        FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
+        fileMetadataDTO.setFilename("largefile.txt");
+        fileMetadataDTO.setFileSize(5242880L); // 5MB
+
+        User user = new User();
+        user.setStorageLimit(1048576L); // 1MB limit
+        user.setUsedStorage(0L);
+
+        Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO, user);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.STORAGE_LIMIT_EXCEEDED)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證密碼強度 - 密碼太短 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    void testValidatePasswordStrength_TooShort_ThrowsValidationException() {
+        RegisterDTO registerDTO = new RegisterDTO();
+        registerDTO.setUsername("testuser123"); // 有效的字母數字用戶名
+        registerDTO.setPassword("123"); // 太短
+        registerDTO.setConfirmPassword("123");
+        registerDTO.setEmail("test@example.com");
+
+        when(mockUserRepository.findByUsername("testuser123")).thenReturn(Mono.empty());
+        when(mockUserRepository.findByEmail("test@example.com")).thenReturn(Mono.empty());
+
+        Mono<Void> result = validationServiceImplUnderTest.validateRegisterDTO(registerDTO);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證密碼強度 - 密碼是回文 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    void testValidatePasswordStrength_Palindrome_ThrowsValidationException() {
+        RegisterDTO registerDTO = new RegisterDTO();
+        registerDTO.setUsername("testuser123"); // 有效的字母數字用戶名
+        registerDTO.setPassword("Password123321drowssaP"); // 回文
+        registerDTO.setConfirmPassword("Password123321drowssaP");
+        registerDTO.setEmail("test@example.com");
+
+        when(mockUserRepository.findByUsername("testuser123")).thenReturn(Mono.empty());
+        when(mockUserRepository.findByEmail("test@example.com")).thenReturn(Mono.empty());
+
+        Mono<Void> result = validationServiceImplUnderTest.validateRegisterDTO(registerDTO);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證密碼強度 - 密碼沒有大小寫字母和數字 - 拋出 PASSWORD_IS_NOT_STRONG_ENOUGH")
+    void testValidatePasswordStrength_NoMixedCase_ThrowsValidationException() {
+        RegisterDTO registerDTO = new RegisterDTO();
+        registerDTO.setUsername("testuser123"); // 有效的字母數字用戶名
+        registerDTO.setPassword("password"); // 沒有大寫字母和數字
+        registerDTO.setConfirmPassword("password");
+        registerDTO.setEmail("test@example.com");
+
+        when(mockUserRepository.findByUsername("testuser123")).thenReturn(Mono.empty());
+        when(mockUserRepository.findByEmail("test@example.com")).thenReturn(Mono.empty());
+
+        Mono<Void> result = validationServiceImplUnderTest.validateRegisterDTO(registerDTO);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.PASSWORD_IS_NOT_STRONG_ENOUGH)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證用戶名稱 - 包含非字母數字字符 - 拋出 USERNAME_INVALID")
+    void testValidateUsername_NonAlphanumeric_ThrowsValidationException() {
+        RegisterDTO registerDTO = new RegisterDTO();
+        registerDTO.setUsername("user-name"); // 包含連字符
+        registerDTO.setPassword("Password123");
+        registerDTO.setConfirmPassword("Password123");
+        registerDTO.setEmail("test@example.com");
+
+        when(mockUserRepository.findByUsername("user-name")).thenReturn(Mono.empty());
+        when(mockUserRepository.findByEmail("test@example.com")).thenReturn(Mono.empty());
+
+        Mono<Void> result = validationServiceImplUnderTest.validateRegisterDTO(registerDTO);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.USERNAME_INVALID)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證文件過濾器 - FileFilterDTO 為 null - 拋出 NULL_DTO")
+    void testValidateFileFilterDTO_Null_ThrowsValidationException() {
+        Mono<Void> result = validationServiceImplUnderTest.validateFileFilterDTO(null);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.NULL_DTO)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證 AuthRequestDTO - DTO 為 null - 拋出 NULL_DTO")
+    void testValidateAuthRequestDTO_Null_ThrowsValidationException() {
+        Mono<Void> result = validationServiceImplUnderTest.validateAuthRequestDTO(null);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.NULL_DTO)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證資料夾名稱 - 包含非法字符的資料夾 - 拋出 INVALID_FOLDER_NAME")
+    void testValidateFolderName_InvalidCharacters_ThrowsValidationException() {
+        FileEditDTO folderEditDTO = new FileEditDTO();
+        folderEditDTO.setFilename("folder\\name"); // 包含反斜杠
+        folderEditDTO.setEditType(EditTypeEnum.EDIT_METADATA);
+
+        Mono<Void> result = validationServiceImplUnderTest.validateEditFileDTO(folderEditDTO, true);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.INVALID_FOLDER_NAME)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("驗證 EditFileDTO - 內容為 null 的編輯操作 - 驗證成功")
+    void testValidateEditFileDTO_NullContentForEdit_Success() {
+        FileEditDTO fileEditDTO = new FileEditDTO();
+        fileEditDTO.setEditType(EditTypeEnum.EDIT_CONTENT);
+        fileEditDTO.setContent(null); // 內容可以為null
+
+        Mono<Void> result = validationServiceImplUnderTest.validateEditFileDTO(fileEditDTO, false);
+
+        StepVerifier.create(result).verifyComplete();
+    }
+
+    @Test
+    @DisplayName("驗證存儲限制 - 邊界情況：使用空間加新檔案剛好等於限制 - 驗證成功")
+    void testValidateStorageLimit_ExactLimit_Success() {
+        FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
+        fileMetadataDTO.setFilename("exactfile.txt");
+        fileMetadataDTO.setFileSize(1024L); // 1KB
+
+        User user = new User();
+        user.setStorageLimit(2048L); // 2KB limit
+        user.setUsedStorage(1024L); // 已使用1KB
+
+        Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO, user);
+
+        StepVerifier.create(result).verifyComplete();
+    }
+
+    @Test
+    @DisplayName("驗證空的檔案名稱 - 空字符串 - 拋出 INVALID_FILE_NAME")
+    void testValidateFileName_EmptyString_ThrowsValidationException() {
+        FileMetadataDTO fileMetadataDTO = new FileMetadataDTO();
+        fileMetadataDTO.setFilename(""); // 空字符串
+        fileMetadataDTO.setFileSize(1024L);
+
+        User user = new User();
+        user.setStorageLimit(10485760L);
+        user.setUsedStorage(0L);
+
+        Mono<Void> result = validationServiceImplUnderTest.validateFileMetadataDTO(fileMetadataDTO, user);
+
+        StepVerifier
+                .create(result)
+                .expectErrorMatches(throwable -> throwable instanceof ValidationException && 
+                        ((ValidationException) throwable).getErrorCode() == ValidationException.ErrorCode.INVALID_FILE_NAME)
+                .verify();
+    }
 }
