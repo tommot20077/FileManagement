@@ -9,10 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import reactor.test.StepVerifier;
+import xyz.dowob.filemanagement.config.properties.GlobalProperties;
 import xyz.dowob.filemanagement.exception.ProcessException;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -25,7 +25,9 @@ class EmailProviderImplTest {
     @Mock
     private JavaMailSender mockJavaMailSender;
     @Mock
-    private MailProperties mockMailProperties;
+    private GlobalProperties globalProperties;
+    @Mock
+    private GlobalProperties.Email mockEmail;
 
     private EmailProviderImpl emailProviderImplUnderTest;
 
@@ -33,7 +35,7 @@ class EmailProviderImplTest {
 
     @BeforeEach
     void setUp() {
-        emailProviderImplUnderTest = new EmailProviderImpl(mockJavaMailSender, mockMailProperties);
+        emailProviderImplUnderTest = new EmailProviderImpl(mockJavaMailSender, globalProperties);
         mimeMessage = new MimeMessage((Session) null);
     }
 
@@ -45,7 +47,8 @@ class EmailProviderImplTest {
         String content = "Test Content";
         String fromEmail = "sender@example.com";
 
-        when(mockMailProperties.getUsername()).thenReturn(fromEmail);
+        when(globalProperties.getEmail()).thenReturn(mockEmail);
+        when(mockEmail.getMailSender()).thenReturn(fromEmail);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         var result = emailProviderImplUnderTest.sendEmail(sendToEmail, subject, content);
@@ -63,7 +66,8 @@ class EmailProviderImplTest {
         String content = "Test Content";
         String fromEmail = "sender@example.com";
 
-        when(mockMailProperties.getUsername()).thenReturn(fromEmail);
+        when(globalProperties.getEmail()).thenReturn(mockEmail);
+        when(mockEmail.getMailSender()).thenReturn(fromEmail);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         doThrow(new MailException("Simulated send failure") {
         }).when(mockJavaMailSender).send(any(MimeMessage.class));
@@ -102,7 +106,8 @@ class EmailProviderImplTest {
         String subject = "Test Subject";
         String content = "Test Content";
 
-        when(mockMailProperties.getUsername()).thenReturn(null);
+        when(globalProperties.getEmail()).thenReturn(mockEmail);
+        when(mockEmail.getMailSender()).thenReturn(null);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         var result = emailProviderImplUnderTest.sendEmail(sendToEmail, subject, content);

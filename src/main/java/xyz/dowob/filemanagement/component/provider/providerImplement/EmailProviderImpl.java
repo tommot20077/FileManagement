@@ -3,13 +3,13 @@ package xyz.dowob.filemanagement.component.provider.providerImplement;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.config.properties.GlobalProperties;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ProcessException;
 
@@ -27,7 +27,7 @@ import xyz.dowob.filemanagement.exception.ProcessException;
  **/
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = {"spring.mail.username", "spring.mail.password"})
+@ConditionalOnProperty(name = {"spring.mail.username", "spring.mail.password", "global.email.mail-sender"})
 public class EmailProviderImpl implements xyz.dowob.filemanagement.component.provider.providerInterface.EmailProvider {
     /**
      * JavaMailSender Java 郵件發送器
@@ -35,10 +35,9 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
     private final JavaMailSender javaMailSender;
 
     /**
-     * 郵件配置，這裡使用了 Spring Boot 提供的 MailProperties
+     * 全局配置，這裡配置發送郵件的信箱位置
      */
-    private final MailProperties mailProperties;
-
+    private final GlobalProperties globalProperties;
 
     /**
      * 發送郵件
@@ -56,7 +55,7 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
                 MimeMessage mimeMessage = javaMailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-                helper.setFrom(mailProperties.getUsername(), "帳號安全管理組");
+                helper.setFrom(globalProperties.getEmail().getMailSender(), "帳號安全管理組");
                 helper.setTo(sendToEmail);
                 helper.setSubject(subject);
                 helper.setText(content, false);

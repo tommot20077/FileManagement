@@ -34,6 +34,11 @@ public class GlobalProperties {
      */
     private NettyPool nettyPool = new NettyPool();
 
+    /**
+     * 郵件發送設定
+     */
+    private Email email = new Email();
+
     @Data
     public static class RequestLimiter {
         /**
@@ -150,5 +155,13 @@ public class GlobalProperties {
          * Netty 的請求佇列的最長等待時間，預設為 30 秒
          */
         private Duration pendingAcquireTimeout = Duration.ofSeconds(30);
+    }
+
+    @Data
+    public static class Email {
+        /**
+         * 信件發送者的電子郵件地址
+         */
+        private String mailSender = "sender@example.com";
     }
 }

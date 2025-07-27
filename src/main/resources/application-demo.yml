@@ -299,6 +299,10 @@ global:
     # netty 線程池的請求佇列的最長等待時間，默認為 30 秒
     pending-acquire-timeout: 30s
 
+  # 郵件相關設定
+  email:
+    # 郵件發送者的電子郵件地址，默認為 sender@example.com
+    mail-sender: sender@example.com
 
 # Spring 相關設定
 spring:
