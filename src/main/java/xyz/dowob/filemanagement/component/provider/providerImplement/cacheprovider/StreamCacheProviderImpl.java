@@ -23,48 +23,55 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 文件流緩存提供者實現類，用於提供文件流緩存的操作
- * 對於每一次請求都需要從GridFS中獲取文件流，這樣會對服務器造成壓力，因此提供對於檔案的數據流進行緩存
- * 透過繼承AbstractRedisCacheProvider，實現了CacheProvider接口，提供了緩存操作的具體實現
- * 此類透過緩存設定enable-file-stream-cache來判斷是否啟用文件流緩存，當開啟時此類才會生效，默認開啟 {@link CacheProperties}
- * 文件流緩存的key前綴以及緩存的默認過期時間來自於檔案設定
+ * 基於 Redis 的檔案流緩存提供者實現，專為大型檔案流的高效緩存設計。
+ * 透過分塊存儲策略將檔案流分割為可配置大小的緩存塊，結合 Base64 編碼確保資料完整性。
+ * <p>
+ * 核心特性包括原子性緩存操作、自動錯誤恢復機制和記憶體最佳化。當任一緩存塊寫入失敗時，
+ * 系統會自動執行清理操作以維護資料一致性。緩存塊大小預設可調整，適用於不同規模的檔案流處理需求。
+ * <p>
+ * 此實現僅在配置屬性 cache.enable-file-download-stream-cache 為 true 時生效，預設為啟用狀態。
+ * 支援 FluxDataPO、Collection 和 Flux 等多種資料類型的緩存操作。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName StreamCacheProviderImpl
- * @create 2025/3/15
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ * @see CacheProvider
+ * @see RedisProvider
+ * @see CacheProperties
+ * @see FluxDataPO
+ */
 @Component
 @CacheProviderType(CacheProviderEnum.FILE_STREAM_CACHE)
 @ConditionalOnProperty(prefix = "cache", name = "enable-file-download-stream-cache", havingValue = "true", matchIfMissing = true)
 public class StreamCacheProviderImpl implements CacheProvider {
     /**
-     * Redis操作提供者
+     * Redis 操作提供者，用於執行底層的 Redis 緩存操作
      */
     private final RedisProvider redisProvider;
 
     /**
-     * 默認過期時間
+     * 緩存的預設過期時間，來自配置檔案設定
      */
     private final Duration DEFAULT_EXPIRE_TIME;
 
     /**
-     * 緩存前綴
+     * 緩存鍵的前綴，用於區分不同類型的緩存資料
      */
     private final String CACHE_PREFIX;
 
     /**
-     * 單個緩存塊的大小
+     * 單個緩存塊的位元組大小，用於分割大型檔案流
      */
     private final int CHUNK_SIZE;
 
 
     /**
-     * 文件流緩存提供者實現類的構造方法
+     * 建構檔案流緩存提供者實例。
+     * 初始化緩存配置並驗證設定參數的有效性。
      *
-     * @param redisProvider   Redis操作提供者
-     * @param cacheProperties 緩存配置
+     * @param redisProvider   Redis 操作提供者，不可為 null
+     * @param cacheProperties 緩存配置屬性，包含緩存塊大小與過期時間設定
+     * @throws IllegalArgumentException 當緩存塊大小小於等於 0 或過期時間為負值時
      */
     public StreamCacheProviderImpl(RedisProvider redisProvider, CacheProperties cacheProperties) {
         Assert.isTrue(cacheProperties.getChunkSize().toBytes() > 0, "下載流緩存塊大小必須大於0");
@@ -77,14 +84,16 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 查詢緩存值
+     * 根據指定鍵值查詢緩存的檔案流資料。
+     * 此方法會自動重組分散在多個緩存塊中的資料，按照塊編號順序重新組合，
+     * 並將 Base64 編碼的字串解碼轉換回 DataBuffer 流包裝為 FluxDataPO 物件。
      *
-     * @param key   查詢key
-     * @param clazz 值的類型
-     * @param <T>   泛型類型
-     *
-     * @return Mono<T> 返回緩存的值
+     * @param key   緩存鍵值，用於識別特定的檔案流資料，不可為 null
+     * @param clazz 期望的回傳類型，必須是 FluxDataPO 的相容類型
+     * @param <T>   泛型類型參數，通常為 FluxDataPO 或其子類型
+     * @return 包含檔案流資料的 Mono，若緩存不存在則回傳空的 Mono
      */
+    @Override
     public <T> Mono<T> get(String key, Class<T> clazz) {
         return redisProvider.getHashMapByPattern(CACHE_PREFIX, key + "_*", String.class).collectList().flatMap(list -> {
             if (list.isEmpty()) {
@@ -104,13 +113,14 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 查詢緩存集合 (返回一個 List)
+     * 查詢指定鍵值的緩存資料並以列表形式回傳。
+     * 重組緩存塊後將資料流解碼為 DataBuffer，再轉換為指定類型的元素列表。
+     * 適用於需要將檔案流緩存轉換為多個離散物件的場景。
      *
-     * @param key   緩存鍵集合
-     * @param clazz 值的類型
-     * @param <T>   泛型類型
-     *
-     * @return Mono<List < T>> 返回緩存的列表
+     * @param key   緩存鍵值，不可為 null
+     * @param clazz 列表元素的類型，必須與緩存內容相容
+     * @param <T>   泛型類型參數，代表列表元素類型
+     * @return 包含緩存資料列表的 Mono，若緩存不存在則回傳空列表
      */
     @Override
     public <T> Mono<List<T>> getAsList(String key, Class<T> clazz) {
@@ -129,13 +139,14 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 批量查詢緩存列表 (返回一個 Map，內部為列表)
+     * 批量查詢多個緩存鍵對應的資料列表。
+     * 針對每個鍵值並行執行查詢操作，並將結果整合為鍵值與資料列表的映射。
+     * 適用於需要同時讀取多個檔案流緩存的批次處理場景。
      *
-     * @param keys  緩存鍵集合
-     * @param clazz 值的類型
-     * @param <T>   泛型類型
-     *
-     * @return Mono<Map < String, List < T>>> 返回緩存的 Map
+     * @param keys  要查詢的緩存鍵值集合，不可為 null 且不可包含 null 元素
+     * @param clazz 列表元素的類型，必須與緩存內容相容
+     * @param <T>   泛型類型參數，代表列表元素類型
+     * @return 包含鍵值與對應資料列表映射的 Mono，若某鍵值無緩存則對應空列表
      */
     @Override
     public <T> Mono<Map<String, List<T>>> getAllAsMapList(Collection<String> keys, Class<T> clazz) {
@@ -145,15 +156,16 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 設定單個緩存值，這邊加入額外的處理
-     * 因為這類緩存通常大小比較大，因此需要將其分割成多個小的緩存塊並且加入緩存完整檢查
-     * 當某個緩存塊寫入失敗時，則刪除其他所有的緩存塊避免緩存數據缺失
+     * 設定檔案流緩存，採用分塊存儲策略以處理大型檔案。
+     * 將資料流轉換為 Base64 編碼並按配置的塊大小分割為多個緩存塊進行原子性存儲。
+     * 若任一緩存塊寫入失敗，會自動觸發清理機制刪除所有相關緩存塊以確保資料一致性。
+     * 支援多種資料類型的自動轉換和處理。
      *
-     * @param key    查詢key
-     * @param value  存儲value
-     * @param expire 過期時間
-     *
-     * @return Mono<Void>
+     * @param key    緩存鍵值，不可為 null 或空字串
+     * @param value  要緩存的資料，支援 FluxDataPO、Collection 或 Flux&lt;DataBuffer&gt; 類型
+     * @param expire 緩存過期時間，若為 null 則使用預設過期時間
+     * @return 完成設定操作的 Mono&lt;Void&gt;
+     * @throws UnsupportedOperationException 當資料類型不受支援時拋出
      */
     @Override
     public Mono<Void> set(String key, Object value, Duration expire) {
@@ -199,12 +211,13 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 設定緩存數據，此為批量設定
+     * 批量設定多個緩存項目。
+     * 對每個鍵值對並行執行個別的分塊緩存設定操作，確保批次處理的效率。
+     * 每個項目的緩存策略與單一設定操作相同，包括分塊存儲和錯誤恢復機制。
      *
-     * @param keyValues key-keyValues 集合
-     * @param expire    過期時間
-     *
-     * @return Mono<Void>
+     * @param keyValues 包含鍵值與對應資料的映射，不可為 null
+     * @param expire    所有緩存項目的統一過期時間，若為 null 則使用預設過期時間
+     * @return 完成所有設定操作的 Mono&lt;Void&gt;
      */
     @Override
     public Mono<Void> setAll(Map<String, Object> keyValues, Duration expire) {
@@ -213,9 +226,10 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 獲取默認過期時間
+     * 取得緩存的預設過期時間。
+     * 此時間設定來自於系統配置，用於所有未明確指定過期時間的緩存操作。
      *
-     * @return 默認過期時間
+     * @return 預設過期時間設定，保證為正值
      */
     @Override
     public Duration getDefaultExpire() {
@@ -224,11 +238,13 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 轉換流為base64格式的字符串
+     * 將 DataBuffer 流轉換為 Base64 編碼字串。
+     * 依序讀取所有 DataBuffer 的位元組資料，合併為完整的位元組陣列後進行 Base64 編碼。
+     * 此方法會自動釋放 DataBuffer 資源以防止記憶體洩漏。
      *
-     * @param dataBufferFlux 數據流
-     *
-     * @return Mono<String> 轉換後的base64字符串
+     * @param dataBufferFlux 要轉換的資料流，不可為 null
+     * @return 包含 Base64 編碼字串的 Mono
+     * @throws RuntimeException 當寫入位元組陣列時發生 I/O 錯誤時包裝並拋出
      */
     private Mono<String> formatStreamToBase64(Flux<DataBuffer> dataBufferFlux) {
         return dataBufferFlux.map(dataBuffer -> {
@@ -251,12 +267,13 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 刪除未完成的緩存
+     * 清理未完成的緩存塊以維護資料一致性。
+     * 當緩存寫入過程中發生錯誤時，自動刪除所有相關的緩存塊以避免部分寫入造成的資料不完整。
+     * 採用指數退避重試策略（最多重試 3 次，初始間隔 1 分鐘）確保清理操作的可靠性。
      *
-     * @param key         緩存鍵
-     * @param totalChunks 總塊數
-     *
-     * @return Mono<Void>
+     * @param key         緩存的基礎鍵值，用於構建要刪除的緩存塊鍵名
+     * @param totalChunks 需要清理的緩存塊總數，必須為正整數
+     * @return 完成清理操作的 Mono&lt;Void&gt;
      */
     private Mono<Void> deleteUnCompletedCache(String key, int totalChunks) {
         List<String> keysToDelete = new ArrayList<>();
@@ -268,11 +285,13 @@ public class StreamCacheProviderImpl implements CacheProvider {
 
 
     /**
-     * 將base64格式的字符串轉換為流
+     * 將 Base64 編碼字串轉換為 DataBuffer 流。
+     * 使用標準 Base64 解碼器解碼字串，並使用預設的 DataBufferFactory 包裝為 DataBuffer。
+     * 轉換後的 DataBuffer 可直接用於 WebFlux 響應式流處理。
      *
-     * @param base64 base64字符串
-     *
-     * @return Flux<DataBuffer> 轉換後的數據流
+     * @param base64 要轉換的 Base64 編碼字串，不可為 null 或無效的 Base64 格式
+     * @return 包含解碼資料的 DataBuffer 流
+     * @throws IllegalArgumentException 當 Base64 字串格式無效時由解碼器拋出
      */
     private Flux<DataBuffer> formatBase64ToStream(String base64) {
         byte[] bytes = Base64.getDecoder().decode(base64);

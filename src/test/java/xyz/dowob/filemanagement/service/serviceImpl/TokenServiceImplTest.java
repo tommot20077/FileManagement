@@ -8,16 +8,40 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
+import xyz.dowob.filemanagement.repostiory.TokenRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
+/**
+ * 權杖服務實現測試類別。
+ * 
+ * 測試 TokenServiceImpl 類別的核心功能，包括權杖產生、驗證、更新和刪除操作。
+ * 此測試類別驗證服務層的權杖管理邏輯和 JWT 權杖處理機制。
+ * 
+ * <p>測試涵蓋範圍：
+ * <ul>
+ * <li>JWT 權杖的產生和解析</li>
+ * <li>權杖的有效性驗證</li>
+ * <li>權杖更新和刷新機制</li>
+ * <li>權杖的儲存和刪除</li>
+ * <li>WebFlux 反應式權杖處理流程</li>
+ * </ul>
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ * @see TokenServiceImpl
+ * @see JwtTokenProviderImpl
+ * @see TokenRepository
+ */
 @SuppressWarnings("all")
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TokenService 邏輯處理測試")
@@ -27,11 +51,36 @@ class TokenServiceImplTest {
 
     private TokenServiceImpl tokenServiceImplUnderTest;
 
+    /**
+     * 測試前置作業。
+     * 
+     * 初始化 TokenServiceImpl 實例和所需的模擬依賴項。
+     * 設定測試權杖和使用者資料，確保每個測試方法都有乾淨的起始狀態。
+     */
     @BeforeEach
     void setUp() {
         tokenServiceImplUnderTest = new TokenServiceImpl(mockTokenStrategy);
     }
 
+    /**
+     * 測試有效使用者的 JWT 權杖產生。
+     * 
+     * 驗證當提供有效的使用者對象時，權杖服務能成功產生並回傳 JWT 權杖。
+     * 確保權杖產生流程的正確運作和策略模式的實現。
+     * 
+     * 前置條件：
+     * - 使用者對象非空且有效
+     * - 權杖提供者策略正確配置
+     * 
+     * 測試步驟：
+     * - 準備有效的使用者對象
+     * - 模擬權杖提供者和權杖產生
+     * - 執行權杖產生操作
+     * 
+     * 預期結果：
+     * - 成功回傳有效的 JWT 權杖
+     * - 相關服務方法被正確調用
+     */
     @Test
     @DisplayName("產生 JWT Token - 傳入有效 User 應回傳 token")
     void generateToken_validUser_returnsToken() {

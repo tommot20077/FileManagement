@@ -18,21 +18,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 文件類型的枚舉類，用於標記文件的類型
+ * 檔案類型枚舉類別，用於識別及分類不同檔案類型。
+ *
+ * <p>提供了根據 MIME 類型和副檔名識別檔案類型的方法，
+ * 支援影像、影片、音樂、檔案、壓縮檔等多種檔案類型。使用 Apache Tika 
+ * 進行檔案類型檢測，並提供了反應式資料流的處理支援。</p>
  *
  * @author yuan
- * @program File-Management
- * @ClassName FileEnum
- * @description
- * @create 2024-09-20 22:30
- * @Version 1.0
+ * @version 1.0
+ * @since 1.0
  */
 @Getter
 @RequiredArgsConstructor
 public enum FileEnum {
 
     /**
-     * 照片類型
+     * 影像類型，包括 JPEG、PNG、GIF 等圖片檔案。
      */
     IMAGE("照片"),
 
@@ -47,9 +48,9 @@ public enum FileEnum {
     MUSIC("音樂"),
 
     /**
-     * 文件類型
+     * 檔案類型，包括 PDF、Word、Excel、PowerPoint 等辦公檔案。
      */
-    DOCUMENT("文件"),
+    DOCUMENT("檔案"),
 
     /**
      * 壓縮檔類型
@@ -57,9 +58,9 @@ public enum FileEnum {
     ZIP("壓縮檔"),
 
     /**
-     * 個人文件類型
+     * 個人檔案類型
      */
-    ONLINE_DOCUMENT("線上文件"),
+    ONLINE_DOCUMENT("線上檔案"),
 
     /**
      * 資料夾類型
@@ -72,12 +73,12 @@ public enum FileEnum {
     OTHER("其他");
 
     /**
-     * MIME類型與文件類型的映射
+     * MIME類型與檔案類型的映射
      */
     private static final Map<String, FileEnum> MIME_TYPE_MAPPING = new HashMap<>();
 
     /**
-     * 文件類型與擴展名的映射
+     * 檔案類型與擴展名的映射
      */
     private static final Map<FileEnum, Map<String, String>> FILE_ENUM_MAP = new HashMap<>();
 
@@ -121,7 +122,7 @@ public enum FileEnum {
         MIME_TYPE_MAPPING.put("application/vnd.openxmlformats-officedocument.wordprocessingml.document", FileEnum.DOCUMENT);
         MIME_TYPE_MAPPING.put("application/vnd.openxmlformats-officedocument.presentationml.presentation", FileEnum.DOCUMENT);
 
-        // 壓縮文件類型
+        // 壓縮檔案類型
         MIME_TYPE_MAPPING.put("application/zip", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-rar-compressed", FileEnum.ZIP);
         MIME_TYPE_MAPPING.put("application/x-7z-compressed", FileEnum.ZIP);
@@ -150,7 +151,7 @@ public enum FileEnum {
         musicMap.put("ogg", "audio/ogg");
         FILE_ENUM_MAP.put(FileEnum.MUSIC, musicMap);
 
-        // 文件類型
+        // 檔案類型
         Map<String, String> documentMap = new HashMap<>();
         documentMap.put("pdf", "application/pdf");
         documentMap.put("doc", "application/msword");
@@ -166,16 +167,16 @@ public enum FileEnum {
     }
 
     /**
-     * 文件類型
+     * 檔案類型的中文描述。
      */
     private final String type;
 
     /**
-     * 根據 MIME 類型獲取文件類型，如果找不到對應的文件類型，則返回其他類型
+     * 根據 MIME 類型獲取檔案類型，如果找不到對應的檔案類型，則回傳其他類型
      *
      * @param mimeType MIME 類型
      *
-     * @return 返回文件類型
+     * @return 回傳檔案類型
      */
     public static FileEnum fromMimeType(String mimeType) {
         if (MIME_TYPE_MAPPING.containsKey(mimeType)) {
@@ -188,14 +189,14 @@ public enum FileEnum {
 
 
     /**
-     * 根據文件名獲取文件類型，如果找不到對應的文件類型
-     * 則檢查是否有對應的 Tika 類型，然後返回對應的文件類型
-     * 若果都找不到，則返回默認的文件類型
+     * 根據檔案名獲取檔案類型，如果找不到對應的檔案類型
+     * 則檢查是否有對應的 Tika 類型，然後回傳對應的檔案類型
+     * 若果都找不到，則回傳默認的檔案類型
      *
-     * @param fileEnum 文件類型
-     * @param filename 文件名
+     * @param fileEnum 檔案類型
+     * @param filename 檔案名
      *
-     * @return 返回文件類型
+     * @return 回傳檔案類型
      */
     public static String getMediaType(@NonNull FileEnum fileEnum, String filename) {
         Map<String, String> extensionMap = FILE_ENUM_MAP.get(fileEnum);
@@ -217,7 +218,7 @@ public enum FileEnum {
      *
      * @param bytes 檔案的 byte[]
      *
-     * @return 返回檔案的 MIME 類型
+     * @return 回傳檔案的 MIME 類型
      */
     public static String getMediaType(byte[] bytes, String filename) {
         String mimeType = TIKA.detect(bytes);
@@ -236,7 +237,7 @@ public enum FileEnum {
      * @param dataBufferFlux 檔案的 Flux<DataBuffer>
      * @param filename       檔案的名稱
      *
-     * @return 返回檔案的 MIME 類型
+     * @return 回傳檔案的 MIME 類型
      */
     public static Mono<detectRecord> getMediaType(Flux<DataBuffer> dataBufferFlux, String filename) {
         return DataBufferUtils.join(dataBufferFlux).map(dataBuffer -> {
@@ -256,11 +257,11 @@ public enum FileEnum {
 
 
     /**
-     * 檢測類型紀錄類
+     * 檢測類型記錄類
      * 將 Flux<DataBuffer> 與 MIME 類型進行綁定
      *
      * @param mimeType       MIME 類型
-     * @param dataBufferFlux 數據流
+     * @param dataBufferFlux 資料流
      */
     public record detectRecord(String mimeType, Flux<DataBuffer> dataBufferFlux) {
     }

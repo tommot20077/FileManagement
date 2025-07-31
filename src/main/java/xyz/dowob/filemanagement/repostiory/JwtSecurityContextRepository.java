@@ -32,60 +32,76 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Spring Security 上下文存儲庫，用於保存和加載 SecurityContext
- * 這裡主要用於 JWT 的驗證，從請求中獲取 JWT Token 進行驗證
+ * 基於 WebFlux 的 JWT 安全上下文倉儲實現。
+ *
+ * <p>實現 ServerSecurityContextRepository 介面，提供非阻塞的 JWT 令牌驗證機制。
+ * 支援從多種請求類型（API、WEB、WebSocket）中提取 JWT 令牌，並根據驗證結果
+ * 建立對應的安全上下文。採用策略模式處理不同協議的令牌驗證邏輯。
+ *
+ * <p>令牌提取來源包括：Authorization 標頭、HTTP Cookie、WebSocket 協議標頭。
+ * 支援遊客模式，當未提供有效令牌且啟用遊客功能時，自動建立遊客安全上下文。
+ * 對於 WebSocket 連線，採用特殊的錯誤處理機制以維持連線穩定性。
+ *
+ * <p>此實現為無狀態設計，不會持久化安全上下文，所有驗證操作均為即時執行。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName SecurityContextRepository
- * @description
- * @create 2024-09-25 00:44
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ * @see ServerSecurityContextRepository
+ * @see JwtAuthenticationManager
+ */
 @Component
 public class JwtSecurityContextRepository implements ServerSecurityContextRepository, ResponseUnity {
     /**
-     * JWT 憑證的前綴
+     * Authorization 標頭中 JWT 令牌的標準前綴。
+     * 符合 RFC 6750 Bearer Token 規範。
      */
     private static final String TOKEN_PREFIX = "Bearer ";
 
     /**
-     * 登錄請求的 URL
+     * 登入端點的 URL 路徑。
+     * 此路徑的請求將跳過 JWT 驗證處理。
      */
     private static final String LOGIN_URL = "/guest/login";
 
     /**
-     * WebSocket 授權協議請求頭，用於存儲 WebSocket 協議
+     * WebSocket 子協議標頭名稱。
+     * 用於在 WebSocket 握手過程中傳遞 JWT 令牌。
      */
     private static final String WEBSOCKET_SEC_PROTOCOL = "Sec-WebSocket-Protocol";
 
     /**
-     * 遊客用戶對象
+     * 遊客使用者實體的靜態實例。
+     * 在啟用遊客模式時用於建立匿名安全上下文。
      */
     private static final User GUEST_USER = new User();
 
     /**
-     * JWT 驗證管理器
+     * JWT 身份驗證管理器，負責令牌的解析與驗證。
      */
     private final JwtAuthenticationManager authenticationManager;
 
     /**
-     * 安全配置屬性
+     * 安全配置屬性，包含 Cookie 名稱和 WebSocket 令牌前綴等設定。
      */
     private final SecurityProperties securityProperties;
 
     /**
-     * JWT 憑證的正則表達式
+     * 用於從 Cookie 字串中提取 JWT 令牌的正則表達式模式。
+     * 根據配置的 Cookie 名稱動態建立。
      */
     private final Pattern jwtCookieNamePattern;
 
 
     /**
-     * JWT 憑證處理庫的構造函數
-     * 會檢查安全配置屬性中的 JWT Cookie 名稱和 WebSocket Token 前綴是否為空
+     * 建構 JWT 安全上下文倉儲實例。
      *
-     * @param authenticationManager JWT 驗證管理器
-     * @param securityProperties    安全配置屬性
+     * <p>初始化過程中會驗證必要的配置參數，包括 JWT Cookie 名稱和
+     * WebSocket 令牌前綴的有效性，並建立對應的正則表達式模式。
+     *
+     * @param authenticationManager JWT 身份驗證管理器
+     * @param securityProperties 安全配置屬性
+     * @throws IllegalArgumentException 當 Cookie 名稱或 WebSocket 令牌前綴為空時
      */
     public JwtSecurityContextRepository(JwtAuthenticationManager authenticationManager, SecurityProperties securityProperties) {
         this.authenticationManager = authenticationManager;
@@ -99,8 +115,10 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
 
     /**
-     * 初始化方法，設置遊客用戶對象的屬性
-     * 遊客用戶對象的 ID 為 0，角色為 VISITOR，存儲限制和已使用存儲空間均為 0
+     * 初始化遊客使用者實體的預設屬性。
+     *
+     * <p>設定遊客使用者的基本資訊：ID 為 0、角色為 VISITOR、
+     * 儲存限制和已使用空間均為 0。此方法在 Bean 初始化完成後執行。
      */
     @PostConstruct
     public void init() {
@@ -115,12 +133,14 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
 
     /**
-     * 此方法不支援，不需要保存 SecurityContext
+     * 不支援安全上下文的持久化操作。
      *
-     * @param exchange 請求
-     * @param context  安全上下文
+     * <p>由於採用無狀態的 JWT 驗證機制，不需要將安全上下文儲存至伺服器端。
+     * 所有驗證資訊均透過令牌本身攜帶。
      *
-     * @return Mono<Void>
+     * @param exchange 伺服器 Web 交換物件
+     * @param context 安全上下文
+     * @return 永遠回傳 null
      */
     @Override
     public Mono<Void> save(ServerWebExchange exchange, SecurityContext context) {
@@ -129,17 +149,18 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
 
     /**
-     * 從請求中獲取 JWT Token，若存在則進行驗證
-     * 分成 API 、WEB 和 WEBSOCKET 三種請求類型
-     * 其中 API請求只會從請求頭中獲取 JWT Token
-     * WEB 以及 WEBSOCKET 請求則會從請求頭和 Cookie 中獲取 JWT Token
-     * 驗證成功則返回 SecurityContext，驗證失敗則返回 Mono.error()
-     * 如無法獲取 JWT Token，則會檢查是否啟用遊客用戶
-     * 若啟用則返回遊客用戶的 SecurityContext，否則返回 Mono.empty()，設置為 AnonymousAuthenticationToken
+     * 載入並建立請求對應的安全上下文。
      *
-     * @param exchange 請求
+     * <p>根據請求類型採用不同的令牌提取策略：API 請求僅從 Authorization 標頭提取，
+     * WEB 和 WebSocket 請求同時支援標頭和 Cookie 提取。WebSocket 請求額外支援
+     * 從子協議標頭提取令牌。
      *
-     * @return Mono<SecurityContext> 安全上下文
+     * <p>令牌驗證成功時建立對應的安全上下文，失敗時根據請求類型決定錯誤處理方式：
+     * WebSocket 請求建立錯誤驗證物件以維持連線，其他請求型別拋出驗證例外。
+     * 當無法取得有效令牌且啟用遊客模式時，自動建立遊客安全上下文。
+     *
+     * @param exchange 伺服器 Web 交換物件
+     * @return 包含安全上下文的 Mono，若無有效驗證則為空
      */
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
@@ -206,11 +227,13 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
 
     /**
-     * 從 Cookie 中提取 JWT Token
+     * 從 Cookie 字串中提取 JWT 令牌。
      *
-     * @param cookieValue Cookie
+     * <p>使用預編譯的正則表達式模式匹配配置的 Cookie 名稱，
+     * 並提取對應的令牌值。
      *
-     * @return JWT Token
+     * @param cookieValue 完整的 Cookie 字串
+     * @return 包含 JWT 令牌的 Optional，若未找到則為空
      */
     private Optional<String> extractJwtFromCookies(String cookieValue) {
         if (cookieValue == null) {
@@ -225,11 +248,13 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     }
 
     /**
-     * 創建 WebSocket 錯誤的身份驗證對象
+     * 建立 WebSocket 連線的錯誤身份驗證物件。
      *
-     * @param errorCode 錯誤代碼
+     * <p>當 WebSocket 令牌驗證失敗時，建立特殊的驗證物件以維持連線狀態，
+     * 避免連線中斷。錯誤資訊包含在驗證物件的詳細資料中。
      *
-     * @return Authentication 返回身份驗證對象
+     * @param errorCode 驗證失敗的錯誤代碼
+     * @return 包含錯誤資訊的身份驗證物件
      */
     private Authentication createWebSocketErrorAuthentication(ValidationException.ErrorCode errorCode) {
         Object principal = "ERROR_WEBSOCKET_AUTH_" + errorCode.name();
@@ -240,9 +265,12 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
     }
 
     /**
-     * 設置為遊客身分的用戶對象
+     * 建立遊客使用者的安全上下文。
      *
-     * @return Mono<User> 返回遊客身分的用戶對象
+     * <p>為遊客使用者建立具有 VISITOR 角色權限的安全上下文，
+     * 用於支援匿名存取受限功能的場景。
+     *
+     * @return 包含遊客安全上下文的 Mono
      */
     private Mono<SecurityContext> createGuestSecurityContext() {
         List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(RoleEnum.VISITOR.name()));
@@ -252,43 +280,47 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
 
     /**
-     * 請求類型枚舉類，用於定義請求的類型
-     * 主要用於區分各種類型的請求，使用不同的方式來獲取 JWT Token
+     * 請求類型枚舉，定義不同協議的令牌提取策略。
+     *
+     * <p>根據請求路徑和標頭特徵識別請求類型，並採用對應的
+     * JWT 令牌提取和驗證邏輯。
      */
     @Getter
     @RequiredArgsConstructor
     enum RequestType {
         /**
-         * API 請求，此為默認請求類型，從請求頭中獲取 JWT Token
+         * API 請求類型，僅從 Authorization 標頭提取令牌。
          */
         API("API協議"),
 
         /**
-         * WEB 請求，從請求頭和 Cookie 中獲取 JWT Token
+         * WEB 請求類型，支援從標頭和 Cookie 提取令牌。
          */
         WEB("WEB協議"),
 
         /**
-         * WebSocket 請求，此處不做驗證，交由 ${@link xyz.dowob.filemanagement.component.manager.JwtWebSocketHandlerAdapter} 處理
+         * WebSocket 請求類型，支援從 Cookie 和子協議標頭提取令牌。
          */
         WEB_SOCKET("WebSocket協議"),
 
         /**
-         * 其他請求類型，此類為功能性請求，包含 /docs、/actuator 等請求
+         * 其他請求類型，包含文件和監控端點等功能性請求。
          */
         OTHER("其他協議");
 
         /**
-         * 請求類型名稱
+         * 請求類型的顯示名稱。
          */
         private final String name;
 
         /**
-         * 獲取請求類型
+         * 根據請求特徵識別請求類型。
          *
-         * @param exchange 請求
+         * <p>依序檢查請求路徑前綴和標頭資訊，判斷請求所屬的協議類型。
+         * 支援 WEB、WebSocket、文件/監控端點和 API 請求的自動識別。
          *
-         * @return 請求類型
+         * @param exchange 伺服器 Web 交換物件
+         * @return 對應的請求類型，若無法識別則回傳 null
          */
         public static RequestType getRequestType(ServerWebExchange exchange) {
             String path = exchange.getRequest().getPath().value();

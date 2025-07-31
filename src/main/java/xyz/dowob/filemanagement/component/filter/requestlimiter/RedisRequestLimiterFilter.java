@@ -9,6 +9,7 @@ import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.async.RedisAsyncCommands;
+import jakarta.annotation.Nonnull;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -31,19 +32,19 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * Redis 請求限制器過濾器，透過 Bucket4j 以及 Redis 實現
- * 這個過濾器會在請求進入時檢查用戶的請求次數是否超過限制
- * 如果超過限制，則會返回 429 Too Many Requests 錯誤，如果沒有超過限制，則會將請求放行
- * 採用窗口令牌桶算法進行請求限制，在任意週期內，請求次數不會超過限制
- * 實現了 WebFilter 接口，並在過濾器鏈中處理請求，以及 ResponseUnity 接口，內部封裝一些常用的響應方法
- * 此類僅在啟用 Redis 請求限制器時生效 {@link GlobalProperties.RequestLimiter}
+ * 基於 Redis 的分佈式 IP 請求限流過濾器，支援多節點共享限流狀態。
+ *
+ * <p>本過濾器使用 Bucket4j 與 Redis 實現分佈式令牌桶演算法，提供跨節點一致的 IP 限流功能。
+ * 透過 Lettuce Redis 客戶端實現非阻塞的令牌消費機制，確保高併發環境下的性能表現。
+ * 當請求頻率超過設定閾值時，回傳 HTTP 429 狀態碼。</p>
+ *
+ * <p>包含可選的 IP 封禁功能，當連續請求失敗次數達到閾值時，會在 Redis 中記錄封禁狀態。
+ * 支援動態過期時間設定，適用於需要持久化限流狀態的分佈式部署環境。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName RequestFilter
- * @create 2025/4/21
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @ConditionalOnProperty(prefix = "global", name = "request-limiter.type", havingValue = "redis", matchIfMissing = true)
 public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
@@ -58,8 +59,8 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
     private final static String IP_BAN_COUNT_KEY_PREFIX = "request-ban-ip:";
 
     /**
-     * 請求限制的上限，當請求次數超過這個值時，會返回 429 Too Many Requests 錯誤
-     * 當設置為值小於等於 0 時，則使用預設值: Integer.MAX_VALUE
+     * 請求限制的上限，當請求次數超過這個值時，會回傳 429 Too Many Requests 錯誤
+     * 當設定為值小於等於 0 時，則使用預設值: Integer.MAX_VALUE
      */
     private final int limit;
 
@@ -82,17 +83,17 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
 
     /**
      * 是否啟用禁止IP
-     * 當設置為true時，會檢查請求的IP是否在禁止列表中
+     * 當設定為true時，會檢查請求的IP是否在禁止列表中
      */
     private final boolean isEnableBanIp;
     /**
      * 禁止IP的封禁時間
-     * 當設置為值小於等於 0 時，則使用預設值: 1小時
+     * 當設定為值小於等於 0 時，則使用預設值: 1小時
      */
     private final Duration banExpireDuration;
     /**
      * 禁止IP的計算時間
-     * 當設置為值小於等於 0 時，則使用預設值: 10分鐘
+     * 當設定為值小於等於 0 時，則使用預設值: 10分鐘
      * 在本段時間內，請求失敗的次數若超過 {@link #failureCount}，則會禁止IP訪問
      * 僅在啟用禁止IP時生效
      */
@@ -109,18 +110,18 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
     private final ObjectMapper objectMapper;
     /**
      * 失敗次數，當請求次數超過這個值時，會禁止IP訪問
-     * 當設置為值小於等於 0 時，則使用預設值: 5
+     * 當設定為值小於等於 0 時，則使用預設值: 5
      * 僅在啟用禁止IP時生效
      */
     private int failureCount = 5;
 
     /**
      * 構造函數，初始化 RedisRequestLimiterFilter
-     * 將請求限制器的配置從全局配置中獲取，並引入 Redis 客戶端來進行代理限制
-     * 使用 FixedTimeToLive 策略來設置請求限制器的過期時間並添加自定義的序列化器
+     * 將請求限制器的設定從全局設定中獲取，並引入 Redis 客戶端來進行代理限制
+     * 使用 FixedTimeToLive 策略來設定請求限制器的過期時間並添加自定義的序列化器
      * 將限制器轉換成 byte[] 存儲到 Redis 中
      *
-     * @param globalProperties 全局配置屬性
+     * @param globalProperties 全局設定屬性
      * @param objectMapper     Jackson ObjectMapper 實例
      * @param redisProvider    Redis 提供者
      * @param redisClient      Redis 客戶端
@@ -159,7 +160,7 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
 
     /**
      * 過濾器方法，處理請求並檢查請求次數是否超過限制
-     * 當超過限制時，返回 429 Too Many Requests 錯誤
+     * 當超過限制時，回傳 429 Too Many Requests 錯誤
      * 當沒有超過限制時，將請求放行
      *
      * @param exchange 請求交換對象
@@ -167,9 +168,9 @@ public class RedisRequestLimiterFilter implements WebFilter, ResponseUnity {
      *
      * @return Mono<Void>
      */
-    @NotNull
+    @Nonnull
     @Override
-    public Mono<Void> filter(@NotNull ServerWebExchange exchange, @NotNull WebFilterChain chain) {
+    public Mono<Void> filter(@Nonnull ServerWebExchange exchange, @Nonnull WebFilterChain chain) {
         Optional<String> clientIpOptional = ClientIpFilter.getClientIpFromExchange(exchange);
         if (clientIpOptional.isEmpty()) {
             LogUnity.debug(exchange, "無法獲取用戶 IP: %s, 拒絕連線", exchange.getRequest().getRemoteAddress());

@@ -42,45 +42,56 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * 一般檔案控制器的基礎類，用於處理一般檔案的相關請求
- * 此類繼承自 {@link BaseFileController}，用於處理文件相關的請求
- *
+ * 基於反應式編程的一般檔案控制器抽象基類，實現通用檔案的完整管理功能。
+ * 
+ * <p>此類繼承自 BaseFileController，專門處理一般檔案（非線上檔案）的相關操作，
+ * 包括檔案上傳、下載、編輯、刪除等核心功能。支援多種傳輸方式（分塊上傳、Multipart上傳），
+ * 並整合用戶限流機制確保系統穩定性。</p>
+ * 
+ * <p>提供靈活的檔案處理策略，支援預覽和下載模式，
+ * 並透過權限驗證確保檔案操作的安全性。</p>
+ * 
  * @author yuan
- * @program FileManagement
- * @ClassName BaseGeneralFileController
- * @create 2025/1/14
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @RecordLevel(LogLevelEnum.INFO)
 public abstract class BaseGeneralFileController extends BaseFileController {
 
     /**
-     * 是否強制使用伺服器配置
+     * 是否強制使用伺服器設定的標誌。
+     * 
+     * <p>當此標誌為 true 時，系統將忽略客戶端的傳輸方式選擇，
+     * 強制使用伺服器預設的傳輸設定。</p>
      */
     private final boolean isForceUseServerConfig;
 
     /**
-     * 預設的上傳類型
+     * 系統預設的檔案上傳傳輸類型。
+     * 
+     * <p>定義當客戶端未指定傳輸方式或伺服器強制使用設定時的預設傳輸方式。</p>
      */
     private final TransmissionEnum defaultUploadType;
 
     /**
-     * 用戶限額策略，用於控制用戶的操作限制。
+     * 用戶限額策略管理器，實現使用者操作頻率和資源使用的控制機制。
+     * 
+     * <p>透過不同的限流策略保護系統資源，防止使用者濫用或超量使用。</p>
      */
     private final UserLimiterStrategy userLimiterStrategy;
 
 
     /**
-     * 構造函數，初始化基本的業務層服務
+     * 建構函式，初始化一般檔案控制器所需的各項服務和組件。
      *
-     * @param userService               用戶服務層對象
-     * @param fileServiceStrategy       文件服務策略對象，用於選擇適當的文件服務
-     * @param fileProperties            文件屬性設置
-     * @param validationService         驗證服務對象
-     * @param permissionService         用戶文件元數據授權服務
-     * @param objectMapper              用於處理對象映射的工具
-     * @param filePermissionRuleManager 文件權限規則管理器
-     * @param userLimiterStrategy       用戶限制策略
+     * @param userService               使用者服務，提供使用者相關的業務邏輯
+     * @param fileServiceStrategy       檔案服務策略，用於選擇適當的檔案服務實現
+     * @param fileProperties            檔案系統設定屬性
+     * @param validationService         資料驗證服務
+     * @param permissionService         使用者檔案權限服務
+     * @param objectMapper              JSON 物件映射器
+     * @param filePermissionRuleManager 檔案權限規則管理器
+     * @param userLimiterStrategy       使用者限額策略管理器
      */
     public BaseGeneralFileController(UserService userService, FileServiceStrategy fileServiceStrategy, FileProperties fileProperties, ValidationService validationService, PermissionService<UserFileMetadata> permissionService, UserLimiterStrategy userLimiterStrategy, ObjectMapper objectMapper, FilePermissionRuleManager filePermissionRuleManager) {
         super(userService, fileServiceStrategy, fileProperties, validationService, permissionService, objectMapper, filePermissionRuleManager);
@@ -92,13 +103,13 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 上傳文件的請求，此步驟為預先上傳文件的元數據檢驗檔案的步驟
-     * 處理完成之後依照結果提供繼續上傳文件分塊或是完成操作
+     * 上傳檔案的請求，此步驟為預先上傳檔案的元資料檢驗檔案的步驟
+     * 處理完成之後依照結果提供繼續上傳檔案分塊或是完成操作
      *
-     * @param fileMetadataDTO 上傳文件的元數據
+     * @param fileMetadataDTO 上傳檔案的元資料
      * @param exchange        請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件的結果
+     * @return Mono<ResponseEntity < ?>> 回傳上傳檔案的結果
      */
     public Mono<ResponseEntity<?>> uploadFile(FileMetadataDTO fileMetadataDTO, ServerWebExchange exchange) {
         Mono<ResponseEntity<?>> action = userService.getUser(exchange).flatMap(user -> {
@@ -139,14 +150,14 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 下載文件的請求，根據文件 ID 下載文件並提供預覽或是下載
+     * 下載檔案的請求，根據檔案 ID 下載檔案並提供預覽或是下載
      * 預設為預覽
      *
      * @param action   預覽或是下載
-     * @param id       文件 ID
+     * @param id       檔案 ID
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
+     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 回傳檔案流
      */
     public Mono<ResponseEntity<Flux<DataBuffer>>> downloadFile(String action, Long id, ServerWebExchange exchange) {
         DownloadActionEnum actionEnum = DownloadActionEnum.getType(action);
@@ -158,13 +169,13 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
-     * 處理文件下載的方法
+     * 處理檔案下載的方法
      *
      * @param action 預覽或是下載
-     * @param id     文件 ID
+     * @param id     檔案 ID
      * @param user   用戶對象
      *
-     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
+     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 回傳檔案流
      */
     @SkipRecord
     private Mono<ResponseEntity<Flux<DataBuffer>>> processFileDownload(DownloadActionEnum action, Long id, User user, String rangeHeader) {
@@ -177,13 +188,13 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 下載文件並準備返回結果
+     * 下載檔案並準備回傳結果
      *
-     * @param file   文件對象
+     * @param file   檔案對象
      * @param user   用戶對象
      * @param action 下載類型
      *
-     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 返回文件流
+     * @return Mono<ResponseEntity < Flux < DataBuffer>>> 回傳檔案流
      */
     @SkipRecord
     private Mono<ResponseEntity<Flux<DataBuffer>>> downloadAndPrepareResponse(UserFileMetadata file, User user, DownloadActionEnum action, String rangeHeader) {
@@ -196,12 +207,12 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 獲取文件的信息，根據文件 ID 獲取文件的信息
+     * 獲取檔案的信息，根據檔案 ID 獲取檔案的信息
      *
-     * @param id       文件 ID
+     * @param id       檔案 ID
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回文件信息
+     * @return Mono<ResponseEntity < ?>> 回傳檔案信息
      */
     public Mono<ResponseEntity<?>> getFileType(Long id, ServerWebExchange exchange) {
         Mono<ResponseEntity<?>> result = userService.getUser(exchange).flatMap(user -> {
@@ -212,7 +223,7 @@ public abstract class BaseGeneralFileController extends BaseFileController {
                 String mediaType = FileEnum.getMediaType(serverFileMetadata.getFileType(), file.getFilename());
                 long fileSize = serverFileMetadata.getFileSize();
                 Map<String, Object> data = Map.of("X-File-Content-Type", mediaType, "X-File-Size", fileSize);
-                ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "獲取文件類型成功", data);
+                ApiResponseDTO<?> apiResponse = createApiResponse(exchange, "獲取檔案類型成功", data);
                 return createResponseEntity(apiResponse);
             });
         });
@@ -221,12 +232,12 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 刪除文件的請求，根據文件 ID 刪除文件
+     * 刪除檔案的請求，根據檔案 ID 刪除檔案
      *
-     * @param id       文件 ID
+     * @param id       檔案 ID
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回刪除文件的結果
+     * @return Mono<ResponseEntity < ?>> 回傳刪除檔案的結果
      */
     public Mono<ResponseEntity<?>> deleteFile(@PathVariable String id, ServerWebExchange exchange) {
         List<Permission<UserFileMetadata>> rules = new ArrayList<>(List.of(filePermissionRuleManager.getAllowOwner(),
@@ -245,12 +256,12 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 編輯文件的請求，根據文件 ID 編輯文件
+     * 編輯檔案的請求，根據檔案 ID 編輯檔案
      *
-     * @param fileEditDTO 文件編輯的元數據
+     * @param fileEditDTO 檔案編輯的元資料
      * @param exchange    請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回編輯文件的結果
+     * @return Mono<ResponseEntity < ?>> 回傳編輯檔案的結果
      */
     public Mono<ResponseEntity<?>> editFile(FileEditDTO fileEditDTO, ServerWebExchange exchange) {
         Mono<ResponseEntity<?>> result = validationService
@@ -281,14 +292,14 @@ public abstract class BaseGeneralFileController extends BaseFileController {
 
 
     /**
-     * 上傳文件的請求，根據文件 ID 上傳文件分塊
-     * 根據用戶的選擇的上傳方式以及伺服器的配置來決定上傳的方式
-     * 並將任務 ID 以及文件分塊的內容傳遞給具體的處理方法
+     * 上傳檔案的請求，根據檔案 ID 上傳檔案分塊
+     * 根據用戶的選擇的上傳方式以及伺服器的設定來決定上傳的方式
+     * 並將任務 ID 以及檔案分塊的內容傳遞給具體的處理方法
      *
      * @param transmissionType 上傳方式
      * @param exchange         請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     * @return Mono<ResponseEntity < ?>> 回傳上傳檔案分塊的結果
      */
     protected Mono<ResponseEntity<?>> uploadFileData(String transmissionType, ServerWebExchange exchange) {
         TransmissionEnum transmissionEnum = getChooseTransmissionType(transmissionType);
@@ -302,12 +313,12 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
-     * 獲取用戶選擇的上傳方式，如果伺服器配置為強制使用伺服器配置則使用伺服器配置
-     * 否則使用用戶選擇的上傳方式，如果用戶選擇的上傳方式為空則使用伺服器配置
+     * 獲取用戶選擇的上傳方式，如果伺服器設定為強制使用伺服器設定則使用伺服器設定
+     * 否則使用用戶選擇的上傳方式，如果用戶選擇的上傳方式為空則使用伺服器設定
      *
      * @param uploadType 上傳方式
      *
-     * @return TransmissionEnum 返回上傳方式
+     * @return TransmissionEnum 回傳上傳方式
      */
     @SkipRecord
     protected TransmissionEnum getChooseTransmissionType(String uploadType) {
@@ -318,11 +329,11 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
-     * 將請求的 Multipart 類型轉換獲取 文件的 ID 以及文件分塊
+     * 將請求的 Multipart 類型轉換獲取 檔案的 ID 以及檔案分塊
      *
      * @param exchange 請求對象
      *
-     * @return Mono<Tuple2 < String, Mono < Part>>> 返回 Multipart 類型
+     * @return Mono<Tuple2 < String, Mono < Part>>> 回傳 Multipart 類型
      */
     protected Mono<Tuple2<String, Mono<Part>>> formatMultipartData(ServerWebExchange exchange) {
         return exchange.getMultipartData().flatMap(multipartData -> {
@@ -346,11 +357,11 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     /**
      * 此方法為Multipart上傳的處理方法
      *
-     * @param transferTaskId 文件 ID
-     * @param filePart       文件分塊
+     * @param transferTaskId 檔案 ID
+     * @param filePart       檔案分塊
      * @param exchange       請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     * @return Mono<ResponseEntity < ?>> 回傳上傳檔案分塊的結果
      */
     protected Mono<ResponseEntity<?>> handleMultipartUpload(String transferTaskId, Mono<Part> filePart, ServerWebExchange exchange) {
         return filePart.map(Part::content).flatMap(dataBufferFlux -> {
@@ -373,11 +384,11 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
-     * 將請求的數據轉換為 UploadChunkDTO 類型
+     * 將請求的資料轉換為 UploadChunkDTO 類型
      *
      * @param exchange 請求對象
      *
-     * @return Mono<UploadChunkDTO> 返回 UploadChunkDTO 類型
+     * @return Mono<UploadChunkDTO> 回傳 UploadChunkDTO 類型
      */
     protected Mono<UploadChunkDTO> formatChunkData(ServerWebExchange exchange) {
         return exchange.getRequest().getBody().collectList().flatMap(dataBuffers -> {
@@ -401,10 +412,10 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     /**
      * 此方法為分塊上傳的處理方法
      *
-     * @param uploadChunkDTO 上傳文件分塊的元數據
+     * @param uploadChunkDTO 上傳檔案分塊的元資料
      * @param exchange       請求對象
      *
-     * @return Mono<ResponseEntity < ?>> 返回上傳文件分塊的結果
+     * @return Mono<ResponseEntity < ?>> 回傳上傳檔案分塊的結果
      */
     protected Mono<ResponseEntity<?>> handleChunkUpload(UploadChunkDTO uploadChunkDTO, ServerWebExchange exchange) {
         return handleError(fileServiceStrategy.getFileService().uploadFileChunk(uploadChunkDTO).flatMap(transferResponseDTO -> {
@@ -420,11 +431,11 @@ public abstract class BaseGeneralFileController extends BaseFileController {
     }
 
     /**
-     * 獲取用戶文件列表的請求
+     * 獲取用戶檔案列表的請求
      *
      * @param exchange 請求對象
      *
-     * @return Mono<ResponseEntity> 返回用戶文件列表
+     * @return Mono<ResponseEntity> 回傳用戶檔案列表
      */
     public Mono<ResponseEntity<?>> getUserFileList(ServerWebExchange exchange, Integer page, Integer size, List<String> types) {
         List<FileEnum> fileEnums = Optional.ofNullable(types).orElse(Collections.emptyList()).stream().map(type -> {

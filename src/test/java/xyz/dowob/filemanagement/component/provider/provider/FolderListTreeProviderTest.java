@@ -26,6 +26,25 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * FolderListTreeProvider 測試類別。
+ * 
+ * <p>測試 FolderListTreeProvider 的資料夾樹狀結構管理功能，包括：
+ * <ul>
+ * <li>資料夾新增、更新、刪除操作</li>
+ * <li>父子關係建立與維護</li>
+ * <li>最大深度限制驗證</li>
+ * <li>循環引用檢測與預防</li>
+ * <li>資料夾路徑導航及結構初始化</li>
+ * </ul>
+ * 
+ * <p>測試傳範短淺反應式程式設計，透過模擬依賴關係驗證樹狀結構操作的正確性和完整性。
+ * 測試包含正常情況、異常處理和邊界條件，確保資料夾管理程序的穩定性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @Log4j2
 @DisplayName("FolderListTreeProvider 邏輯處理測試")
 @ExtendWith(MockitoExtension.class)
@@ -313,7 +332,7 @@ class FolderListTreeProviderTest {
             assertThat(e)
                     .isInstanceOf(ProcessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ProcessException.ErrorCode.BUILD_FILE_TREE_FAILED)
-                    .hasMessageContaining("構建文件樹失敗: 無效的 parentFolderId: " + invalidFolder.getParentFolderId());
+                    .hasMessageContaining("構建檔案樹失敗: 無效的 parentFolderId: " + invalidFolder.getParentFolderId());
         });
     }
 }

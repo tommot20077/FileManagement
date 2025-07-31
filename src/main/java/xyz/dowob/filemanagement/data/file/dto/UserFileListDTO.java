@@ -17,30 +17,28 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 用戶文件列表數據傳輸對象，用於封裝用戶文件列表的數據
+ * 用戶檔案列表資料傳輸對象，用於封裝用戶檔案列表的資料
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UserFileListDTO
- * @create 2025/1/14
- * @Version 1.0
+ * @since 1.0
+ * @version 1.0
  **/
 @Getter
 @Setter
 @NoArgsConstructor
 public class UserFileListDTO {
     /**
-     * 文件ID
+     * 檔案ID
      */
     private Long id;
 
     /**
-     * 文件名稱
+     * 檔案名稱
      */
     private String filename;
 
     /**
-     * 父文件夾ID
+     * 父檔案夾ID
      */
     private Long parentFolderId;
 
@@ -57,32 +55,32 @@ public class UserFileListDTO {
     private LocalDateTime lastAccessTime;
 
     /**
-     * 是否為星標文件
+     * 是否為星標檔案
      */
     private Boolean isStar;
 
     /**
-     * 文件大小
+     * 檔案大小
      */
     private Long fileSize;
 
     /**
-     * 文件類型
+     * 檔案類型
      */
     private FileEnum fileType;
 
     /**
-     * 文件共享類型
+     * 檔案共享類型
      */
     private FileShareTypeEnum shareType;
 
     /**
-     * 文件GridFsId
+     * 檔案GridFsId
      */
     private String gridFsId;
 
     /**
-     * 文件MD5值
+     * 檔案MD5值
      */
     private String md5;
 
@@ -97,21 +95,21 @@ public class UserFileListDTO {
     private Boolean isDeleted = false;
 
     /**
-     * 文件擁有者名稱
+     * 檔案擁有者名稱
      */
     private String ownerUsername;
 
     /**
-     * 文件的MIME類型
+     * 檔案的MIME類型
      */
     private String mimeType;
 
 
     /**
-     * 用戶文件列表數據傳輸對象構造函數
+     * 用戶檔案列表資料傳輸對象構造函數
      *
-     * @param serverFileMetadata 服務器文件元數據對象
-     * @param userFileMetadata   用戶文件元數據對象
+     * @param serverFileMetadata 服務器檔案元資料對象
+     * @param userFileMetadata   用戶檔案元資料對象
      */
     public UserFileListDTO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
@@ -135,10 +133,10 @@ public class UserFileListDTO {
 
 
     /**
-     * 用戶文件列表數據傳輸對象構造函數
+     * 用戶檔案列表資料傳輸對象構造函數
      *
-     * @param userOnlineFile   用戶在線文件對象
-     * @param userFileMetadata 用戶文件元數據對象
+     * @param userOnlineFile   用戶在線檔案對象
+     * @param userFileMetadata 用戶檔案元資料對象
      */
     public UserFileListDTO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
@@ -159,9 +157,9 @@ public class UserFileListDTO {
 
 
     /**
-     * 用戶文件列表數據傳輸對象構造函數
+     * 用戶檔案列表資料傳輸對象構造函數
      *
-     * @param userFileMetadata 用戶文件元數據對象
+     * @param userFileMetadata 用戶檔案元資料對象
      */
     public UserFileListDTO(UserFileMetadata userFileMetadata, Collection<Long> shareUsers) {
         this.id = userFileMetadata.getId();
@@ -180,9 +178,9 @@ public class UserFileListDTO {
 
 
     /**
-     * 用戶文件列表數據傳輸對象構造函數
+     * 用戶檔案列表資料傳輸對象構造函數
      *
-     * @param userFileMetaWithDataDAO 用戶文件元數據與數據對象
+     * @param userFileMetaWithDataDAO 用戶檔案元資料與資料對象
      * @param shareUsers              共享用戶ID集合
      */
     public UserFileListDTO(UserFileMetaWithDataDAO userFileMetaWithDataDAO, Collection<Long> shareUsers) {

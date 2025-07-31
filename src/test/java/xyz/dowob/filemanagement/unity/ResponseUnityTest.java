@@ -36,24 +36,31 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * ResponseUnity 介面測試。
- * 
- * 測試 ResponseUnity 介面中所有預設方法的功能，
- * 包括響應創建、錯誤處理和WebSocket響應等。
- * 
+ * ResponseUnity 響應工具介面的單元測試。
+ *
+ * 測試統一響應處理介面的所有預設方法，包括API響應創建、錯誤處理、
+ * WebSocket響應生成和異常映射功能。驗證響應格式化、狀態碼處理和錯誤轉換機制。
+ *
  * 前置條件：
- * - 模擬所有必要的依賴項目
- * - 設定測試資料和環境
- * 
+ * - Mock Spring WebFlux 相關組件
+ * - 配置測試用的響應資料和狀態碼
+ * - 設定ObjectMapper和DataBuffer模擬
+ *
  * 測試步驟：
- * - 測試一般功能：響應創建、正常流程
- * - 測試異常處理：各種例外情況
- * - 測試邊界條件：null值、極值等
- * 
+ * - 測試API響應創建的各種變體
+ * - 驗證錯誤處理和異常映射
+ * - 檢查WebSocket響應生成
+ * - 測試邊界條件和異常情況
+ *
  * 預期結果：
- * - 所有響應創建方法正確執行
- * - 錯誤處理正確處理各種例外
- * - 邊界條件得到適當處理
+ * - 所有響應創建方法應正確執行
+ * - 錯誤處理應正確映射各種異常類型
+ * - WebSocket響應應包含正確的格式和內容
+ * - 邊界條件應得到適當處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ResponseUnity 介面功能測試")
@@ -116,6 +123,22 @@ class ResponseUnityTest {
 
     // ==================== 一般測試 ====================
 
+    /**
+     * 測試創建ResponseEntity使用預設狀態碼的功能。
+     *
+     * 驗證當不指定自訂狀態碼時，ResponseEntity能夠使用ApiResponse中的狀態碼創建響應。
+     *
+     * 前置條件：
+     * - 創建包含狀態碼200的ApiResponseDTO實例
+     *
+     * 測試步驟：
+     * - 調用createResponseEntity方法（不指定狀態碼）
+     * - 驗證返回的ResponseEntity狀態碼和內容
+     *
+     * 預期結果：
+     * - ResponseEntity狀態碼應與ApiResponse中的狀態碼一致
+     * - 響應體應包含正確的ApiResponse內容
+     */
     @Test
     @DisplayName("一般測試 - 創建 ResponseEntity (預設狀態碼)")
     void testCreateResponseEntity_DefaultStatus() {

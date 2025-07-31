@@ -25,6 +25,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * 自定義 WebSocket 工作階段的單元測試類別。
+ *
+ * <p>本測試類別全面驗證 CustomWebSocketSession 的功能和使用者關聯機制。</p>
+ *
+ * <p>測試範圍：
+ * 
+ *   - WebSocket 工作階段的包裝和擴展功能
+ *   - 使用者資訊的關聯和管理
+ *   - 屬性設置和獲取機制
+ *   - WebSocket 工作階段的代理行為
+ * 
+ * </p>
+ *
+ * <p>主要測試方法：
+ * 
+ *   - 驗證屬性管理功能的正確性
+ *   - 測試使用者資訊的關聯機制
+ *   - 確認 WebSocket 代理行為的正確性
+ *   - 檢驗工作階段生命週期管理
+ * 
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomWebSocketSession 邏輯處理測試")
 class CustomWebSocketSessionTest {
@@ -43,6 +70,26 @@ class CustomWebSocketSessionTest {
         customWebSocketSessionUnderTest = new CustomWebSocketSession(mockDelegate, mockUser);
     }
 
+    /**
+     * 測試屬性設置和獲取的功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證 CustomWebSocketSession 能正確設置和獲取屬性值。
+     *
+     * 前置條件：
+     * - 初始化 CustomWebSocketSession 實例
+     * - 準備測試用的鍵值對
+     *
+     * 測試步驟：
+     * - 使用 setAttribute 設置屬性
+     * - 使用 getAttribute 獲取屬性
+     * - 驗證獲取的值與設置的值一致
+     *
+     * 預期結果：
+     * - 成功設置屬性值
+     * - 成功獲取先前設置的屬性值
+     * - 設置和獲取的值完全一致
+     */
     @Test
     @DisplayName("設置和獲取屬性 - 成功設置並獲取屬性")
     void setAndGetAttribute_setsAndGetsAttributeSuccessfully() {

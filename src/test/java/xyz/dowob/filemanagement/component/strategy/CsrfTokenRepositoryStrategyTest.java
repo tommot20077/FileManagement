@@ -19,6 +19,25 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * CsrfTokenRepositoryStrategy 測試類別。
+ * 
+ * <p>測試 CsrfTokenRepositoryStrategy 的 CSRF 斑證存储庫策略選擇功能，包括：
+ * <ul>
+ * <li>正常情況下的存储庫匹配與選擇</li>
+ * <li>無效配置的異常處理</li>
+ * <li>多個匹配存储庫的選擇策略</li>
+ * <li>空存储庫清單的異常處理</li>
+ * <li>註解配置的驗證與匹配</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋策略模式的所有核心逻輯，包含正常情況、異常處理和邊界條件。
+ * 透過模擬不同的 CSRF 斑證存储庫實現，驗證策略選擇的正確性和健壯性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CsrfTokenRepositoryStrategy 邏輯處理測試")
 class CsrfTokenRepositoryStrategyTest {

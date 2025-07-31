@@ -22,6 +22,33 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+/**
+ * FilePermissionRuleManager 檔案權限規則管理測試類別。
+ *
+ * 測試 FilePermissionRuleManager 的檔案權限控制機制，包括擁有者權限、共享檔案存取、
+ * 預設共享狀態處理、保留搜尋操作和已刪除檔案的權限規則。
+ *
+ * 前置條件：
+ * - 初始化所有必要的 Mock 依賴項目
+ * - 設置測試用戶和檔案元資料
+ * - 初始化權限規則管理器
+ *
+ * 測試步驟：
+ * - 測試檔案擁有者權限驗證
+ * - 測試共享檔案的存取權限  
+ * - 測試預設共享檔案的父資料夾權限繼承
+ * - 測試保留搜尋 ID 的處理
+ * - 測試已刪除檔案的存取控制
+ *
+ * 預期結果：
+ * - 權限規則應正確實施存取控制
+ * - 異常情況應返回適當的錯誤資訊
+ * - 預設權限規則組合應正確配置
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FilePermissionRuleManager 邏輯處理測試")
 class FilePermissionRuleManagerTest {
@@ -61,8 +88,20 @@ class FilePermissionRuleManagerTest {
     }
 
 
+    /**
+     * 測試檔案擁有者權限規則的存取機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置測試用戶為檔案擁有者
+     *   - 執行 getAllowOwner().check 方法
+     *   - 確認用戶可以正常訪問自己的檔案
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功允許訪問</p>
+     */
     @Test
-    @DisplayName("測試檔案擁有者權限規則 - 應允許訪問")
     void allowOwner_whenUserIsOwner_shouldAllowAccess() {
         testFile.setUserId(testUser.getId());
 
@@ -70,8 +109,20 @@ class FilePermissionRuleManagerTest {
     }
 
 
+    /**
+     * 測試非檔案擁有者權限規則的拒絕機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置測試用戶非檔案擁有者
+     *   - 執行 getAllowOwner().check 方法
+     *   - 確認系統拒絕非擁有者訪問
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功拒絕非擁有者訪問</p>
+     */
     @Test
-    @DisplayName("測試非檔案擁有者權限規則 - 應拒絕訪問")
     void allowOwner_whenUserIsNotOwner_shouldDenyAccess() {
         StepVerifier
                 .create(filePermissionRuleManagerUnderTest.getAllowOwner().check(testUser, testFile))
@@ -80,8 +131,20 @@ class FilePermissionRuleManagerTest {
     }
 
 
+    /**
+     * 測試公開共享檔案的存取機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置檔案為公開共享
+     *   - 執行 getAllowShared().check 方法
+     *   - 確認所有用戶可以訪問公開檔案
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功允許訪問公開檔案</p>
+     */
     @Test
-    @DisplayName("測試公開共享檔案權限規則 - 應允許訪問")
     void allowShared_whenFileIsPublic_shouldAllowAccess() {
         testFile.setShareType(FileShareTypeEnum.PUBLIC);
 

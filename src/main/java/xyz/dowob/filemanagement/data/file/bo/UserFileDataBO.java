@@ -20,15 +20,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 用戶文件數據業務對象，此對象用於封裝用戶文件的數據
- * 包括整個用戶檔案的所有信息
+ * 用戶檔案資料業務對象，封裝用戶檔案的完整資料和業務邏輯。
+ * 用於統一管理用戶檔案的元資料、內容資料和共享資訊。
+ *
+ * <p>此對象整合來自多個實體的資料，包括用戶檔案元資料、伺服器檔案元資料、
+ * 在線檔案資料和共享記錄。提供多種建構方式以適應不同的使用場景。
+ * 支援非阻塞式資料流讀取和內容編輯功能。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName DownloadTaskBO
- * @create 2025/1/22
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Getter
 @Setter
 @Builder
@@ -36,106 +38,106 @@ import java.util.Set;
 @AllArgsConstructor
 public class UserFileDataBO {
     /**
-     * 用戶文件ID
+     * 用戶檔案元資料識別符
      */
     private Long userFileId;
 
     /**
-     * 服務器文件ID
+     * 伺服器檔案元資料識別符
      */
     private Long serverFileId;
 
     /**
-     * 用戶ID
+     * 檔案擁有者的用戶識別符
      */
     private Long userId;
 
     /**
-     * 文件名稱
+     * 檔案名稱，包括副檔名
      */
     private String filename;
 
     /**
-     * 父文件夾ID
+     * 父資料夾識別符，為 null 則表示根目錄
      */
     private Long parentFolderId;
 
     /**
-     * 文件類型
+     * 檔案類型枚舉，定義檔案的基本類別
      */
     private FileEnum fileType;
 
     /**
-     * 文件的MIME類型
+     * 檔案 MIME 類型，用於內容識別和處理
      */
     private String mimeType;
 
     /**
-     * 文件大小
+     * 檔案大小（以位元組為單位）
      */
     private Long fileSize;
 
     /**
-     * 共享類型
+     * 檔案共享類型，定義檔案的存取權限
      */
     private FileShareTypeEnum shareType;
 
     /**
-     * 共享用戶
+     * 共享用戶識別符集合，包含所有可存取此檔案的用戶
      */
     private Set<Long> shareUsers = new HashSet<>();
 
     /**
-     * 最後更改時間
+     * 最後存取時間，記錄檔案最後一次被存取的時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastAccessTime;
 
     /**
-     * 上傳時間
+     * 檔案初始上傳時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadTime;
 
     /**
-     * GridFS ID
+     * MongoDB GridFS 檔案識別符，用於二進位資料存取
      */
     private String gridFsId;
 
     /**
-     * MD5值
+     * 檔案 MD5 校驗值，用於檔案完整性驗證
      */
     private String md5;
 
     /**
-     * 數據流 dataBuffer
+     * 非阻塞式資料流，用於檔案內容的實時讀取
      */
     @JsonIgnore
     private transient Flux<DataBuffer> dataBufferFlux;
 
     /**
-     * 數據流 byte[]
+     * 位元組資料流，用於一次性讀取完整檔案內容
      */
     @JsonIgnore
     private transient Mono<byte[]> dataBufferByte;
 
     /**
-     * 字符串內容
+     * 編輯器內容，用於文本檔案的結構化內容表示
      */
     @JsonIgnore
     private transient EditorContentDTO content;
 
     /**
-     * 最後修改者
+     * 最後修改者的用戶識別符
      */
     private Long lastModifiedBy;
 
 
     /**
-     * 用戶文件數據業務對象構造函數
+     * 建構用戶檔案業務對象，整合伺服器和用戶檔案元資料。
      *
-     * @param serverFileMetadata 服務器文件元數據對象
-     * @param userFileMetadata   用戶文件元數據對象
+     * @param serverFileMetadata 伺服器檔案元資料，包含檔案的物理資訊
+     * @param userFileMetadata   用戶檔案元資料，包含用戶相關的檔案資訊
      */
     public UserFileDataBO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata) {
         this.userFileId = userFileMetadata.getId();
@@ -155,11 +157,11 @@ public class UserFileDataBO {
 
 
     /**
-     * 用戶文件數據業務對象構造函數
+     * 建構用戶檔案業務對象，包含共享記錄資訊。
      *
-     * @param serverFileMetadata   服務器文件元數據對象
-     * @param userFileMetadata     用戶文件元數據對象
-     * @param userFileShareRecords 用戶文件共享記錄對象集合
+     * @param serverFileMetadata   伺服器檔案元資料，包含檔案的物理資訊
+     * @param userFileMetadata     用戶檔案元資料，包含用戶相關的檔案資訊
+     * @param userFileShareRecords 用戶檔案共享記錄集合，定義檔案的共享權限
      */
     public UserFileDataBO(ServerFileMetadata serverFileMetadata, UserFileMetadata userFileMetadata, Collection<UserFileShareRecord> userFileShareRecords) {
         UserFileDataBO userFileDataBO = new UserFileDataBO(serverFileMetadata, userFileMetadata);
@@ -168,9 +170,11 @@ public class UserFileDataBO {
 
 
     /**
-     * 用戶文件數據業務對象構造函數
+     * 建構在線檔案業務對象，用於在線編輯場景。
      *
-     * @param userOnlineFile 用戶線上檔案對象
+     * @param userOnlineFile   在線檔案實體，包含在線編輯相關資訊
+     * @param userFileMetadata 用戶檔案元資料，包含基本檔案資訊
+     * @param content          編輯器內容，包含結構化的文本內容
      */
     public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, EditorContentDTO content) {
         this.userFileId = userOnlineFile.getId();
@@ -187,12 +191,12 @@ public class UserFileDataBO {
 
 
     /**
-     * 用戶文件數據業務對象構造函數
+     * 建構完整的在線檔案業務對象，包含共享記錄資訊。
      *
-     * @param userOnlineFile       用戶線上檔案對象
-     * @param userFileMetadata     用戶文件元數據對象
-     * @param content              編輯器內容對象
-     * @param userFileShareRecords 用戶文件共享記錄對象集合
+     * @param userOnlineFile       在線檔案實體，包含在線編輯相關資訊
+     * @param userFileMetadata     用戶檔案元資料，包含基本檔案資訊
+     * @param content              編輯器內容，包含結構化的文本內容
+     * @param userFileShareRecords 用戶檔案共享記錄集合，定義檔案的共享權限
      */
     public UserFileDataBO(UserOnlineFile userOnlineFile, UserFileMetadata userFileMetadata, EditorContentDTO content, Collection<UserFileShareRecord> userFileShareRecords) {
         UserFileDataBO userFileDataBO = new UserFileDataBO(userOnlineFile, userFileMetadata, content);

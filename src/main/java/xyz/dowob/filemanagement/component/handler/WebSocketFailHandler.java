@@ -2,7 +2,7 @@ package xyz.dowob.filemanagement.component.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.validation.constraints.NotNull;
+import jakarta.annotation.Nonnull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.CloseStatus;
@@ -23,18 +23,20 @@ import xyz.dowob.filemanagement.unity.ResponseUnity;
 import java.util.Optional;
 
 /**
- * 用於處理WebSocket連接失敗的處理器，當WebSocket連接失敗時將無法使用原本的連線返回錯誤內容
- * 因此需要使用這個處理器來處理連線失敗的情況，透過一個默認的WebSocket連線來返回錯誤內容
- * 這個處理器會將錯誤內容轉換為JSON格式，並返回給客戶端
- * 此類實現了WebSocketHandler接口，並重寫了handle方法，將內容寫入並回傳
- * 以及ResponseUnity接口，內部提供通用的回應處理方法
+ * WebSocket 連線失敗情況的專用錯誤處理器，提供優雅的錯誤回應機制。
+ *
+ * <p>本處理器專門處理 WebSocket 握手成功但後續驗證或初始化失敗的場景。
+ * 當正常的 WebSocket 處理器無法完成連線建立時，系統會重導向至此處理器來提供錯誤資訊。
+ * 透過標準化的 JSON 格式回傳具體的錯誤原因，並確保連線的正確關閉。</p>
+ *
+ * <p>支援從會話屬性中讀取錯誤類型，根據不同的失敗原因提供對應的錯誤訊息。
+ * 具備完整的錯誤處理機制，即使在 JSON 序列化失敗的情況下也能妥善處理。
+ * 自動管理連線的生命週期，確保資源的正確釋放。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FailWebSocketHandler
- * @create 2025/2/5
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @RequiredArgsConstructor
 public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
@@ -51,16 +53,16 @@ public class WebSocketFailHandler implements WebSocketHandler, ResponseUnity {
 
     /**
      * handle方法用於處理WebSocket連接失敗的情況
-     * 當WebSocket連接失敗時，將錯誤內容轉換為JSON格式，並返回給客戶端
+     * 當WebSocket連接失敗時，將錯誤內容轉換為JSON格式，並回傳給客戶端
      *
      * @param session WebSocketSession 用於處理WebSocket連接的會話
      *
-     * @return Mono<Void> 返回一個Mono對象，表示異步操作的結果
+     * @return Mono<Void> 回傳一個Mono對象，表示異步操作的結果
      */
-    @NotNull
+    @Nonnull
     @Override
     @RecordLevel(LogLevelEnum.INFO)
-    public Mono<Void> handle(@NotNull WebSocketSession session) {
+    public Mono<Void> handle(@Nonnull WebSocketSession session) {
         ValidationException.ErrorCode errorCode = Optional
                 .ofNullable(session.getAttributes().get(WEBSOCKET_ERROR_ATTRIBUTE))
                 .map(errorName -> ValidationException.ErrorCode.fromName(errorName.toString()))

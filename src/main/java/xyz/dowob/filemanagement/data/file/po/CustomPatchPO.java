@@ -9,14 +9,17 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 自定義 Patch 數據傳輸對象，用於封裝 Patch 的數據
+ * 自定義 Patch 持久化對象，封裝文本差分和版本比較資料。
+ * 用於儲存和傳輸檔案版本之間的差異資訊，支援版本比較和合併操作。
+ *
+ * <p>此類別提供 diff-utils 函庫 Patch 物件的序列化支援，包括三種基本操作：
+ * 插入（INSERT）、刪除（DELETE）和修改（CHANGE）。
+ * 通過內嵌的靜態類別提供完整的 Patch 生命週期管理。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName CustomPatchPO
- * @create 2025/2/12
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 public class CustomPatchPO {
     @Data
     public static class Patch {

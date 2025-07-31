@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.data.file.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
@@ -9,39 +10,36 @@ import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import java.time.LocalDateTime;
 
 /**
- * 文件元數據傳輸對象，用於規範文件元數據的傳輸對象
- * 用於初始化文件元數據
+ * 檔案元資料傳輸對象，用於規範檔案元資料的傳輸對象
+ * 用於初始化檔案元資料
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FileMetadata
- * @description
- * @create 2024-09-26 23:54
- * @Version 1.0
+ * @since 1.0
+ * @version 1.0
  **/
 @Data
 public class FileMetadataDTO {
     /**
-     * 文件名稱
+     * 檔案名稱
      */
-    @NotBlank(message = "文件名稱不能為空")
+    @NotBlank(message = "檔案名稱不能為空")
     private String filename;
 
     /**
-     * 文件路徑
+     * 檔案路徑
      */
     private Long parentFolderId;
 
     /**
-     * 文件MD5值
+     * 檔案MD5值
      */
-    @NotBlank(message = "文件MD5值不能為空")
+    @NotBlank(message = "檔案MD5值不能為空")
     private String md5;
 
     /**
-     * 文件大小
+     * 檔案大小
      */
-    @NotBlank(message = "文件大小不能為空")
+    @NotBlank(message = "檔案大小不能為空")
     private Long fileSize;
 
     /**
@@ -49,13 +47,18 @@ public class FileMetadataDTO {
      */
     private User user;
 
+    /**
+     * 檔案類型
+     */
+    private FileEnum fileType;
+
 
     /**
-     * 將文件元數據對象轉換為用戶文件元數據對象
+     * 將檔案元資料對象轉換為用戶檔案元資料對象
      *
-     * @param serverFileId 服務器文件ID
+     * @param serverFileId 服務器檔案ID
      *
-     * @return 用戶文件元數據對象
+     * @return 用戶檔案元資料對象
      */
     public UserFileMetadata formatToUserFileMetadata(Long serverFileId) {
         UserFileMetadata userFileMetadata = new UserFileMetadata();
@@ -70,12 +73,12 @@ public class FileMetadataDTO {
 
 
     /**
-     * 將文件元數據對象轉換為文件傳輸任務對象
+     * 將檔案元資料對象轉換為檔案傳輸任務對象
      *
      * @param uploadTaskId 上傳任務ID
-     * @param message      任務消息
+     * @param message      任務訊息
      *
-     * @return 文件傳輸任務對象
+     * @return 檔案傳輸任務對象
      */
     public UploadTaskBO formatToTransferTask(String uploadTaskId, String message) {
         UploadTaskBO task = new UploadTaskBO();

@@ -26,34 +26,55 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 用戶檔案元數據操作介面，使用Spring Data R2DBC來操作數據庫，繼承ReactiveCrudRepository。
+ * 用戶檔案元資料響應式資料存取層介面，提供完整的檔案元資料管理功能。
+ * <p>
+ * 此介面繼承自 Spring Data R2DBC 的 {@link ReactiveCrudRepository}，
+ * 提供對用戶檔案元資料的完整 CRUD 操作和複雜查詢功能。
+ * 支援檔案分享、權限管理、檔案搜尋等進階功能。
+ * </p>
+ * <p>
+ * 主要功能包括：
+ * <ul>
+ *   <li>基本的 CRUD 操作（繼承自父介面）</li>
+ *   <li>用戶檔案查詢和過濾功能</li>
+ *   <li>檔案分享權限管理</li>
+ *   <li>複雜的資料結合查詢（JOIN）</li>
+ *   <li>批量操作和統計分析</li>
+ * </ul>
+ * </p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UserFileMetaRepository
- * @description
- * @create 2024-09-26 18:46
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ * @see UserFileMetadata
+ * @see ReactiveCrudRepository
+ */
 @Repository
 public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileMetadata, String> {
 
     /**
-     * 根據用戶ID查詢所有檔案元數據
+     * 根據用戶 ID 查詢所有檔案元資料。
+     * <p>
+     * 此方法用於獲取指定用戶擁有的所有檔案元資料，
+     * 包括檔案、資料夾和其他類型的資料。通常用於用戶檔案清单顯示和管理功能。
+     * </p>
      *
-     * @param userId 用戶ID
-     *
-     * @return Flux<UserFileMetadata>
+     * @param userId 用戶的唯一識別碼，不得為 null
+     * @return 包含用戶所有檔案元資料的 {@link Flux}，可能為空流
      */
     Flux<UserFileMetadata> findAllByUserId(Long userId);
 
     /**
-     * 根據用戶ID和父文件夾ID查詢檔案元數據，此方法可以蒐尋多個父文件夾ID並返回所有符合條件的檔案元數據
+     * 根據父資料夾 ID 集合批次查詢檔案元資料。
+     * <p>
+     * 此方法允許一次性查詢多個父資料夾下的所有檔案元資料，提供高效的批量查詢能力。
+     * 查詢結果會自動排除已刪除的檔案，僅回傳有效的檔案記錄。
+     * 常用於資料夾樹展開、批量檔案操作等場景。
+     * </p>
      *
-     * @param parentFolderId   父文件夾ID
-     * @param entityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
+     * @param parentFolderId 父資料夾 ID 集合，不得為 null 或包含 null 元素
+     * @param entityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含所有符合條件檔案元資料的 {@link Flux}，可能為空流
      */
     default Flux<UserFileMetadata> findAllByParentFolderIdIn(List<Long> parentFolderId, R2dbcEntityOperations entityOperations) {
         Criteria criteria = Criteria.where("parent_folder_id").in(parentFolderId).and("is_deleted").is(false);
@@ -62,14 +83,27 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
 
 
     /**
-     * 查詢指定的父文件夾ID下的所有檔案元數據，並根據用戶ID和共享類型進行過濾
-     * 最終僅返回用戶有權限訪問的檔案元數據
+     * 查詢指定父資料夾下用戶有權限存取的所有檔案元資料。
+     * <p>
+     * 此方法實現了複雜的檔案權限控制邏輯，會根據檔案的分享類型和用戶權限
+     * 來決定用戶是否能夠存取特定的檔案。支援公開分享、特定用戶分享和預設繼承權限等多種分享模式。
+     * 這是檔案權限管理系統的核心方法之一。
+     * </p>
+     * <p>
+     * 權限判斷規則：
+     * <ul>
+     *   <li>資料夾類型檔案：用戶始終可存取</li>
+     *   <li>檔案擁有者：擁有完整存取權限</li>
+     *   <li>公開分享檔案：所有用戶均可存取</li>
+     *   <li>特定分享檔案：僅被分享的用戶可存取</li>
+     *   <li>預設分享檔案：繼承父資料夾的分享權限</li>
+     * </ul>
+     * </p>
      *
-     * @param parentFolderId   父文件夾ID
-     * @param user             用戶
-     * @param entityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetadata> 返回所有符合條件的檔案元數據
+     * @param parentFolderId 父資料夾 ID，指定要查詢的資料夾
+     * @param user 請求存取的用戶物件，用於權限驗證
+     * @param entityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含用戶有權限存取的檔案元資料的 {@link Flux}，可能為空流
      */
     default Flux<UserFileMetadata> findAllByParentFolderIdWithShare(Long parentFolderId, User user, R2dbcEntityOperations entityOperations) {
         List<UserFileMetadata> allowFiles = new ArrayList<>();
@@ -121,13 +155,18 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
 
 
     /**
-     * 計算該用戶擁有同一伺服器檔案的檔案數量
+     * 統計指定用戶對於伺服器檔案的引用計數。
+     * <p>
+     * 此方法用於計算同一個伺服器檔案被特定用戶引用的次數，主要用於檔案去重和儲存空間統計。
+     * 當多個用戶檔案指向同一個實際的伺服器檔案時，此方法可以統計每個伺服器檔案的引用次數，
+     * 這對於檔案刪除時的引用計數管理和儲存空間優化非常重要。
+     * </p>
      *
-     * @param userId           用戶ID
-     * @param serverFileIds    伺服器檔案ID
-     * @param entityOperations R2dbc實體操作
-     *
-     * @return Flux<ServerFileMetaCountDAO> 返回所有檔案計數紀錄 {@link ServerFileMetaCountDAO}
+     * @param serverFileIds 要統計的伺服器檔案 ID 集合，不得為 null 或包含 null 元素
+     * @param userId 用戶 ID，指定要統計的用戶
+     * @param entityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含檔案引用計數資料的 {@link Flux}，每個元素包含伺服器檔案 ID 和對應的引用次數
+     * @see ServerFileMetaCountDAO
      */
     default Flux<ServerFileMetaCountDAO> countByServerFileIdInAndUserId(
             @Param("serverFileIds") List<Long> serverFileIds, @Param("userId") Long userId, R2dbcEntityOperations entityOperations) {
@@ -143,13 +182,30 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
 
 
     /**
-     * 根據用戶ID和過濾條件查詢複合檔案元數據，並包含檔案數據
+     * 根據用戶 ID 和過濾條件查詢複合檔案元資料（包含檔案資料）。
+     * <p>
+     * 此方法執行複雜的多表聯接查詢，結合用戶檔案元資料、伺服器檔案元資料、
+     * 線上檔案資料和用戶資訊，提供完整的檔案檢視。支援多種過濾條件包括關鍵字搜尋、
+     * 資料夾過濾、時間範圍、檔案類型等。這是檔案搜尋和列表顯示功能的核心方法。
+     * </p>
+     * <p>
+     * 支援的過濾條件：
+     * <ul>
+     *   <li>關鍵字搜尋（使用 MySQL 全文搜尋）</li>
+     *   <li>指定資料夾過濾</li>
+     *   <li>檔案類型過濾</li>
+     *   <li>時間範圍過濾</li>
+     *   <li>是否包含已刪除檔案</li>
+     *   <li>是否包含分享檔案</li>
+     * </ul>
+     * </p>
      *
-     * @param userId                用戶ID
-     * @param fileFilterDTO         過濾條件
-     * @param r2dbcEntityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetaWithDataDAO> 複合檔案元數據流，包含檔案數據
+     * @param userId 用戶 ID，指定要查詢的用戶
+     * @param fileFilterDTO 檔案過濾條件，包含各種搜尋和過濾參數
+     * @param r2dbcEntityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含完整檔案資訊的複合資料流 {@link Flux}，可能為空流
+     * @see UserFileMetaWithDataDAO
+     * @see FileFilterDTO
      */
     default Flux<UserFileMetaWithDataDAO> findAllByUserIdAndFilterDTO(Long userId, FileFilterDTO fileFilterDTO, R2dbcEntityOperations r2dbcEntityOperations) {
         StringBuilder where = new StringBuilder(" WHERE ufm.user_id = :userId");
@@ -300,12 +356,26 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     }
 
     /**
-     * 根據用戶ID查詢所有共享給該用戶的複合檔案元數據，並包含檔案數據
+     * 查詢所有分享給指定用戶的複合檔案元資料（包含檔案資料）。
+     * <p>
+     * 此方法專門用於查詢其他用戶分享給指定用戶的檔案，實現檔案分享功能的核心查詢邏輯。
+     * 查詢會結合檔案分享記錄表，僅回傳確實被分享且用戶有權限存取的檔案。
+     * 查詢結果包含完整的檔案資訊，包括檔案元資料、實際檔案資料和擁有者資訊。
+     * </p>
+     * <p>
+     * 查詢邏輯：
+     * <ul>
+     *   <li>通過檔案分享記錄表確認分享關係</li>
+     *   <li>排除已刪除和禁止分享的檔案</li>
+     *   <li>提供完整的檔案詳細資訊</li>
+     *   <li>包含原始檔案擁有者的用戶名資訊</li>
+     * </ul>
+     * </p>
      *
-     * @param userId                用戶ID
-     * @param r2dbcEntityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetaWithDataDAO> 複合檔案元數據流，包含檔案數據
+     * @param userId 被分享用戶的 ID，指定要查詢分享檔案的用戶
+     * @param r2dbcEntityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含所有分享檔案資訊的複合資料流 {@link Flux}，可能為空流
+     * @see UserFileMetaWithDataDAO
      */
 
     default Flux<UserFileMetaWithDataDAO> findSharedUserFileMetaWithDataDAO(Long userId, R2dbcEntityOperations r2dbcEntityOperations) {
@@ -391,12 +461,16 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
     }
 
     /**
-     * 根據檔案ID查詢檔案共享類型
+     * 根據檔案 ID 查詢檔案的分享類型。
+     * <p>
+     * 此方法用於快速獲取指定檔案的分享設定，用於權限驗證和存取控制。
+     * 檔案分享類型決定了檔案的可見性和存取權限範圍，是檔案權限管理的重要屬性。
+     * </p>
      *
-     * @param fileId                檔案ID
-     * @param r2dbcEntityOperations R2dbc實體操作
-     *
-     * @return Mono<FileShareTypeEnum> 返回檔案共享類型
+     * @param fileId 檔案的唯一識別碼，不得為 null
+     * @param r2dbcEntityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含檔案分享類型的 {@link Mono}，如果檔案不存在則為空
+     * @see FileShareTypeEnum
      */
     default Mono<FileShareTypeEnum> getShareTypeByFileId(Long fileId, R2dbcEntityOperations r2dbcEntityOperations) {
         return r2dbcEntityOperations
@@ -408,13 +482,31 @@ public interface UserFileMetaRepository extends ReactiveCrudRepository<UserFileM
 
 
     /**
-     * 根據用戶ID和過濾條件查詢複合檔案元數據，並包含檔案數據
+     * 根據用戶 ID 和過濾條件查詢優化的複合檔案元資料（包含檔案資料）。
+     * <p>
+     * 此方法是高效能的檔案查詢實現，針對不同的查詢場景進行了優化，
+     * 包括根目錄瀏覽、星標檔案、回收站、最近檔案等特殊檢視。
+     * 使用了資料庫索引優化和條件查詢來提升查詢效能。
+     * </p>
+     * <p>
+     * 支援的特殊檢視：
+     * <ul>
+     *   <li>根目錄檔案檢視（使用索引優化）</li>
+     *   <li>星標檔案檢視</li>
+     *   <li>回收站檔案檢視</li>
+     *   <li>最近存取檔案檢視（限制數量）</li>
+     *   <li>分享檔案檢視（重新導向到分享查詢）</li>
+     *   <li>所有檔案檢視</li>
+     * </ul>
+     * </p>
      *
-     * @param userId                用戶ID
-     * @param fileFilterDTO         過濾條件
-     * @param r2dbcEntityOperations R2dbc實體操作
-     *
-     * @return Flux<UserFileMetaWithDataDAO> 複合檔案元數據流，包含檔案數據
+     * @param userId 用戶 ID，指定要查詢的用戶
+     * @param fileFilterDTO 檔案過濾條件，包含特殊檢視類型和其他過濾條件
+     * @param r2dbcEntityOperations R2DBC 實體操作介面，提供底層資料庫存取能力
+     * @return 包含完整檔案資訊的複合資料流 {@link Flux}，根據檢視類型排序
+     * @see UserFileMetaWithDataDAO
+     * @see FileFilterDTO  
+     * @see ReservedSearchIdEnum
      */
     default Flux<UserFileMetaWithDataDAO> getUserFileMetaWithDataDAO(Long userId, FileFilterDTO fileFilterDTO, R2dbcEntityOperations r2dbcEntityOperations) {
         StringBuilder where = new StringBuilder();

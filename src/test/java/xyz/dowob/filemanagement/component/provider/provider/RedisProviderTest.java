@@ -21,6 +21,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+/**
+ * RedisProvider 測試類別。
+ * 
+ * <p>測試 RedisProvider 的 Redis 操作功能，包括：
+ * <ul>
+ * <li>基本的 Key-Value 操作（設定、獲取、刪除）</li>
+ * <li>Hash 操作（單一和批量設定、獲取、操作）</li>
+ * <li>List 操作（插入、獲取、刪除）</li>
+ * <li>Set 操作（新增、查詢、刪除）</li>
+ * <li>ZSet 操作（排序集合操作）</li>
+ * <li>過期時間設定與自增操作</li>
+ * <li>分頁查詢和通配符搜尋</li>
+ * <li>網路異常與錯誤處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋非同步反應式 Redis 操作的所有面向，包含正常情況、異常處理和邊界條件。
+ * 透過模擬 ReactiveRedisTemplate 來驗證各種 Redis 資料結構的正確操作。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RedisProvider 邏輯處理測試")
 class RedisProviderTest {

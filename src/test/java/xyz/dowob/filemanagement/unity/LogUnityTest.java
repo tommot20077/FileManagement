@@ -17,25 +17,31 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 /**
- * LogUnity 測試類別。
- * 
- * 測試 LogUnity 統一日誌工具的核心功能，包括格式化輸出、
- * 多級別日誌、參數化訊息、異常處理等。
- * 
+ * LogUnity 統一日誌工具的單元測試。
+ *
+ * 測試基於 Log4j2 實現的統一日誌工具，支援多種輸入源（ServerWebExchange、WebSocket、字串）
+ * 和多級別日誌輸出。驗證格式化輸出、參數化訊息、異常處理和邊界條件。
+ *
  * 前置條件：
- * - Mock Spring WebFlux 組件
- * - 模擬各種輸入情境
- * - 驗證方法調用不會拋出異常
- * 
+ * - Mock Spring WebFlux 組件和 WebSocket 會話
+ * - 模擬各種輸入情境和參數組合
+ * - 配置 ClientIpFilter 靜態方法模擬
+ *
  * 測試步驟：
- * - 驗證日誌方法正常執行
- * - 測試參數替換功能
- * - 檢查異常處理邏輯
- * 
+ * - 驗證所有日誌級別的正常執行
+ * - 測試不同輸入源的日誌格式化
+ * - 檢查參數化訊息的處理能力
+ * - 驗證異常處理和邊界條件
+ *
  * 預期結果：
- * - 所有日誌級別正常工作
- * - 參數化訊息正常處理
- * - 異常情況優雅處理
+ * - 所有日誌級別應正常工作且不拋出異常
+ * - 參數化訊息應正確格式化
+ * - 異常情況應優雅處理
+ * - 邊界條件應得到適當處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("LogUnity 統一日誌工具測試")
@@ -122,6 +128,21 @@ class LogUnityTest {
         @DisplayName("日誌級別測試")
         class LogLevelTests {
             
+            /**
+             * 測試TRACE級別日誌輸出功能。
+             *
+             * 驗證使用ServerWebExchange作為上下文的TRACE級別日誌能夠正常輸出。
+             *
+             * 前置條件：
+             * - 配置包含用戶資訊的ServerWebExchange模擬
+             *
+             * 測試步驟：
+             * - 調用LogUnity.trace方法
+             * - 驗證方法執行不拋出異常
+             *
+             * 預期結果：
+             * - TRACE日誌應正常輸出且不拋出異常
+             */
             @Test
             @DisplayName("TRACE級別日誌 - ServerWebExchange")
             void testTraceLogging_WithExchange() {

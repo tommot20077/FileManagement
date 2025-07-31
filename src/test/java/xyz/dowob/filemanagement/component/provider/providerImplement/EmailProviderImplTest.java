@@ -18,6 +18,25 @@ import xyz.dowob.filemanagement.exception.ProcessException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * EmailProviderImpl 測試類別。
+ * 
+ * <p>測試 EmailProviderImpl 的郵件發送功能，包括：
+ * <ul>
+ * <li>正常郵件發送操作</li>
+ * <li>JavaMailSender 發送失敗處理</li>
+ * <li>MimeMessage 創建失敗處理</li>
+ * <li>寄件人資訊異常處理</li>
+ * <li>各種郵件參數的驗證</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋郵件服務的所有核心操作，包含正常發送流程、
+ * 各種異常情況及錯誤處理。透過模擬 JavaMailSender 驗證郵件發送功能的健壯性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EmailProvider 邏輯處理測試")
 class EmailProviderImplTest {

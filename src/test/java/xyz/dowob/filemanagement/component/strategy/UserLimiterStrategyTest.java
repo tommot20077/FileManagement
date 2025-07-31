@@ -17,6 +17,25 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * UserLimiterStrategy 測試類別。
+ * 
+ * <p>測試 UserLimiterStrategy 的使用者限流策略選擇功能，包括：
+ * <ul>
+ * <li>構造函數初始化與驗證</li>
+ * <li>存在的限流器類型的正確獲取</li>
+ * <li>不存在的限流器類型的處理</li>
+ * <li>重複限流器類型的異常處理</li>
+ * <li>註解配置的驗證與匹配</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋策略模式下使用者限流管理的所有核心功能，包含正常情況、異常處理及系統健墯性。
+ * 透過模擬不同的限流器實現，驗證策略選擇的正確性和依賴注入的可靠性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @DisplayName("UserLimiterStrategy 邏輯處理測試")
 @ExtendWith(MockitoExtension.class)
 class UserLimiterStrategyTest {

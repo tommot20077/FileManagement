@@ -44,17 +44,44 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * WebSocket 處理器適配器，處理 WebSocket 連線請求以及連線轉發
- * 預處理請求，並將請求轉發給 {@link FileUploadWebSocketHandler} 或 {@link OnlineFileWebSocketHandler} 處理
- * 當發生連線錯誤時則交由 {@link WebSocketFailHandler} 處理
- * 此類繼承 {@link HandshakeWebSocketService}，這父類提供WebSocket連線的升級處理
- * 並實現了 {@link ResponseUnity} 接口，提供通用的回應處理方法
+ * WebSocket 安全適配器，實現基於 JWT 的響應式 WebSocket 連線安全管理機制。
+ *
+ * <p>本類是一個高度動態且安全的 WebSocket 連線處理適配器，負責管理 WebSocket 的整個生命週期和安全驗證流程。</p>
+ *
+ * <p>主要設計特點：</p>
+ *
+ * <p>1. 響應式安全驗證：
+ *    - 繼承 {@link org.springframework.web.reactive.socket.server.support.HandshakeWebSocketService}
+ *    - 實現 {@link xyz.dowob.filemanagement.unity.ResponseUnity} 通用響應處理
+ *    - 支持基於 JWT 的安全認證與授權</p>
+ *
+ * <p>2. WebSocket 連線路由：
+ *    - 動態路由至特定的 WebSocket 處理器：
+ *      - {@link xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler}
+ *      - {@link xyz.dowob.filemanagement.component.handler.OnlineFileWebSocketHandler}
+ *    - 當連線發生錯誤時，由 {@link xyz.dowob.filemanagement.component.handler.WebSocketFailHandler} 處理</p>
+ *
+ * <p>3. 高級連線管理：
+ *    - 支持遊客模式連線
+ *    - 動態提取和驗證 WebSocket 連線參數
+ *    - 處理複雜的連線異常情況</p>
+ *
+ * <p>4. 安全性保護：
+ *    - 嚴格驗證用戶身份和連線權限
+ *    - 支持自定義 WebSocket 協議和負載大小
+ *    - 提供細粒度的連線錯誤處理機制</p>
+ *
+ * <p>本類通過客製化的 WebSocket 升級策略和連線處理邏輯，確保了 WebSocket 連線的安全性、可靠性和可擴展性。</p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @Component
 public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implements ResponseUnity {
     /**
      * WebSocket 錯誤屬性名稱
-     * 當 WebSocket 連線失敗時，將錯誤內容轉換為 JSON 格式，並返回給客戶端
+     * 當 WebSocket 連線失敗時，將錯誤內容轉換為 JSON 格式，並回傳給客戶端
      */
     private static final String WEBSOCKET_ERROR_ATTRIBUTE = "X-WebSocket-Error";
 
@@ -66,7 +93,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
     /**
      * WebSocket 路徑前綴
-     * 用於設置 WebSocket 的路徑前綴，所有的 WebSocket 路徑都會以這個前綴開頭
+     * 用於設定 WebSocket 的路徑前綴，所有的 WebSocket 路徑都會以這個前綴開頭
      */
     private static final String WEBSOCKET_PATH_PREFIX = "/ws";
 
@@ -76,17 +103,17 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
     private final UserService userService;
 
     /**
-     * 安全配置屬性
+     * 安全設定屬性
      */
     private final SecurityProperties securityProperties;
 
     /**
-     * 文件上傳 WebSocket 處理器
+     * 檔案上傳 WebSocket 處理器
      */
     private final FileUploadWebSocketHandler fileUploadWebSocketHandler;
 
     /**
-     * 線上文件 WebSocket 處理器
+     * 線上檔案 WebSocket 處理器
      */
     private final OnlineFileWebSocketHandler onlineFileWebSocketHandler;
 
@@ -96,30 +123,30 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
     private final WebSocketFailHandler webSocketFailHandler;
 
     /**
-     * 文件上傳 WebSocket 路徑
+     * 檔案上傳 WebSocket 路徑
      * 由 {@link FileProperties#getGlobal().getWebSocketPathPrefix()} 和 {@link FileProperties#getUpload().getUploadWebSocketPath()} 組成
      */
     private final String fileUploadWebSocketPath;
 
     /**
-     * 在線文件編輯 WebSocket 路徑
+     * 在線檔案編輯 WebSocket 路徑
      * 由 {@link FileProperties#getGlobal().getWebSocketPathPrefix()} 和 {@link FileProperties#getUpload().getEditOnlineFileWebSocketPath()} 組成
      */
     private final String onlineFileEditWebSocketPath;
 
     /**
      * WebSocketHandlerAdapter 的構造函數
-     * 將 WebSocketHandlerAdapter 的請求升級策略設置為 {@link ReactorNettyRequestUpgradeStrategy}
-     * 並設置 WebSocket 錯誤屬性名稱
-     * 檢查安全配置屬性中的 JWT Token 前綴、JWT Cookie 名稱和 WebSocket 路徑前綴是否為空
-     * 並將 WebSocket 路徑前綴、文件上傳 WebSocket 路徑和在線文件編輯 WebSocket 路徑設置為對應的屬性
+     * 將 WebSocketHandlerAdapter 的請求升級策略設定為 {@link ReactorNettyRequestUpgradeStrategy}
+     * 並設定 WebSocket 錯誤屬性名稱
+     * 檢查安全設定屬性中的 JWT Token 前綴、JWT Cookie 名稱和 WebSocket 路徑前綴是否為空
+     * 並將 WebSocket 路徑前綴、檔案上傳 WebSocket 路徑和在線檔案編輯 WebSocket 路徑設定為對應的屬性
      *
      * @param userService                用戶服務
-     * @param fileProperties             文件配置屬性
-     * @param securityProperties         安全配置屬性
-     * @param fileUploadWebSocketHandler 文件上傳 WebSocket 處理器
+     * @param fileProperties             檔案設定屬性
+     * @param securityProperties         安全設定屬性
+     * @param fileUploadWebSocketHandler 檔案上傳 WebSocket 處理器
      * @param webSocketFailHandler       WebSocket 連線失敗處理器
-     * @param onlineFileWebSocketHandler 在線文件 WebSocket 處理器
+     * @param onlineFileWebSocketHandler 在線檔案 WebSocket 處理器
      */
     public JwtWebSocketHandlerAdapter(UserService userService, FileProperties fileProperties, SecurityProperties securityProperties, FileUploadWebSocketHandler fileUploadWebSocketHandler, WebSocketFailHandler webSocketFailHandler, OnlineFileWebSocketHandler onlineFileWebSocketHandler) {
         super(createUpgradeStrategy(fileProperties.getUpload().getPayloadLength()));
@@ -140,7 +167,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
     /**
      * 創建 WebSocket 升級策略
-     * 使用 {@link WebsocketServerSpec} 來設置 WebSocket 的最大幀負載長度
+     * 使用 {@link WebsocketServerSpec} 來設定 WebSocket 的最大幀負載長度
      * 同時檢查請求的 WebSocket 協議是否存在，當前請求的 WebSocket 協議不為空時，則使用請求的 WebSocket 協議
      * 若為空則使用默認的 WebSocket 協議
      *
@@ -223,34 +250,20 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
 
     /**
-     * 失敗時設置錯誤標頭，並使用 {@link WebSocketFailHandler} 處理請求
+     * 處理遊客請求
+     * 當安全設定屬性中的遊客用戶啟用時，則使用 {@link UserService#getById)}} 方法獲取遊客用戶
+     * 並將請求轉發給 {@link #handleWebSocketRequest(ServerWebExchange, User)} 方法處理
+     * 否則將交由 {@link #failWithError} 方法處理錯誤
      *
-     * @param exchange  ServerWebExchange 用於處理請求的交換器
-     * @param throwable 當前請求的異常
+     * @param exchange 用於處理請求的交換器
+     *
+     * @return Mono<Void>
      */
-    private Mono<Void> failWithError(ServerWebExchange exchange, User user, Throwable throwable) {
-        if (exchange.getResponse().isCommitted()) {
-            LogUnity.info(exchange, "響應已提交，無法處理錯誤: %s", throwable.getMessage());
-            return Mono.empty();
+    private Mono<Void> switchGuestHandler(ServerWebExchange exchange) {
+        if (securityProperties.getGuestUser().isEnable()) {
+            return userService.getById(0L).flatMap(user -> handleWebSocketRequest(exchange, user));
         }
-
-        String errorCodeName;
-        if (throwable instanceof ValidationException validationException) {
-            LogUnity.info(exchange, "用戶 WebSocket 連線請求錯誤: %s ", validationException.getMessage());
-            errorCodeName = validationException.getErrorCode().name();
-        } else {
-            LogUnity.error(exchange, "用戶 WebSocket 連線發生非預期的錯誤: ", throwable);
-            errorCodeName = ValidationException.ErrorCode.WEBSOCKET_CONNECTION_ERROR.name();
-        }
-
-        ConnectionInfo connectionInfo = new ConnectionInfo(webSocketFailHandler);
-        connectionInfo.setAttribute(WEBSOCKET_ERROR_ATTRIBUTE, errorCodeName);
-        return super
-                .handleRequest(exchange, session -> handleWebSocketSession(session, user, connectionInfo))
-                .onErrorResume(upgradeOrHandlerError -> {
-                    LogUnity.error(exchange, "處理連線失敗的 WebSocket 協議時，升級發生未預期錯誤", upgradeOrHandlerError);
-                    return Mono.empty();
-                });
+        return failWithError(exchange, new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED));
     }
 
 
@@ -267,7 +280,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
     /**
      * 處理 WebSocket 連線請求
-     * 當從 {@link #getConnectionInfo(ServerWebExchange)} 獲取到的連接處理訊息為空時，則返回錯誤
+     * 當從 {@link #getConnectionInfo(ServerWebExchange)} 獲取到的連接處理訊息為空時，則回傳錯誤
      * 否則將請求轉發給後續的 WebSocketHandler 處理器進行處理
      *
      * @param exchange ServerWebExchange 用於處理請求的交換器
@@ -286,9 +299,9 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
     /**
      * 獲取請求的連接處理訊息
-     * 會依照請求的路徑來獲取對應的連接處理訊息並將所使用的處理器設置
+     * 會依照請求的路徑來獲取對應的連接處理訊息並將所使用的處理器設定
      * 並解析請求中的檔案 ID 將其與 Exchange 中的請求 ID 和用戶 IP 放入 {@link ConnectionInfo#attributes} 中
-     * 當請求的路徑不符合預設的 WebSocket 路徑時或者請求的檔案 ID 無效時，則返回錯誤
+     * 當請求的路徑不符合預設的 WebSocket 路徑時或者請求的檔案 ID 無效時，則回傳錯誤
      *
      * @param exchange 用於處理請求的交換器
      *
@@ -331,8 +344,40 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
 
     /**
+     * 失敗時設定錯誤標頭，並使用 {@link WebSocketFailHandler} 處理請求
+     *
+     * @param exchange  ServerWebExchange 用於處理請求的交換器
+     * @param throwable 當前請求的異常
+     */
+    private Mono<Void> failWithError(ServerWebExchange exchange, User user, Throwable throwable) {
+        if (exchange.getResponse().isCommitted()) {
+            LogUnity.info(exchange, "響應已提交，無法處理錯誤: %s", throwable.getMessage());
+            return Mono.empty();
+        }
+
+        String errorCodeName;
+        if (throwable instanceof ValidationException validationException) {
+            LogUnity.info(exchange, "用戶 WebSocket 連線請求錯誤: %s ", validationException.getMessage());
+            errorCodeName = validationException.getErrorCode().name();
+        } else {
+            LogUnity.error(exchange, "用戶 WebSocket 連線發生非預期的錯誤: ", throwable);
+            errorCodeName = ValidationException.ErrorCode.WEBSOCKET_CONNECTION_ERROR.name();
+        }
+
+        ConnectionInfo connectionInfo = new ConnectionInfo(webSocketFailHandler);
+        connectionInfo.setAttribute(WEBSOCKET_ERROR_ATTRIBUTE, errorCodeName);
+        return super
+                .handleRequest(exchange, session -> handleWebSocketSession(session, user, connectionInfo))
+                .onErrorResume(upgradeOrHandlerError -> {
+                    LogUnity.error(exchange, "處理連線失敗的 WebSocket 協議時，升級發生未預期錯誤", upgradeOrHandlerError);
+                    return Mono.empty();
+                });
+    }
+
+
+    /**
      * 從請求中提取檔案 ID
-     * 當請求的檔案 ID 為空或不符合數字格式時，則返回錯誤
+     * 當請求的檔案 ID 為空或不符合數字格式時，則回傳錯誤
      *
      * @param exchange 用於處理請求的交換器
      *
@@ -346,25 +391,6 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
         }
         return null;
     }
-
-
-    /**
-     * 處理遊客請求
-     * 當安全配置屬性中的遊客用戶啟用時，則使用 {@link UserService#getById)}} 方法獲取遊客用戶
-     * 並將請求轉發給 {@link #handleWebSocketRequest(ServerWebExchange, User)} 方法處理
-     * 否則將交由 {@link #failWithError} 方法處理錯誤
-     *
-     * @param exchange 用於處理請求的交換器
-     *
-     * @return Mono<Void>
-     */
-    private Mono<Void> switchGuestHandler(ServerWebExchange exchange) {
-        if (securityProperties.getGuestUser().isEnable()) {
-            return userService.getById(0L).flatMap(user -> handleWebSocketRequest(exchange, user));
-        }
-        return failWithError(exchange, new ValidationException(ValidationException.ErrorCode.UNAUTHORIZED));
-    }
-
 
     /**
      * 連接處理訊息
@@ -398,7 +424,7 @@ public class JwtWebSocketHandlerAdapter extends HandshakeWebSocketService implem
 
 
         /**
-         * 設置請求的屬性
+         * 設定請求的屬性
          *
          * @param key   屬性鍵
          * @param value 屬性值

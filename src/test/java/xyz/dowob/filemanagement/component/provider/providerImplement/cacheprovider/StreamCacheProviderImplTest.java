@@ -31,6 +31,27 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+/**
+ * StreamCacheProviderImpl 測試類別。
+ * 
+ * <p>測試 StreamCacheProviderImpl 的串流緩存功能，包括：
+ * <ul>
+ * <li>構造函數初始化及參數驗證</li>
+ * <li>串流資料的分塊存储與獲取</li>
+ * <li>DataBuffer 與 FluxDataPO 的轉換處理</li>
+ * <li>單一及多個區塊的缅存操作</li>
+ * <li>批量操作與緩存失敗後的清理</li>
+ * <li>Base64 編解碼及資料完整性驗證</li>
+ * <li>空串流與錯誤情況處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 DataBuffer 與 Flux 的非同步處理，包含資料分塊、緩存還原、
+ * 及各種邊界情況的正確處理。透過模擬 Redis 操作驗證串流緩存策略的可靠性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StreamCacheProvider 邏輯處理測試")
 class StreamCacheProviderImplTest {

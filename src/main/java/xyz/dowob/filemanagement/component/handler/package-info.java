@@ -1,10 +1,27 @@
 /**
- * 用於處理外部請求的類別，包含了請求的處理以及回應的處理
- * 使用抽象類以及接口來規範實現類別的行為
- * 1. CustomExceptionHandler: 自定義錯誤處理器 {@link xyz.dowob.filemanagement.component.handler.CustomExceptionHandler}
- * 2. CustomWebSocketHandler: 自定義WebSocket Session {@link xyz.dowob.filemanagement.component.handler.CustomWebSocketSession}
- * 3. FileUploadWebSocketHandler: 用於檔案上傳的WebSocket處理器 {@link xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler}
- * 4. OnlineFileWebSocketHandler: 用於線上編輯的WebSocket處理器 {@link xyz.dowob.filemanagement.component.handler.OnlineFileWebSocketHandler}
- * 5. WebSocketFailHandler: 用於處理WebSocket連接失敗的處理器 {@link xyz.dowob.filemanagement.component.handler.WebSocketFailHandler}
+ * 反應式請求處理器包，提供 WebFlux 環境下的異常處理和 WebSocket 通訊機制。
+ *
+ * <p>核心處理器實現：</p>
+ *
+ * <ul>
+ *   <li>{@link xyz.dowob.filemanagement.component.handler.CustomExceptionHandler} - 全域異常處理器</li>
+ *   <li>{@link xyz.dowob.filemanagement.component.handler.CustomWebSocketSession} - 增強型 WebSocket 會話封裝器</li>
+ *   <li>{@link xyz.dowob.filemanagement.component.handler.FileUploadWebSocketHandler} - 檔案上傳 WebSocket 處理器</li>
+ *   <li>{@link xyz.dowob.filemanagement.component.handler.OnlineFileWebSocketHandler} - 線上協作編輯處理器</li>
+ *   <li>{@link xyz.dowob.filemanagement.component.handler.WebSocketFailHandler} - WebSocket 連線錯誤處理器</li>
+ * </ul>
+ *
+ * <p>技術特點：</p>
+ *
+ * <ul>
+ *   <li>完全支持 Spring WebFlux 反應式編程模型</li>
+ *   <li>統一的錯誤處理和響應格式化機制</li>
+ *   <li>非阻塞的 WebSocket 通訊實現</li>
+ *   <li>可擴展的處理器架構設計</li>
+ * </ul>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 package xyz.dowob.filemanagement.component.handler;

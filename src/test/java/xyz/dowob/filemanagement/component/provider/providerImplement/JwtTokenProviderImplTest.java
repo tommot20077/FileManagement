@@ -18,6 +18,25 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static reactor.test.StepVerifier.create;
 
+/**
+ * JwtTokenProviderImpl 測試類別。
+ * 
+ * <p>測試 JwtTokenProviderImpl 的 JWT 憑證管理功能，包括：
+ * <ul>
+ * <li>JWT 憑證的生成與驗證</li>
+ * <li>使用者物件轉換為 JWT 憑證</li>
+ * <li>無效使用者資料處理</li>
+ * <li>Token 存储庫依賴操作</li>
+ * <li>安全性與過期時間管理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 JWT 憑證的所有核心功能，包含正常生成流程及異常處理。
+ * 透過反應式程式測試驗證 JWT 服務的正確性和安全性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JwtTokenProvider 邏輯處理測試")
 class JwtTokenProviderImplTest {

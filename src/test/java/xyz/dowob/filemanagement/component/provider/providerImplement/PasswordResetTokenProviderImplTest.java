@@ -22,6 +22,25 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
+/**
+ * PasswordResetTokenProviderImpl 測試類別。
+ * 
+ * <p>測試 PasswordResetTokenProviderImpl 的密碼重設憑證管理功能，包括：
+ * <ul>
+ * <li>重設密碼憑證的生成與保存</li>
+ * <li>新用戶與現有用戶的憑證處理</li>
+ * <li>憑證驗證及過期檢查</li>
+ * <li>憑證撤銷與清理</li>
+ * <li>各種異常情況處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋数字驗證碼的完整生命週期，包含生成、驗證、過期與撤銷。
+ * 透過反應式程式測試驗證密碼重設流程的安全性和完整性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PasswordResetTokenProvider 邏輯處理測試")
 class PasswordResetTokenProviderImplTest {

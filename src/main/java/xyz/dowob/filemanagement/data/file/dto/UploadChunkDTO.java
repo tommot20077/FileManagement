@@ -11,14 +11,11 @@ import reactor.core.publisher.Flux;
 import java.util.Optional;
 
 /**
- * 文件上傳分片的數據傳輸對象，用於規範文件上傳分片的數據傳輸對象，紀錄文件上傳分片的數據
+ * 檔案上傳分片的資料傳輸對象，用於規範檔案上傳分片的資料傳輸對象，記錄檔案上傳分片的資料
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UploadChunkDTO
- * @description
- * @create 2024-09-27 00:40
- * @Version 1.0
+ * @since 1.0
+ * @version 1.0
  **/
 @Data
 @NoArgsConstructor
@@ -40,12 +37,12 @@ public class UploadChunkDTO {
     private int chunkIndex;
 
     /**
-     * 分塊數據
+     * 分塊資料
      */
     private byte[] chunkData;
 
     /**
-     * 分塊數據流
+     * 分塊資料流
      */
     @JsonIgnore
     private Flux<DataBuffer> chunkDataFlux;
@@ -56,7 +53,7 @@ public class UploadChunkDTO {
      * @param transferTaskId 任務ID
      * @param totalChunks    總分塊數
      * @param chunkIndex     分塊索引
-     * @param chunkData      分塊數據
+     * @param chunkData      分塊資料
      */
     public UploadChunkDTO(String transferTaskId, int totalChunks, int chunkIndex, byte[] chunkData) {
         this.transferTaskId = transferTaskId;
@@ -71,7 +68,7 @@ public class UploadChunkDTO {
      * @param transferTaskId 任務ID
      * @param totalChunks    總分塊數
      * @param chunkIndex     分塊索引
-     * @param chunkDataFlux  分塊數據流
+     * @param chunkDataFlux  分塊資料流
      */
     public UploadChunkDTO(String transferTaskId, int totalChunks, int chunkIndex, Flux<DataBuffer> chunkDataFlux) {
         this.transferTaskId = transferTaskId;
@@ -81,11 +78,11 @@ public class UploadChunkDTO {
     }
 
     /**
-     * 獲取分塊數據流，當 chunkDataFlux 不為空時，返回 chunkDataFlux
-     * 否則檢查 chunkData 是否為空，若不為空則將其包裝為 DataBuffer 並返回
-     * 否則返回空的 Flux
+     * 獲取分塊資料流，當 chunkDataFlux 不為空時，回傳 chunkDataFlux
+     * 否則檢查 chunkData 是否為空，若不為空則將其包裝為 DataBuffer 並回傳
+     * 否則回傳空的 Flux
      *
-     * @return 分塊數據流
+     * @return 分塊資料流
      */
     public Flux<DataBuffer> getChunkDataFlux() {
         if (chunkDataFlux != null) {
@@ -97,13 +94,13 @@ public class UploadChunkDTO {
     }
 
     /**
-     * 將文件上傳分片的數據傳輸對象轉換為文件傳輸響應的數據傳輸對象
+     * 將檔案上傳分片的資料傳輸對象轉換為檔案傳輸響應的資料傳輸對象
      *
      * @param isSuccess     是否成功
      * @param uploadedChunk 已上傳的分塊數
      * @param message       訊息
      *
-     * @return 文件傳輸響應的數據傳輸對象
+     * @return 檔案傳輸響應的資料傳輸對象
      */
     public UploadResponseDTO toTransferResponseDTO(Boolean isSuccess, Integer uploadedChunk, String message) {
         UploadResponseDTO uploadResponseDTO = new UploadResponseDTO();

@@ -11,18 +11,27 @@ import xyz.dowob.filemanagement.unity.LogUnity;
 import java.util.List;
 
 /**
- * CsrfTokenRepository 策略模式，當有多種 CsrfTokenRepository 時
- * 會根據 {@link SecurityProperties} 中的設定選擇對應的 CsrfTokenRepository
- * 並且將其注入到 {@link CsrfTokenRepositoryStrategy#csrfTokenRepository} 中
- * 當無法找到對應的 CsrfTokenRepository 時會拋出 IllegalArgumentException
- * 這樣就可以在其他地方直接使用 {@link CsrfTokenRepositoryStrategy#csrfTokenRepository} 來操作 CsrfTokenRepository
+ * CSRF 令牌儲存庫策略，實現可插拔的跨站請求偽造（CSRF）防禦機制。
+ *
+ * <p>本類別採用策略模式（Strategy Pattern）動態選擇 CSRF 令牌儲存庫實作，
+ * 根據 {@link SecurityProperties} 中的設定，靈活切換不同的 CSRF 防護策略。</p>
+ *
+ * <p>主要特性：
+ * <ul>
+ *   <li>支援多種 CSRF 令牌儲存庫實作</li>
+ *   <li>動態根據設定選擇適當的儲存庫</li>
+ *   <li>當找不到對應的儲存庫時，拋出具體的 {@link IllegalArgumentException}</li>
+ * </ul>
+ * </p>
+ *
+ * <p>設計目的：
+ * 通過依賴注入和策略模式，實現 CSRF 防護機制的高度可設定性，
+ * 使系統能夠輕鬆適應不同的安全需求和部署環境。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName CsrfTokenRepositoryStrategy
- * @create 2025/3/6
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Getter
 @Component
 public class CsrfTokenRepositoryStrategy {

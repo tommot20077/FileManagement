@@ -25,6 +25,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * TransfersTasksManager 傳輸任務管理測試類別。
+ *
+ * 測試 TransfersTasksManager 的檔案傳輸任務管理功能，包括任務註冊、獲取、
+ * 建立、更新和銷毀等操作。
+ *
+ * 前置條件：
+ * - 初始化 Mock 依賴項目
+ * - 設置檔案屬性配置
+ * - 確保任務狀態管理的正確性
+ *
+ * 測試步驟：
+ * - 測試上傳任務的註冊功能
+ * - 測試傳輸任務的獲取和過濾
+ * - 測試任務的建立和更新機制
+ * - 測試異常情況和限制處理
+ * - 測試管理器銷毀時的清理機制
+ *
+ * 預期結果：
+ * - 任務應被正確管理和追蹤
+ * - 限制和驗證應正確執行
+ * - 異常情況應被適當處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TransfersTasksManager 邏輯處理測試")
 class TransfersTasksManagerTest {
@@ -44,6 +71,17 @@ class TransfersTasksManagerTest {
     }
 
 
+    /**
+     * 測試註冊上傳任務的成功情況。
+     *
+     * 測試步驟：
+     * - 建立檔案元資料和傳輸任務 ID
+     * - 設置檔案大小限制配置
+     * - 執行任務註冊
+     * - 驗證任務被正確儲存和管理
+     *
+     * 預期結果：任務應成功註冊且加入管理清單
+     */
     @Test
     @DisplayName("註冊上傳任務 - 成功註冊")
     void registerUploadTask_successfulRegistration_returnsMonoEmpty() {
@@ -64,6 +102,16 @@ class TransfersTasksManagerTest {
     }
 
 
+    /**
+     * 測試註冊重複 MD5 上傳任務的異常處理。
+     *
+     * 測試步驟：
+     * - 先建立一個正在上傳的任務
+     * - 嘗試使用相同 MD5 註冊新任務
+     * - 驗證拋出適當的驗證異常
+     *
+     * 預期結果：應拋出 ValidationException 且包含現有任務 ID
+     */
     @Test
     @DisplayName("註冊上傳任務 - 已存在相同MD5且正在上傳的任務 - 拋出 ValidationException")
     void registerUploadTask_existingTaskWithSameMd5AndUploadingStatus_throwsValidationException() {
@@ -87,6 +135,15 @@ class TransfersTasksManagerTest {
     }
 
 
+    /**
+     * 建立通用傳輸任務的輔助方法。
+     *
+     * @param md5 檔案 MD5 值
+     * @param taskId 任務 ID
+     * @param status 任務狀態
+     * @param fileSize 檔案大小
+     * @return 傳輸任務物件
+     */
     private TransfersTask createGenericTask(String md5, String taskId, TransfersStatusEnum status, long fileSize) {
         TransfersTask task = new TransfersTask();
         task.setMd5(md5);
@@ -98,6 +155,16 @@ class TransfersTasksManagerTest {
     }
 
 
+    /**
+     * 測試檔案大小超過限制時的異常處理。
+     *
+     * 測試步驟：
+     * - 設置檔案大小超過配置限制
+     * - 嘗試註冊上傳任務
+     * - 驗證拋出檔案大小限制異常
+     *
+     * 預期結果：應拋出 ValidationException 且不儲存任務
+     */
     @Test
     @DisplayName("註冊上傳任務 - 檔案大小超過限制 - 拋出 ValidationException")
     void registerUploadTask_fileSizeExceedsLimit_throwsValidationException() {

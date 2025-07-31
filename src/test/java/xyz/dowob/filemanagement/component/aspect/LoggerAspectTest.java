@@ -33,6 +33,15 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 
+/**
+ * LoggerAspect 日誌切面的單元測試類別。
+ *
+ * <p>本測試類別旨在驗證日誌切面（LoggerAspect）的各種日誌記錄行為和異常處理機制。</p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @DisplayName("LoggerAspect 日誌切面測試")
 @ExtendWith(MockitoExtension.class)
 class LoggerAspectTest {
@@ -73,6 +82,26 @@ class LoggerAspectTest {
     }
 
 
+    /**
+     * 測試 Mono 返回結果的日誌記錄功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當方法返回 Mono 類型時，日誌切面能正確記錄執行過程和返回值。
+     *
+     * 前置條件：
+     * - Mock 方法簽名和切入點
+     * - 設置 Mono 返回值
+     * - 配置日誌工具模擬
+     *
+     * 測試步驟：
+     * - 執行日誌切面方法
+     * - 驗證 Mono 流程正確執行
+     * - 確認日誌記錄被正確調用
+     *
+     * 預期結果：
+     * - Mono 流成功完成並返回預期值
+     * - 日誌工具被調用並記錄相關訊息
+     */
     @Test
     @DisplayName("測試 Mono 返回結果 - 正常處理並記錄日誌")
     void logAround_withMonoResult() throws Throwable {
@@ -85,7 +114,7 @@ class LoggerAspectTest {
 
         StepVerifier.create((Mono<?>) result).expectNextMatches(actual -> actual.equals(testResult)).verifyComplete();
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
 
@@ -96,6 +125,26 @@ class LoggerAspectTest {
     }
 
 
+    /**
+     * 測試 Flux 返回結果的日誌記錄功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當方法返回 Flux 類型時，日誌切面能正確記錄執行過程和返回值。
+     *
+     * 前置條件：
+     * - Mock 方法簽名和切入點
+     * - 設置 Flux 返回值
+     * - 配置日誌工具模擬
+     *
+     * 測試步驟：
+     * - 執行日誌切面方法
+     * - 驗證 Flux 流程正確執行
+     * - 確認日誌記錄被正確調用
+     *
+     * 預期結果：
+     * - Flux 流成功完成並返回預期值序列
+     * - 日誌工具被調用並記錄相關訊息
+     */
     @Test
     @DisplayName("測試 Flux 返回結果 - 正常處理並記錄日誌")
     void logAround_withFluxResult() throws Throwable {
@@ -113,10 +162,30 @@ class LoggerAspectTest {
                 .verifyComplete();
 
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
 
+    /**
+     * 測試普通對象返回結果的日誌記錄功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當方法返回普通對象時，日誌切面能正確記錄執行過程和返回值。
+     *
+     * 前置條件：
+     * - Mock 方法簽名和切入點
+     * - 設置普通對象返回值
+     * - 配置日誌工具和請求上下文模擬
+     *
+     * 測試步驟：
+     * - 執行日誌切面方法
+     * - 驗證方法正常執行
+     * - 確認日誌記錄被正確調用
+     *
+     * 預期結果：
+     * - 方法成功執行並返回預期對象
+     * - 日誌工具被調用並記錄相關訊息
+     */
     @Test
     @DisplayName("測試普通對象返回結果 - 正常處理並記錄日誌")
     void logAround_withObjectResult() throws Throwable {
@@ -127,10 +196,30 @@ class LoggerAspectTest {
 
         assertEquals(testResult, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
 
+    /**
+     * 測試方法拋出異常時的日誌記錄功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當被攔截的方法拋出異常時，日誌切面能正確記錄錯誤訊息。
+     *
+     * 前置條件：
+     * - Mock 方法簽名和切入點
+     * - 設置方法拋出 RuntimeException
+     * - 配置日誌工具模擬
+     *
+     * 測試步驟：
+     * - 執行日誌切面方法並期望異常
+     * - 驗證異常被正確拋出
+     * - 確認錯誤日誌被記錄
+     *
+     * 預期結果：
+     * - RuntimeException 被成功拋出
+     * - 日誌工具被調用並記錄錯誤訊息
+     */
     @Test
     @DisplayName("測試方法拋出異常 - 記錄錯誤日誌")
     void logAround_withException() throws Throwable {
@@ -144,6 +233,26 @@ class LoggerAspectTest {
         logUnityMockedStatic.verify(() -> LogUnity.error(eq(exchange), anyString()));
     }
 
+    /**
+     * 測試 ValidationException 的特殊日誌處理。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當方法拋出 ValidationException 時，日誌切面使用調試級別記錄而非錯誤級別。
+     *
+     * 前置條件：
+     * - Mock 方法簽名和切入點
+     * - 設置方法拋出 ValidationException
+     * - 配置日誌工具模擬
+     *
+     * 測試步驟：
+     * - 執行日誌切面方法並期望異常
+     * - 驗證 ValidationException 被正確拋出
+     * - 確認使用調試級別記錄日誌
+     *
+     * 預期結果：
+     * - ValidationException 被成功拋出
+     * - 日誌工具的 debug 方法被調用
+     */
     @Test
     @DisplayName("測試 ValidationException - 記錄調試級別日誌")
     void logAround_withValidationException() throws Throwable {
@@ -158,7 +267,7 @@ class LoggerAspectTest {
     }
 
     @Test
-    @DisplayName("測試空返回值 - 顯示無返回值訊息")
+    @DisplayName("測試空返回值 - 顯示無回傳值訊息")
     void logAround_withNullResult() throws Throwable {
         when(proceedingJoinPoint.proceed()).thenReturn(null);
 
@@ -166,7 +275,7 @@ class LoggerAspectTest {
 
         assertEquals(null, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), eq("無返回值")));
+        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), eq("無回傳值")));
     }
 
     @Test
@@ -213,7 +322,7 @@ class LoggerAspectTest {
                 .verifyComplete();
 
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
     @Test
@@ -242,7 +351,7 @@ class LoggerAspectTest {
 
         assertEquals(testResult, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.info((ServerWebExchange) isNull(), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
     @Test
@@ -257,7 +366,7 @@ class LoggerAspectTest {
 
         assertEquals(longString, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), contains("..."))); // 驗證有截斷
+        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), contains("..."))); // 驗證有截斷
     }
 
     @Test
@@ -273,7 +382,7 @@ class LoggerAspectTest {
         assertEquals(sensitiveResult, result);
         verify(proceedingJoinPoint).proceed();
         // 敏感方法會隱藏返回值
-        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), eq("[隱藏敏感訊息]")));
+        logUnityMockedStatic.verify(() -> LogUnity.info(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), eq("[隱藏敏感訊息]")));
     }
 
     @Test
@@ -303,7 +412,7 @@ class LoggerAspectTest {
 
         assertEquals(testResult, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.debug(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.debug(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
     @Test
@@ -318,7 +427,7 @@ class LoggerAspectTest {
 
         assertEquals(testResult, result);
         verify(proceedingJoinPoint).proceed();
-        logUnityMockedStatic.verify(() -> LogUnity.error(eq(exchange), eq("所屬類: %s | 使用方法: %s | 返回值: %s"), anyString(), anyString(), anyString()));
+        logUnityMockedStatic.verify(() -> LogUnity.error(eq(exchange), eq("所屬類: %s | 使用方法: %s | 回傳值: %s"), anyString(), anyString(), anyString()));
     }
 
     @Test

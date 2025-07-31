@@ -16,7 +16,6 @@ import xyz.dowob.filemanagement.annotation.HideOverLength;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
 import xyz.dowob.filemanagement.annotation.SkipRecord;
-import xyz.dowob.filemanagement.controller.exception.ExceptionController;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.holder.CustomRequestContextHolder;
@@ -28,29 +27,43 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
- * 用於記錄 Component 和 ServiceInterface 層的日誌切面
- * 當業務方法執行或發生異常時，記錄請求者、所屬類、使用方法、返回值等信息到日誌中
+ * 日誌切面，實現應用程式各層（Component、Service、Controller）的橫向日誌記錄。
+ *
+ * <p>本切面利用 AOP 技術，攔截並記錄方法的執行過程，包括：
+ * <ul>
+ *   <li>方法執行時的上下文資訊</li>
+ *   <li>方法回傳值</li>
+ *   <li>異常處理與錯誤記錄</li>
+ * </ul>
+ * </p>
+ *
+ * <p>特點：
+ * <ul>
+ *   <li>支援 WebFlux 反應式編程模型</li>
+ *   <li>自動處理 {@link reactor.core.publisher.Mono} 和 {@link reactor.core.publisher.Flux} 回傳類型</li>
+ *   <li>根據客製化標記（如 {@link xyz.dowob.filemanagement.annotation.SkipRecord}）控制日誌輸出</li>
+ * </ul>
+ * </p>
  *
  * @author yuan
- * @program File-Management
- * @ClassName LoggerAspect
- * @description
- * @create 2024-09-23 17:19
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Aspect
 @Component
 @NoArgsConstructor
 @SuppressWarnings("all")
 public class LoggerAspect {
     /**
-     * 日誌的記錄器
+     * 日誌記錄器，用於記錄 LoggerAspect 的執行資訊和錯誤訊息。
      */
     private static final Logger log = LogManager.getLogger(LoggerAspect.class);
 
 
     /**
-     * 定義 ServiceInterface 層切入點
+     * 定義 Service 層切入點，攔截所有 service 包下的方法執行。
+     *
+     * <p>此切入點將攔截 {@code xyz.dowob.filemanagement.service} 包及其子包下的所有方法。</p>
      */
     @Pointcut("within(xyz.dowob.filemanagement.service..*)")
     public void serviceLayerPointcut() {
@@ -58,7 +71,9 @@ public class LoggerAspect {
 
 
     /**
-     * 定義 Component 層切入點
+     * 定義 Component 層切入點，攔截所有 component 包下的方法執行。
+     *
+     * <p>此切入點將攔截 {@code xyz.dowob.filemanagement.component} 包及其子包下的所有方法。</p>
      */
     @Pointcut("within(xyz.dowob.filemanagement.component..*)")
     public void componentLayerPointcut() {
@@ -66,7 +81,9 @@ public class LoggerAspect {
 
 
     /**
-     * 定義 Controller 層切入點
+     * 定義 Controller 層切入點，攔截所有 controller 包下的方法執行。
+     *
+     * <p>此切入點將攔截 {@code xyz.dowob.filemanagement.controller} 包及其子包下的所有方法。</p>
      */
     @Pointcut("within(xyz.dowob.filemanagement.controller..*)")
     public void controllerLayerPointcut() {
@@ -74,16 +91,27 @@ public class LoggerAspect {
 
 
     /**
-     * 環繞通知，用於記錄 Component 、 Service 和 Controller 層的日誌
-     * 當業務方法執行或發生異常時，記錄請求者、所屬類、使用方法、返回值等信息到日誌中
-     * 區分2種情況：
-     * 1. 方法返回值為 Mono 或 Flux，因為這兩種類型是非阻塞的，所以需要特別處理
-     * 需要轉換Mono中的錯誤信息並提取出來，最後交由錯誤控制器處理 {@link ExceptionController}
-     * 2. 方法返回值為普通對象，可以直接紀錄並返回
+     * 通過 AOP 環繞通知攔截並記錄方法執行的日誌資訊。
      *
-     * @param joinPoint 切入點
+     * <p>處理三種不同回傳類型的方法：
+     * <ul>
+     *   <li>回傳 {@link reactor.core.publisher.Mono} 的非阻塞響應方法</li>
+     *   <li>回傳 {@link reactor.core.publisher.Flux} 的資料流方法</li>
+     *   <li>回傳普通同步對象的傳統方法</li>
+     * </ul>
+     * </p>
      *
-     * @return Object 方法的返回值
+     * <p>日誌處理特性：
+     * <ul>
+     *   <li>轉換 Mono/Flux 中的錯誤資訊</li>
+     *   <li>交由 {@link xyz.dowob.filemanagement.controller.exception.ExceptionController} 處理異常</li>
+     *   <li>記錄方法執行上下文、回傳值和可能的異常資訊</li>
+     * </ul>
+     * </p>
+     *
+     * @param joinPoint 方法執行的切入點，提供方法執行的上下文資訊
+     * @return 原方法的執行結果，包裝後回傳
+     * @throws Throwable 如果方法執行過程中發生任何異常
      */
     @Around("serviceLayerPointcut() || componentLayerPointcut() || controllerLayerPointcut()")
     public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -127,23 +155,20 @@ public class LoggerAspect {
 
 
     /**
-     * 根據方法的是否有額外的標記注釋，來判斷是否在日誌中的返回值是否進行處理
-     * 處理標記的順序如下:
-     * 1. 獲取是否具有日誌級別的標記 {@link RecordLevel}，如果有則取代預設值 {@link LogLevelEnum#TRACE}
-     * - 會檢查獲取到的日誌級別是否包含在當前日誌級別中，如果不符合則直接返回 null
-     * 2. 是否有 {@link SkipRecord} 標記，並檢查是否有與當前日誌級別相同的跳過標記，此為第一優先處理，會覆蓋其他標記
-     * - 優先處理方法的標記
-     * - 其次處理類的標記
-     * 3. 返回值為 null 時，則返回無返回值的訊息
-     * 4. 是否有 {@link HideSensitive} 標記，隱藏敏感訊息
-     * 5. 是否有 {@link HideOverLength} 標記，自動截斷過長的訊息
-     * - 會將訊息截斷為300個字元，並在最後加上省略號
-     * 最後返回處理後的日誌訊息
+     * 根據方法上的注釋標記處理日誌訊息的顯示格式和內容。
      *
-     * @param method 方法
-     * @param result 方法的返回值
+     * <p>處理標記的優先順序如下：</p>
+     * <ol>
+     *   <li>檢查 {@link RecordLevel} 標記，決定日誌級別（預設為 {@link LogLevelEnum#TRACE}）</li>
+     *   <li>檢查 {@link SkipRecord} 標記，若符合條件則跳過記錄（優先處理方法標記，其次處理類別標記）</li>
+     *   <li>處理 null 回傳值，顯示「無回傳值」訊息</li>
+     *   <li>檢查 {@link HideSensitive} 標記，隱藏敏感訊息</li>
+     *   <li>檢查 {@link HideOverLength} 標記，自動截斷超過 300 字元的訊息</li>
+     * </ol>
      *
-     * @return String 處理後的日誌顯示的返回值
+     * @param method 被執行的方法對象
+     * @param result 方法的回傳值
+     * @return 處理後的日誌訊息對象，包含日誌級別和顯示內容；若不需記錄則回傳 null
      */
     private LogInfo processMethodSignature(Method method, Object result) {
         Class<?> declaringClass = method.getDeclaringClass();
@@ -168,14 +193,14 @@ public class LoggerAspect {
 
         if (skipRecordLevel != null) {
             for (LogLevelEnum skipLevel : skipRecordLevel) {
-                if (logLevelEnum == skipLevel) {
+                if (logLevelEnum.getLevel().intLevel() >= skipLevel.getLevel().intLevel()) {
                     return null;
                 }
             }
         }
 
         if (result == null) {
-            return new LogInfo(logLevelEnum, "無返回值");
+            return new LogInfo(logLevelEnum, "無回傳值");
         }
 
         boolean isSensitive = method.isAnnotationPresent(HideSensitive.class);
@@ -193,15 +218,18 @@ public class LoggerAspect {
 
 
     /**
-     * 記錄操作信息，包括請求ID、請求者名稱、所屬類、使用方法、返回值等信息
-     * 若處理結果有發生異常，則記錄錯誤訊息
-     * 並依照照日誌紀錄 {@link LogInfo} 的級別進行日誌輸出
+     * 記錄方法執行的操作資訊，包括類別名稱、方法名稱、回傳值和異常資訊。
      *
-     * @param exchange   伺服器交換協議對象
-     * @param className  類名
-     * @param methodName 方法名
-     * @param info       日誌紀錄訊息
-     * @param error      錯誤
+     * <p>此方法會根據不同情況進行日誌記錄：</p>
+     * <ul>
+     *   <li>若有異常發生，記錄錯誤訊息和相關的執行上下文</li>
+     *   <li>若正常執行，根據 {@link LogInfo} 的級別輸出對應的日誌</li>
+     * </ul>
+     *
+     * @param exchange 伺服器請求交換對象，包含請求上下文資訊
+     * @param joinPoint 方法執行的切入點對象
+     * @param info 包含日誌級別和訊息內容的日誌資訊對象
+     * @param error 方法執行過程中發生的異常，若無異常則為 null
      */
     private void logOperation(ServerWebExchange exchange, ProceedingJoinPoint joinPoint, LogInfo info, Throwable error) {
         String className = joinPoint.getTarget().getClass().getSimpleName();
@@ -230,7 +258,7 @@ public class LoggerAspect {
             if (info == null) {
                 return;
             }
-            String format = "所屬類: %s | 使用方法: %s | 返回值: %s";
+            String format = "所屬類: %s | 使用方法: %s | 回傳值: %s";
             Object[] args = new Object[]{className, methodName, info.message()};
 
             switch (info.logLevel()) {
@@ -246,12 +274,14 @@ public class LoggerAspect {
 
 
     /**
-     * 此方法為處理一般狀況下的日誌輸出，因為無法直接獲取 ServerWebExchange 對象
-     * 所以需要進行判斷，如果為空則直接輸出日誌，否則獲取 ServerWebExchange 對象進行日誌輸出
+     * 處理非反應式方法的日誌輸出，嘗試獲取 ServerWebExchange 對象進行上下文日誌記錄。
      *
-     * @param joinPoint 切入點
-     * @param result    返回值
-     * @param error     錯誤
+     * <p>此方法主要用於處理傳統同步方法的日誌記錄，會嘗試從 {@link CustomRequestContextHolder} 獲取
+     * ServerWebExchange 對象。若獲取成功則包含請求上下文資訊，否則進行無上下文的日誌記錄。</p>
+     *
+     * @param joinPoint 方法執行的切入點對象
+     * @param result 包含日誌級別和訊息內容的日誌資訊對象
+     * @param error 方法執行過程中發生的異常，若無異常則為 null
      */
     private void logWithExchange(ProceedingJoinPoint joinPoint, LogInfo result, Throwable error) {
         CustomRequestContextHolder.getExchange().doOnNext(exchange -> {
@@ -264,27 +294,32 @@ public class LoggerAspect {
 
 
     /**
-     * 日誌信息類，用於存儲日誌級別和日誌訊息
+     * 日誌資訊記錄類，用於儲存日誌級別和訊息內容。
+     *
+     * @param logLevel 日誌級別，決定日誌輸出的重要性等級
+     * @param message 日誌訊息內容
      */
     record LogInfo(LogLevelEnum logLevel, String message) {
     }
 
     /**
-     * 用戶請求信息類，用於存儲請求ID、請求者名稱和請求IP
+     * 使用者請求資訊類，用於儲存請求相關的識別資訊。
+     *
+     * <p>此類別目前未被使用，保留作為未來擴展請求追蹤功能的基礎結構。</p>
      */
     private class UserRequestInfo {
         /**
-         * 請求者的辨識名稱
+         * 請求者的識別名稱。
          */
         private String identify;
 
         /**
-         * 請求ID
+         * 請求的唯一識別碼。
          */
         private String requestId;
 
         /**
-         * 請求IP
+         * 發起請求的 IP 位址。
          */
         private String requestIp;
     }

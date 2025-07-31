@@ -1,14 +1,39 @@
 /**
- * 數據庫操作介面，使用Spring Data JPA來操作數據庫。
- * 1. FileTrashRecordRepository: 用於操作檔案回收站數據庫 {@link xyz.dowob.filemanagement.entity.FileTrashRecord}
- * 2. JwtSecurityContextRepository: 用於加載JWT SecurityContext {@link xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository}
- * 3. ServerFileMetaRepository: 用於操作伺服器檔案元數據庫 {@link xyz.dowob.filemanagement.entity.ServerFileMetadata}
- * 4. TokenRepository: 用於操作憑證數據庫 {@link xyz.dowob.filemanagement.entity.Token}
- * 5. TransfersRepository: 用於操作檔案傳輸數據庫 {@link xyz.dowob.filemanagement.entity.TransfersTask}
- * 6. UserFileMetaRepository: 用於操作用戶檔案元數據庫 {@link xyz.dowob.filemanagement.entity.UserFileMetadata}
- * 7. UserFileShareRecordRepository: 用於操作用戶檔案分享記錄數據庫 {@link xyz.dowob.filemanagement.entity.UserFileShareRecord}
- * 8. UserOnlineFileRepository: 用於操作用戶在線檔案數據庫 {@link xyz.dowob.filemanagement.entity.UserOnlineFile}
- * 9. UserOnlineFileHistoryRepository: 用於操作用戶在線檔案歷史數據庫 {@link xyz.dowob.filemanagement.entity.UserOnlineFileHistory}
- * 10. UserRepository: 用於操作用戶數據庫 {@link xyz.dowob.filemanagement.entity.User}
+ * 資料存取層介面套件，提供基於 Spring Data R2DBC 的響應式資料庫操作功能。
+ * <p>
+ * 此套件包含系統中所有的資料存取層介面，採用響應式程式設計模式，
+ * 提供非阻塞的資料庫存取能力，確保高併發環境下的效能表現。
+ * 所有介面均繼承自 {@link org.springframework.data.repository.reactive.ReactiveCrudRepository}，
+ * 提供標準的 CRUD 操作和自定義查詢方法。
+ * </p>
+ * <p>
+ * 主要介面包括：
+ * <ul>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.FileTrashRecordRepository} - 檔案回收站記錄管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.JwtSecurityContextRepository} - JWT 安全上下文處理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.ServerFileMetaRepository} - 伺服器檔案元資料管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.TokenRepository} - 使用者憑證管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.TransfersTasksRepository} - 檔案傳輸任務管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.UserFileMetaRepository} - 使用者檔案元資料管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.UserFIleShareRecordRepository} - 檔案分享記錄管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.UserOnlineFileRepository} - 線上檔案管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.UserOnlineFileHistoryRepository} - 線上檔案版本歷史管理</li>
+ *   <li>{@link xyz.dowob.filemanagement.repostiory.UserRepository} - 使用者資料管理</li>
+ * </ul>
+ * </p>
+ * <p>
+ * 設計原則：
+ * <ul>
+ *   <li>採用響應式程式設計模式，支援非阻塞操作</li>
+ *   <li>遵循單一職責原則，每個介面專注於特定實體的資料操作</li>
+ *   <li>提供豐富的查詢方法，滿足不同業務場景需求</li>
+ *   <li>支援複雜查詢和統計分析功能</li>
+ *   <li>確保資料存取的安全性和一致性</li>
+ * </ul>
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 package xyz.dowob.filemanagement.repostiory;

@@ -33,6 +33,32 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
+/**
+ * JwtWebSocketHandlerAdapter JWT WebSocket 處理器適配器測試類別。
+ *
+ * 測試 JwtWebSocketHandlerAdapter 的 WebSocket 連接處理和 JWT 認證功能，
+ * 包括已驗證用戶的請求處理、訪客用戶的處理和各種異常情況。
+ *
+ * 前置條件：
+ * - 初始化所有必要的 Mock 依賴項目
+ * - 設置檔案和安全屬性配置
+ * - 確保 WebSocket 處理器的正確配置
+ *
+ * 測試步驟：
+ * - 測試已驗證用戶的上傳和編輯 WebSocket 請求
+ * - 測試訪客用戶的 WebSocket 請求處理
+ * - 測試無效路徑和參數的錯誤處理
+ * - 測試認證異常和連接錯誤的處理
+ *
+ * 預期結果：
+ * - 有效請求應被正確路由到相應處理器
+ * - 無效請求應被適當處理或拒絕
+ * - 錯誤情況應被正確記錄和處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("JwtWebSocketHandlerAdapter 邏輯處理測試")
@@ -109,6 +135,16 @@ class JwtWebSocketHandlerAdapterTest {
     }
 
 
+    /**
+     * 測試建構器缺少必要配置時的異常處理。
+     *
+     * 測試步驟：
+     * - 設置空的 WebSocket 憑證前綴
+     * - 嘗試建立 JwtWebSocketHandlerAdapter
+     * - 驗證拋出 IllegalArgumentException
+     *
+     * 預期結果：應拋出 IllegalArgumentException
+     */
     @Test
     @DisplayName("建構JwtWebSocketHandlerAdapter時缺少必要配置 - 拋出IllegalArgumentException")
     void constructor_missingRequiredProperties_throwsException() {
@@ -127,6 +163,18 @@ class JwtWebSocketHandlerAdapterTest {
     }
 
 
+    /**
+     * 測試處理已驗證用戶的上傳 WebSocket 請求。
+     *
+     * 測試步驟：
+     * - 建立測試用戶和 WebSocket 交換物件
+     * - 設置安全上下文和認證資訊
+     * - 模擬用戶服務和處理器回傳
+     * - 執行請求處理
+     * - 驗證路由和認證結果
+     *
+     * 預期結果：請求應被正確路由到上傳處理器
+     */
     @Test
     @DisplayName("處理有效的已驗證使用者的上傳WebSocket請求 - 成功路由到FileUploadWebSocketHandler")
     void handleRequest_authenticatedUserUploadPath_routesToFileUploadHandler() {

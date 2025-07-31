@@ -36,30 +36,32 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * localRequestLimiterFilter 測試類。
+ * localRequestLimiterFilter 本地請求限制器測試類別，全面檢驗請求限制和效能管理機制。
+ *
+ * <p>本測試類別網羅全面地檢驗 localRequestLimiterFilter 元件的請求限制行為，包括多面向的請求限制場景。</p>
+ *
+ * <p>測試範圍：
  * 
- * 測試涵蓋的邏輯或場景說明：
- * - 正常請求處理
- * - 請求限制機制
- * - IP 封禁機制
- * - 異常情況處理
- * - 邊界條件測試
+ *   - 正常請求限制流程
+ *   - IP 地址限制機制
+ *   - 不同請求限制場景的驗證
+ *   - 並發與異常情況的機制檢驗
  * 
- * 前置條件：
- * - 初始化 Mock 對象
- * - 配置 GlobalProperties
+ * </p>
+ *
+ * <p>主要測試方法：
  * 
- * 測試步驟：
- * - 設置測試數據
- * - 調用被測試方法
- * - 驗證結果
+ *   - 檢驗請求限制的正確性
+ *   - 驗證非法請求的拒絕機制
+ *   - 檢驗並發處理的安全性
  * 
- * 預期結果：
- * - 正常情況下請求通過
- * - 超過限制時返回 429 狀態碼
- * - IP 被封禁時返回 403 狀態碼
- * - 異常情況下正確處理錯誤
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
+
 @DisplayName("localRequestLimiterFilter 本地請求限制器過濾器測試")
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -121,6 +123,26 @@ class localRequestLimiterFilterTest {
         when(exchange.getAttributes()).thenReturn(attributes);
     }
 
+    /**
+     * 測試正常請求處理功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當請求未達到限制闾值時，過濾器能正常處理請求。
+     *
+     * 前置條件：
+     * - 初始化本地請求限制器過濾器
+     * - 設置模擬的客戶端 IP 地址
+     * - 配置 Mock 物件和回傳值
+     *
+     * 測試步驟：
+     * - 執行過濾器方法
+     * - 驗證請求正常通過
+     * - 確認下一層過濾器被調用
+     *
+     * 預期結果：
+     * - 過濾器成功完成並調用下一層過濾器
+     * - 不設置任何錯誤狀態碼
+     */
     @Test
     @DisplayName("測試正常請求處理 - 請求未達限制")
     void filter_withNormalRequest_shouldPass() {
@@ -147,6 +169,26 @@ class localRequestLimiterFilterTest {
         }
     }
 
+    /**
+     * 測試請求超過限制的處理機制。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當請求超過配置的限制闾值時，過濾器能正確返回 HTTP 429 狀態碼。
+     *
+     * 前置條件：
+     * - 設置請求限制為 1
+     * - 設置令牌桶補充量為 1
+     * - 初始化過濾器和 Mock 物件
+     *
+     * 測試步驟：
+     * - 執行第一個請求（應通過）
+     * - 執行第二個請求（應被限制）
+     * - 驗證狀態碼和錯誤回應
+     *
+     * 預期結果：
+     * - 第一個請求成功通過
+     * - 第二個請求返回 429 狀態碼和適當的錯誤訊息
+     */
     @Test
     @DisplayName("測試請求超過限制 - 返回 429 狀態碼")
     void filter_withExceededLimit_shouldReturnTooManyRequests() {
@@ -181,6 +223,27 @@ class localRequestLimiterFilterTest {
         }
     }
 
+    /**
+     * 測試 IP 封禁機制的功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當啟用 IP 封禁功能且請求失敗達到闾值時，系統能正確將 IP 標記為封禁狀態。
+     *
+     * 前置條件：
+     * - 啟用 IP 封禁功能
+     * - 設置失敗次數闾值為 1
+     * - 設置請求限制參數
+     *
+     * 測試步驟：
+     * - 執行正常請求（消耗令牌）
+     * - 執行超過限制的請求（觸發封禁機制）
+     * - 驗證後續請求的處理狀態
+     *
+     * 預期結果：
+     * - 第一個請求成功通過
+     * - 後續請求返回 429 狀態碼
+     * - IP 被標記為封禁狀態
+     */
     @Test
     @DisplayName("測試 IP 封禁機制 - 多次失敗後封禁 IP")
     void filter_withBanIpEnabled_shouldBanIpAfterFailures() {
@@ -222,6 +285,27 @@ class localRequestLimiterFilterTest {
         }
     }
 
+    /**
+     * 測試無法獲取客戶端 IP 時的處理機制。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當無法從請求中獲取客戶端 IP 地址時，過濾器能正確返回錯誤回應。
+     *
+     * 前置條件：
+     * - 初始化過濾器
+     * - 設置 ClientIpFilter 返回空的 Optional
+     * - 配置 Mock 物件和回應方法
+     *
+     * 測試步驟：
+     * - 執行過濾器方法
+     * - 驗證返回的 HTTP 狀態碼
+     * - 確認錯誤回應方法被調用
+     *
+     * 預期結果：
+     * - 返回 400 Bad Request 狀態碼
+     * - 調用錯誤回應方法並傳遞適當的錯誤訊息
+     * - 不調用下一層過濾器
+     */
     @Test
     @DisplayName("測試無法獲取客戶端 IP - 返回 400 狀態碼")
     void filter_withNoClientIp_shouldReturnBadRequest() {

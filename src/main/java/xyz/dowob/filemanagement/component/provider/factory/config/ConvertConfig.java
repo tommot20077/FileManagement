@@ -9,15 +9,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 配置文件轉換的參數設定，可以在這邊自定義參數的設定
- * 並將設定檔經由 {@link ContentConvertProviderFactory} 轉換成對應的轉換器
+ * 內容轉換器的設定參數類，定義轉換過程中使用的格式化設定。
+ *
+ * <p>提供檔案轉換所需的詳細參數設定，包含字體、編號、縮進等格式化選項。
+ * 這些設定通過 {@link ContentConvertProviderFactory} 傳遞給具體的轉換器實現。</p>
+ *
+ * <p>支援的設定項目涵蓋：列表編號、代碼區塊樣式、預設字體設定、
+ * 字體轉換映射以及段落縮進參數。所有設定均提供合理的預設值。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName ConvertConfig
- * @create 2025/4/8
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Getter
 @Setter
 public class ConvertConfig {

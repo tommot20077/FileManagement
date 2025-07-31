@@ -15,6 +15,25 @@ import xyz.dowob.filemanagement.customenum.TokenEnum;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * TokenStrategy 測試類別。
+ * 
+ * <p>測試 TokenStrategy 的憑證策略選擇功能，包括：
+ * <ul>
+ * <li>JWT 授權憑證提供者的獲取</li>
+ * <li>密碼重設憑證提供者的獲取</li>
+ * <li>無效憑證類型的異常處理</li>
+ * <li>所有支援憑證類型的完整性驗證</li>
+ * <li>憑證提供者的正確映射與選擇</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋策略模式下憑證管理的所有核心功能，包含正常情況、異常處理及系統健墯性。
+ * 透過反應式程式測試驗證憑證策略的正確性和依賴注入的可靠性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TokenStrategy 邏輯處理測試")
 class TokenStrategyTest {

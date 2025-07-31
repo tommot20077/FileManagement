@@ -20,6 +20,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * UserCacheProviderImpl 測試類別。
+ * 
+ * <p>測試 UserCacheProviderImpl 的使用者資訊緩存功能，包括：
+ * <ul>
+ * <li>構造函數初始化及參數驗證</li>
+ * <li>單一使用者資訊緩存的獲取與設定</li>
+ * <li>批量使用者資訊緩存的獲取與設定</li>
+ * <li>緩存刪除操作（單一及批量）</li>
+ * <li>Hash 結構的緩存操作</li>
+ * <li>過期時間管理（預設及自定）</li>
+ * <li>緩存命中與未命中情況處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 Redis Hash 操作的所有核心功能，包含空鍵值處理、
+ * 批量操作及異常情況。透過反應式程式測試確保緩存提供者的正確性和可靠性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserCacheProvider 邏輯處理測試")
 class UserCacheProviderImplTest {

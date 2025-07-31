@@ -5,48 +5,50 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 文件分享類型
+ * 檔案分享類型枚舉，定義不同的檔案分享等級。
+ *
+ * <p>提供了完整的檔案存取控制機制，包括公開分享、預設分享、私有分享和不分享等選項。
+ * 支援父資料夾權限繼承及獨立的檔案存取控制。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FileShareType
- * @create 2025/3/6
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Getter
 @RequiredArgsConstructor
 public enum FileShareTypeEnum {
     /**
-     * 公開分享: 所有人都可以訪問，無須設定允許的用戶
+     * 公開分享，所有人都可以訪問，無須設定允許的使用者。
      */
     PUBLIC("公開分享"),
 
     /**
-     * 默認分享: 不公開所有人但可以設定允許的用戶使用，此外會跟隨文件的父文件夾的分享設定，當用戶有權限訪問父文件夾時，也可以訪問此文件
+     * 預設分享，不公開所有人但可以設定允許的使用者存取。
+     * 此外會繼承父資料夾的分享設定，當使用者有權限訪問父資料夾時，也可以訪問此檔案。
      */
     DEFAULT("預設分享"),
 
     /**
-     * 私有分享: 只有設定的用戶可以訪問，即使具有父文件夾的訪問權限也無法訪問
+     * 私有分享，只有明確指定的使用者可以訪問。
+     * 即使具有父資料夾的訪問權限也無法訪問此檔案。
      */
     PRIVATE("私有分享"),
 
     /**
-     * 不分享: 不分享文件，即使設定用戶也無法訪問
+     * 不分享，完全不分享檔案，即使明確設定使用者也無法訪問。
      */
     NONE("不分享");
 
     /**
-     * 描述
+     * 分享類型的中文描述。
      */
     private final String describe;
 
     /**
-     * 根據字符串格式化文件分享類型，此為不區分大小寫的格式化
+     * 根據字符串轉換為檔案分享類型，不區分大小寫。
      *
-     * @param type 文件分享類型字符串
-     *
-     * @return 文件分享類型
+     * @param type 檔案分享類型字符串
+     * @return 對應的檔案分享類型，若找不到匹配則回傳 null
      */
     @JsonCreator
     public static FileShareTypeEnum fromString(String type) {

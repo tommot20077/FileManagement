@@ -42,7 +42,7 @@ import static org.mockito.Mockito.*;
 /**
  * FileUploadWebSocketHandler 邏輯處理測試
  * 
- * 此測試類別涵蓋文件上傳 WebSocket 處理器的核心功能測試。
+ * 此測試類別涵蓋檔案上傳 WebSocket 處理器的核心功能測試。
  * 
  * 前置條件：
  * - 初始化 FileUploadWebSocketHandler 和相關依賴的 Mock 對象

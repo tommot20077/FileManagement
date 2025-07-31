@@ -30,28 +30,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 /**
- * PermissionAspect 測試類。
+ * PermissionAspect 權限切面的單元測試類別。
+ *
+ * <p>此測試類全面驗證 PermissionAspect 切面的權限檢查機制，涵蓋多種場景和角色權限驗證。</p>
+ *
+ * <p>測試目標：
  * 
- * 測試涵蓋的邏輯或場景說明：
- * - 權限檢查成功的情況
- * - 權限檢查失敗的情況
- * - 不同角色的權限驗證
- * - Mono/Flux 響應式流的權限檢查
- * - 異常情況的處理
+ *   - 驗證不同角色的權限檢查邏輯
+ *   - 測試 Mono 和 Flux 響應式流的權限處理
+ *   - 確保異常情況和邊界條件的正確處理
  * 
- * 前置條件：
- * - 初始化 Mock 對象
- * - 配置 Security Context
+ * </p>
+ *
+ * <p>測試重點：
  * 
- * 測試步驟：
- * - 設置測試數據
- * - 調用被測試方法
- * - 驗證結果
+ *   - 權限檢查成功流程
+ *   - 權限檢查失敗流程
+ *   - 不同角色（管理員、普通用戶、訪客）的權限驗證
+ *   - 異常和錯誤流的正確傳播
  * 
- * 預期結果：
- * - 有權限時操作成功
- * - 無權限時拋出 ValidationException
- * - 不支持的返回類型時拋出 UnsupportedOperationException
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @DisplayName("PermissionAspect 權限切面測試")
 @ExtendWith(MockitoExtension.class)

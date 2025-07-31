@@ -3,34 +3,36 @@ package xyz.dowob.filemanagement.customenum;
 import com.fasterxml.jackson.annotation.JsonCreator;
 
 /**
- * 查詢用戶信息的類型枚舉類，根據不同的查詢類型，返回不同的查詢結果。
- * 當以用戶名查詢時，返回用戶ID；當以用戶ID查詢時，返回用戶名。
- * 如果查詢類型不在枚舉類中，則默認返回用戶名的模式。
+ * 使用者資訊查詢類型列舉。
+ * <p>定義系統中使用者資訊查詢的不同模式，支援以使用者名稱或使用者 ID 進行查詢。
+ * 系統會根據指定的查詢類型回傳相對應的資訊：以名稱查詢時回傳 ID，以 ID 查詢時回傳名稱。
+ * 若查詢類型無法識別或未指定，系統預設使用名稱查詢模式。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UserInfoType
- * @create 2025/3/11
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 
 public enum UserInfoTypeEnum {
     /**
-     * 用戶名稱模式
+     * 使用者名稱查詢模式。
+     * 使用使用者名稱作為查詢條件，系統將回傳對應的使用者唯一識別碼。
      */
     NAME,
 
     /**
-     * 用戶ID模式
+     * 使用者識別碼查詢模式。
+     * 使用使用者唯一識別碼作為查詢條件，系統將回傳對應的使用者名稱。
      */
     ID;
 
     /**
-     * 根據查詢類型的值，返回對應的查詢類型枚舉對象，默認返回用戶名的模式。
+     * 根據字串值解析使用者資訊查詢類型。
+     * 將字串格式的查詢類型轉換為對應的列舉值，支援不分大小寫的比對。
+     * 若無法匹配或參數為 null，則預設回傳名稱查詢模式。
      *
-     * @param value 查詢類型的值
-     *
-     * @return 查詢類型枚舉對象
+     * @param value 查詢類型字串，如 "name" 或 "id"
+     * @return 匹配的查詢類型列舉，預設為 NAME
      */
     @JsonCreator
     public static UserInfoTypeEnum fromString(String value) {

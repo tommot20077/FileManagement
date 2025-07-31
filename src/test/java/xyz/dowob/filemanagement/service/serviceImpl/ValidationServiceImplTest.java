@@ -21,6 +21,29 @@ import xyz.dowob.filemanagement.repostiory.UserRepository;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
+/**
+ * 驗證服務實現測試類別。
+ * 
+ * 測試 ValidationServiceImpl 類別的核心功能，包括各種資料傳輸對象的驗證邏輯。
+ * 此測試類別驗證服務層的資料驗證實現和业務規則控制。
+ * 
+ * <p>測試涵蓋範圍：
+ * <ul>
+ * <li>使用者註冊資料驗證</li>
+ * <li>密碼重設資料驗證</li>
+ * <li>檔案元資料驗證</li>
+ * <li>檔案編輯資料驗證</li>
+ * <li>編輯器內容驗證</li>
+ * <li>WebFlux 反應式驗證流程</li>
+ * </ul>
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ * @see ValidationServiceImpl
+ * @see ValidationException
+ * @see RegisterDTO
+ */
 @DisplayName("ValidationServiceI 邏輯處理測試")
 @ExtendWith(MockitoExtension.class)
 class ValidationServiceImplTest {
@@ -30,11 +53,34 @@ class ValidationServiceImplTest {
 
     private ValidationServiceImpl validationServiceImplUnderTest;
 
+    /**
+     * 測試前置作業。
+     * 
+     * 初始化 ValidationServiceImpl 實例和所需的模擬依賴項。
+     * 設定測試環境，確保每個測試方法都有乾淨的起始狀態。
+     */
     @BeforeEach
     void setUp() {
         validationServiceImplUnderTest = new ValidationServiceImpl(mockUserRepository);
     }
 
+    /**
+     * 測試 null RegisterDTO 的驗證處理。
+     * 
+     * 驗證當註冊資料傳輸對象為 null 時，驗證服務能正確識別並
+     * 拋出適當的驗證例外。
+     * 
+     * 前置條件：
+     * - RegisterDTO 為 null
+     * 
+     * 測試步驟：
+     * - 傳入 null 值的 RegisterDTO
+     * - 執行驗證操作
+     * - 檢查例外拋出
+     * 
+     * 預期結果：
+     * - 拋出 ValidationException 並包含 NULL_DTO 錯誤碼
+     */
     @Test
     @DisplayName("驗證 RegisterDTO - DTO 為 null - 拋出 ValidationException")
     void testValidateRegisterDTO_DTONull_ThrowsValidationException() {
@@ -731,7 +777,7 @@ class ValidationServiceImplTest {
     }
 
     @Test
-    @DisplayName("驗證文件過濾器 - FileFilterDTO 為 null - 拋出 NULL_DTO")
+    @DisplayName("驗證檔案過濾器 - FileFilterDTO 為 null - 拋出 NULL_DTO")
     void testValidateFileFilterDTO_Null_ThrowsValidationException() {
         Mono<Void> result = validationServiceImplUnderTest.validateFileFilterDTO(null);
 

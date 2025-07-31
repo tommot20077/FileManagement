@@ -16,7 +16,31 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * CacheConcurrentHashMap 的單元測試類。
+ * CacheConcurrentHashMap 併發緩存容器的單元測試。
+ *
+ * 測試基於哈希表實現的併發安全緩存容器，支援過期時間管理、自動清理機制和高併發訪問。
+ * 驗證緩存的基本操作、併發安全性、過期機制和批量處理功能。
+ *
+ * 前置條件：
+ * - 初始化測試用的緩存實例和參數
+ * - 設定不同過期時間和清理間隔
+ * - 配置併發測試環境
+ *
+ * 測試步驟：
+ * - 驗證基本CRUD操作的正確性
+ * - 測試併發環境下的線程安全性
+ * - 檢查過期機制和自動清理功能
+ * - 驗證批量操作和邊界條件
+ *
+ * 預期結果：
+ * - 所有基本操作應正確執行
+ * - 併發訪問應保持數據一致性
+ * - 過期機制應準確工作
+ * - 異常情況應得到適當處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @DisplayName("CacheConcurrentHashMap 邏輯處理測試")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -54,6 +78,24 @@ class CacheConcurrentHashMapTest {
     }
 
 
+    /**
+     * 測試構造函數啟用清理功能且清理間隔有效時的行為。
+     *
+     * 驗證當啟用自動清理功能且提供有效清理間隔時，緩存容器能夠正確初始化調度器。
+     *
+     * 前置條件：
+     * - 設定啟用清理功能為 true
+     * - 提供有效的清理間隔（大於0）
+     *
+     * 測試步驟：
+     * - 創建啟用清理功能的緩存實例
+     * - 驗證實例創建成功
+     * - 清理測試資源
+     *
+     * 預期結果：
+     * - 緩存實例應成功創建
+     * - 調度器應正確初始化
+     */
     @Test
 @DisplayName("測試構造函數 - 啟用清理功能且清理間隔有效 - Scheduler 初始化成功")
     void constructor_whenEnableCleanupWithValidInterval_thenSchedulerInitialized() {

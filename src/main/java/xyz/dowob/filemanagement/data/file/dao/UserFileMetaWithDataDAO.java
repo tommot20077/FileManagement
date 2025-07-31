@@ -8,99 +8,102 @@ import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
 import java.time.LocalDateTime;
 
 /**
- * 用戶文件元數據與數據的數據訪問對象，用於封裝用戶文件元數據和主資料數據的實體類
+ * 用戶檔案元資料與伺服器資料的資料存取對象，封裝聯結查詢結果。
+ * 用於一次性獲取用戶檔案元資料和對應的伺服器檔案資訊。
+ *
+ * <p>此類別整合來自多個表的資料，包括用戶檔案元資料、伺服器檔案元資料和用戶資訊。
+ * 通過此對象可以減少多次數據庫查詢，提高效能。字段命名使用縮寫形式以区分來源表。
+ *
  * @author yuan
- * @program FileManagement
- * @ClassName UserFileMetaWithData
- * @create 2025/5/26
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Data
 public class UserFileMetaWithDataDAO {
     /**
-     * 用戶文件元數據ID
+     * 用戶檔案元資料識別符（ufm = UserFileMetadata）
      */
     private Long ufmId;
 
     /**
-     * 用戶文件元數據的檔案名稱
+     * 用戶檔案名稱，包含副檔名
      */
     private String ufmFilename;
 
     /**
-     * 用戶文件元數據的父文件夾ID
+     * 父資料夾識別符，為 null 則表示根目錄
      */
     private Long ufmParentFolderId;
 
     /**
-     * 用戶文件元數據是否為星標文件
+     * 是否為星標檔案，用於快速訪問
      */
     private Boolean ufmIsStar;
 
     /**
-     * 用戶文件元數據的檔案類型
+     * 檔案類型枚舉，定義檔案的基本類別
      */
     private FileEnum ufmFileType;
 
     /**
-     * 用戶文件元數據的分享類型
+     * 檔案共享類型，定義檔案的存取權限
      */
     private FileShareTypeEnum ufmShareType;
 
     /**
-     * 用戶文件元數據的上傳時間
+     * 檔案初始上傳時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime ufmUploadTime;
 
     /**
-     * 用戶文件元數據的最後訪問時間
+     * 最後存取時間，記錄檔案最後一次被存取的時間
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime ufmLastAccessTime;
 
     /**
-     * 用戶文件元數據是否已刪除
+     * 是否已被標記為已刪除，支援軟刪除功能
      */
     private Boolean ufmIsDeleted;
 
     /**
-     * 伺服器文件元數據ID
+     * 伺服器檔案元資料識別符（sfm = ServerFileMetadata）
      */
     private Long sfmId;
 
     /**
-     * 伺服器元數據檔案大小
+     * 檔案大小（以位元組為單位）
      */
     private Long sfmFileSize;
 
     /**
-     * 伺服器元數據的MIME類型
+     * 檔案 MIME 類型，用於內容識別和處理
      */
     private String sfmMimeType;
 
     /**
-     * 伺服器元數據的GridFsId
+     * MongoDB GridFS 檔案識別符，用於二進位資料存取
      */
     private String sfmGridFsId;
 
     /**
-     * 伺服器元數據的MD5值
+     * 檔案 MD5 校驗值，用於檔案完整性驗證
      */
     private String sfmMd5;
 
     /**
-     * 線上檔案的識別ID
+     * 在線檔案識別符（uof = UserOnlineFile），為 null 則表示非在線檔案
      */
     private Long uofId;
 
     /**
-     * 用戶文件元數據的用戶ID
+     * 檔案擁有者的用戶識別符
      */
     private Long ufmUserId;
 
     /**
-     * 用戶文件元數據的所有者用戶名
+     * 檔案擁有者的用戶名，用於顯示和權限管理
      */
     private String ownerUsername;
 }

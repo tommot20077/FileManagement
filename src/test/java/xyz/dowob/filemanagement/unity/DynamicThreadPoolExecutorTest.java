@@ -15,7 +15,31 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * DynamicThreadPoolExecutor 的單元測試
+ * DynamicThreadPoolExecutor 動態線程池執行器的單元測試。
+ *
+ * 測試基於 ThreadPoolExecutor 擴展的動態線程池執行器，支援動態調整核心線程數、
+ * 最大線程數和優先級控制。驗證線程池的基本功能、動態調整機制和併發安全性。
+ *
+ * 前置條件：
+ * - 配置測試用的線程池參數
+ * - 初始化各種類型的工作隊列
+ * - 設定併發測試環境
+ *
+ * 測試步驟：
+ * - 驗證線程池創建和初始化
+ * - 測試任務執行和併發處理
+ * - 檢查動態調整機制的正確性
+ * - 驗證優先級控制和CPU使用率調整
+ *
+ * 預期結果：
+ * - 線程池應正確創建和執行任務
+ * - 動態調整機制應根據負載正常工作
+ * - 優先級控制應有效調整資源分配
+ * - 異常情況應得到適當處理
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  */
 @DisplayName("DynamicThreadPoolExecutor 邏輯處理測試")
 class DynamicThreadPoolExecutorTest {
@@ -42,6 +66,21 @@ class DynamicThreadPoolExecutorTest {
         }
     }
 
+    /**
+     * 測試工作隊列容量計算對於ArrayBlockingQueue的處理。
+     *
+     * 驗證工具方法能夠正確獲取有界阻塞隊列的容量值。
+     *
+     * 前置條件：
+     * - 創建指定容量的ArrayBlockingQueue實例
+     *
+     * 測試步驟：
+     * - 調用getWorkQueueCapacity方法
+     * - 驗證返回的容量值
+     *
+     * 預期結果：
+     * - 應返回正確的隊列容量
+     */
     @Test
     @DisplayName("測試工作隊列容量計算(ArrayBlockingQueue) - 預期返回正確容量")
     void testGetWorkQueueCapacity_ArrayBlockingQueue_ReturnsCorrectCapacity() {

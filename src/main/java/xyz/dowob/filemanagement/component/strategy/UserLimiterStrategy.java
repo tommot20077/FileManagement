@@ -11,25 +11,39 @@ import java.util.EnumMap;
 import java.util.List;
 
 /**
- * 用戶限流器策略，用於根據不同的限流器類型返回不同的限流器
+ * 基於策略模式的用戶限流器管理服務實作。
+ *
+ * <p>本類別使用 EnumMap 存儲不同類型的限流器實例，提供高效的限流器查詢和管理。
+ * 在初始化時會自動掃描所有標記了 {@link UserLimiterType} 註解的限流器實作，
+ * 並根據註解值將其註冊到對應的枚舉類型中。重複類型的限流器註冊會拋出例外。</p>
+ *
+ * <p>限流器的選擇基於 {@link UserLimiterEnum} 枚舉值，支援執行時動態切換限流策略。
+ * 當查詢不存在的限流器類型時，返回 null 值。新增限流器類型只需要實作 {@link UserLimiter} 
+ * 介面並使用適當的 {@link UserLimiterType} 註解標記。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UserLimiterStrategy
- * @create 2025/1/20
- * @Version 1.0
+ * @version 1.0
+ * @since 1.0
  */
 @Component
 public class UserLimiterStrategy {
     /**
-     * 用於存儲不同類型的用戶限流器
+     * 存儲不同限流器類型與實作映射的 EnumMap。
+     * 
+     * <p>使用 EnumMap 確保高效的查詢性能和類型安全，鍵為 {@link UserLimiterEnum} 枚舉值，
+     * 值為對應的 {@link UserLimiter} 實作實例。</p>
      */
     private final EnumMap<UserLimiterEnum, UserLimiter> userLimiterEnumMap;
 
     /**
-     * 用於構造 UserLimiterStrategy 對象
+     * 建構限流器策略管理服務，自動註冊所有可用的限流器實作。
      *
-     * @param userLimiters 用戶限流器列表
+     * <p>透過依賴注入接收所有 {@link UserLimiter} 實作的 Bean 列表，
+     * 掃描每個實作類別上的 {@link UserLimiterType} 註解，並將其註冊到對應的枚舉類型映射中。
+     * 如果發現重複的限流器類型註冊，將拋出 {@link IllegalArgumentException}。</p>
+     *
+     * @param userLimiters 系統中所有 UserLimiter 實作的 Bean 列表，可為 null
+     * @throws IllegalArgumentException 當存在重複的限流器類型註冊時
      */
     public UserLimiterStrategy(List<UserLimiter> userLimiters) {
         userLimiterEnumMap = new EnumMap<>(UserLimiterEnum.class);
@@ -62,11 +76,13 @@ public class UserLimiterStrategy {
     }
 
     /**
-     * 根據用戶限流器類型獲取用戶限流器
+     * 根據指定的限流器類型獲取對應的限流器實作。
      *
-     * @param userLimiterEnum 用戶限流器類型
+     * <p>從內部 EnumMap 中查詢並返回指定類型的限流器實例。
+     * 此方法提供 O(1) 時間複雜度的查詢性能。</p>
      *
-     * @return 用戶限流器
+     * @param userLimiterEnum 要查詢的限流器類型枚舉，不可為 null
+     * @return 對應類型的限流器實作，如果該類型未註冊則返回 null
      */
     public UserLimiter getUserLimiter(UserLimiterEnum userLimiterEnum) {
         return userLimiterEnumMap.get(userLimiterEnum);

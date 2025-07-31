@@ -13,33 +13,40 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
 /**
- * 用戶上傳限流器，用於限制用戶的上傳任務數量
- * 實現 UserLimiter 接口，實現用戶限流器的限流和釋放
+ * 基於信號量的用戶上傳任務限流器，控制並發上傳數量防止系統過載。
+ * 
+ * <p>本類使用 {@link java.util.concurrent.Semaphore} 實現用戶級別的上傳任務並發控制，
+ * 每個用戶獨立維護其上傳許可池，確保單一用戶無法佔用過多系統資源。</p>
+ * 
+ * <p>限流器的運作機制：每個用戶分配固定數量的上傳許可，當許可用盡時新的上傳請求將被拒絕。
+ * 任務完成後自動釋放許可，若用戶無活躍任務則清理其許可池以節約記憶體。</p>
+ * 
+ * <p>設定來源：最大並發數從 {@link xyz.dowob.filemanagement.config.properties.FileProperties} 
+ * 的 upload.maxUploadTaskLimit 屬性獲取。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName UploadLimiter
- * @create 2025/1/20
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @UserLimiterType(UserLimiterEnum.USER_UPLOAD_LIMITER)
 public class UserUploadLimiter implements UserLimiter {
     /**
-     * 每個用戶最大的並發上傳任務數量，此值從配置文件中獲取
+     * 每用戶最大並發上傳任務數量，從設定檔案動態載入
      */
     private final int MAX_CONCURRENT_UPLOADS_PER_USER;
 
     /**
-     * 用戶憑證映射，用於存儲用戶的可用的憑證
+     * 用戶信號量映射表，儲存各用戶的上傳許可信號量
      */
     private final ConcurrentHashMap<Long, Semaphore> userSemaphoreMap = new ConcurrentHashMap<>();
 
     /**
-     * 用戶上傳限流器構造方法
-     * 獲取配置文件中的最大上傳任務數量
+     * 構造上傳限流器並初始化最大並發限制。
+     * 
+     * <p>從檔案設定中讀取每用戶的最大並發上傳數量設定。</p>
      *
-     * @param fileProperties 文件屬性配置類
+     * @param fileProperties 檔案屬性設定，包含上傳限制參數
      */
     public UserUploadLimiter(FileProperties fileProperties) {
         this.MAX_CONCURRENT_UPLOADS_PER_USER = fileProperties.getUpload().getMaxUploadTaskLimit();
@@ -47,12 +54,13 @@ public class UserUploadLimiter implements UserLimiter {
 
 
     /**
-     * 嘗試獲取用戶的限流器，根據設定的限制數量，判斷是否可以獲取
-     * 當用戶的憑證不存在時，創建一個新的憑證
+     * 嘗試為用戶取得上傳許可，支援動態信號量建立。
+     * 
+     * <p>檢查用戶是否有可用的上傳許可。若用戶首次上傳，
+     * 自動建立對應的信號量池。採用非阻塞方式嘗試取得許可。</p>
      *
-     * @param key 用戶辨識值
-     *
-     * @return Mono<Boolean> 是否獲取成功
+     * @param key 用戶ID，必須為 Long 類型
+     * @return 布林值響應流，true表示許可取得成功，false表示已達上限
      */
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
@@ -65,10 +73,13 @@ public class UserUploadLimiter implements UserLimiter {
 
 
     /**
-     * 釋放用戶的限流器
-     * 當用戶的憑證可用憑證數量等於最大憑證數量時，刪除用戶的憑證
+     * 釋放用戶上傳許可並執行記憶體最佳化。
+     * 
+     * <p>歸還已使用的上傳許可。當用戶所有許可都歸還時，
+     * 自動清理該用戶的信號量以節約記憶體。</p>
      *
-     * @param key 用戶辨識值
+     * @param key 用戶ID，必須為 Long 類型
+     * @return 完成信號，表示釋放操作已執行
      */
     @Override
     public Mono<Void> release(Object key) {
@@ -85,8 +96,9 @@ public class UserUploadLimiter implements UserLimiter {
 
 
     /**
-     * 銷毀方法，清除用戶的憑證映射
-     * 當應用程序關閉時，清除用戶的憑證映射
+     * 應用關閉時的資源清理，釋放所有用戶信號量資源。
+     * 
+     * <p>確保應用程式正常關閉時清理所有信號量映射，防止記憶體洩漏。</p>
      */
     @PreDestroy
     public void destroy() {

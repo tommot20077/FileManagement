@@ -10,10 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.r2dbc.core.R2dbcEntityOperations;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import xyz.dowob.filemanagement.customenum.FileEnum;
-import xyz.dowob.filemanagement.customenum.FileShareTypeEnum;
-import xyz.dowob.filemanagement.customenum.ReservedSearchIdEnum;
-import xyz.dowob.filemanagement.customenum.RoleEnum;
+import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -27,6 +24,29 @@ import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
+/**
+ * 檔案權限服務實現測試類別。
+ * 
+ * 測試 FilePermissionServiceImpl 類別的核心功能，包括檔案權限驗證、使用者存取權限檢查
+ * 和各種權限控制場景。此測試類別驗證服務層的權限管理邏輯和安全性實現。
+ * 
+ * <p>測試涵蓋範圍：
+ * <ul>
+ * <li>使用者權限狀態檢查</li>
+ * <li>檔案存取權限驗證</li>
+ * <li>特殊權限操作的處理</li>
+ * <li>WebFlux 反應式權限檢查流程</li>
+ * <li>保留 ID 和虛擬檔案的處理</li>
+ * <li>檔案分享權限驗證</li>
+ * </ul>
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ * @see FilePermissionServiceImpl
+ * @see PermissionEnum
+ * @see ValidationException
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FilePermissionServiceImpl 邏輯處理測試")
 class FilePermissionServiceImplTest {
@@ -52,6 +72,13 @@ class FilePermissionServiceImplTest {
     private User nonOwnerUser;
     private UserFileMetadata fileMetadata;
 
+    /**
+     * 測試前置作業。
+     * 
+     * 初始化 FilePermissionServiceImpl 實例和所需的模擬依賴項。
+     * 設定權限檢查函數和測試環境，確保每個測試方法都有乾淨的起始狀態。
+     * 包括擁有者權限、已刪除檔案阻擋、搜尋限制和分享權限等函數的設置。
+     */
     @BeforeEach
     void setUp() {
 

@@ -8,12 +8,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Spring Boot 啟動類
  *
- * @Author yuan
- * @Program File-Management
- * @ClassName FileManagementApplication
- * @description Spring Boot 啟動類
- * @create 2024-09-14 17:08
- * @Version 1.0
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
  **/
 @EnableScheduling
 @EnableAspectJAutoProxy

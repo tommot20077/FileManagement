@@ -23,6 +23,33 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 
+/**
+ * 自定義異常處理器的單元測試類別。
+ *
+ * <p>本測試類別全面驗證 CustomExceptionHandler 的異常處理和錯誤回應機制。</p>
+ *
+ * <p>測試範圍：
+ * 
+ *   - 異常路由函數的建立和配置
+ *   - 不同種類異常的處理機制
+ *   - HTTP 狀態碼和錯誤回應的正確性
+ *   - JSON 格式的錯誤回應序列化
+ * 
+ * </p>
+ *
+ * <p>主要測試方法：
+ * 
+ *   - 驗證路由函數的正確生成
+ *   - 測試各種異常的處理和回應
+ *   - 確認錯誤訊息的格式和內容
+ *   - 檢驗 WebFlux 異常處理流程
+ * 
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomExceptionHandler 邏輯處理測試")
 class CustomExceptionHandlerTest {
@@ -55,6 +82,23 @@ class CustomExceptionHandlerTest {
         webTestClient = WebTestClient.bindToRouterFunction(customExceptionHandlerUnderTest.getRoutingFunction(mockErrorAttributes)).build();
     }
 
+    /**
+     * 測試獲取路由函數的功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證 CustomExceptionHandler 能正確建立和返回異常處理的路由函數。
+     *
+     * 前置條件：
+     * - 初始化 CustomExceptionHandler 實例
+     * - 配置 Mock ErrorAttributes
+     *
+     * 測試步驟：
+     * - 調用 getRoutingFunction 方法
+     * - 驗證返回的路由函數不為 null
+     *
+     * 預期結果：
+     * - 成功返回非 null 的 RouterFunction 實例
+     */
     @Test
     @DisplayName("獲取路由函數 - 成功返回路由函數")
     void getRoutingFunction_returnsRouterFunction() {
@@ -62,6 +106,26 @@ class CustomExceptionHandlerTest {
         assertThat(routerFunction).isNotNull();
     }
 
+    /**
+     * 測試處理內部伺服器錯誤的功能。
+     *
+     * 測試涵蓋的邏輯或場景說明：
+     * 驗證當系統發生 RuntimeException 時，異常處理器能正確返回 HTTP 500 回應。
+     *
+     * 前置條件：
+     * - 設置 Mock ErrorAttributes 返回 RuntimeException
+     * - 初始化 WebTestClient 用於測試
+     *
+     * 測試步驟：
+     * - 發送 GET 請求至錯誤路徑
+     * - 驗證 HTTP 狀態碼為 500
+     * - 檢查回應內容和格式
+     *
+     * 預期結果：
+     * - 返回 HTTP 500 Internal Server Error
+     * - 回應為 JSON 格式的 ApiResponseDTO
+     * - 包含適當的錯誤訊息和路徑資訊
+     */
     @Test
     @DisplayName("處理內部伺服器錯誤 - 成功返回內部伺服器錯誤響應")
     void handleException_internalServerError_returnsInternalServerErrorResponse() {

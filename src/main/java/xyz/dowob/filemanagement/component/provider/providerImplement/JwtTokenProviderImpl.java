@@ -29,43 +29,51 @@ import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 此類用於 JWT相關的基礎操作。
- * 繼承 TokenProvider 接口實現包括生成、驗證、刪除 JWT 憑證等功能，
+ * 基於 JWT 的令牌管理反應式實現。
+ *
+ * <p>此實現提供完整的 JWT 令牌生命週期管理，包括生成、驗證、撤銷等操作。
+ * 使用 HMAC-SHA 簽章技術確保令牌安全性，支援令牌版本控制以實現強制登出功能。
+ * 令牌包含使用者基本資訊和角色權限，並透過內建快取機制提升驗證效能。</p>
+ *
+ * <p>實現採用非阻塞反應式設計，適用於高併發環境下的令牌操作。
+ * 快取機制使用 ConcurrentHashMap 確保線程安全，並提供自動過期清理功能。</p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName JwtTokenProviderImpl
- * @description
- * @create 2024-09-23 14:16
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @RecordLevel(LogLevelEnum.DEBUG)
 @RequiredArgsConstructor
 public class JwtTokenProviderImpl implements TokenProvider {
     /**
-     * TokenRepository 用於操作 Token 實體的數據庫操作類
+     * 令牌資料庫操作介面，負責令牌實體的持久化和查詢操作。
      */
     private final TokenRepository tokenRepository;
 
     /**
-     * SecurityProperties 用於操作安全配置的類
+     * 系統安全配置屬性，提供 JWT 令牌相關的安全參數設定。
      */
     private final SecurityProperties securityProperties;
 
     /**
-     * 用於存儲 JWT 憑證的緩存，key 為 JWT 憑證，value 為 TokenCacheEntity 記錄類 {@link TokenCacheEntity}
+     * 令牌快取映射表，用於暫存令牌驗證資訊以提升效能。
+     *
+     * <p>使用 ConcurrentHashMap 確保多線程環境下的快取安全性。</p>
      */
     private final ConcurrentHashMap<String, TokenCacheEntity> cacheTokenMap = new ConcurrentHashMap<>();
 
     /**
-     * key 用於生成 JWT 憑證的密鑰
+     * JWT 令牌簽章密鑰，用於令牌的生成和驗證操作。
      */
     private SecretKey key;
 
 
     /**
-     * 初始化方法，用於將 secret 解碼後生成 key
+     * 初始化 JWT 簽章密鑰。
+     *
+     * <p>從安全配置中讀取 Base64 編碼的密鑰字串，解碼後生成 HMAC-SHA 簽章密鑰。
+     * 此方法在 Spring 容器初始化後自動執行。</p>
      */
     @PostConstruct
     public void init() {
@@ -75,13 +83,13 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 根據用戶 ID 生成 JWT 憑證，會根據 Token 實體中的 JWT 憑證版本進行版本管理
-     * 其中 subject 為用戶 ID，claim 中包含 JWT 憑證版本
-     * 將 JWT 憑證存入 Token 實體中 並一併清除 cacheTokenMap 中的該用戶的 JWT 憑證
+     * 為指定用戶生成 JWT 令牌。
      *
-     * @param user 用戶實體
+     * <p>生成過程包括驗證用戶有效性、查詢或建立令牌實體、設定令牌聲明（包含用戶 ID、角色、
+     * 用戶名稱和版本號）、儲存令牌實體並清除相關快取。令牌包含過期時間並使用 HMAC-SHA 簽章。</p>
      *
-     * @return JWT 令牌字符串
+     * @param user 用戶實體，不可為 null
+     * @return 包含生成的 JWT 令牌字串的 Mono
      */
     @Override
     @HideSensitive
@@ -126,18 +134,14 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 驗證 JWT 憑證，獲取用戶 ID
-     * 此方法會根據 JWT 憑證中的用戶 ID 進行驗證，並根據 Token 快取或資料庫實體中的 JWT 憑證版本進行版本管理
-     * 主要流程為：
-     * 1. 獲取 JWT 憑證中的 Claims
-     * 2. 驗證快取中的 JWT 憑證是否有效，若有效則返回用戶 ID
-     * 3. 若快取中的 JWT 憑證無效，則根據用戶 ID 查找 Token 實體，並進行版本驗證
-     * 驗證成功後返回用戶 ID，否則傳出 JWT_TOKEN_INVALID 錯誤
+     * 驗證 JWT 令牌並回傳用戶 ID。
      *
-     * @param token         JWT 憑證
-     * @param userIdUseLess 用戶 ID (此參數在此方法中無用)
+     * <p>驗證過程包括檢查快取、解析令牌聲明、驗證令牌版本和有效期。
+     * 若快取失效則查詢資料庫進行驗證，並更新快取。包含重試機制處理暫時性錯誤。</p>
      *
-     * @return 用戶 ID
+     * @param token 待驗證的 JWT 令牌字串
+     * @param userIdUseLess 相容性參數，此實現中不使用
+     * @return 包含用戶 ID 的 Mono，驗證失敗時回傳錯誤
      */
     @Override
     public Mono<Long> validateToken(String token, Long userIdUseLess) {
@@ -152,12 +156,13 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 根據用戶 ID 刪除 JWT 憑證
-     * 此方法會根據用戶 ID 查找 Token 實體，並將 JWT 憑證版本將被重新設定，過期時間設為空
-     * 此時 JWT 在驗證時版本不匹配，並且過期時間在當前時間之前，即 JWT 憑證無效
-     * 並且會將 cacheTokenMap 中的對應關係刪除
+     * 撤銷指定用戶的所有有效令牌。
      *
-     * @param userId 用戶 ID
+     * <p>撤銷過程包括查詢用戶令牌實體、清除相關快取、更新令牌版本號並清空過期時間。
+     * 版本號更新後，所有使用舊版本的令牌將自動失效。</p>
+     *
+     * @param userId 需要撤銷令牌的用戶 ID
+     * @return 完成撤銷操作的 Mono
      */
     @Override
     public Mono<Void> revokeToken(Long userId) {
@@ -173,12 +178,13 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 根據 JWT 憑證獲取 JWT 憑證中的 Claims
-     * 當 JWT 憑證無效時，傳出 JWT_TOKEN_INVALID 錯誤
+     * 解析 JWT 令牌並提取聲明內容。
      *
-     * @param token JWT 憑證
+     * <p>使用配置的 HMAC-SHA 密鑰驗證令牌簽章並解析其中的聲明內容。
+     * 解析失敗時回傳驗證異常。</p>
      *
-     * @return JWT 憑證中的 Claims
+     * @param token 待解析的 JWT 令牌字串
+     * @return 包含令牌聲明的 Mono，解析失敗時回傳錯誤
      */
     public Mono<Claims> getClaimsFromToken(String token) {
         return Mono.defer(() -> {
@@ -192,15 +198,15 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 驗證 JWT 憑證中的 Claims，並根據快取中的 JWT 憑證版本進行版本管理
-     * 當 JWT 憑證版本不匹配或 JWT 憑證過期時，傳出 JWT_TOKEN_INVALID 錯誤
-     * 驗證成功後返回用戶 ID
+     * 驗證令牌聲明並進行版本控制檢查。
      *
-     * @param token       JWT 憑證
-     * @param claims      JWT 憑證中的 Claims
-     * @param cacheEntity 快取中的 JWT 憑證記錄
+     * <p>從聲明中提取用戶 ID 和版本號，優先檢查快取有效性。
+     * 若快取無效則查詢資料庫驗證令牌版本，並更新快取。</p>
      *
-     * @return 用戶 ID
+     * @param token 令牌字串
+     * @param claims 令牌聲明內容
+     * @param cacheEntity 快取實體，可為 null
+     * @return 包含用戶 ID 的 Mono，驗證失敗時回傳錯誤
      */
     private Mono<Long> validateTokenWithClaims(String token, Claims claims, TokenCacheEntity cacheEntity) {
         Long userId = Long.parseLong(claims.getSubject());
@@ -225,21 +231,16 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 驗證快取中的 JWT 憑證是否有效
-     * 分成幾種情況：
-     * 1. 快取中無 JWT 憑證，返回 false
-     * 2. JWT 憑證過期，刪除快取中的 JWT 憑證，返回 false
-     * 3. JWT 憑證有效但版本不匹配，返回 false
-     * 4. JWT 憑證有效且版本匹配，返回 true
-     * 5. JWT 憑證的過期時間為空，傳出 JWT_TOKEN_INVALID 錯誤(此情況為登出後的 JWT 憑證)
+     * 檢查快取中的令牌是否有效。
      *
-     * @param cacheEntity 快取中的 JWT 憑證記錄
-     * @param version     JWT 憑證版本
-     * @param token       JWT 憑證
+     * <p>驗證快取實體存在性、過期時間和版本號。若過期時間為 null 表示令牌已被撤銷，
+     * 若已過期則清除快取，版本不符則回傳無效。</p>
      *
-     * @return 是否有效
-     *
-     * @throws ValidationException 驗證失敗時傳出 JWT_TOKEN_INVALID 錯誤
+     * @param cacheEntity 快取實體，可為 null
+     * @param version 令牌版本號
+     * @param token 令牌字串，用於清除過期快取
+     * @return true 表示快取有效，false 表示需查詢資料庫
+     * @throws ValidationException 當令牌已被撤銷時拋出
      */
     @SkipRecord
     private boolean isValidCache(TokenCacheEntity cacheEntity, String version, String token) throws ValidationException {
@@ -260,11 +261,13 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 更新快取中的 JWT 憑證記錄
+     * 更新令牌快取記錄。
      *
-     * @param token       JWT 憑證
-     * @param tokenEntity Token 實體
-     * @param userId      用戶 ID
+     * <p>將令牌實體的版本號、用戶 ID 和過期時間存入快取映射表。</p>
+     *
+     * @param token 令牌字串作為快取鍵
+     * @param tokenEntity 令牌資料庫實體
+     * @param userId 用戶 ID
      */
     @SkipRecord
     private void updateCache(String token, Token tokenEntity, Long userId) {
@@ -277,9 +280,11 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 獲取快取中的 JWT 憑證記錄
+     * 取得令牌快取映射表。
      *
-     * @return 快取中的 JWT 憑證記錄
+     * <p>回傳內部快取映射表的參考，主要用於測試和監控目的。</p>
+     *
+     * @return 令牌快取映射表
      */
     @HideSensitive
     @SkipRecord
@@ -289,7 +294,14 @@ public class JwtTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * TokenCacheEntity 用於記錄 JWT 憑證的版本、用戶 ID 和過期時間
+     * 令牌快取實體記錄，包含令牌驗證所需的關鍵資訊。
+     *
+     * <p>此記錄包含令牌版本號、擁有者用戶 ID 和過期時間，
+     * 用於快速驗證令牌有效性而無需查詢資料庫。</p>
+     *
+     * @param version 令牌版本號
+     * @param userId 令牌擁有者用戶 ID  
+     * @param expireTime 令牌過期時間，null 表示已撤銷
      */
     public record TokenCacheEntity(String version, Long userId, Date expireTime) {
     }

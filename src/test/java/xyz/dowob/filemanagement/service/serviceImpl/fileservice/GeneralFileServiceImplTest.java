@@ -344,7 +344,7 @@ class GeneralFileServiceImplTest {
     }
 
     @Test
-    @DisplayName("整合測試 - 繼承的文件列表功能")
+    @DisplayName("整合測試 - 繼承的檔案列表功能")
     void testIntegration_InheritedFileListFunctionality() {
         // 準備測試資料
         User testUser = new User();
@@ -372,7 +372,7 @@ class GeneralFileServiceImplTest {
         assertNotEquals(FileEnum.FOLDER, annotation.value(),
                 "不應該處理資料夾類型");
         assertNotEquals(FileEnum.ONLINE_DOCUMENT, annotation.value(),
-                "不應該處理線上文件類型");
+                "不應該處理線上檔案類型");
     }
 
     @Test

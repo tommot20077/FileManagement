@@ -15,6 +15,25 @@ import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * ContentConvertProviderFactory 測試類別。
+ * 
+ * <p>測試 ContentConvertProviderFactory 工廠類別的內容轉換器創建功能，包括：
+ * <ul>
+ * <li>DOCX 轉換器的創建與配置驗證</li>
+ * <li>Markdown 轉換器的創建行為</li>
+ * <li>無效參數處理與異常拋出</li>
+ * <li>預設配置處理</li>
+ * <li>所有支援轉換類型的完整性驗證</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋正常情況、邊界條件及異常處理，確保工廠類別能夠正確創建對應的轉換器實例
+ * 並正確處理各種配置參數。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ContentConvertProviderFactory 邏輯處理測試")
 class ContentConvertProviderFactoryTest {

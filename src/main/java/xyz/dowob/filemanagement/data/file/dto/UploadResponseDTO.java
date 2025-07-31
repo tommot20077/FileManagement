@@ -6,14 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 文件傳輸響應的數據傳輸對象，用於規範文件傳輸響應的數據傳輸對象，用於文件傳輸響應的數據
+ * 檔案傳輸響應的資料傳輸對象，用於規範檔案傳輸響應的資料傳輸對象，用於檔案傳輸響應的資料
  *
  * @author yuan
- * @program FileManagement
- * @ClassName TransferResponseDTO
- * @description
- * @create 2024-09-26 23:58
- * @Version 1.0
+ * @since 1.0
+ * @version 1.0
  **/
 @Data
 @AllArgsConstructor

@@ -20,6 +20,28 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * WordConvertProvider 測試類別。
+ * 
+ * <p>測試 WordConvertProvider 的 Word 檔案轉換功能，包括：
+ * <ul>
+ * <li>轉換器類型與配置獲取</li>
+ * <li>JSON 格式轉換為 InputStream</li>
+ * <li>JSON 格式轉換為 DataBuffer</li>
+ * <li>各種文字格式處理（粗體、斜體、標題）</li>
+ * <li>列表格式處理（有序、無序）</li>
+ * <li>程式碼區塊與表格轉換</li>
+ * <li>超連結與特殊內容處理</li>
+ * <li>無效 JSON 與空內容處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 Quill Delta JSON 格式轉換為 DOCX 檔案的所有場景，
+ * 包含正常轉換、異常處理及各種文字格式的正確性。透過反應式程式測試確保轉換功能的完整性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("WordConvertProvider 邏輯處理測試")
 @MockitoSettings(strictness = Strictness.LENIENT)

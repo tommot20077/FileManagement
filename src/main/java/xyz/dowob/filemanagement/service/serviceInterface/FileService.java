@@ -11,29 +11,30 @@ import xyz.dowob.filemanagement.entity.UserFileMetadata;
 import xyz.dowob.filemanagement.unity.FileCrudService;
 
 /**
- * 文件業務邏輯接口，定義了文件業務邏輯的相關方法
- * 繼承了 {@link FileCrudService} 和 {@link BaseFileService} 接口
- * 這兩個接口分別定義了文件的基本操作和底層文件業務邏輯的規範
- * 並且實現了 {@link RecoverableFile} 接口
- * 該接口定義了文件的可恢復操作
+ * 基於反應式模式的檔案服務介面。整合 FileCrudService、BaseFileService 和 RecoverableFile，
+ * 提供完整的檔案操作功能。
+ *
+ * <p>採用非阻塞 I/O 設計，支援檔案上傳、下載、刪除和編輯操作。所有方法回傳 Mono 類型
+ * 以確保高並發處理和資源效率。內建用戶權限驗證和安全性控制。
+ *
+ * <p>錯誤處理通過 Mono.error() 傳播，權限不足或操作失敗時拋出相應例外。
+ * 檔案操作執行時進行權限檢查，確保用戶僅能操作有權限的檔案。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FileService
- * @description
- * @create 2024-09-30 20:13
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ * @see FileCrudService
+ * @see BaseFileService
+ * @see RecoverableFile
+ */
 public interface FileService extends FileCrudService, BaseFileService, RecoverableFile<UserFileMetadata> {
 
     /**
-     * 上傳文件的接口
+     * 上傳檔案至系統。驗證用戶權限並處理檔案元資料和實際檔案內容。
      *
-     * @param fileMetadataDTO 文件元數據
-     *                        包含文件名、文件大小、文件類型等信息
-     * @param user            用戶信息
-     *
-     * @return 返回上傳結果
+     * @param fileMetadataDTO 檔案元資料，包含檔案名稱、大小、類型等資訊
+     * @param user 執行上傳的用戶
+     * @return 上傳結果響應的 Mono，包含檔案標識符和狀態資訊
      */
     default Mono<UploadResponseDTO> uploadFile(FileMetadataDTO fileMetadataDTO, User user) {
         return Mono.empty();
@@ -41,12 +42,10 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
 
 
     /**
-     * 上傳文件分塊的接口
+     * 上傳檔案分塊。支援大型檔案的分段上傳和斷點續傳功能。
      *
-     * @param uploadChunkDTO 上傳文件數據
-     *                       包含文件分塊數據、文件ID等信息
-     *
-     * @return 返回上傳結果
+     * @param uploadChunkDTO 分塊上傳資料，包含分塊內容、檔案標識符、分塊序號和總數
+     * @return 分塊上傳結果的 Mono，包含當前分塊狀態和進度資訊
      */
     default Mono<UploadResponseDTO> uploadFileChunk(UploadChunkDTO uploadChunkDTO) {
         return Mono.empty();
@@ -54,13 +53,12 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
 
 
     /**
-     * 下載文件的接口
+     * 下載指定檔案。驗證用戶權限並提供檔案內容的非阻塞存取。
      *
-     * @param file     文件
-     * @param user     用戶信息
-     * @param optional 其他可選參數
-     *
-     * @return 返回文件下載流
+     * @param file 要下載的檔案元資料
+     * @param user 執行下載的用戶
+     * @param optional 可選參數，用於指定下載範圍或特殊設定
+     * @return 檔案資料的 Mono，包含檔案內容和相關資訊
      */
     default Mono<UserFileDataBO> downloadFile(UserFileMetadata file, User user, String... optional) {
         return Mono.empty();
@@ -68,12 +66,11 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
 
 
     /**
-     * 刪除文件的接口
+     * 刪除指定檔案。檢查用戶權限並執行檔案刪除操作，支援可恢復性邏輯。
      *
-     * @param file 文件
-     * @param user 用戶信息
-     *
-     * @return 返回刪除結果
+     * @param file 要刪除的檔案元資料
+     * @param user 執行刪除的用戶
+     * @return 刪除完成信號的 Mono
      */
     default Mono<Void> deleteFile(UserFileMetadata file, User user) {
         return Mono.empty();
@@ -81,12 +78,11 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
 
 
     /**
-     * 編輯文件的接口
+     * 編輯指定檔案。檢查用戶權限並執行檔案內容編輯操作。
      *
-     * @param fileEditBO 文件ID
-     * @param user       用戶信息
-     *
-     * @return 返回編輯結果
+     * @param fileEditBO 檔案編輯物件，包含檔案標識、編輯內容和編輯類型
+     * @param user 執行編輯的用戶
+     * @return 編輯完成信號的 Mono
      */
     default Mono<Void> editFile(FileEditBO fileEditBO, User user) {
         return Mono.empty();

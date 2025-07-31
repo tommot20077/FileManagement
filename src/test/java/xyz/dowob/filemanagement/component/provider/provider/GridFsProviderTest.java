@@ -25,6 +25,25 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+/**
+ * GridFsProvider 測試類別。
+ * 
+ * <p>測試 GridFsProvider 的 MongoDB GridFS 檔案存储功能，包括：
+ * <ul>
+ * <li>檔案存储與上傳操作</li>
+ * <li>檔案查詢（依名稱、ID、批量查詢）</li>
+ * <li>檔案資源獲取與下載</li>
+ * <li>檔案刪除操作</li>
+ * <li>空檔案和錯誤情況處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋反應式程式設計的所有核心操作，透過模擬 ReactiveGridFsTemplate
+ * 驗證 GridFS 存储操作的正確性和非同步流處理的完整性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GridFsProvider 邏輯處理測試")
 class GridFsProviderTest {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Objects;
 
@@ -11,10 +12,8 @@ import java.util.Objects;
  * 用於映射分享用戶的PO類，用於檔案修改時快速查找用戶以及相對應的操作類型
  *
  * @author yuan
- * @program FileManagement
- * @ClassName ShareUserEditPO
- * @create 2025/3/5
- * @Version 1.0
+ * @version 1.0
+ * @since 1.0
  **/
 @Data
 public class ShareUserEditPO {
@@ -31,21 +30,43 @@ public class ShareUserEditPO {
     private EditTypeEnum editType;
 
     /**
+     * 檔案ID
+     */
+    private Long fileId;
+
+    /**
+     * 編輯內容
+     */
+    private String editContent;
+
+    /**
+     * 編輯時間
+     */
+    private LocalDateTime editTime;
+
+    /**
+     * 權限
+     */
+    private String permission;
+
+
+    /**
      * 重寫hashCode方法
      *
-     * @return 返回對象的hashCode
+     * @return 回傳對象的hashCode
      */
     @Override
     public int hashCode() {
         return Objects.hash(userId);
     }
 
+
     /**
      * 重寫equals方法
      *
      * @param o 要比較的對象
      *
-     * @return 返回比較結果
+     * @return 回傳比較結果
      */
     @Override
     public boolean equals(Object o) {
@@ -59,10 +80,11 @@ public class ShareUserEditPO {
         return userId.equals(that.userId);
     }
 
+
     /**
      * 重寫toString方法
      *
-     * @return 返回對象的字符串形式
+     * @return 回傳對象的字符串形式
      */
     @Override
     public String toString() {
@@ -89,12 +111,13 @@ public class ShareUserEditPO {
          */
         REMOVE;
 
+
         /**
          * 重寫fromString方法，用於根據key查找對應的枚舉類，不區分大小寫
          *
          * @param key 要查找的key
          *
-         * @return 返回查找結果
+         * @return 回傳查找結果
          */
         @JsonCreator
         public static EditTypeEnum fromString(String key) {

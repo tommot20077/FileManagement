@@ -359,7 +359,7 @@ class OnlineFileWebSocketHandlerTest {
     }
 
     @Test
-    @DisplayName("檔案類型驗證失敗 - 非線上文件類型拒絕編輯")
+    @DisplayName("檔案類型驗證失敗 - 非線上檔案類型拒絕編輯")
     void handle_fileTypeValidationFailed_rejectNonOnlineDocument() throws JsonProcessingException {
         // 前置條件
         Long fileId = 1L;

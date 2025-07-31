@@ -6,23 +6,26 @@ import xyz.dowob.filemanagement.component.event.EventSink;
 import xyz.dowob.filemanagement.data.event.FileEditedMessage;
 
 /**
- * 事件發送器配置類，用於註冊事件發送器
- * 所有的事件發送器都在這裡註冊進行統一管理
- * 不同的事件發送器依照類型來區分，詳細請參考 {@link EventSink}
+ * 事件發送器設定類，管理系統中的反應式事件傳遞 Bean。
+ *
+ * <p>提供檔案編輯事件發送器的設定，支援非同步事件處理和訂閱機制。
+ * 所有事件發送器統一在此設定類中註冊，便於系統管理和維護。
+ * 基於 Reactor 的 Sinks 實現高效能事件廣播。</p>
+ *
  * @author yuan
- * @program FileManagement
- * @ClassName EventSinkConfig
- * @create 2025/5/15
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 
 @Configuration
 public class EventSinkConfig {
     /**
-     * 文件編輯事件發送器
-     * 當有文件編輯事件發生時，將使用此事件發送器來發送事件
+     * 建立檔案編輯事件發送器 Bean，處理檔案編輯相關事件廣播。
      *
-     * @return 文件編輯事件發送器
+     * <p>當檔案編輯操作發生時，透過此發送器將事件訊息廣播給所有訂閱者。
+     * 支援 WebFlux 非同步事件處理，提供高效的反應式事件傳遞能力。</p>
+     *
+     * @return 檔案編輯事件發送器實例
      */
     @Bean
     public EventSink<FileEditedMessage> fileEditedMessageSink() {

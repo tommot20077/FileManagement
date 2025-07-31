@@ -34,6 +34,27 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * FileScanProviderImpl 測試類別。
+ * 
+ * <p>測試 FileScanProviderImpl 的檔案掃描功能，包括：
+ * <ul>
+ * <li>構造函數初始化及參數驗證</li>
+ * <li>檔案大小限制檢查與跳過掃描</li>
+ * <li>ByteBuf、Bytes、DataBuffer 格式掃描</li>
+ * <li>掃描伺服器連線與通訊</li>
+ * <li>病毒檢測結果處理</li>
+ * <li>掃描超時與異常處理</li>
+ * <li>空檔案與無效資料處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 Netty TCP 連線的非同步掃描功能，包含正常掃描流程、
+ * 異常情況與超時處理。透過模擬 TCP 連線與回應驗證掃描服務的完整性和可靠性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FileScanProvider 邏輯處理測試")
 class FileScanProviderImplTest {

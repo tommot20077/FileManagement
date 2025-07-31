@@ -21,6 +21,24 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 
+/**
+ * CacheManager 快取管理單元測試
+ *
+ * <p>本測試類專注於驗證 CacheManager 的各種快取操作邏輯，包括設置、獲取、刪除和管理快取。</p>
+ *
+ * <p>測試涵蓋的主要場景：
+ * 
+ *   - 快取提供者設置與獲取
+ *   - 單值和批量快取操作
+ *   - 快取鎖與併發控制
+ *   - 錯誤處理和邊界情況
+ * 
+ * </p>
+ *
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CacheManager 邏輯處理測試")
 class CacheManagerTest {
@@ -42,7 +60,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("設置快取提供者 - 成功設置並可以獲取")
+    /**
+     * 驗證快取提供者的設置與獲取功能
+     *
+     * <p>測試步驟：
+     * 
+     *   - 創建新的快取提供者
+     *   - 設置快取提供者到 CacheManager
+     *   - 檢查是否能正確獲取已設置的快取提供者
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功設置並獲取指定類型的快取提供者</p>
+     */
     @Test
     void setCacheProvider_successfullySetAndGet() {
         CacheProvider newProvider = mock(CacheProvider.class);
@@ -54,7 +84,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("獲取單個值的快取 - 成功從快取中獲取數據")
+    /**
+     * 測試從快取中成功獲取單一值的功能
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置測試鍵值對
+     *   - 模擬快取提供者返回指定值
+     *   - 調用 getCacheMono 方法
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功從快取中獲取預期的值</p>
+     */
     @Test
     void getCacheMono_successfullyRetrieveFromCache() {
         String key = "testKey";
@@ -70,7 +112,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("獲取單個值的快取 - 快取不存在時返回空")
+    /**
+     * 測試獲取不存在的快取值時的空值返回
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置一個不存在的鍵值
+     *   - 調用 getCacheMono 方法
+     *   - 確認獲取結果為空
+     * 
+     * </p>
+     *
+     * <p>預期結果：返回空值，且不會報错</p>
+     */
     @Test
     void getCacheMono_whenCacheNotExists_returnsEmpty() {
         String key = "nonExistentKey";
@@ -82,7 +136,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("設置快取值 - 成功設置並鎖定")
+    /**
+     * 測試快取值的設置和鎖定機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 偷鎖定快取金锈
+     *   - 設置快取值
+     *   - 檢查鎖定的成功從行
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功設置快取值且釋放鎖定</p>
+     */
     @Test
     void setCache_successfullySetWithLock() {
         String key = "testKey";
@@ -101,7 +167,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("設置快取值 - 無法獲取鎖時不進行設置")
+    /**
+     * 測試無法獲取快取鎖時的處理行為
+     *
+     * <p>測試步驟：
+     * 
+     *   - 模擬無法取得鎖的情景
+     *   - 嘗試設置快取值
+     *   - 確認不會更新快取
+     * 
+     * </p>
+     *
+     * <p>預期結果：不進行快取設置</p>
+     */
     @Test
     void setCache_whenLockCannotBeAcquired_doesNotSet() {
         String key = "testKey";
@@ -117,7 +195,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("刪除快取 - 成功刪除並釋放鎖")
+    /**
+     * 測試快取刪除且釋放鎖定的正確性
+     *
+     * <p>測試步驟：
+     * 
+     *   - 設置快取金鑰
+     *   - 刪除指定的快取值
+     *   - 確認重置快取金鑰
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功刪除快取並釋放鎖定</p>
+     */
     @Test
     void deleteCache_successfullyDeleteAndReleaseLock() {
         String key = "testKey";
@@ -136,7 +226,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("批量刪除快取 - 成功刪除多個快取")
+    /**
+     * 測試批量快取刪除的效能
+     *
+     * <p>測試步驟：
+     * 
+     *   - 創建多個快取鍵值
+     *   - 設置臨時鎖
+     *   - 善妥刪除所有指定的快取
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功刪除多個快取內容</p>
+     */
     @Test
     void deleteCaches_successfullyDeleteMultipleCaches() {
         List<String> keys = Arrays.asList("key1", "key2");
@@ -153,7 +255,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("生成快取規則 - 成功生成並執行規則")
+    /**
+     * 測試快取規則生成與執行的正確性
+     *
+     * <p>測試步驟：
+     * 
+     *   - 創建快取鍵值和值
+     *   - 生成快取规则
+     *   - 執行规则并驗證是否成功設置
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功生成并執行快取规則</p>
+     */
     @Test
     void generateCacheRule_successfullyGenerateAndExecute() {
         String key = "testKey";
@@ -170,7 +284,20 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("運行並設置單值快取 - 當快取不存在時設置快取")
+    /**
+     * 測試當快取不存在時的自動設置機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 備餐測試鍵值和值
+     *   - 模擬快取提供者未發現快取
+     *   - 調用 runAndSetCache 方法
+     *   - 確認快取被正確設置
+     * 
+     * </p>
+     *
+     * <p>預期結果：自動設置快取值</p>
+     */
     @Test
     void runAndSetCache_whenCacheNotExists_setsCache() {
         String key = "testKey";
@@ -195,7 +322,20 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("運行並設置多個快取 - 當快取不存在時設置快取")
+    /**
+     * 測試多值快取的自動設置機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 備餐測試鍵值和值列表
+     *   - 模擬快取提供者未發現快取
+     *   - 使用 runAndSetCache 方法設置多值快取
+     *   - 確認快取被正確設置
+     * 
+     * </p>
+     *
+     * <p>預期結果：自動設置多值快取</p>
+     */
     @Test
     void runAndSetCache_listWhenCacheNotExists_setsCache() {
         String key = "testKey";
@@ -220,7 +360,20 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("運行並設置批量快取 - 當快取不存在時設置快取")
+    /**
+     * 測試批量快取的自動設置機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 備餐多個測試鍵值
+     *   - 模擬快取提供者未發現快取
+     *   - 使用 runAndSetCaches 方法設置多個快取
+     *   - 確認快取被正確設置
+     * 
+     * </p>
+     *
+     * <p>預期結果：自動設置多個快取</p>
+     */
     @Test
     void runAndSetCaches_whenCacheNotExists_setsCache() {
         List<String> keys = Arrays.asList("key1", "key2");
@@ -273,7 +426,20 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("快取操作錯誤處理 - 當設置快取失敗時拋出異常")
+    /**
+     * 測試快取操作失敗時的錯誤處理機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 模擬快取操作失敗的情景
+     *   - 設置模擬的失敗錢為
+     *   - 調用 setCache 方法
+     *   - 確認所前異常被正確報告
+     * 
+     * </p>
+     *
+     * <p>預期結果：呈現所前異常並停止快取操作</p>
+     */
     @Test
     void setCache_whenOperationFails_throwsError() {
         String key = "testKey";
@@ -292,7 +458,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("快取過期時間設置 - 成功設置自定義過期時間")
+    /**
+     * 測試自定義快取過期時間的設置成功性
+     *
+     * <p>測試步驟：
+     * 
+     *   - 備餐鍵值和值
+     *   - 設置自定義過期時間
+     *   - 確認快取提供者收到正確的過期時間
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功設置自定義過期時間的快取</p>
+     */
     @Test
     void setCache_withCustomExpiration_setsCorrectExpiration() {
         String key = "testKey";
@@ -310,7 +488,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("多個快取值操作 - 部分快取操作失敗時的處理")
+    /**
+     * 測試多個快取值操作時的限制與容錢機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 備餐多個鍵值和對應值
+     *   - 模擬部分快取操作失敗的場景
+     *   - 調用 runAndSetCaches 方法來檢查失敗處理
+     * 
+     * </p>
+     *
+     * <p>預期結果：成功處理部分失敗的快取操作</p>
+     */
     @Test
     void setCaches_whenPartialOperationsFail_handleGracefully() {
         List<String> keys = Arrays.asList("key1", "key2", "key3");
@@ -337,7 +527,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("快取鎖釋放 - 確保在操作完成後釋放鎖")
+    /**
+     * 測試快取操作完成後一定要釋放鎖定
+     *
+     * <p>測試步驟：
+     * 
+     *   - 模擬快取操作失敗的情景
+     *   - 調用 setCache 方法來俄白操作
+     *   - 確認快取鎖定必然被釋放
+     * 
+     * </p>
+     *
+     * <p>預期結果：操作失敗時必須釋放鎖</p>
+     */
     @Test
     void setCache_ensuresLockRelease_afterOperation() {
         String key = "testKey";
@@ -355,7 +557,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("並發快取操作 - 多個相同鍵值的快取操作處理")
+    /**
+     * 測試並發快取操作時的同步控制機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 模擬多個幵發的快取操作
+     *   - 檢查是否只有一個操作成功
+     *   - 確保幵發操作的一致性
+     * 
+     * </p>
+     *
+     * <p>預期結果：正確控制多個幵發快取操作</p>
+     */
     @Test
     void setCache_withConcurrentOperations_handlesCorrectly() {
         String key = "testKey";
@@ -426,7 +640,19 @@ class CacheManagerTest {
     }
 
 
-    @DisplayName("快取輸入驗證 - 處理無效的輸入參數")
+    /**
+     * 測試快取輸入的無效參數處理機制
+     *
+     * <p>測試步驟：
+     * 
+     *   - 提供無效的輸入參數
+     *   - 確認系統能夠正確報错
+     *   - 確保沒有非預期的操作發生
+     * 
+     * </p>
+     *
+     * <p>預期結果：以穣健的方式處理無效輸入</p>
+     */
     @Test
     void setCache_withInvalidInput_handlesGracefully() {
         String key = null;

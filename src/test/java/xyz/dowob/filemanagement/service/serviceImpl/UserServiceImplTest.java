@@ -42,6 +42,29 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+/**
+ * 使用者服務實現測試類別。
+ * 
+ * 測試 UserServiceImpl 類別的核心功能，包括使用者註冊、登入、密碼重設和資料管理。
+ * 此測試類別驗證服務層的使用者管理邏輯和安全性實現。
+ * 
+ * <p>測試涵蓋範圍：
+ * <ul>
+ * <li>使用者註冊和驗證流程</li>
+ * <li>登入身份驗證和權杖管理</li>
+ * <li>密碼重設和安全性操作</li>
+ * <li>使用者資料更新和檢索</li>
+ * <li>用戶限流和安全控制</li>
+ * <li>WebFlux 反應式使用者操作流程</li>
+ * </ul>
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ * @see UserServiceImpl
+ * @see AuthorizationService
+ * @see TokenService
+ */
 @SuppressWarnings("all")
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -878,8 +901,8 @@ class UserServiceImplTest {
                 .expectErrorMatches(e -> e instanceof ValidationException validationException && validationException.getErrorCode() == ValidationException.ErrorCode.INVALID_SEARCH_CRITERIA)
                 .verify();
 
-        String typeUsername = "USERNAME";
-        Object[] invalidUsernameArgs = {"", "a"};
+        String typeUsername = "NAME";
+        Object[] invalidUsernameArgs = {"", "   "};
 
         StepVerifier
                 .create(userServiceImplUnderTest.getAllByParams(typeUsername, invalidUsernameArgs))

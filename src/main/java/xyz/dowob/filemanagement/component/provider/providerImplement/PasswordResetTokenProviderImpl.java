@@ -16,38 +16,63 @@ import xyz.dowob.filemanagement.repostiory.TokenRepository;
 import java.time.LocalDateTime;
 
 /**
- * 重製密碼憑證提供者實現類，用於生成重置密碼憑證
- * 實現了 TokenProvider 接口用於定義 TokenProvider 所需的方法
+ * 密碼重置驗證令牌提供者，從反應式的觀點管理密碼重置流程。
+ *
+ * <p>此類別實現了 {@link xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider} 介面，
+ * 提供安全且反應式的密碼重置機制。</p>
+ *
+ * <p>重要特性：
+ * <ul>
+ *   <li>使用並時性令牌生成機制</li>
+ *   <li>重置密碼驗證碼可設定</li>
+ *   <li>對令牌設定超時時間</li>
+ *   <li>令牌與用戶 ID 的安全鑑權</li>
+ * </ul>
+ * </p>
  *
  * @author yuan
- * @program File-Management
- * @ClassName PasswordResetTokenProviderImpl
- * @description
- * @create 2024-09-20 01:12
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @RecordLevel(LogLevelEnum.DEBUG)
 @RequiredArgsConstructor
 public class PasswordResetTokenProviderImpl implements TokenProvider {
     /**
-     * TokenRepository 用於操作 Token 實體的數據庫操作類
+     * 令牌儲存庫操作維護，專責管理重置密碼令牌的持久化和查詢作業。
+     *
+     * @see xyz.dowob.filemanagement.repostiory.TokenRepository
      */
     private final TokenRepository tokenRepository;
 
     /**
-     * SecurityProperties 用於獲取配置文件中的相關配置
-     * 1. 重置密碼憑證的長度
-     * 2. 重置密碼憑證的過期時間
+     * 全域安全設定屬性，管理密碼重置令牌的安全設定。
+     *
+     * <p>主要設定項目：
+     * <ul>
+     *   <li>重置密碼驗證碼的位數長度</li>
+     *   <li>重置密碼驗證碼的有效期限</li>
+     * </ul>
+     * </p>
+     *
+     * @see xyz.dowob.filemanagement.config.properties.SecurityProperties
      */
     private final SecurityProperties securityProperties;
 
     /**
-     * 生成重置密碼的6位驗證碼
+     * 生成密碼重置的安全驗證碼，使用第5層反應式設計。
      *
-     * @param user 用戶
+     * <p>生成流程：
+     * <ol>
+     *   <li>根據設定生成指定位數的驗證碼</li>
+     *   <li>將驗證碼儲存至用戶令牌實體</li>
+     *   <li>設定驗證碼超時時間</li>
+     *   <li>儲存令牌至資料庫</li>
+     * </ol>
+     * </p>
      *
-     * @return 返回生成的驗證碼
+     * @param user 用戶實體
+     * @return {@link reactor.core.publisher.Mono<String>} 非同步生成的驗證碼
      */
     @Override
     @HideSensitive
@@ -71,13 +96,19 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 驗證憑證，並返回用戶ID
-     * 當憑證無效時，傳出 VERIFICATION_CODE_ERROR 錯誤
+     * 非同步驗證密碼重置驗證碼的有效性。
      *
-     * @param token  憑證
-     * @param userId 用戶ID
+     * <p>驗證流程：
+     * <ol>
+     *   <li>檢查用戶儲存的驗證碼實體</li>
+     *   <li>檢查驗證碼是否匹配</li>
+     *   <li>檢查驗證碼是否過期</li>
+     * </ol>
+     * </p>
      *
-     * @return 返回用戶ID
+     * @param token 待驗證的驗證碼
+     * @param userId 用戶 ID
+     * @return {@link reactor.core.publisher.Mono<Long>} 非同步回傳的用戶 ID
      */
     @Override
     public Mono<Long> validateToken(String token, Long userId) {
@@ -99,11 +130,18 @@ public class PasswordResetTokenProviderImpl implements TokenProvider {
 
 
     /**
-     * 根據用戶ID刪除憑證
-     * 此方法用於重置密碼憑證，當用戶重置密碼後刪除憑證
+     * 失效密碼重置驗證碼，確保安全令牌的生命週期。
      *
-     * @param userId 用戶ID
-     * @return Mono<Void>
+     * <p>失效流程：
+     * <ol>
+     *   <li>查詢用戶的驗證碼實體</li>
+     *   <li>清除驗證碼</li>
+     *   <li>將驗證碼超時時間設為立即</li>
+     * </ol>
+     * </p>
+     *
+     * @param userId 用戶 ID
+     * @return {@link reactor.core.publisher.Mono<Void>} 非同步失效作業
      */
     @Override
     public Mono<Void> revokeToken(Long userId) {

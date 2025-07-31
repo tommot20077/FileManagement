@@ -23,42 +23,70 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 檔案掃描提供者實現類，實現了 FileScanProvider 接口，其定義了掃描檔案的基本方法
- * 本實現類根據接口方法對於檔案掃描的要求，使用了 Netty 的 TCP 客戶端來連接到檢查的服務器，並將檔案數據發送進行掃描
- * 本實現是基於 ClamAV 的掃描實現，使用了 ClamAV 的 zINSTREAM 協議來進行檔案掃描
- * 若採用其他掃描服務器，則需要根據其協議進行相應的修改
- * 另外，這個實現類還使用了 Spring 的 @ConditionalOnProperty 註解來根據配置文件中的屬性來決定是否啟用檔案掃描功能
+ * 非同步檔案安全掃描提供者實現，透過反應式程式設計實現檔案安全檢查。
+ *
+ * <p>此類別實現了 {@link xyz.dowob.filemanagement.component.provider.providerInterface.FileScanProvider} 介面，
+ * 主要基於 Netty TCP 客戶端和 ClamAV 的 zINSTREAM 協議來執行檔案安全掃描。</p>
+ *
+ * <p>技術特點：
+ * <ul>
+ *   <li>使用 Reactor Netty 進行非阻塞 TCP 連線</li>
+ *   <li>支援多種檔案格式的安全掃描（ByteBuf、byte[]、DataBuffer）</li>
+ *   <li>可設定的檔案大小限制</li>
+ *   <li>彈性的服務器連線設定</li>
+ * </ul>
+ * </p>
+ *
+ * <p>設定特性：
+ * <ul>
+ *   <li>透過 @ConditionalOnProperty 根據設定動態啟用</li>
+ *   <li>可自定義掃描服務器主機、埠和超時時間</li>
+ * </ul>
+ * </p>
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FileScanProviderImpl
- * @create 2025/4/28
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ */
 @Component
 @RecordLevel(LogLevelEnum.DEBUG)
 @ConditionalOnProperty(prefix = "file.security", name = "enable-security-check", havingValue = "true", matchIfMissing = true)
 public class FileScanProviderImpl implements FileScanProvider {
     /**
-     * FileProperties 用於操作檔案上傳相關配置的類
+     * 檔案安全設定屬性，用於載入和管理檔案上傳相關的安全設定。
+     *
+     * @see xyz.dowob.filemanagement.config.properties.FileProperties
      */
     private final FileProperties fileProperties;
 
     /**
-     * ConnectionProvider 用於提供連接的類
+     * Reactor Netty 連線提供者，管理非同步 TCP 連線的生命週期和資源。
+     *
+     * @see reactor.netty.resources.ConnectionProvider
      */
     private final ConnectionProvider connectionProvider;
 
     /**
-     * 檔案掃描的超時時間
+     * 檔案安全掃描作業的超時時間設定，控制連線和響應等待的最大時間。
+     *
+     * @see java.time.Duration
      */
     private final Duration timeout;
 
     /**
-     * 檔案掃描提供者實現類的構造函數
+     * 初始化檔案安全掃描提供者，載入必要的設定和連線資源。
      *
-     * @param fileProperties FileProperties 用於操作檔案上傳相關配置的類
-     * @param connectionProvider ConnectionProvider 用於提供連接的類
+     * <p>進行嚴格的設定參數驗證，確保檔案掃描服務可正常運作：
+     * <ul>
+     *   <li>驗證超時時間必須為正值</li>
+     *   <li>確認掃描服務器位址不為空</li>
+     *   <li>檢查服務器埠號的有效性</li>
+     * </ul>
+     * </p>
+     *
+     * @param fileProperties 檔案安全設定屬性
+     * @param connectionProvider Netty 連線資源管理器
+     * @throws IllegalArgumentException 當設定參數不符合要求時
      */
     public FileScanProviderImpl(FileProperties fileProperties, ConnectionProvider connectionProvider) {
         this.fileProperties = fileProperties;
@@ -70,12 +98,19 @@ public class FileScanProviderImpl implements FileScanProvider {
     }
 
     /**
-     * 傳輸檔案的 ByteBuf 數組流進行掃描並返回掃描結果
+     * 透過非同步方式處理 ByteBuf 資料流進行檔案安全掃描。
      *
-     * @param byteBufFlux ByteBuf 數組流
-     * @param totalSize   檔案的總大小
+     * <p>執行流程：
+     * <ol>
+     *   <li>首先驗證檔案大小是否符合安全限制</li>
+     *   <li>若檔案大小合法，則將資料流傳送至安全掃描服務器</li>
+     *   <li>處理並回傳掃描結果</li>
+     * </ol>
+     * </p>
      *
-     * @return Mono<scanResult> 掃描結果
+     * @param byteBufFlux Netty ByteBuf 資料流
+     * @param totalSize 檔案總大小（位元組）
+     * @return {@link reactor.core.publisher.Mono<scanResult>} 檔案安全掃描結果
      */
     @Override
     public Mono<scanResult> scanByteBuf(Flux<ByteBuf> byteBufFlux, long totalSize) {
@@ -83,11 +118,14 @@ public class FileScanProviderImpl implements FileScanProvider {
     }
 
     /**
-     * 傳輸檔案的 byte[] 數組流進行轉換並返回掃描結果
+     * 將 byte[] 資料流轉換為 ByteBuf 並進行檔案安全掃描。
      *
-     * @param byteFlux byte[] 數組流
+     * <p>提供額外的資料流轉換功能，支援不同來源的位元組資料。
+     * 轉換過程中會計算總檔案大小並委派給 {@link #scanByteBuf(Flux, long)} 方法處理。
+     * </p>
      *
-     * @return Mono<scanResult> 掃描結果
+     * @param byteFlux 位元組陣列資料流
+     * @return {@link reactor.core.publisher.Mono<scanResult>} 檔案安全掃描結果
      */
     @Override
     public Mono<scanResult> scanBytes(Flux<byte[]> byteFlux) {
@@ -101,11 +139,14 @@ public class FileScanProviderImpl implements FileScanProvider {
 
 
     /**
-     * 傳輸檔案的 DataBuffer 數組流進行轉換並返回掃描結果
+     * 將 Spring DataBuffer 資料流轉換為 ByteBuf 並進行檔案安全掃描。
      *
-     * @param dataBufferFlux DataBuffer 數組流
+     * <p>支援 Spring WebFlux 的 DataBuffer 資料流，確保與 WebFlux 生態系統的相容性。
+     * 轉換過程會釋放原始 DataBuffer 資源，防止記憶體洩漏。
+     * </p>
      *
-     * @return Mono<scanResult> 掃描結果
+     * @param dataBufferFlux Spring DataBuffer 資料流
+     * @return {@link reactor.core.publisher.Mono<scanResult>} 檔案安全掃描結果
      */
     @Override
     public Mono<scanResult> scanDataBuffer(Flux<DataBuffer> dataBufferFlux) {
@@ -124,13 +165,20 @@ public class FileScanProviderImpl implements FileScanProvider {
 
 
     /**
-     * 處理連接，並將檔案數據發送到掃描服務器
-     * 透過接收一個函數來處理連接，這個函數會在連接建立後被調用
-     * 這個函數會將檔案數據發送到掃描服務器，然後接收掃描結果
+     * 非同步建立 TCP 連線並執行檔案安全掃描的核心方法。
      *
-     * @param byteBufFlux ByteBuf 數組流
+     * <p>執行複雜的反應式作業流程：
+     * <ol>
+     *   <li>建立 Netty TCP 客戶端連線</li>
+     *   <li>傳送 zINSTREAM 協議命令</li>
+     *   <li>以資料流方式發送檔案內容</li>
+     *   <li>接收並解析掃描服務器的回應</li>
+     *   <li>處理連線資源的釋放</li>
+     * </ol>
+     * </p>
      *
-     * @return Mono<scanResult> 掃描結果
+     * @param byteBufFlux Netty ByteBuf 資料流
+     * @return {@link reactor.core.publisher.Mono<scanResult>} 檔案安全掃描結果
      */
     private Mono<scanResult> sendToScanServer(Flux<ByteBuf> byteBufFlux) {
         return TcpClient
@@ -174,11 +222,17 @@ public class FileScanProviderImpl implements FileScanProvider {
 
 
     /**
-     * 驗證檔案大小是否符合要求
+     * 根據預設的檔案大小限制，驗證檔案是否需要進行安全掃描。
      *
-     * @param totalSize 檔案的總大小
+     * <p>檢查依據：
+     * <ul>
+     *   <li>最小檔案大小限制（若設定）</li>
+     *   <li>最大檔案大小限制（若設定）</li>
+     * </ul>
+     * </p>
      *
-     * @return Mono<scanResult> 掃描結果
+     * @param totalSize 檔案的總大小（位元組）
+     * @return {@link reactor.core.publisher.Mono<scanResult>} 檔案大小驗證結果
      */
     private Mono<scanResult> validateFileSize(long totalSize) {
         long minSize = fileProperties.getSecurity().getMinFileSize().toBytes();

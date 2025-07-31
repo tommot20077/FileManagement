@@ -21,6 +21,27 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * FileListCacheProviderImpl 測試類別。
+ * 
+ * <p>測試 FileListCacheProviderImpl 的檔案清單緩存功能，包括：
+ * <ul>
+ * <li>構造函數初始化及參數驗證</li>
+ * <li>單一清單緩存的獲取與設定</li>
+ * <li>批量清單緩存的獲取與設定</li>
+ * <li>緩存刪除操作（單一及批量）</li>
+ * <li>不同資料類型的轉換與處理</li>
+ * <li>過期時間管理與驗證</li>
+ * <li>錯誤情況與異常處理</li>
+ * </ul>
+ * 
+ * <p>測試涵蓋 Redis 簿列操作的所有核心功能，驗證緩存提供者的正確性和健壯性。
+ * 透過反應式程式測試確保異步操作的正確性和緩存策略的有效性。
+ * 
+ * @author yuan
+ * @version 1.0
+ * @since 1.0
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FileListCacheProvider 邏輯處理測試")
 class FileListCacheProviderImplTest {

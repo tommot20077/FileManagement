@@ -7,12 +7,10 @@ import xyz.dowob.filemanagement.entity.UserOnlineFileHistory;
 import java.time.LocalDateTime;
 
 /**
- * 文件版本數據傳輸對象，用於封裝文件版本的數據
+ * 檔案版本資料傳輸對象，用於封裝檔案版本的資料
  * @author yuan
- * @program FileManagement
- * @ClassName FileVersionDTO
- * @create 2025/2/11
- * @Version 1.0
+ * @since 1.0
+ * @version 1.0
  **/
 @Data
 public class FileVersionDTO {
@@ -41,7 +39,7 @@ public class FileVersionDTO {
     /**
      * 構造函數，從 UserOnlineFileHistory 對象中初始化 FileVersionDTO 對象
      *
-     * @param userOnlineFileHistory 用戶在線文件歷史對象
+     * @param userOnlineFileHistory 用戶在線檔案歷史對象
      */
     public FileVersionDTO(UserOnlineFileHistory userOnlineFileHistory) {
         this.version = userOnlineFileHistory.getVersion();

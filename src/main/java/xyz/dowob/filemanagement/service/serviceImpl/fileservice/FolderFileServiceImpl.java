@@ -54,49 +54,94 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * 文件夾文件服務實現，處理文件夾的相關操作
- * 繼承自AbstractFileService，實現了FolderService接口
- * AbstractFileService中定義了文件服務的共通操作，而FolderService定義了文件夾服務的操作
- * 通過FileHandlerType註解標記為文件夾文件服務
+ * 資料夾檔案服務實現類，提供資料夾相關操作的響應式處理功能。
+ * <p>
+ * 繼承 {@link AbstractFileService} 並實現 {@link FolderService} 介面，
+ * 專門處理資料夾的完整生命週期管理。支援建立、編輯、刪除、恢復、下載等複雜操作，
+ * 採用響應式編程模式確保高效能的非阻塞式處理。
+ * <p>
+ * 提供遞迴資料夾操作和深度遍歷功能，整合智慧型快取管理和樹狀結構維護。
+ * 支援資料夾 ZIP 打包下載、檔案名稱衝突處理、多檔案類型支援（一般檔案、線上檔案）、
+ * 自動格式轉換等進階功能。內建暫存檔案管理和清理機制，確保系統資源的有效利用。
  *
  * @author yuan
- * @program FileManagement
- * @ClassName FolderFileServiceImpl
- * @create 2025/2/15
- * @Version 1.0
- **/
+ * @version 1.0
+ * @since 1.0
+ * @see AbstractFileService
+ * @see FolderService
+ * @see FileEnum#FOLDER
+ */
 @Service
 @RecordLevel(LogLevelEnum.DEBUG)
 @FileHandlerType(FileEnum.FOLDER)
 public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
     /**
-     * 文件夾下載的臨時路徑
+     * 檔案夾下載的臨時路徑
      */
     private final String downloadFolderPath;
 
     /**
-     * 文件夾下載的緩衝區大小，當此值設定為0或負數時，則使用默認值4096
+     * 檔案夾下載的緩衝區大小，當此值設定為0或負數時，則使用默認值4096
      */
     private final int bufferSize;
 
 
     /**
-     * 文件夾文件服務實現類，繼承 @see {@link AbstractFileService}
+     * 檔案夾檔案服務實現類的構造函數。
+     * <p>
+     * 初始化檔案夾服務的所有必要依賴項目，包括資料庫操作介面、
+     * 儲存提供者、緩存管理器、ZIP 壓縮相關設定等核心組件。
+     * <p>
+     * 特別初始化項目：
+     * <ul>
+     *   <li>創建並驗證臨時下載目錄</li>
+     *   <li>設定 ZIP 壓縮緩衝區大小</li>
+     *   <li>初始化檔案夾樹狀結構提供者</li>
+     * </ul>
+     * <p>
+     * <strong>初始化異常處理：</strong>
+     * <ul>
+     *   <li>如果無法創建臨時下載目錄，拋出 {@code ProcessException}</li>
+     *   <li>如果緩衝區大小設定無效，使用預設值 4096</li>
+     * </ul>
+     * <p>
+     * <strong>依賴注入示例：</strong>
+     * <pre>{@code
+     * @Service
+     * public class FolderFileServiceImpl extends AbstractFileService implements FolderService {
+     *     public FolderFileServiceImpl(
+     *         ServerFileMetaRepository serverRepo,
+     *         UserFileMetaRepository userRepo,
+     *         RedisProvider redisProvider,
+     *         GridFsProvider gridFsProvider,
+     *         FileProperties fileProperties
+     *     ) throws ProcessException {
+     *         super(serverRepo, userRepo, redisProvider, gridFsProvider, ...);
+     *         this.downloadFolderPath = initDownloadPath(fileProperties);
+     *         this.bufferSize = initBufferSize(fileProperties);
+     *     }
+     * }
+     * }</pre>
      *
-     * @param serverFileMetaRepository      伺服器檔案元數據操作介面
-     * @param userFileMetaRepository        用戶檔案元數據操作介面
-     * @param redisProvider                 Redis提供者
-     * @param gridFsProvider                GridFS提供者
-     * @param transfersTasksManager         傳輸任務管理器
-     * @param fileProperties                檔案屬性配置
-     * @param circuitBreakerConfig          CircuitBreaker配置
-     * @param userRepository                用戶操作介面
-     * @param userOnlineFileRepository      用戶在線檔案操作介面
-     * @param entityOperations              R2DBC實體操作介面
-     * @param fileTrashRecordRepository     檔案垃圾桶記錄操作介面
-     * @param transactionalOperator         事務操作介面
-     * @param rateLimiterConfig             RateLimiter配置
-     * @param userFIleShareRecordRepository 用戶檔案分享記錄操作介面
+     * @param serverFileMetaRepository 伺服器檔案元資料資料庫操作介面
+     * @param userFileMetaRepository 用戶檔案元資料資料庫操作介面
+     * @param redisProvider Redis 緩存提供者，用於緩存管理
+     * @param gridFsProvider GridFS 儲存提供者，用於分散式檔案儲存
+     * @param transfersTasksManager 檔案傳輸任務管理器
+     * @param fileProperties 檔案相關設定屬性，包含下載路徑和緩衝區設定
+     * @param circuitBreakerConfig 斷路器設定，用於系統穩定性保護
+     * @param userRepository 用戶資料庫操作介面
+     * @param userOnlineFileRepository 用戶線上檔案資料庫操作介面
+     * @param entityOperations R2DBC 實體操作介面，用於非阻塞式資料庫操作
+     * @param fileTrashRecordRepository 檔案回收站記錄資料庫操作介面
+     * @param transactionalOperator 事務操作器，用於響應式事務管理
+     * @param rateLimiterConfig 限流器設定，用於控制請求頻率
+     * @param userFIleShareRecordRepository 用戶檔案分享記錄資料庫操作介面
+     * @param objectMapper JSON 序列化工具，用於物件轉換
+     * @param cacheManager 緩存管理器，統一管理各種緩存操作
+     * @param folderListTreeProvider 檔案夾樹狀結構提供者（可選）
+     * @param fileScanProvider 檔案安全掃描提供者（可選）
+     * @throws ProcessException 當無法創建臨時下載目錄時拋出
      */
     public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
                                  @Nullable FolderListTreeProvider folderListTreeProvider,
@@ -141,12 +186,14 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 創建文件夾的實現
+     * 建立新的資料夾。
+     * <p>
+     * 根據提供的編輯資料在資料庫中建立新的資料夾記錄。設定屬性包括所有者、
+     * 建立時間、父資料夾關係等。支援資料夾分享功能，操作完成後清理相關快取。
      *
-     * @param fileEditDTO 文件編輯數據
-     * @param user        用戶信息
-     *
-     * @return Mono<Void>
+     * @param fileEditDTO 資料夾編輯資訊，包含資料夾名稱、父資料夾 ID 等
+     * @param user 當前操作的用戶
+     * @return 表示建立操作完成的響應式信號
      */
     @Override
     public Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
@@ -181,17 +228,15 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 編輯文件夾的實現 - 修復版本
-     * 修復了移動父資料夾時緩存清理不完整的問題
-     * 現在會正確清理所有相關的緩存，包括：
-     * 1. 被移動資料夾原位置的緩存
-     * 2. 被移動資料夾新位置的緩存
-     * 3. 所有子資料夾的緩存
+     * 編輯資料夾屬性和設定。
+     * <p>
+     * 支援修改資料夾名稱、移動位置、更新分享設定、遞迴更新子資料夾屬性等操作。
+     * 特別優化快取管理，確保在資料夾移動時正確清理原始位置和更新新位置的快取。
+     * 支援遞迴更新所有子資料夾的相關屬性。
      *
-     * @param fileEditBO 文件編輯數據
-     * @param user       用戶信息
-     *
-     * @return Mono<Void>
+     * @param fileEditBO 資料夾編輯業務物件
+     * @param user 執行編輯操作的用戶
+     * @return 表示編輯操作完成的響應式信號
      */
     @Override
     public Mono<Void> editFolder(FileEditBO fileEditBO, User user) {
@@ -275,12 +320,22 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 刪除文件夾的實現
+     * 響應式刪除檔案夾的實現，支持邏輯刪除和緩存管理。
+     * <p>
+     * 執行檔案夾刪除的完整流程，包括：
+     * <ul>
+     *   <li>遞迴查找並刪除所有子檔案夾和檔案</li>
+     *   <li>更新用戶檔案元資料</li>
+     *   <li>清理相關緩存</li>
+     *   <li>更新檔案夾列表樹</li>
+     * </ul>
      *
-     * @param folder 文件
-     * @param user   用戶信息
+     * <p>注意：此方法執行邏輯刪除，不會立即從資料庫中移除檔案夾，而是標記為已刪除。</p>
      *
-     * @return Mono<Void>
+     * @param folder 要刪除的檔案夾元資料
+     * @param user 執行刪除操作的用戶
+     *
+     * @return {@link reactor.core.publisher.Mono}<{@link Void}> 表示刪除操作的響應式完成信號
      */
     @Override
     public Mono<Void> deleteFolder(UserFileMetadata folder, User user) {
@@ -302,15 +357,15 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 下載文件夾的實現
-     * 此方法會查詢所有子文件夾和文件，並將其壓縮成一個zip文件後返回成 UserFileDataBO對象
+     * 下載資料夾為 ZIP 壓縮檔。
      * <p>
-     * 對於創建 ZipOutputStream、關閉 ZipOutputStream、刪除臨時檔案可能會回傳 Mono.error
+     * 執行資料夾的遞迴打包操作，支援多種檔案類型：一般檔案、線上檔案、子資料夾。
+     * 自動處理檔案名稱衝突，生成 ZIP 壓縮檔案供下載。使用有界調度器確保非阻塞操作，
+     * 下載完成後自動清理暫存檔案。
      *
-     * @param rootFolder 根文件夾
-     * @param user       用戶
-     *
-     * @return Mono<UserFileDataBO> 文件數據
+     * @param rootFolder 要下載的根資料夾元資料
+     * @param user 執行下載操作的用戶
+     * @return 包含 ZIP 壓縮檔資料的業務物件
      */
     @Override
     public Mono<UserFileDataBO> downloadFolder(UserFileMetadata rootFolder, User user) {
@@ -355,12 +410,14 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 恢復文件夾的實現
+     * 恢復資料夾及其所有子內容。
+     * <p>
+     * 恢復已刪除的資料夾，包括檢查父資料夾狀態、遞迴恢復所有子資料夾、
+     * 刪除回收站記錄、更新相關快取和資料夾樹狀結構。
      *
-     * @param folder 資料夾
-     * @param user   用戶
-     *
-     * @return Mono<UserFileMetadata> 資料夾
+     * @param folder 要恢復的資料夾
+     * @param user 當前操作的用戶
+     * @return 恢復後的資料夾元資料
      */
     @Override
     public Mono<UserFileMetadata> restoreFile(UserFileMetadata folder, User user) {
@@ -412,12 +469,13 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 批量恢復文件夾的實現
+     * 批量恢復多個資料夾。
+     * <p>
+     * 對指定的資料夾集合逐個執行恢復操作。
      *
-     * @param folders 資料夾
-     * @param user    用戶
-     *
-     * @return Flux<UserFileMetadata> 資料夾
+     * @param folders 要恢復的資料夾集合
+     * @param user 當前操作的用戶
+     * @return 恢復結果的響應式流
      */
     @Override
     public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> folders, User user) {
@@ -426,14 +484,15 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 刪除文件夾的實現 - 使用延遲雙刪增強版本
-     * 修復了在刪除包含子資料夾的資料夾時緩存未被正確清除的問題
-     * 現在使用延遲雙刪模式來確保緩存一致性
+     * 永久刪除資料夾及其所有內容。
+     * <p>
+     * 執行資料夾的永久刪除操作，包括遞迴查找所有子資料夾和檔案、
+     * 建立回收站記錄、標記為已刪除、清理相關快取和更新資料夾樹。
+     * 使用延遲雙刪模式確保快取一致性。
      *
-     * @param folder 文件夾
-     * @param user   用戶
-     *
-     * @return Mono<Boolean> 是否刪除成功
+     * @param folder 要刪除的資料夾
+     * @param user 當前操作的用戶
+     * @return 是否刪除成功
      */
     @Override
     public Mono<Boolean> removeFile(UserFileMetadata folder, User user) {
@@ -461,7 +520,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                         try {
                             folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
                         } catch (Exception e) {
-                            throw new RuntimeException("更新文件夾列表樹時發生錯誤", e);
+                            throw new RuntimeException("更新檔案夾列表樹時發生錯誤", e);
                         }
                     }
                 });
@@ -472,12 +531,13 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 批量刪除文件夾的實現
+     * 批量永久刪除多個資料夾。
+     * <p>
+     * 對指定的資料夾集合逐個執行永久刪除操作。
      *
-     * @param folders 文件夾
-     * @param user    用戶
-     *
-     * @return Mono<Boolean> 是否刪除成功
+     * @param folders 要刪除的資料夾集合
+     * @param user 當前操作的用戶
+     * @return 所有資料夾是否都刪除成功
      */
     @Override
     public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
@@ -486,16 +546,39 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 處理文件夾的壓縮
-     * 根據所查詢到的當前目錄下的檔案進行處理
-     * 若當前目錄下有子文件夾，則會遞迴調用此方法
-     * 若當前目錄下有文件且該文件存在於 GridFS 中，則會調用 zipFileBatch 方法進行檔案壓縮
+     * 響應式處理檔案夾遞迴壓縮的核心邏輯，支持複雜的檔案夾結構和多檔案類型。
+     * <p>
+     * 操作流程：
+     * <ul>
+     *   <li>查詢當前目錄下的所有檔案和子檔案夾</li>
+     *   <li>遍歷子檔案夾，遞迴將所有檔案壓縮到ZIP檔案中</li>
+     *   <li>支持各種檔案類型：
+     *     <ul>
+     *       <li>GridFS儲存的一般檔案</li>
+     *       <li>線上文檔</li>
+     *       <li>子檔案夾</li>
+     *     </ul>
+     *   </li>
+     *   <li>自動解決檔案名稱衝突</li>
+     * </ul>
+     * </p>
      *
-     * @param zipOutputStream 壓縮輸出流
-     * @param folder          文件夾
-     * @param parentPath      父路徑
+     * <p>
+     * 核心特性：
+     * <ul>
+     *   <li>完全非阻塞的檔案壓縮遍歷</li>
+     *   <li>支持複雜的檔案夾和檔案結構</li>
+     *   <li>高效率的資源處理</li>
+     * </ul>
+     * </p>
      *
-     * @return Mono<Void>
+     * @param zipOutputStream 要寫入的ZIP壓縮輸出流
+     * @param folder 當前必需壓縮的檔案夾元資料
+     * @param parentPath 父目錄路徑，用於設定壓縮檔案的目錄結構
+     * @param zipEntryNameCountMap 用於處理重複檔案名稱的映射
+     * @param user 執行下載操作的用戶
+     *
+     * @return 表示壓縮操作的響應式完成信號
      */
     private Mono<Void> processFolder(ZipOutputStream zipOutputStream, UserFileMetadata folder, String parentPath, Map<String, AtomicInteger> zipEntryNameCountMap, User user) {
         return Mono.defer(() -> findFilesWithSameParentFolderIds(folder.getId(), user).flatMap(files -> {
@@ -556,13 +639,27 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 獲取文件資源
-     * 給定一個文件列表，將返回一個包含 檔案 Flux<DataBuffer> 和對應的用戶文件元數據的 Flux
-     * 其鍵為 Flux<DataBuffer>，值為對應的用戶文件元數據
+     * 響應式獲取一般檔案資源的高效方法，支持批次處理和高併發檔案讀取。
      *
-     * @param files 文件列表
+     * <p>檔案資源機制：
+     * <ul>
+     *   <li>按照GridFS檔案ID分組檔案資源</li>
+     *   <li>立即讀取檔案的資料緩存作為 DataBuffer</li>
+     *   <li>保證高效率和記憶體效能</li>
+     * </ul>
+     * </p>
      *
-     * @return Flux<Pair < Flux < DataBuffer>, UserFileMetadata>> 檔案資源對象
+     * <p>核心特性：
+     * <ul>
+     *   <li>完全非阻塞的檔案讀取</li>
+     *   <li>支持大量檔案的分批處理</li>
+     *   <li>自動管理資源釋放</li>
+     * </ul>
+     * </p>
+     *
+     * @param files 需要獲取的檔案元資料列表
+     *
+     * @return 檔案資源的響應式流
      */
     private Flux<Pair<Flux<DataBuffer>, UserFileMetadata>> getGeneralFileResource(List<UserFileMetadata> files) {
         Map<Long, List<UserFileMetadata>> userMetadatasByServerId = files
@@ -594,13 +691,27 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 獲取線上文件資源
-     * 給定一個文件列表，將返回一個包含 檔案 Flux<DataBuffer> 和對應的用戶文件元數據的 Flux
-     * 其鍵為 Flux<DataBuffer>，值為對應的用戶文件元數據列表
+     * 響應式獲取線上檔案資源的高級實現，支持多檔案類型和動態轉換。
      *
-     * @param files 文件列表
+     * <p>檔案轉換機制：
+     * <ul>
+     *   <li>支持多種線上檔案格式的轉換</li>
+     *   <li>使用內建的檔案轉換提供程式</li>
+     *   <li>自動處理檔案名稱和檔案後綴</li>
+     * </ul>
+     * </p>
      *
-     * @return Flux<Pair < Flux < DataBuffer>, UserFileMetadata>> 檔案資源對象
+     * <p>核心特性：
+     * <ul>
+     *   <li>完全非阻塞的檔案轉換</li>
+     *   <li>支持大量檔案的線上轉換</li>
+     *   <li>高效率的資源管理</li>
+     * </ul>
+     * </p>
+     *
+     * @param files 需要轉換的線上檔案元資料列表
+     *
+     * @return 檔案轉換資源的響應式流
      */
     private Flux<Pair<Flux<DataBuffer>, UserFileMetadata>> getOnlineFileResource(List<UserFileMetadata> files) {
         Map<String, UserFileMetadata> userFileMetadataMap = files
@@ -620,13 +731,13 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 將文件寫入到 ZipOutputStream 中
+     * 將檔案寫入到 ZipOutputStream 中
      * 此方法會將給定的 Flux<DataBuffer> 寫入到 ZipOutputStream 中
      * 如果寫入過程中發生錯誤，則會拋出異常
      *
      * @param dataBufferFlux  輸入流
      * @param zipOutputStream 壓縮輸出流
-     * @param filePath        文件路徑
+     * @param filePath        檔案路徑
      *
      * @return Mono<Void>
      */
@@ -670,12 +781,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 找尋指定文件夾的所有子文件夾
+     * 找尋指定檔案夾的所有子檔案夾
      *
-     * @param parentFolderIdList 父文件夾ID列表
-     * @param childFolderList    子文件夾列表
+     * @param parentFolderIdList 父檔案夾ID列表
+     * @param childFolderList    子檔案夾列表
      *
-     * @return List<UserFileMetadata> 子文件夾列表
+     * @return List<UserFileMetadata> 子檔案夾列表
      */
     private Mono<List<UserFileMetadata>> findAllChildFolder(List<Long> parentFolderIdList, List<UserFileMetadata> childFolderList) {
         return findFilesWithSameParentFolderIds(parentFolderIdList).flatMap(subFile -> {
@@ -693,9 +804,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 查詢具有相同父文件夾ID的檔案列表
+     * 查詢具有相同父檔案夾ID的檔案列表
      *
-     * @param parentFolderIds 父文件夾ID列表
+     * @param parentFolderIds 父檔案夾ID列表
      *
      * @return Mono<List < UserFileMetadata>>  檔案列表
      */
@@ -708,10 +819,10 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 查詢具有相同父文件夾ID的檔案列表，此為重載方法
+     * 查詢具有相同父檔案夾ID的檔案列表，此為重載方法
      * 將會只查詢資料夾以及指定用戶所擁有權限的檔案
      *
-     * @param parentFolderId 父文件夾ID
+     * @param parentFolderId 父檔案夾ID
      * @param shareUser      分享用戶
      *
      * @return Mono<List < UserFileMetadata>> 檔案列表
@@ -725,11 +836,11 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 獲取臨時壓縮文件名
+     * 獲取臨時壓縮檔案名
      *
-     * @param folder 文件夾
+     * @param folder 檔案夾
      *
-     * @return String 臨時壓縮文件名
+     * @return String 臨時壓縮檔案名
      */
     @SkipRecord
     private String getTempZipFilename(UserFileMetadata folder) {
