@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("RedisServerCsrfTokenRepository Redis CSRF Token存儲庫測試")
 class RedisServerCsrfTokenRepositoryTest {
 

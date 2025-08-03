@@ -1,0 +1,89 @@
+# 測試環境專用配置
+# 此配置文件提供測試環境的基礎設定
+# 在 CI 環境中，需要與 demo 和 ci profiles 一起使用
+
+# Spring 基礎配置
+spring:
+  # 測試環境使用內存數據庫配置佔位符
+  # 實際數據庫連接會從 demo 或 ci profile 覆蓋
+  test:
+    database:
+      replace: none
+
+# 日誌配置
+logging:
+  level:
+    root: WARN
+    xyz.dowob.filemanagement: DEBUG
+    org.springframework: WARN
+    org.springframework.test: INFO
+
+# 測試專用配置
+test:
+  # 測試模式標記
+  mode: true
+  
+# 關閉不必要的功能以加快測試速度
+management:
+  endpoints:
+    enabled-by-default: false
+
+# 測試環境的請求限制配置
+global:
+  request-limiter:
+    # 測試環境關閉請求限制以避免干擾測試
+    type: none
+    enable-ban-ip: false
+
+# 測試環境的緩存配置
+cache:
+  # 測試環境關閉緩存以確保測試獨立性
+  enable-file-download-stream-cache: false
+  enable-user-file-list-cache: false
+  enable-user-info-cache: false
+
+# 測試環境的文件配置
+file:
+  # 測試環境使用臨時目錄
+  download:
+    folder-temp-download-path: ./target/test-temp/folder-zip
+  
+  # 關閉文件安全檢查以加快測試速度
+  security:
+    enable-security-check: false
+    
+  # 測試環境的上傳配置
+  upload:
+    # 減小測試環境的限制值以加快測試
+    payload-length: 5MB
+    chunk-size: 1MB
+    max-upload-file-size: 100MB
+    max-upload-duration: 1h
+
+# 測試環境的安全配置
+security:
+  # 測試環境的 JWT 配置
+  jwt-token:
+    # 測試用的短期過期時間
+    expiration: 10m
+    
+  # 測試環境的密碼重置配置
+  reset-password-token:
+    expiration: 5m
+    
+  # 測試環境關閉 HTTPS
+  cookie:
+    secure: false
+    
+  # 測試環境的 CORS 配置
+  cors:
+    allowed-origins-pattern: ".*"
+    
+  # 測試環境的登錄限制
+  login:
+    # 測試環境關閉登錄限制
+    limiter-provider: none
+
+# 注意：此配置必須與其他 profiles 配合使用
+# - 在本地測試：spring.profiles.active=test,demo
+# - 在 CI 環境：spring.profiles.active=test,demo,ci

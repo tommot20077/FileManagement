@@ -46,7 +46,7 @@ import static org.mockito.Mockito.*;
  * @author yuan
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("WebFolderController Web 資料夾控制器測試")
 class WebFolderControllerTest {
 

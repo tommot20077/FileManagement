@@ -86,7 +86,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("BaseUserController 用戶控制器基類測試")
 class BaseUserControllerTest {
 

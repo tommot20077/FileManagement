@@ -80,7 +80,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("WebUserController Web 用戶控制器測試")
 class WebUserControllerTest {
 

@@ -101,7 +101,7 @@ import static org.mockito.Mockito.when;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("ApiOnlineFileController API 在線檔案控制器測試")
 class ApiOnlineFileControllerTest {
 

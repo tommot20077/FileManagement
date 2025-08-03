@@ -52,7 +52,7 @@ import static org.mockito.Mockito.when;
  * @author yuan
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("WebGeneralFileController Web 檔案控制器測試")
 class WebGeneralFileControllerTest {
 

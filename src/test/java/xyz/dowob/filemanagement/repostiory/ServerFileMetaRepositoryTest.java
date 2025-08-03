@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("ServerFileMetaRepository 伺服器檔案元數據操作接口測試")
 class ServerFileMetaRepositoryTest {
 

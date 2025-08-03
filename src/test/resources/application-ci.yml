@@ -1,0 +1,45 @@
+# CI 環境專用配置，使用 GitHub Actions Service Containers
+# 此配置會在 CI 環境中覆蓋默認配置，讓測試連接到 Service Containers
+# 
+# Profile 載入順序：test -> demo -> ci
+# - test: 提供測試基礎配置（日誌、緩存、限制器等）
+# - demo: 提供完整應用配置（JWT secret、檔案路徑等）  
+# - ci: 覆蓋數據庫連接以使用 Service Containers
+
+spring:
+  # R2DBC MySQL 配置
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/file_management
+    username: test
+    password: testpassword
+    pool:
+      initial-size: 5
+      max-size: 10
+      max-idle-time: 30m
+      max-acquire-time: 30s
+      max-create-connection-time: 30s
+      
+  # MongoDB 配置
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/file_management
+      auto-index-creation: true
+      
+    # Redis 配置
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 5s
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+# 重要：此配置必須與 demo profile 一起使用
+# 載入順序：test -> demo -> ci
+# demo 提供完整的應用配置（JWT secret、檔案路徑等）
+# ci 只覆蓋數據庫連接以使用 Service Containers

@@ -91,7 +91,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("ExceptionController 全域異常控制器測試")
 class ExceptionControllerTest {
 

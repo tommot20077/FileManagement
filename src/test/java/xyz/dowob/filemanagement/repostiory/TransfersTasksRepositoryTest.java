@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("TransfersTasksRepository 檔案傳輸任務數據庫操作接口測試")
 class TransfersTasksRepositoryTest {
 

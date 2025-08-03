@@ -14,6 +14,46 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: file_management
+          MYSQL_USER: test
+          MYSQL_PASSWORD: testpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -prootpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=30s
+          
+      mongodb:
+        image: mongo:6.0
+        env:
+          MONGO_INITDB_DATABASE: file_management
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="echo 'db.runCommand(\"ping\").ok' | mongosh --quiet"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+          
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
     steps:
       - name: 檢出代碼
         uses: actions/checkout@v4
@@ -31,17 +71,20 @@ jobs:
       - name: 顯示 Java 版本
         run: java -version
 
-      - name: 設定環境變數以使用 demo 設定檔
-        run: echo "SPRING_PROFILES_ACTIVE=demo" >> $GITHUB_ENV
-
       - name: 執行 Maven 測試
         id: maven_test
         run: |
           echo "::group::Maven 測試"
           chmod +x ./mvnw
-          ./mvnw test
+          # 使用 test,demo,ci profiles 執行測試
+          # ci profile 會覆蓋 demo 的數據庫連接設定
+          ./mvnw test -Dspring.profiles.active=test,demo,ci
           echo "::endgroup::"
         continue-on-error: false
+        env:
+          # 確保測試連接到 Service Containers
+          # 載入順序：test -> demo -> ci (ci 覆蓋數據庫連接)
+          SPRING_PROFILES_ACTIVE: test,demo,ci
 
       - name: 測試結果通知
         run: echo "測試流程完成..."

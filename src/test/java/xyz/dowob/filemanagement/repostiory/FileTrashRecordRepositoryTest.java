@@ -40,7 +40,7 @@ import static org.mockito.Mockito.mock;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("FileTrashRecordRepository 檔案回收站記錄數據庫操作接口測試")
 class FileTrashRecordRepositoryTest {
 

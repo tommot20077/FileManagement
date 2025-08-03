@@ -77,7 +77,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("WebGuestController Web 訪客控制器測試")
 class WebGuestControllerTest {
 

@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("UserOnlineFileRepository 用戶在線檔案數據庫操作接口測試")
 class UserOnlineFileRepositoryTest {
 

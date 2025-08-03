@@ -78,7 +78,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("SecurityConfig 安全配置測試")
 class SecurityConfigTest {
 

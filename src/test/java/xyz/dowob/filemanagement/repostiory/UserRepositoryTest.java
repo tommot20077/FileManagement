@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("UserRepository 用戶數據庫操作接口測試")
 class UserRepositoryTest {
 

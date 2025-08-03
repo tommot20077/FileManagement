@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("CustomEnum 自定義枚舉測試")
 class CustomEnumTest {
 

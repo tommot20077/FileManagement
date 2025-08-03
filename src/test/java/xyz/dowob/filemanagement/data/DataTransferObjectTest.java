@@ -64,7 +64,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @see xyz.dowob.filemanagement.data.file.bo.UserFileDataBO
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("DataTransferObject 數據傳輸對象測試")
 class DataTransferObjectTest {
 

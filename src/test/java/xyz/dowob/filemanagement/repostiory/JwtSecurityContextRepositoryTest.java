@@ -49,7 +49,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("JwtSecurityContextRepository JWT安全上下文存儲庫測試")
 class JwtSecurityContextRepositoryTest {
 

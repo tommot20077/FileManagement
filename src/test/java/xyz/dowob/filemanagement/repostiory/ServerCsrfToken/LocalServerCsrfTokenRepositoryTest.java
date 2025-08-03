@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("LocalServerCsrfTokenRepository 本地CSRF Token存儲庫測試")
 class LocalServerCsrfTokenRepositoryTest {
 

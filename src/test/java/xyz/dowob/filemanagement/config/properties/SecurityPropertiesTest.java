@@ -64,7 +64,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("SecurityProperties 安全屬性配置測試")
 class SecurityPropertiesTest {
 

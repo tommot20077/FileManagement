@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("UserFIleShareRecordRepository 用戶檔案分享記錄數據庫操作接口測試")
 class UserFileShareRecordRepositoryTest {
 

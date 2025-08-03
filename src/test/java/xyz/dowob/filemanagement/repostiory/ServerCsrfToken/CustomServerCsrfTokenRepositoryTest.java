@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("CustomServerCsrfTokenRepository 自定義CSRF Token存儲庫接口測試")
 class CustomServerCsrfTokenRepositoryTest {
 

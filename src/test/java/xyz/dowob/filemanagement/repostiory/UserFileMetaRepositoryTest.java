@@ -47,7 +47,7 @@ import static org.mockito.Mockito.mock;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("UserFileMetaRepository 用戶檔案元數據操作接口測試")
 class UserFileMetaRepositoryTest {
 

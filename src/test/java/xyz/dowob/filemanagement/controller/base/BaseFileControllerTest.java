@@ -107,7 +107,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("BaseFileController 檔案控制器基類測試")
 class BaseFileControllerTest {
 

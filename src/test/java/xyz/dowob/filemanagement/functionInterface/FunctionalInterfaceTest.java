@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("FunctionalInterface 函數式接口測試")
 class FunctionalInterfaceTest {
 

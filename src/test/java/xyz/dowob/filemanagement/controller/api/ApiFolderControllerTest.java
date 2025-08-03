@@ -69,7 +69,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("ApiFolderController API 資料夾控制器測試")
 class ApiFolderControllerTest {
 

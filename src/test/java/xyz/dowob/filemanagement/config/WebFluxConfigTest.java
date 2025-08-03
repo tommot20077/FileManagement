@@ -59,7 +59,7 @@ import static org.mockito.Mockito.*;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("WebFluxConfig Web 流配置測試")
 class WebFluxConfigTest {
 

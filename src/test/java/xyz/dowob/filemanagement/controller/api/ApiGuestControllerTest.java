@@ -83,7 +83,7 @@ import static org.mockito.Mockito.when;
  * @since 1.0
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "demo", "ci"})
 @DisplayName("ApiGuestController API 訪客控制器測試")
 class ApiGuestControllerTest {
 
