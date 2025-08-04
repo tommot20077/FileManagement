@@ -324,25 +324,58 @@ spring:
   #   發送郵件的用戶名
   #   username: your_email
   #
-  #   發送郵件的用戶密碼
+  #   發送郵件的用戶密碼（使用 OAuth 時可留空）
   #   password: your_password
   #
   #   發送郵件的參數
   #   properties:
   #     mail:
   #       smtp:
-  #        #是否啟用 SSL，默認為 true
+  #        # 是否啟用認證，默認為 true
   #         auth: true
   #
-  #       #是否啟用 STARTTLS，默認為 true
+  #       # 是否啟用 STARTTLS，默認為 true
   #         starttls:
   #           enable: true
   #
-  #   SMTP 伺服器的主機名稱
+  #       # 認證機制，預設為 LOGIN，使用 OAuth 時設為 XOAUTH2
+  #         auth.mechanisms: LOGIN
+  #
+  #   # SMTP 伺服器的主機名稱
   #   host: smtp.host
   #
-  #   SMTP 伺服器的端口號
+  #   # SMTP 伺服器的端口號
   #   port: 587
+  #
+  #   # OAuth 相關配置（可選）
+  #   oauth:
+  #     # 是否啟用 OAuth 認證，默認為 false
+  #     enabled: false
+  #
+  #     # OAuth 提供者，支援 microsoft、google
+  #     provider: microsoft
+  #
+  #     # OAuth 應用程式的客戶端 ID
+  #     client-id: your-client-id
+  #
+  #     # OAuth 應用程式的客戶端密鑰
+  #     client-secret: your-client-secret
+  #
+  #     # Microsoft Azure AD 租戶 ID（Microsoft 專用）
+  #     tenant-id: your-tenant-id
+  #
+  #     # OAuth 權限範圍（如未設定，使用提供者預設值）
+  #     # Microsoft: https://graph.microsoft.com/Mail.Send
+  #     # Google: https://www.googleapis.com/auth/gmail.send
+  #     scope: 
+  #
+  #     # Token 快取時間（秒），預設 3300（55分鐘）
+  #     token-cache-duration: 3300
+  #
+  #   # 郵件發送者配置
+  #   mail-sender:
+  #     # 系統郵件發送者的電子郵件地址
+  #     mail-sender: sender@example.com
 
   # 資料庫相關設定
   data:

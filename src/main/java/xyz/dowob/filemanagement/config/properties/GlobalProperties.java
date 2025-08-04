@@ -33,7 +33,6 @@ import java.time.Duration;
  * - {@link RequestLimiter} - 請求限制器設定
  * - {@link forwarded} - 網路轉發設定
  * - {@link NettyPool} - Netty 連接池設定
- * - {@link Email} - 郵件發送設定
  *
  * @author yuan
  * @version 1.0
@@ -63,13 +62,6 @@ public class GlobalProperties {
      * 管理 WebFlux 使用的 Netty 連接池資源，包括連接數量、生命週期等設定。
      */
     private NettyPool nettyPool = new NettyPool();
-
-    /**
-     * 郵件發送設定實例。
-     * <p>
-     * 定義系統發送郵件時使用的發送者資訊。
-     */
-    private Email email = new Email();
 
     /**
      * 請求限制器設定內部類。
@@ -296,26 +288,5 @@ public class GlobalProperties {
          * 預設值：30 秒
          */
         private Duration pendingAcquireTimeout = Duration.ofSeconds(30);
-    }
-
-    /**
-     * 郵件發送設定內部類。
-     * <p>
-     * 管理系統發送郵件時使用的發送者資訊和相關參數。
-     */
-    @Data
-    public static class Email {
-        /**
-         * 系統郵件發送者的電子郵件地址。
-         * <p>
-         * 定義系統發送各種通知郵件（如密碼重設、帳號驗證等）時使用的發送者地址。
-         * 此地址會顯示在收件者的郵件客戶端中作為發送者資訊。
-         * <p>
-         * 注意：此地址必須與 SMTP 伺服器設定中的認證資訊相符，
-         * 否則可能導致郵件發送失敗或被標記為垃圾郵件。
-         * <p>
-         * 預設值：{@code "sender@example.com"}
-         */
-        private String mailSender = "sender@example.com";
     }
 }

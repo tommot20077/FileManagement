@@ -12,25 +12,55 @@ spring:
   #   發送郵件的用戶名
   #   username: your_email
   #
-  #   發送郵件的用戶密碼
+  #   發送郵件的用戶密碼（使用 OAuth 時可留空）
   #   password: your_password
   #
   #   發送郵件的參數
   #   properties:
   #     mail:
   #       smtp:
-  #        #是否啟用 SSL，默認為 true
+  #        # 是否啟用認證，默認為 true
   #         auth: true
   #
-  #       #是否啟用 STARTTLS，默認為 true
+  #       # 是否啟用 STARTTLS，默認為 true
   #         starttls:
   #           enable: true
   #
-  #   SMTP 伺服器的主機名稱
+  #       # 認證機制，預設為 LOGIN，使用 OAuth 時設為 XOAUTH2
+  #       # auth.mechanisms: LOGIN
+  #
+  #   # SMTP 伺服器的主機名稱
   #   host: smtp.host
   #
-  #   SMTP 伺服器的端口號
+  #   # SMTP 伺服器的端口號
   #   port: 587
+  #
+  #   # OAuth 相關配置（可選）
+  #   # oauth:
+  #   #   啟用 OAuth 認證
+  #   #   enabled: true
+  #   #
+  #   #   OAuth 提供者（microsoft 或 google，不區分大小寫）
+  #   #   provider: microsoft
+  #   #
+  #   #   OAuth 應用程式的客戶端 ID
+  #   #   client-id: your-client-id
+  #   #
+  #   #   OAuth 應用程式的客戶端密鑰
+  #   #   client-secret: your-client-secret
+  #   #
+  #   #   Microsoft Azure AD 租戶 ID（Microsoft 專用，可使用 common）
+  #   #   tenant-id: your-tenant-id
+  #   #
+  #   #   OAuth 權限範圍（如未設定，使用提供者預設值）
+  #   #   scope: https://graph.microsoft.com/Mail.Send
+  #   #
+  #   #   Token 快取時間（秒），預設 3300（55分鐘）
+  #   #   token-cache-duration: 3300
+  #   #
+  #   # 郵件發送者配置
+  #   # mail-sender:
+  #   #   mail-sender: sender@example.com
   data:
     mongodb:
       # 請確認 mongodb 服務名稱、帳號、密碼、資料庫名稱是否跟 docker-compose.yml 一致
@@ -58,6 +88,11 @@ spring:
       max-file-size: 5GB
   codec:
     max-in-memory-size: 16MB
+
+management:
+  health:
+    mail:
+      enabled: false
 
 security:
   reset-password-token:

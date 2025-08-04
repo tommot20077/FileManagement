@@ -33,10 +33,7 @@ import xyz.dowob.filemanagement.service.serviceInterface.AuthorizationService;
 import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
 import xyz.dowob.filemanagement.service.serviceInterface.UserService;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -212,7 +209,6 @@ public class UserServiceImpl implements UserService {
      * @param authRequestDTO 包含用戶名和密碼的登入請求資料，不可為 {@code null}
      * @param request WebFlux 伺服器請求交換物件，用於會話管理
      * @return 包含 JWT 令牌的 {@code Mono}，登入失敗時傳播異常
-     * @throws LimitationException 當登入嘗試次數超過限制時拋出
      * @see AuthorizationService#authenticate(AuthRequestDTO, ServerWebExchange)
      * @see UserLimiterStrategy#getUserLimiter(UserLimiterEnum)
      */
@@ -277,9 +273,8 @@ public class UserServiceImpl implements UserService {
      * @param userId 要登出的用戶 ID，{@code 0L} 表示遊客用戶，{@code null} 時返回空 Mono
      * @param exchange WebFlux 伺服器請求交換物件，用於會話管理，{@code null} 時返回空 Mono
      * @return 空的 {@code Mono}，登出完成時完成
-     * @throws ValidationException 當無法獲取會話或用戶不存在時拋出
      * @see TokenService#revokeToken(Long, TokenEnum)
-     * @see UserRepository#findById(Long)
+     * @see UserRepository#findById(Object)
      */
     @Override
     public Mono<Void> logout(Long userId, ServerWebExchange exchange) {
@@ -444,7 +439,6 @@ public class UserServiceImpl implements UserService {
      *
      * @param userEmailDTO 包含目標電子郵件地址的請求資料，不可為 {@code null}
      * @return 空的 {@code Mono}，郵件發送成功時完成
-     * @throws ValidationException 當用戶不存在或電子郵件服務不可用時拋出
      * @see EmailProvider#sendEmail(String, String, String)
      * @see TokenService#generateToken(User, TokenEnum)
      * @see SecurityProperties#getResetPasswordToken()
@@ -519,7 +513,6 @@ public class UserServiceImpl implements UserService {
      *
      * @param resetPasswordDTO 包含電子郵件、驗證碼和新密碼的重設請求資料，不可為 {@code null}
      * @return 空的 {@code Mono}，密碼重設成功時完成
-     * @throws ValidationException 當用戶不存在時拋出
      * @see TokenService#validateToken(String, Long, TokenEnum)
      * @see TokenService#revokeToken(Long, TokenEnum)
      * @see PasswordEncoder#encode(CharSequence)
@@ -584,7 +577,6 @@ public class UserServiceImpl implements UserService {
      *
      * @param exchange WebFlux 伺服器請求交換物件，包含安全上下文資訊
      * @return 包含當前用戶完整資訊的 {@code Mono}
-     * @throws ValidationException 當請求未通過身份驗證時拋出
      * @see ReactiveSecurityContextHolder#getContext()
      * @see #getById(Long)
      */
@@ -622,7 +614,7 @@ public class UserServiceImpl implements UserService {
      *
      * @param userId 要查詢的用戶 ID，不可為 {@code null}
      * @return 包含用戶資訊的 {@code Mono}，若用戶不存在則為空
-     * @see UserRepository#findById(Long)
+     * @see UserRepository#findById(Object)
      */
     private Mono<User> getByIdWithDB(Long userId) {
         return userRepository.findById(userId);
@@ -701,7 +693,6 @@ public class UserServiceImpl implements UserService {
      *
      * @param userId 要查詢的用戶 ID，{@code 0L} 表示遊客用戶，{@code null} 時拋出異常
      * @return 包含用戶完整資訊的 {@code Mono}
-     * @throws ValidationException 當用戶 ID 為 null 或用戶不存在時拋出
      * @see CacheManager#runAndSetCache
      * @see #getByIdWithDB(Long)
      */
@@ -846,11 +837,10 @@ public class UserServiceImpl implements UserService {
      * @param type 查詢類型，必須為 {@link UserInfoTypeEnum#ID} 或 {@link UserInfoTypeEnum#NAME}
      * @param args 查詢參數陣列，包含用戶 ID 或用戶名
      * @return 包含查詢結果的 {@code Flux}，按緩存和資料庫結果的順序返回
-     * @throws ValidationException 當參數為空、類型無效或所有參數無效時拋出
      * @see UserInfoTypeEnum
      * @see CacheManager#getCachesAsConcat
-     * @see UserRepository#findAllByIdIn(List)
-     * @see UserRepository#findAllByUsernameIn(List)
+     * @see UserRepository#findAllByIdIn(Collection)
+     * @see UserRepository#findAllByUsernameIn(Collection)
      */
     @Override
     @RecordLevel(LogLevelEnum.DEBUG)
