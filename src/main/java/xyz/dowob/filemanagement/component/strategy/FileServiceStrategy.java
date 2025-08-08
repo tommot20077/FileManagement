@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * 基於 EnumMap 的檔案服務策略實現，根據檔案類型動態選擇對應的檔案處理服務。
  *
- * <p>此實現採用策略模式，在應用程式啟動時自動掃描所有帶有 {@link FileHandlerType} 
+ * <p>此實現採用策略模式，在應用程式啟動時自動掃描所有帶有 {@link FileHandlerType}
  * 註解的 {@link FileService} 實現，並將其註冊到內部映射表中。當請求特定檔案類型的
  * 服務時，會從映射表中返回對應的服務實例。
  *
@@ -40,6 +40,7 @@ public class FileServiceStrategy {
      */
     private final EnumMap<FileEnum, FileService> fileStrategies;
 
+
     /**
      * 建構檔案服務策略並初始化服務映射表。
      *
@@ -48,6 +49,7 @@ public class FileServiceStrategy {
      * 檔案類型映射，如有重複則拋出異常。
      *
      * @param fileServices 所有可用的檔案服務實現列表，通過依賴注入提供
+     *
      * @throws IllegalArgumentException 當發現重複的檔案類型映射或未找到任何有效服務時
      */
     public FileServiceStrategy(List<FileService> fileServices) {
@@ -76,6 +78,7 @@ public class FileServiceStrategy {
      * {@link FileEnum#OTHER} 類型對應的服務實例。
      *
      * @return 預設的檔案處理服務實例
+     *
      * @throws IllegalArgumentException 當未找到 OTHER 類型的服務時
      */
     public FileService getFileService() {
@@ -88,21 +91,22 @@ public class FileServiceStrategy {
      *
      * <p>當 fileEnum 為 null 時，返回 {@link FileEnum#OTHER} 類型對應的預設服務。
      * 如果指定的檔案類型存在對應的服務，則直接返回該服務實例。
+     * 如果找不到指定檔案類型的服務，則回退到通用的 {@link FileEnum#OTHER} 服務。
      *
      * @param fileEnum 要查找的檔案類型，null 表示使用預設類型
+     *
      * @return 對應的檔案處理服務實例
-     * @throws IllegalArgumentException 當找不到指定檔案類型對應的服務時
+     *
+     * @throws IllegalArgumentException 當找不到任何可用的服務時
      */
     public FileService getFileService(FileEnum fileEnum) {
-        if (fileEnum != null) {
-            FileService fileService = fileStrategies.get(fileEnum);
-            if (fileService != null) {
-                return fileService;
-            }
-            throw new IllegalArgumentException("沒有找到對應的檔案處理方法");
-        }
+        FileEnum chosenFileEnum = fileEnum == null ? FileEnum.OTHER : fileEnum;
+
         return Optional
-                .ofNullable(fileStrategies.get(FileEnum.OTHER))
-                .orElseThrow(() -> new IllegalArgumentException("沒有找到對應的檔案處理方法"));
+                .ofNullable(fileStrategies.get(chosenFileEnum))
+                .orElseGet(() -> Optional
+                        .ofNullable(fileStrategies.get(FileEnum.OTHER))
+                        .orElseThrow(() -> new IllegalArgumentException("沒有找到對應的檔案處理方法")));
     }
+
 }

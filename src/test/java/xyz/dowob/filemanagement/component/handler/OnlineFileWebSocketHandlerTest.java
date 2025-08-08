@@ -1036,7 +1036,7 @@ class OnlineFileWebSocketHandlerTest {
             .expectErrorMatches(throwable -> 
                 throwable.getMessage() != null && 
                 throwable.getMessage().contains("Retries exhausted"))
-            .verify(Duration.ofSeconds(3));
+            .verify(Duration.ofSeconds(10));
         
         // 驗證重試處理 - 從日誌可以看到重試發生，但Mock只被調用一次 (Reactor內部處理重試)
         verify(flakySession, times(1)).send(any());

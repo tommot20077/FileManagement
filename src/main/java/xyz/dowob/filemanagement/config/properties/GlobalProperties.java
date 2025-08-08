@@ -64,6 +64,20 @@ public class GlobalProperties {
     private NettyPool nettyPool = new NettyPool();
 
     /**
+     * gRPC 服務設定實例。
+     * <p>
+     * 控制 gRPC 服務的啟用狀態，用於內部服務間通訊。
+     */
+    private Grpc grpc = new Grpc();
+
+    /**
+     * WebDAV 整合設定實例。
+     * <p>
+     * 管理 WebDAV 子服務的整合功能，包括認證和通訊設定。
+     */
+    private WebDav webdav = new WebDav();
+
+    /**
      * 請求限制器設定內部類。
      * <p>
      * 基於令牌桶演算法實現的請求速率限制機制，支援 Redis 分散式限制和本地記憶體限制兩種模式。
@@ -288,5 +302,54 @@ public class GlobalProperties {
          * 預設值：30 秒
          */
         private Duration pendingAcquireTimeout = Duration.ofSeconds(30);
+    }
+
+    /**
+     * gRPC 服務設定內部類。
+     * <p>
+     * 控制 gRPC 服務的啟用狀態和相關參數。gRPC 服務主要用於內部服務間的高效通訊，
+     * 特別是與 WebDAV 子服務的整合。
+     */
+    @Data
+    public static class Grpc {
+        /**
+         * 是否啟用 gRPC 服務。
+         * <p>
+         * 當設定為 true 時，應用程式會啟動 gRPC 服務端並監聽指定端口。
+         * 在測試環境中建議設為 false 以避免端口衝突。
+         * <p>
+         * 預設值：{@code false}
+         */
+        private boolean enabled = false;
+    }
+
+    /**
+     * WebDAV 整合設定內部類。
+     * <p>
+     * 管理與 WebDAV 子服務的整合功能，包括服務啟用狀態和安全認證。
+     * WebDAV 服務提供標準的 WebDAV 協議支援，允許用戶通過 WebDAV 客戶端存取檔案系統。
+     */
+    @Data
+    public static class WebDav {
+        /**
+         * 是否啟用 WebDAV 整合功能。
+         * <p>
+         * 當設定為 true 時，會啟用與 WebDAV 子服務的通訊功能，
+         * 包括 gRPC 服務端和相關的認證攔截器。
+         * <p>
+         * 預設值：{@code false}
+         */
+        private boolean enabled = false;
+
+        /**
+         * WebDAV 子服務與主服務間通訊的 API Key。
+         * <p>
+         * 用於驗證來自 WebDAV 子服務的 gRPC 請求，確保通訊安全。
+         * 此金鑰必須與 WebDAV 子服務配置的金鑰一致。
+         * 建議使用強密碼並定期更換。
+         * <p>
+         * 約束條件：在啟用 WebDAV 功能時，此值不能為空。
+         */
+        private String apiKey;
     }
 }

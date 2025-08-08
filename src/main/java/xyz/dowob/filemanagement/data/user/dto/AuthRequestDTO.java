@@ -2,6 +2,7 @@ package xyz.dowob.filemanagement.data.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -16,6 +17,7 @@ import lombok.NoArgsConstructor;
  * @see xyz.dowob.filemanagement.data.user.dto.AuthResponseDTO
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthRequestDTO {

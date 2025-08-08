@@ -10,6 +10,7 @@ import xyz.dowob.filemanagement.customenum.FileEnum;
 import xyz.dowob.filemanagement.service.serviceImpl.fileservice.FolderFileServiceImpl;
 import xyz.dowob.filemanagement.service.serviceImpl.fileservice.GeneralFileServiceImpl;
 import xyz.dowob.filemanagement.service.serviceImpl.fileservice.OnlineFileServiceImpl;
+import xyz.dowob.filemanagement.service.serviceInterface.FileService;
 
 import java.util.List;
 
@@ -74,9 +75,13 @@ class FileServiceStrategyTest {
     }
 
     @Test
-    @DisplayName("獲取檔案服務 - 不存在的類型應拋出IllegalArgumentException")
-    void getNonExistFileService_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> fileServiceStrategy.getFileService(FileEnum.DOCUMENT));
+    @DisplayName("獲取檔案服務 - 不存在的類型應返回默認OTHER服務")
+    void getNonExistFileService_ShouldReturnDefaultService() {
+        // 對於未註冊的檔案類型，應該回退到OTHER類型的默認服務
+        FileService result = fileServiceStrategy.getFileService(FileEnum.DOCUMENT);
+        assertNotNull(result);
+        // 驗證返回的服務與OTHER類型的服務相同
+        assertEquals(fileServiceStrategy.getFileService(FileEnum.OTHER), result);
     }
 
     @Test
@@ -89,5 +94,15 @@ class FileServiceStrategyTest {
     @DisplayName("獲取默認檔案服務 - OTHER類型存在應成功")
     void getDefaultFileService_WhenOtherExists_ShouldSuccess() {
         assertNotNull(fileServiceStrategy.getFileService());
+    }
+
+    @Test
+    @DisplayName("獲取檔案服務 - 沒有OTHER類型服務時應拋出IllegalArgumentException")
+    void getFileService_WhenNoOtherService_ShouldThrowException() {
+        // 創建一個只有FOLDER服務的策略，沒有OTHER服務
+        FileServiceStrategy strategyWithoutOther = new FileServiceStrategy(List.of(folderFileService));
+        
+        // 嘗試獲取不存在的檔案類型，且沒有OTHER回退服務
+        assertThrows(IllegalArgumentException.class, () -> strategyWithoutOther.getFileService(FileEnum.DOCUMENT));
     }
 }

@@ -53,6 +53,11 @@ public class UploadResponseDTO {
     private Boolean isFinished;
 
     /**
+     * 檔案ID
+     */
+    private Long fileId;
+
+    /**
      * 信息
      */
     private String message;

@@ -91,24 +91,24 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 所有參數都會傳遞給父類進行統一初始化。
      *
      * @param userOnlineFileHistoryRepository 用戶線上檔案歷史資料庫操作介面
-     * @param serverFileMetaRepository 伺服器檔案元資料操作介面
-     * @param userFileMetaRepository 用戶檔案元資料操作介面
-     * @param redisProvider Redis 緩存提供者
-     * @param gridFsProvider GridFS 儲存提供者
-     * @param transfersTasksManager 檔案傳輸任務管理器
-     * @param fileProperties 檔案設定屬性
-     * @param circuitBreakerConfig 斷路器設定
-     * @param userRepository 用戶資料庫操作介面
-     * @param userOnlineFileRepository 用戶線上檔案操作介面
-     * @param entityOperations R2DBC 實體操作介面
-     * @param fileTrashRecordRepository 檔案回收站記錄操作介面
-     * @param transactionalOperator 事務操作器
-     * @param rateLimiterConfig 限流器設定
-     * @param userFIleShareRecordRepository 用戶檔案分享記錄操作介面
-     * @param objectMapper JSON 序列化工具
-     * @param cacheManager 緩存管理器
-     * @param folderListTreeProvider 資料夾樹狀結構提供者（可選）
-     * @param fileScanProvider 檔案安全掃描提供者（可選）
+     * @param serverFileMetaRepository        伺服器檔案元資料操作介面
+     * @param userFileMetaRepository          用戶檔案元資料操作介面
+     * @param redisProvider                   Redis 緩存提供者
+     * @param gridFsProvider                  GridFS 儲存提供者
+     * @param transfersTasksManager           檔案傳輸任務管理器
+     * @param fileProperties                  檔案設定屬性
+     * @param circuitBreakerConfig            斷路器設定
+     * @param userRepository                  用戶資料庫操作介面
+     * @param userOnlineFileRepository        用戶線上檔案操作介面
+     * @param entityOperations                R2DBC 實體操作介面
+     * @param fileTrashRecordRepository       檔案回收站記錄操作介面
+     * @param transactionalOperator           事務操作器
+     * @param rateLimiterConfig               限流器設定
+     * @param userFIleShareRecordRepository   用戶檔案分享記錄操作介面
+     * @param objectMapper                    JSON 序列化工具
+     * @param cacheManager                    緩存管理器
+     * @param folderListTreeProvider          資料夾樹狀結構提供者（可選）
+     * @param fileScanProvider                檔案安全掃描提供者（可選）
      */
     public OnlineFileServiceImpl(UserOnlineFileHistoryRepository userOnlineFileHistoryRepository, ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
                                  @Nullable FolderListTreeProvider folderListTreeProvider, @Nullable FileScanProvider fileScanProvider) {
@@ -143,7 +143,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 完成後清理相關快取並回傳上傳結果。
      *
      * @param fileMetadataDTO 檔案元資料，包含檔案名稱、父目錄等資訊
-     * @param user 當前操作的用戶
+     * @param user            當前操作的用戶
+     *
      * @return 上傳結果的響應式包裝，包含進度和成功狀態
      */
     @Override
@@ -174,7 +175,14 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                     .flatMap(userOnlineFile -> userOnlineFileRepository
                             .insertWithId(userOnlineFile)
                             .then(cleanUserListCache(user.getId(), userFileMetadata.getParentFolderId()))
-                            .thenReturn(UploadResponseDTO.builder().progress(100.0).isSuccess(true).isFinished(true).message("上傳成功").build()));
+                            .thenReturn(UploadResponseDTO
+                                                .builder()
+                                                .progress(100.0)
+                                                .isSuccess(true)
+                                                .isFinished(true)
+                                                .message("上傳成功")
+                                                .fileId(userOnlineFile.getId())
+                                                .build()));
         });
     }
 
@@ -186,8 +194,9 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 或透過內容轉換提供者轉換為其他格式（如 DOCX）。更新檔案最後存取時間。
      *
      * @param userFileMetadata 檔案元資料，包含檔案 ID 和基本資訊
-     * @param user 當前操作的用戶
-     * @param optional 可選參數，指定下載類型
+     * @param user             當前操作的用戶
+     * @param optional         可選參數，指定下載類型
+     *
      * @return 包含檔案資料和元資料的業務物件
      */
     @Override
@@ -227,7 +236,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 快取清理和相關記錄更新。
      *
      * @param fileMetadata 檔案元資料
-     * @param user 當前操作的用戶
+     * @param user         當前操作的用戶
+     *
      * @return 表示刪除操作完成的響應式信號
      */
     @Override
@@ -243,7 +253,8 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 還原歷史版本或刪除歷史記錄。使用策略模式處理各種編輯操作。
      *
      * @param fileEditBO 編輯檔案的業務物件，包含檔案 ID 和編輯類型
-     * @param user 當前操作的用戶
+     * @param user       當前操作的用戶
+     *
      * @return 表示編輯操作完成的響應式信號
      */
     @Override
@@ -267,6 +278,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * 操作在有界調度器中執行以確保非阻塞性。
      *
      * @param userFileMetadata 用戶檔案元資料物件
+     *
      * @return 更新後的檔案元資料
      */
     public Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata userFileMetadata) {
@@ -278,11 +290,78 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
 
     /**
+     * 儲存編輯後的檔案內容。
+     * <p>
+     * 操作步驟：格式化新內容為 JSON 形式，更新檔案的修改者和歷史理合狀態，
+     * 然後同步更新檔案內容和元資料。空內容會被設為預設的空 JSON 結構。
+     *
+     * @param userOnlineFile 線上檔案物件
+     * @param fileEditBO     檔案編輯業務物件
+     * @param user           當前操作的用戶
+     *
+     * @return 表示儲存操作完成的響應式信號
+     */
+    private Mono<Void> saveContent(UserOnlineFile userOnlineFile, FileEditBO fileEditBO, User user) {
+        return Mono.defer(() -> {
+            userOnlineFile.setLastModifiedBy(user.getId());
+            userOnlineFile.setIsMatchHistory(false);
+            FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
+            if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
+                userOnlineFile.setContent(EMPTY_CONTENT);
+                return Mono.just(userOnlineFile);
+            }
+
+            return formatObjectToJson(fileEditDTO.getContent()).flatMap(contentJson -> {
+                userOnlineFile.setContent(contentJson);
+                return Mono.just(userOnlineFile);
+            });
+        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
+    }
+
+
+    /**
+     * 將物件格式化為 JSON 字串的通用轉換方法。
+     * <p>
+     * 使用 Jackson ObjectMapper 將任意物件序列化為 JSON 格式，
+     * 主要用於線上檔案內容的持久化儲存。支援複雜的巢狀物件結構，
+     * 確保資料完整性和格式一致性。
+     * <p>
+     * <strong>轉換特性：</strong>
+     * <ul>
+     *   <li>支援所有可序列化的 Java 物件</li>
+     *   <li>自動處理日期、集合、陣列等複雜類型</li>
+     *   <li>保持原始資料結構和類型資訊</li>
+     *   <li>統一的錯誤處理和異常轉換</li>
+     * </ul>
+     * <p>
+     * <strong>使用場景：</strong>
+     * <ul>
+     *   <li>線上檔案內容的資料庫儲存</li>
+     *   <li>檔案歷史版本的快照建立</li>
+     *   <li>檔案編輯內容的暫存處理</li>
+     * </ul>
+     *
+     * @param content 需要轉換的物件，可以是任何可序列化的類型
+     *
+     * @return 包含 JSON 字串的響應式包裝，轉換失敗時會發出錯誤信號
+     */
+    @SkipRecord
+    private Mono<String> formatObjectToJson(Object content) {
+        try {
+            return Mono.just(objectMapper.writeValueAsString(content));
+        } catch (Exception e) {
+            return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
+        }
+    }
+
+
+    /**
      * 根據檔案 ID 查找用戶線上檔案。
      * <p>
      * 查找指定 ID 的線上檔案記錄。若檔案不存在則拋出驗證異常。
      *
      * @param fileId 檔案的唯一識別碼
+     *
      * @return 線上檔案物件的響應式包裝
      */
     private Mono<UserOnlineFile> findUserOnlineFileById(String fileId) {
@@ -297,10 +376,11 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * <p>
      * 根據檔案 ID 查詢所有歷史版本，支援分頁顯示。使用版本號由新到舊的順序排列。
      *
-     * @param user 當前操作的用戶
+     * @param user         當前操作的用戶
      * @param fileMetadata 檔案元資料
-     * @param page 當前頁碼
-     * @param size 每頁顯示數量
+     * @param page         當前頁碼
+     * @param size         每頁顯示數量
+     *
      * @return 包含版本資訊的分頁響應結果
      */
     @Override
@@ -328,60 +408,6 @@ public class OnlineFileServiceImpl extends AbstractFileService {
                     pagedResponseDTO.setData(fileVersionDTOList);
                     return Mono.just(pagedResponseDTO);
                 }));
-    }
-
-
-    /**
-     * 建立線上檔案的初始歷史記錄。
-     * <p>
-     * 為檔案建立版本 0 的初始快照記錄，記錄當前的檔案內容、
-     * 修改者和時間等資訊。這是版本控制系統的起始點。
-     *
-     * @param userOnlineFile 線上檔案物件
-     * @param fileEditDTO 檔案編輯資訊
-     * @param contentJson 檔案內容的 JSON 字串
-     * @return 初始歷史記錄物件
-     */
-    private Mono<UserOnlineFileHistory> createInitialHistory(UserOnlineFile userOnlineFile, FileEditDTO fileEditDTO, String contentJson) {
-        UserOnlineFileHistory history = new UserOnlineFileHistory();
-        history.setFileId(userOnlineFile.getId());
-        history.setVersion(0L);
-        history.setPreviousVersion(null);
-        history.setModifiedBy(userOnlineFile.getLastModifiedBy());
-        history.setModifiedTime(LocalDateTime.now());
-        history.setIsSnapshot(true);
-        history.setSnapshotContent(contentJson);
-        history.setNote(fileEditDTO.getNote());
-        return userOnlineFileHistoryRepository.save(history);
-    }
-
-
-    /**
-     * 儲存編輯後的檔案內容。
-     * <p>
-     * 操作步驟：格式化新內容為 JSON 形式，更新檔案的修改者和歷史理合狀態，
-     * 然後同步更新檔案內容和元資料。空內容會被設為預設的空 JSON 結構。
-     *
-     * @param userOnlineFile 線上檔案物件
-     * @param fileEditBO 檔案編輯業務物件
-     * @param user 當前操作的用戶
-     * @return 表示儲存操作完成的響應式信號
-     */
-    private Mono<Void> saveContent(UserOnlineFile userOnlineFile, FileEditBO fileEditBO, User user) {
-        return Mono.defer(() -> {
-            userOnlineFile.setLastModifiedBy(user.getId());
-            userOnlineFile.setIsMatchHistory(false);
-            FileEditDTO fileEditDTO = fileEditBO.getFileEditDTO();
-            if (fileEditDTO.getContent() == null || fileEditDTO.getContent().isEmpty()) {
-                userOnlineFile.setContent(EMPTY_CONTENT);
-                return Mono.just(userOnlineFile);
-            }
-
-            return formatObjectToJson(fileEditDTO.getContent()).flatMap(contentJson -> {
-                userOnlineFile.setContent(contentJson);
-                return Mono.just(userOnlineFile);
-            });
-        }).then(userOnlineFileRepository.save(userOnlineFile).then(updateUserFileMetadata(fileEditBO.getUserFileMetadata()))).then();
     }
 
 
@@ -598,37 +624,28 @@ public class OnlineFileServiceImpl extends AbstractFileService {
 
 
     /**
-     * 將物件格式化為 JSON 字串的通用轉換方法。
+     * 建立線上檔案的初始歷史記錄。
      * <p>
-     * 使用 Jackson ObjectMapper 將任意物件序列化為 JSON 格式，
-     * 主要用於線上檔案內容的持久化儲存。支援複雜的巢狀物件結構，
-     * 確保資料完整性和格式一致性。
-     * <p>
-     * <strong>轉換特性：</strong>
-     * <ul>
-     *   <li>支援所有可序列化的 Java 物件</li>
-     *   <li>自動處理日期、集合、陣列等複雜類型</li>
-     *   <li>保持原始資料結構和類型資訊</li>
-     *   <li>統一的錯誤處理和異常轉換</li>
-     * </ul>
-     * <p>
-     * <strong>使用場景：</strong>
-     * <ul>
-     *   <li>線上檔案內容的資料庫儲存</li>
-     *   <li>檔案歷史版本的快照建立</li>
-     *   <li>檔案編輯內容的暫存處理</li>
-     * </ul>
+     * 為檔案建立版本 0 的初始快照記錄，記錄當前的檔案內容、
+     * 修改者和時間等資訊。這是版本控制系統的起始點。
      *
-     * @param content 需要轉換的物件，可以是任何可序列化的類型
-     * @return 包含 JSON 字串的響應式包裝，轉換失敗時會發出錯誤信號
+     * @param userOnlineFile 線上檔案物件
+     * @param fileEditDTO    檔案編輯資訊
+     * @param contentJson    檔案內容的 JSON 字串
+     *
+     * @return 初始歷史記錄物件
      */
-    @SkipRecord
-    private Mono<String> formatObjectToJson(Object content) {
-        try {
-            return Mono.just(objectMapper.writeValueAsString(content));
-        } catch (Exception e) {
-            return Mono.error(new ProcessException(ProcessException.ErrorCode.FORMAT_DATA_TO_JSON_FAILED, e));
-        }
+    private Mono<UserOnlineFileHistory> createInitialHistory(UserOnlineFile userOnlineFile, FileEditDTO fileEditDTO, String contentJson) {
+        UserOnlineFileHistory history = new UserOnlineFileHistory();
+        history.setFileId(userOnlineFile.getId());
+        history.setVersion(0L);
+        history.setPreviousVersion(null);
+        history.setModifiedBy(userOnlineFile.getLastModifiedBy());
+        history.setModifiedTime(LocalDateTime.now());
+        history.setIsSnapshot(true);
+        history.setSnapshotContent(contentJson);
+        history.setNote(fileEditDTO.getNote());
+        return userOnlineFileHistoryRepository.save(history);
     }
 
 
@@ -654,6 +671,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * </ul>
      *
      * @param content 編輯器內容 DTO，包含 Delta 操作序列
+     *
      * @return 字串行列表，每行代表一個 Delta 操作的 JSON 表示
      */
     @SkipRecord
@@ -707,6 +725,7 @@ public class OnlineFileServiceImpl extends AbstractFileService {
      * </ul>
      *
      * @param deltaList 差異字串行列表，每行包含一個 Delta 操作的 JSON 表示
+     *
      * @return 包含完整編輯器內容的響應式包裝，還原失敗時會發出錯誤信號
      */
     private Mono<EditorContentDTO> formatJsonToEditorContentJsonDTO(List<String> deltaList) {

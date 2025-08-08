@@ -277,6 +277,21 @@ global:
     # 請求限制的清除時間，在超過設定時間後，會清除用戶的請求限制，默認為 10 分鐘
     clean-interval: 10m
 
+  # gRPC 服務配置
+  grpc:
+    # 是否啟用 gRPC 服務，默認為 false
+    # 注意：只有在需要 WebDAV 整合或其他 gRPC 功能時才啟用
+    enabled: ${GLOBAL_GRPC_ENABLED:false}
+  
+  # WebDAV 整合配置
+  webdav:
+    # 是否啟用 WebDAV 整合功能，默認為 false
+    enabled: ${GLOBAL_WEBDAV_ENABLED:false}
+    
+    # WebDAV 子服務與主服務間通訊的 API Key
+    # 請確保此密鑰足夠複雜且與 WebDAV 子服務配置一致
+    api-key: ${GLOBAL_WEBDAV_API_KEY:your-secure-api-key-here}
+
   # 轉發請求的配置，若無使用 反向代理則不需要配置
   forwarded:
     # 真實的 IP 地址的標頭名稱，默認為 X-Real-IP
@@ -298,11 +313,6 @@ global:
 
     # netty 線程池的請求佇列的最長等待時間，默認為 30 秒
     pending-acquire-timeout: 30s
-
-  # 郵件相關設定
-  email:
-    # 郵件發送者的電子郵件地址，默認為 sender@example.com
-    mail-sender: sender@example.com
 
 # Spring 相關設定
 spring:
@@ -375,7 +385,7 @@ spring:
   #   # 郵件發送者配置
   #   mail-sender:
   #     # 系統郵件發送者的電子郵件地址
-  #     mail-sender: sender@example.com
+  #     sender: sender@example.com
 
   # 資料庫相關設定
   data:
@@ -451,5 +461,34 @@ springdoc:
 
   # 需要加入的 API Docs 的路徑，默認為 /api/**
   paths-to-match: /api/**
+
+# ====================================================================================
+# WebDAV 整合配置 (可選功能，預設為關閉)
+# 啟用此功能需要配合 WebDAV 子服務使用
+# 詳細資訊請參考：https://github.com/tommot20077/FileManagement-WebDav
+# ====================================================================================
+
+# 注意：WebDAV 和 gRPC 配置已經移至 global 部分
+
+# gRPC 服務配置 (WebDAV 整合所需)
+#grpc:
+#  server:
+#    # gRPC 服務端口，默認為 9090
+#    port: ${GRPC_SERVER_PORT:9090}
+#    
+#    # 最大入站消息大小，默認為 100MB
+#    max-inbound-message-size: 104857600  # 100MB
+#    
+#    # 最大並發調用數，默認為 100
+#    max-concurrent-calls: 100
+#    
+#    # Keep-alive 時間，默認為 30 秒
+#    keep-alive-time: 30s
+#    
+#    # Keep-alive 超時時間，默認為 5 秒
+#    keep-alive-timeout: 5s
+#    
+#    # 是否允許無調用時的 keep-alive，默認為 true
+#    permit-keep-alive-without-calls: true
 
 

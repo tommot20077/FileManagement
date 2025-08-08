@@ -17,11 +17,6 @@ logging:
     xyz.dowob.filemanagement: DEBUG
     org.springframework: WARN
     org.springframework.test: INFO
-
-# 測試專用配置
-test:
-  # 測試模式標記
-  mode: true
   
 # 關閉不必要的功能以加快測試速度
 management:
@@ -34,6 +29,14 @@ global:
     # 測試環境關閉請求限制以避免干擾測試
     type: none
     enable-ban-ip: false
+  
+  # 測試環境禁用 gRPC 服務以避免端口衝突
+  grpc:
+    enabled: false
+  
+  # 同時禁用 WebDAV 相關的 gRPC 服務
+  webdav:
+    enabled: false
 
 # 測試環境的緩存配置
 cache:
@@ -83,6 +86,8 @@ security:
   login:
     # 測試環境關閉登錄限制
     limiter-provider: none
+
+# 注意：gRPC 和 WebDAV 配置已移至 global 部分
 
 # 注意：此配置必須與其他 profiles 配合使用
 # - 在本地測試：spring.profiles.active=test,demo

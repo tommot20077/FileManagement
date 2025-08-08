@@ -14,7 +14,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  **/
 @EnableScheduling
 @EnableAspectJAutoProxy
-@SpringBootApplication(exclude = {org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class})
+@SpringBootApplication(exclude = {
+    org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+    net.devh.boot.grpc.server.autoconfigure.GrpcServerAutoConfiguration.class,
+    net.devh.boot.grpc.server.autoconfigure.GrpcServerFactoryAutoConfiguration.class
+})
 public class FileManagementApplication {
     /**
      * Spring Boot 啟動方法
@@ -24,5 +28,4 @@ public class FileManagementApplication {
     public static void main(String[] args) {
         SpringApplication.run(FileManagementApplication.class, args);
     }
-
 }

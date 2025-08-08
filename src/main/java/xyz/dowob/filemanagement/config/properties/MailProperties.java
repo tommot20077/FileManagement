@@ -177,6 +177,6 @@ public class MailProperties {
          * <p>
          * 預設值：{@code "sender@example.com"}
          */
-        private String mailSender = "sender@example.com";
+        private String sender = "sender@example.com";
     }
 }

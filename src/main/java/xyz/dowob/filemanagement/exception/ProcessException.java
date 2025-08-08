@@ -292,7 +292,13 @@ public class ProcessException extends Exception {
          * 錯誤碼: 1224
          * 錯誤訊息: 認證憑證時發生意外錯誤
          */
-        AUTHENTICATION_ERROR(1224, "認證憑證時發生意外錯誤")
+        AUTHENTICATION_ERROR(1224, "認證憑證時發生意外錯誤"),
+
+        /**
+         * 錯誤碼: 1225
+         * 錯誤訊息: 檔案檢查失敗
+         */
+        FILE_CHECK_FAILED(1225, "檔案檢查失敗，任務ID: %s")
 
         ;
 

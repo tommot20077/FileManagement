@@ -11,6 +11,7 @@ import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
+import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
 
 /**
@@ -140,6 +141,24 @@ public class TokenServiceImpl implements TokenService {
     @RecordLevel(LogLevelEnum.INFO)
     public Mono<Void> revokeToken(Long userId, TokenEnum tokenType) {
         return tokenStrategy.getTokenProvider(tokenType).revokeToken(userId);
+    }
+
+    /**
+     * 從 JWT 令牌中提取使用者 ID，不需要預先提供使用者 ID 進行驗證。
+     * 
+     * <p>此方法專門用於認證場景，直接解析令牌內容獲取使用者資訊。
+     * 與 validateToken 不同的是，本方法不執行完整的驗證流程，
+     * 僅提取令牌中的使用者 ID 資訊。</p>
+     *
+     * @param token 要解析的 JWT 令牌字串
+     * @param tokenType 令牌類型，決定使用的解析策略
+     * @return 包含使用者 ID 的 Mono，解析失敗時傳播異常
+     */
+    @Override
+    public Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType) {
+        return tokenStrategy.getTokenProvider(tokenType).validateToken(token, null)
+                .onErrorMap(ex -> new ValidationException(
+                        ValidationException.ErrorCode.JWT_TOKEN_INVALID));
     }
 
 

@@ -38,6 +38,7 @@ import xyz.dowob.filemanagement.component.provider.providerInterface.FileScanPro
 import xyz.dowob.filemanagement.config.properties.FileProperties;
 import xyz.dowob.filemanagement.customenum.*;
 import xyz.dowob.filemanagement.data.file.bo.FileEditBO;
+import xyz.dowob.filemanagement.data.file.bo.FileUploadResultBO;
 import xyz.dowob.filemanagement.data.file.bo.UploadTaskBO;
 import xyz.dowob.filemanagement.data.file.bo.UserFileDataBO;
 import xyz.dowob.filemanagement.data.file.dao.ServerFileMetaCountDAO;
@@ -300,8 +301,8 @@ public abstract class AbstractFileService implements FileService {
         Flux<UserFileMetaWithDataDAO> dataDAOs = userFileMetaRepository.getUserFileMetaWithDataDAO(user.getId(), fileFilterDTO, entityOperations);
         Flux<UserFileListDTO> getUserFileListDTOFlux = formatUnifiedDaoToDto(dataDAOs);
 
-        if (fileFilterDTO.getFolderId() == null || fileFilterDTO.getFolderId() < 0) {
-            return filterAndPageResponse(formatUnifiedDaoToDto(dataDAOs), fileFilterDTO);
+        if (fileFilterDTO.getFolderId() != null && fileFilterDTO.getFolderId() < 0) {
+            return filterAndPageResponse(getUserFileListDTOFlux, fileFilterDTO);
         }
 
         CacheRule<UserFileListDTO> cacheRule = cacheManager.generateCacheRule(key, CacheProviderEnum.USER_FILE_LIST_CACHE);
@@ -622,7 +623,14 @@ public abstract class AbstractFileService implements FileService {
                     .then(associateUserFile(existingFile, fileMetadataDTO).flatMap(userFileMetaRepository::save))
                     .then(handleUserStorage(user, existingFile.getFileSize(), false))
                     .then(cleanUserListCache(user.getId(), fileMetadataDTO.getParentFolderId()))
-                    .thenReturn(UploadResponseDTO.builder().progress(100.0).isSuccess(true).isFinished(true).message("上傳成功").build());
+                    .thenReturn(UploadResponseDTO
+                                        .builder()
+                                        .progress(100.0)
+                                        .isSuccess(true)
+                                        .isFinished(true)
+                                        .message("上傳成功")
+                                        .fileId(existingFile.getId())
+                                        .build());
         }).switchIfEmpty(initialUpload(fileMetadataDTO));
     }
 
@@ -675,8 +683,11 @@ public abstract class AbstractFileService implements FileService {
                                 .build();
 
                         if (uploadCountLong.intValue() == uploadChunkDTO.getTotalChunks()) {
-                            fileCheck(transferTaskId, uploadChunkDTO.getTotalChunks()).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                            responseDTO.setIsFinished(true);
+                            return fileCheck(transferTaskId, uploadChunkDTO.getTotalChunks()).flatMap(result -> {
+                                responseDTO.setIsFinished(true);
+                                responseDTO.setFileId(result.getUserFileId());
+                                return Mono.just(responseDTO);
+                            });
                         }
                         return Mono.just(responseDTO);
                     });
@@ -1417,9 +1428,9 @@ public abstract class AbstractFileService implements FileService {
      * @param transferTaskId 上傳任務的唯一識別碼
      * @param totalChunks    預期的檔案分塊總數
      *
-     * @return 檢查完成的信號，透過 Mono<Void> 回傳
+     * @return FileUploadResultBO 上傳結果業務對象，包含檔案處理狀態和相關訊息
      */
-    protected Mono<Void> fileCheck(String transferTaskId, int totalChunks) {
+    protected Mono<FileUploadResultBO> fileCheck(String transferTaskId, int totalChunks) {
         String key = "upload_task:" + transferTaskId;
         return redisProvider
                 .getHashMap(key, "DTO", UploadTaskBO.class)
@@ -1440,7 +1451,13 @@ public abstract class AbstractFileService implements FileService {
                                                                                                   null,
                                                                                                   true
                                 );
-                                return Mono.when(removeTempDataMono, updateTask);
+
+                                return Mono.when(removeTempDataMono, updateTask).then(Mono.defer(() -> {
+                                    if (e instanceof ProcessException || e instanceof ValidationException) {
+                                        return Mono.error(e);
+                                    }
+                                    return Mono.error(new ProcessException(ProcessException.ErrorCode.FILE_CHECK_FAILED, e, transferTaskId));
+                                }));
                             });
                 }));
     }
@@ -1476,9 +1493,9 @@ public abstract class AbstractFileService implements FileService {
      * @param uploadTaskBO  包含上傳任務詳細資訊的業務對象
      * @param combinedBytes 已驗證的完整檔案資料
      *
-     * @return 儲存完成的信號，透過 Mono<Void> 回傳
+     * @return FileUploadResultBO 上傳結果業務對象，包含伺服器檔案和使用者檔案元資料
      */
-    protected Mono<Void> processFileAfterFileCheck(UploadTaskBO uploadTaskBO, byte[] combinedBytes) {
+    protected Mono<FileUploadResultBO> processFileAfterFileCheck(UploadTaskBO uploadTaskBO, byte[] combinedBytes) {
         return gridFsProvider
                 .storeFile(Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(combinedBytes)),
                            String.format("%s_output", uploadTaskBO.getTransferTaskId())
@@ -1515,7 +1532,9 @@ public abstract class AbstractFileService implements FileService {
                             .save(serverFileMetadata)
                             .flatMap(serverFile -> associateUserFile(serverFile, uploadTaskBO.formatToFileMetadata()))
                             .flatMap(userFileMetaRepository::save)
-                            .then(Mono.when(calculateStorage, removeTempData, cleanUserListCache, updateTask));
+                            .flatMap(userFileMetadata -> Mono
+                                    .when(calculateStorage, removeTempData, cleanUserListCache, updateTask)
+                                    .thenReturn(new FileUploadResultBO(userFileMetadata, serverFileMetadata)));
                 });
     }
 
@@ -1697,8 +1716,11 @@ public abstract class AbstractFileService implements FileService {
                             .build();
 
                     if (uploadCount.intValue() == totalChunks) {
-                        fileCheck(transferTaskId, totalChunks).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                        responseDTO.setIsFinished(true);
+                        return fileCheck(transferTaskId, uploadChunkDTO.getTotalChunks()).flatMap(result -> {
+                            responseDTO.setIsFinished(true);
+                            responseDTO.setFileId(result.getUserFileId());
+                            return Mono.just(responseDTO);
+                        });
                     }
                     return Mono.just(responseDTO);
                 })

@@ -81,7 +81,7 @@ class EmailProviderImplTest {
         String fromEmail = "sender@example.com";
 
         when(customMailProperties.getMailSender()).thenReturn(mockEmailSender);
-        when(mockEmailSender.getMailSender()).thenReturn(fromEmail);
+        when(mockEmailSender.getSender()).thenReturn(fromEmail);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         var result = emailProviderImplUnderTest.sendEmail(sendToEmail, subject, content);
@@ -101,7 +101,7 @@ class EmailProviderImplTest {
         String fromEmail = "sender@example.com";
 
         when(customMailProperties.getMailSender()).thenReturn(mockEmailSender);
-        when(mockEmailSender.getMailSender()).thenReturn(fromEmail);
+        when(mockEmailSender.getSender()).thenReturn(fromEmail);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         doThrow(new MailException("Simulated send failure") {
         }).when(mockJavaMailSender).send(any(MimeMessage.class));
@@ -143,7 +143,7 @@ class EmailProviderImplTest {
         String content = "Test Content";
 
         when(customMailProperties.getMailSender()).thenReturn(mockEmailSender);
-        when(mockEmailSender.getMailSender()).thenReturn(null);
+        when(mockEmailSender.getSender()).thenReturn(null);
         when(mockJavaMailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         var result = emailProviderImplUnderTest.sendEmail(sendToEmail, subject, content);

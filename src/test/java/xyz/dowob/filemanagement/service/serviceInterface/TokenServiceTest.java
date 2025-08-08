@@ -181,6 +181,29 @@ class TokenServiceTest {
                 }
                 return Mono.empty();
             }
+
+            @Override
+            public Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType) {
+                if (token == null || token.trim().isEmpty()) {
+                    return Mono.error(new IllegalArgumentException("憑證不能為空"));
+                }
+                if (tokenType == null) {
+                    return Mono.error(new IllegalArgumentException("憑證類型不能為空"));
+                }
+                
+                // 從憑證中提取用戶ID - 假設憑證格式為 "tokentype_userId_timestamp"
+                if (token.startsWith(tokenType.name().toLowerCase() + "_")) {
+                    String[] parts = token.split("_");
+                    if (parts.length >= 3) {
+                        try {
+                            return Mono.just(Long.parseLong(parts[2]));
+                        } catch (NumberFormatException e) {
+                            return Mono.error(new IllegalArgumentException("憑證格式錯誤"));
+                        }
+                    }
+                }
+                return Mono.error(new IllegalArgumentException("憑證驗證失敗"));
+            }
         };
 
         // 設置測試對象
@@ -582,7 +605,7 @@ class TokenServiceTest {
         assertTrue(TokenService.class.isInterface());
         
         // 驗證 TokenService 特有方法數量（不包括繼承的）
-        assertEquals(3, TokenService.class.getDeclaredMethods().length);
+        assertEquals(4, TokenService.class.getDeclaredMethods().length);
         
         // 驗證繼承關係
         assertTrue(CrudService.class.isAssignableFrom(TokenService.class));

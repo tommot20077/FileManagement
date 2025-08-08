@@ -6,7 +6,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.entity.ServerFileMetadata;
 import xyz.dowob.filemanagement.entity.UserFileMetadata;
-import xyz.dowob.filemanagement.exception.ProcessException;
 
 /**
  * 檔案元資料實體的統一 CRUD 操作介面，定義使用者檔案和伺服器檔案元資料的基本操作規範。
@@ -174,9 +173,7 @@ public interface FileCrudService {
      *
      * @param entity 要更新的使用者檔案元資料實體，不可為 null
      * @return 包含更新後實體的 Mono，包含最新的版本資訊
-     * @throws ValidationException 當實體驗證失敗時
      * @throws OptimisticLockingFailureException 當發生並發更新衝突時
-     * @throws EntityNotFoundException 當實體不存在時
      */
     Mono<UserFileMetadata> updateUserFileMetadata(UserFileMetadata entity);
 
@@ -211,8 +208,6 @@ public interface FileCrudService {
      *
      * @param entity 要刪除的使用者檔案元資料實體，不可為 null
      * @return 表示刪除操作完成的空 Mono，成功時不返回任何數據
-     * @throws ValidationException 當實體驗證失敗或不允許刪除時
-     * @throws EntityNotFoundException 當實體不存在時
      * @throws DataIntegrityViolationException 當刪除會造成資料一致性問題時
      */
     Mono<Void> deleteUserFileMetadata(UserFileMetadata entity);
@@ -323,9 +318,7 @@ public interface FileCrudService {
      *
      * @param entity 要更新的伺服器檔案元資料實體，不可為 null
      * @return 包含更新後實體的 Mono，包含最新的系統屬性
-     * @throws ValidationException 當更新參數驗證失敗時
      * @throws SecurityException 當缺乏足夠權限時
-     * @throws IntegrityConstraintViolationException 當更新導致資料不一致時
      */
     Mono<ServerFileMetadata> updateServerFileMetadata(ServerFileMetadata entity);
 
@@ -365,7 +358,6 @@ public interface FileCrudService {
      * @throws SecurityException 當缺乏足夠的管理員權限時
      * @throws IllegalStateException 當檔案仍被其他用戶引用時
      * @throws DataIntegrityViolationException 當刪除會造成系統不一致時
-     * @throws ProcessException 當物理檔案刪除失敗時
      */
     Mono<Void> deleteServerFileMetadata(ServerFileMetadata entity);
 }

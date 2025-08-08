@@ -226,4 +226,33 @@ public interface TokenService extends CrudService<Token, Long> {
      * @see reactor.core.publisher.Mono
      */
     Mono<Void> revokeToken(Long userId, TokenEnum tokenType);
+
+    /**
+     * 從 JWT 令牌中提取使用者 ID，無需事先知道使用者 ID 進行驗證。
+     * 此方法專用於認證場景，僅解析令牌獲取使用者資訊，不執行完整的令牌驗證。
+     * 
+     * <p>此方法與 validateToken 的區別：
+     * <ul>
+     *   <li>validateToken 需要提供預期的使用者 ID 進行匹配驗證</li>
+     *   <li>extractUserIdFromToken 直接從令牌中解析出使用者 ID</li>
+     * </ul>
+     * 
+     * <p>主要用途：
+     * <ul>
+     *   <li>使用者登入認證後從 JWT 中獲取使用者 ID</li>
+     *   <li>無需預知使用者 ID 的令牌解析場景</li>
+     * </ul>
+     * 
+     * <p>範例用法：
+     * <pre>
+     * Mono<Long> userId = tokenService.extractUserIdFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN);
+     * </pre>
+     * 
+     * @param token 要解析的 JWT 令牌字串
+     * @param tokenType 令牌類型，決定使用的解析策略
+     * @return 包含使用者 ID 的 Mono，解析失敗時傳播異常
+     * @see TokenEnum
+     * @see #validateToken(String, Long, TokenEnum)
+     */
+    Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType);
 }

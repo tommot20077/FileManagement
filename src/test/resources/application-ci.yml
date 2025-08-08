@@ -39,6 +39,15 @@ spring:
           min-idle: 0
           max-wait: -1ms
 
+# CI 環境的全局配置
+global:
+  # CI 環境禁用 gRPC 服務以避免端口衝突
+  grpc:
+    enabled: false
+  # 同時禁用 WebDAV 相關的 gRPC 服務
+  webdav:
+    enabled: false
+
 # 重要：此配置必須與 demo profile 一起使用
 # 載入順序：test -> demo -> ci
 # demo 提供完整的應用配置（JWT secret、檔案路徑等）

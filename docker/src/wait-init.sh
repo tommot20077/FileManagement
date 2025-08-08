@@ -35,7 +35,7 @@ wait_for_service "filemanager_mongo" "27017" "60" || exit 1
 wait_for_service "filemanager_redis" "6381" "60" || exit 1
 
 # 等待 Clamav
-wait_for_service "filemanager6" "3310" "60" || exit 1
+wait_for_service "filemanager_clamav" "3310" "60" || exit 1
 
 # 啟動應用
 echo "所有依賴服務已準備就緒，啟動應用..."

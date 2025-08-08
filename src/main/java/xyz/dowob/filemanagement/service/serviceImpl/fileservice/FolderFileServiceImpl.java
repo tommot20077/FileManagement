@@ -206,6 +206,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             folder.setUploadTime(LocalDateTime.now());
             folder.setFileType(FileEnum.FOLDER);
             Mono<Void> action = userFileMetaRepository.save(folder).flatMap(newFolder -> {
+                fileEditDTO.setFileId(newFolder.getId().toString());
+
                 if (folderListTreeProvider != null) {
                     try {
                         folderListTreeProvider.addFolder(user.getId(), folder);
@@ -320,7 +322,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 響應式刪除檔案夾的實現，支持邏輯刪除和緩存管理。
+     * 響應式永久刪除檔案夾的實現，支持邏輯刪除和緩存管理。
      * <p>
      * 執行檔案夾刪除的完整流程，包括：
      * <ul>
@@ -484,9 +486,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 永久刪除資料夾及其所有內容。
+     * 刪除資料夾及其所有內容。
      * <p>
-     * 執行資料夾的永久刪除操作，包括遞迴查找所有子資料夾和檔案、
+     * 執行資料夾的刪除操作，包括遞迴查找所有子資料夾和檔案、
      * 建立回收站記錄、標記為已刪除、清理相關快取和更新資料夾樹。
      * 使用延遲雙刪模式確保快取一致性。
      *
@@ -531,9 +533,9 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 批量永久刪除多個資料夾。
+     * 批量刪除多個資料夾。
      * <p>
-     * 對指定的資料夾集合逐個執行永久刪除操作。
+     * 對指定的資料夾集合逐個執行刪除操作。
      *
      * @param folders 要刪除的資料夾集合
      * @param user 當前操作的用戶

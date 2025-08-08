@@ -186,7 +186,7 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
                 MimeMessage mimeMessage = new MimeMessage(session);
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-                helper.setFrom(customMailProperties.getMailSender().getMailSender(), "帳號安全管理組");
+                helper.setFrom(customMailProperties.getMailSender().getSender(), "帳號安全管理組");
                 helper.setTo(sendToEmail);
                 helper.setSubject(subject);
                 helper.setText(content, false);
@@ -219,7 +219,7 @@ public class EmailProviderImpl implements xyz.dowob.filemanagement.component.pro
                 MimeMessage mimeMessage = javaMailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-                helper.setFrom(customMailProperties.getMailSender().getMailSender(), "帳號安全管理組");
+                helper.setFrom(customMailProperties.getMailSender().getSender(), "帳號安全管理組");
                 helper.setTo(sendToEmail);
                 helper.setSubject(subject);
                 helper.setText(content, false);
