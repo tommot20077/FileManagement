@@ -131,6 +131,13 @@ jobs:
             cd /root/dev/FileManager
             echo "更新到最新代碼"
           
+            # 檢查是否有未提交的變更（保護措施）
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "警告: 檢測到未提交的本地變更"
+              echo "備份本地變更..."
+              git stash save "Auto-stash before deploy at $(date '+%Y-%m-%d %H:%M:%S')"
+            fi
+          
             # 拉取最新代碼確保獲取所有遠端變更
             git fetch --all
           
@@ -237,6 +244,13 @@ jobs:
             # 進入前端專案目錄
             cd /root/dev/FileManager-front
             echo "更新前端代碼"
+          
+            # 檢查是否有未提交的變更（保護措施）
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "警告: 檢測到未提交的本地變更"
+              echo "備份本地變更..."
+              git stash save "Auto-stash before deploy at $(date '+%Y-%m-%d %H:%M:%S')"
+            fi
           
             # 拉取最新代碼確保獲取所有遠端變更
             git fetch --all

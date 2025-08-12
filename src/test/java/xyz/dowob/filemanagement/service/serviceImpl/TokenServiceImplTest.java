@@ -1,5 +1,6 @@
 package xyz.dowob.filemanagement.service.serviceImpl;
 
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,9 +13,12 @@ import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenPro
 import xyz.dowob.filemanagement.component.provider.providerInterface.TokenProvider;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
 import xyz.dowob.filemanagement.repostiory.TokenRepository;
+
+import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -329,59 +333,76 @@ class TokenServiceImplTest {
 
     @Test
     @DisplayName("從 Token 提取 UserId - 傳入有效 JWT Token 應回傳 userId")
-    void extractUserIdFromToken_validJwtToken_returnsUserId() {
+    void extractUserInfoFromToken_validJwtToken_returnsUserId() {
         String jwtToken = "valid-jwt-token";
         Long expectedUserId = 123L;
-        TokenProvider mockProvider = mock(TokenProvider.class);
+        JwtTokenProviderImpl mockJwtProvider = mock(JwtTokenProviderImpl.class);
 
-        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockProvider);
-        when(mockProvider.validateToken(jwtToken, null)).thenReturn(Mono.just(expectedUserId));
+        // 建立模擬的Claims對象
+        Claims mockClaims = mock(Claims.class);
+        Date expiration = new Date(System.currentTimeMillis() + 3600000);
+        when(mockClaims.getSubject()).thenReturn("123");
+        when(mockClaims.get("username", String.class)).thenReturn("testUser");
+        when(mockClaims.get("role", String.class)).thenReturn("USER");
+        when(mockClaims.getExpiration()).thenReturn(expiration);
+        when(mockClaims.get("version", String.class)).thenReturn("1.0");
+
+        UserInfoDto expectedUserInfoDto = UserInfoDto.builder()
+                                             .userId(expectedUserId)
+                                             .username("testUser")
+                                             .role("USER")
+                                             .tokenExpiry(expiration)
+                                             .tokenVersion("1.0")
+                                             .build();
+
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockJwtProvider);
+        when(mockJwtProvider.getClaimsFromToken(jwtToken)).thenReturn(Mono.just(mockClaims));
 
         StepVerifier
-                .create(tokenServiceImplUnderTest.extractUserIdFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
-                .expectNext(expectedUserId)
+                .create(tokenServiceImplUnderTest.extractUserInfoFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .expectNext(expectedUserInfoDto)
                 .verifyComplete();
 
         verify(mockTokenStrategy).getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
-        verify(mockProvider).validateToken(jwtToken, null);
+        verify(mockJwtProvider).getClaimsFromToken(jwtToken);
     }
 
     @Test
     @DisplayName("從 Token 提取 UserId - 傳入無效 Token 應拋出 JWT_TOKEN_INVALID ValidationException")
-    void extractUserIdFromToken_invalidToken_throwsValidationException() {
+    void extractUserInfoFromToken_invalidToken_throwsValidationException() {
         String invalidToken = "invalid-token";
-        TokenProvider mockProvider = mock(TokenProvider.class);
+        JwtTokenProviderImpl mockJwtProvider = mock(JwtTokenProviderImpl.class);
 
-        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockProvider);
-        when(mockProvider.validateToken(invalidToken, null))
-                .thenReturn(Mono.error(new RuntimeException("Token validation failed")));
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockJwtProvider);
+        when(mockJwtProvider.getClaimsFromToken(invalidToken))
+                .thenReturn(Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID)));
 
         StepVerifier
-                .create(tokenServiceImplUnderTest.extractUserIdFromToken(invalidToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .create(tokenServiceImplUnderTest.extractUserInfoFromToken(invalidToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
                 .expectErrorMatches(e -> e instanceof ValidationException validationException 
                     && validationException.getErrorCode() == ValidationException.ErrorCode.JWT_TOKEN_INVALID)
                 .verify();
 
         verify(mockTokenStrategy).getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
-        verify(mockProvider).validateToken(invalidToken, null);
+        verify(mockJwtProvider).getClaimsFromToken(invalidToken);
     }
 
     @Test
     @DisplayName("從 Token 提取 UserId - 傳入 null Token 應拋出 JWT_TOKEN_INVALID ValidationException")
-    void extractUserIdFromToken_nullToken_throwsValidationException() {
-        TokenProvider mockProvider = mock(TokenProvider.class);
+    void extractUserInfoFromToken_nullToken_throwsValidationException() {
+        JwtTokenProviderImpl mockJwtProvider = mock(JwtTokenProviderImpl.class);
 
-        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockProvider);
-        when(mockProvider.validateToken(null, null))
-                .thenReturn(Mono.error(new RuntimeException("Null token")));
+        when(mockTokenStrategy.getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN)).thenReturn(mockJwtProvider);
+        when(mockJwtProvider.getClaimsFromToken(null))
+                .thenReturn(Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID)));
 
         StepVerifier
-                .create(tokenServiceImplUnderTest.extractUserIdFromToken(null, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .create(tokenServiceImplUnderTest.extractUserInfoFromToken(null, TokenEnum.JWT_AUTHORIZATION_TOKEN))
                 .expectErrorMatches(e -> e instanceof ValidationException validationException 
                     && validationException.getErrorCode() == ValidationException.ErrorCode.JWT_TOKEN_INVALID)
                 .verify();
 
         verify(mockTokenStrategy).getTokenProvider(TokenEnum.JWT_AUTHORIZATION_TOKEN);
-        verify(mockProvider).validateToken(null, null);
+        verify(mockJwtProvider).getClaimsFromToken(null);
     }
 }

@@ -3,6 +3,7 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -226,33 +227,45 @@ public interface TokenService extends CrudService<Token, Long> {
      * @see reactor.core.publisher.Mono
      */
     Mono<Void> revokeToken(Long userId, TokenEnum tokenType);
-
+    
     /**
-     * 從 JWT 令牌中提取使用者 ID，無需事先知道使用者 ID 進行驗證。
-     * 此方法專用於認證場景，僅解析令牌獲取使用者資訊，不執行完整的令牌驗證。
+     * 從 JWT 令牌中提取完整的使用者資訊，包括使用者 ID、使用者名稱、角色和令牌有效期。
+     * 此方法專用於身份驗證和授權場景，提供比 extractUserIdFromToken 更豐富的使用者上下文資訊。
      * 
-     * <p>此方法與 validateToken 的區別：
+     * <p>提取的資訊包括：
      * <ul>
-     *   <li>validateToken 需要提供預期的使用者 ID 進行匹配驗證</li>
-     *   <li>extractUserIdFromToken 直接從令牌中解析出使用者 ID</li>
+     *   <li>使用者 ID - 唯一識別使用者的標識符</li>
+     *   <li>使用者名稱 - 用於顯示和日誌記錄</li>
+     *   <li>角色 - 決定使用者的存取權限</li>
+     *   <li>令牌過期時間 - 用於快取管理和自動清理</li>
+     *   <li>令牌版本號 - 用於撤銷機制和版本控制</li>
      * </ul>
      * 
-     * <p>主要用途：
+     * <p>主要優勢：
      * <ul>
-     *   <li>使用者登入認證後從 JWT 中獲取使用者 ID</li>
-     *   <li>無需預知使用者 ID 的令牌解析場景</li>
+     *   <li>減少重複的令牌解析操作</li>
+     *   <li>提供完整的使用者上下文資訊</li>
+     *   <li>支援更精細的權限控制</li>
+     *   <li>改善快取效率和效能</li>
      * </ul>
      * 
      * <p>範例用法：
      * <pre>
-     * Mono<Long> userId = tokenService.extractUserIdFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN);
+     * Mono<UserInfoDto> userInfo = tokenService.extractUserInfoFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN)
+     *     .doOnSuccess(info -> {
+     *         log.info("使用者 {} 角色為 {}", info.getUsername(), info.getRole());
+     *         if (info.isAdmin()) {
+     *             // 執行管理員操作
+     *         }
+     *     });
      * </pre>
      * 
      * @param token 要解析的 JWT 令牌字串
      * @param tokenType 令牌類型，決定使用的解析策略
-     * @return 包含使用者 ID 的 Mono，解析失敗時傳播異常
+     * @return 包含完整使用者資訊的 Mono，解析失敗時傳播異常
+     * @see UserInfoDto
      * @see TokenEnum
-     * @see #validateToken(String, Long, TokenEnum)
+     * @since 2.0
      */
-    Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType);
+    Mono<UserInfoDto> extractUserInfoFromToken(String token, TokenEnum tokenType);
 }

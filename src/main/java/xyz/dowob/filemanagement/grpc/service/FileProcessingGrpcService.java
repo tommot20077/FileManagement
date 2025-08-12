@@ -62,14 +62,14 @@ import java.util.stream.Collectors;
  * <pre>
  * // gRPC 客戶端使用範例
  * FileProcessingServiceBlockingStub stub = FileProcessingServiceGrpc.newBlockingStub(channel);
- * 
+ *
  * // 認證用戶
  * AuthenticationResponse auth = stub.authenticateUser(
  *     AuthenticationRequest.newBuilder()
  *         .setUsername("user")
  *         .setPassword("password")
  *         .build());
- * 
+ *
  * // 上傳檔案
  * StreamObserver&lt;UploadProgress&gt; uploadObserver = new StreamObserver&lt;UploadProgress&gt;() {
  *     // 處理上傳進度
@@ -79,15 +79,15 @@ import java.util.stream.Collectors;
  *
  * @author yuan
  * @version 1.0
- * @since 1.0
  * @see FileProcessingServiceGrpc.FileProcessingServiceImplBase
  * @see FileServiceStrategy
  * @see UserService
  * @see PermissionService
+ * @since 1.0
  */
 @Component
 @RequiredArgsConstructor
-public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FileProcessingServiceImplBase {
+public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FileProcessingServiceImplBase implements xyz.dowob.filemanagement.unity.ResponseUnity {
 
     /**
      * 檔案服務策略管理器。
@@ -151,11 +151,12 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * </ul>
      *
      * @param responseObserver 上傳進度回應觀察器，用於即時回報上傳進度和結果
+     *
      * @return 檔案上傳分塊的請求觀察器，接收客戶端發送的檔案分塊資料
      */
     @Override
     public StreamObserver<FileUploadChunk> uploadFile(StreamObserver<UploadProgress> responseObserver) {
-        return new StreamObserver<>() {
+        return wrapGrpcStreamObserver(responseObserver, new StreamObserver<FileUploadChunk>() {
             private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
             private final AtomicLong totalReceived = new AtomicLong(0);
@@ -271,7 +272,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
                             }
                 );
             }
-        };
+        });
     }
 
 
@@ -300,33 +301,28 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>錯誤處理：當上傳失敗時，系統會返回詳細錯誤訊息，協助客戶端
      * 進行問題診斷和處理。
      *
-     * @param request 上傳檔案請求，包含檔案內容、元資料和用戶認證資訊
+     * @param request          上傳檔案請求，包含檔案內容、元資料和用戶認證資訊
      * @param responseObserver 上傳結果回應觀察器，用於回傳上傳狀態和結果
      */
     @Override
     public void uploadFileSimple(UploadFileRequest request, StreamObserver<UploadFileResponse> responseObserver) {
-        validateUserAndUpload(request.getUserId(),
-                              request.getUserToken(),
-                              request.getFilename(),
-                              request.getParentFolderId(),
-                              request.getMd5(),
-                              request.getContent().toByteArray(),
-                              request.getMimeType()
-        ).subscribe(response -> {
-                        responseObserver.onNext(UploadFileResponse
-                                                        .newBuilder()
-                                                        .setSuccess(response.getIsSuccess())
-                                                        .setFileId(response.getFileId() != null ? response.getFileId() : 0)
-                                                        .setIsInstantUpload(response.getIsFinished() && response.getProgress() == 100.0)
-                                                        .setMessage(response.getMessage())
-                                                        .build());
-                        responseObserver.onCompleted();
-                    }, error -> {
-                        LogUnity.error("簡單上傳失敗: %s", error, error.getMessage());
-                        responseObserver.onNext(UploadFileResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                        responseObserver.onCompleted();
-                    }
-        );
+        Mono<UploadFileResponse> uploadMono = validateUserAndUpload(
+                request.getUserId(),
+                request.getUserToken(),
+                request.getFilename(),
+                request.getParentFolderId(),
+                request.getMd5(),
+                request.getContent().toByteArray(),
+                request.getMimeType()
+        ).map(response -> UploadFileResponse
+                .newBuilder()
+                .setSuccess(response.getIsSuccess())
+                .setFileId(response.getFileId() != null ? response.getFileId() : 0)
+                .setIsInstantUpload(response.getIsFinished() && response.getProgress() == 100.0)
+                .setMessage(response.getMessage())
+                .build());
+        
+        subscribeWithGrpcHandler(uploadMono, responseObserver);
     }
 
 
@@ -353,7 +349,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>分塊傳輸機制：為了優化大檔案的傳輸效率和記憶體使用，
      * 系統會自動將檔案內容分成 64KB 的小塊進行傳輸，並標記最後一個分塊。
      *
-     * @param request 檔案內容獲取請求，包含檔案 ID 和用戶認證資訊
+     * @param request          檔案內容獲取請求，包含檔案 ID 和用戶認證資訊
      * @param responseObserver 檔案內容回應觀察器，用於分塊傳輸檔案內容
      */
     @Override
@@ -361,17 +357,20 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
         User user = new User();
         user.setId(request.getUserId());
 
-        tokenService.validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN).flatMap(userId -> {
-            user.setId(userId);
-            return permissionService.validateUserPermission(user, request.getFileId());
-        }).flatMap(file -> {
-            FileService fileService = fileServiceStrategy.getFileService(file.getFileType());
-            return fileService.downloadFile(file, user);
-        }).subscribe(userFileDataBO -> handleFileContent(userFileDataBO, responseObserver), error -> {
-                         LogUnity.error("獲取檔案內容失敗: %s", error, error.getMessage());
-                         responseObserver.onNext(FileContentResponse.newBuilder().setErrorMessage(error.getMessage()).build());
-                         responseObserver.onCompleted();
-                     }
+        Mono<UserFileDataBO> downloadMono = tokenService
+            .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
+            .flatMap(userId -> {
+                user.setId(userId);
+                return permissionService.validateUserPermission(user, request.getFileId());
+            })
+            .flatMap(file -> {
+                FileService fileService = fileServiceStrategy.getFileService(file.getFileType());
+                return fileService.downloadFile(file, user);
+            });
+        
+        downloadMono.subscribe(
+            userFileDataBO -> handleFileContent(userFileDataBO, responseObserver),
+            error -> handleGrpcError(error, responseObserver)
         );
     }
 
@@ -401,52 +400,49 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>效能特點：本服務僅獲取檔案元資料，不讀取檔案內容，
      * 因此具有很高的執行效率，適用於檔案瀏覽器和列表顯示等場景。
      *
-     * @param request 檔案元資料獲取請求，包含檔案 ID 和用戶認證資訊
+     * @param request          檔案元資料獲取請求，包含檔案 ID 和用戶認證資訊
      * @param responseObserver 檔案元資料回應觀察器，用於返回檔案的元資料資訊
      */
     @Override
     public void getFileMetadata(GetFileMetadataRequest request, StreamObserver<FileMetadataResponse> responseObserver) {
         User user = new User();
         user.setId(request.getUserId());
-        tokenService
-                .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
-                .flatMap(userId -> permissionService.validateUserPermission(user, request.getFileId()))
-                .flatMap(fileMetadata -> {
-                    if (fileMetadata.getServerFileId() != null) {
-                        FileService fileService = fileServiceStrategy.getFileService(fileMetadata.getFileType());
-                        return fileService.getByServerFileMetadataId(fileMetadata.getServerFileId()).flatMap(serverFileMetadata -> {
-                            return Mono.just(Tuples.of(serverFileMetadata.getFileSize(), fileMetadata));
-                        });
-                    }
-                    return Mono.just(Tuples.of(0L, fileMetadata));
-                })
-                .subscribe(tuple2 -> {
-                               UserFileMetadata file = tuple2.getT2();
-                               FileInfo fileInfo = FileInfo
-                                       .newBuilder()
-                                       .setId(file.getId())
-                                       .setName(file.getFilename())
-                                       .setSize(tuple2.getT1())
-                                       .setIsDirectory(file.getFileType() == FileEnum.FOLDER)
-                                       .setCreatedTime(file.getUploadTime() != null ? file
-                                               .getUploadTime()
-                                               .toInstant(java.time.ZoneOffset.UTC)
-                                               .toEpochMilli() : 0)
-                                       .setModifiedTime(file.getLastAccessTime() != null ? file
-                                               .getLastAccessTime()
-                                               .toInstant(java.time.ZoneOffset.UTC)
-                                               .toEpochMilli() : 0)
-                                       .setParentId(file.getParentFolderId() != null ? file.getParentFolderId() : 0)
-                                       .build();
+        
+        Mono<FileMetadataResponse> metadataMono = tokenService
+            .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
+            .flatMap(userId -> permissionService.validateUserPermission(user, request.getFileId()))
+            .flatMap(fileMetadata -> {
+                if (fileMetadata.getServerFileId() != null) {
+                    FileService fileService = fileServiceStrategy.getFileService(fileMetadata.getFileType());
+                    return fileService.getByServerFileMetadataId(fileMetadata.getServerFileId()).flatMap(serverFileMetadata -> {
+                        return Mono.just(Tuples.of(serverFileMetadata.getFileSize(), fileMetadata));
+                    });
+                }
+                return Mono.just(Tuples.of(0L, fileMetadata));
+            })
+            .map(tuple2 -> {
+                UserFileMetadata file = tuple2.getT2();
+                FileInfo fileInfo = FileInfo
+                    .newBuilder()
+                    .setId(file.getId())
+                    .setName(file.getFilename())
+                    .setSize(tuple2.getT1())
+                    .setIsDirectory(file.getFileType() == FileEnum.FOLDER)
+                    .setCreatedTime(file.getUploadTime() != null ? file
+                            .getUploadTime()
+                            .toInstant(java.time.ZoneOffset.UTC)
+                            .toEpochMilli() : 0)
+                    .setModifiedTime(file.getLastAccessTime() != null ? file
+                            .getLastAccessTime()
+                            .toInstant(java.time.ZoneOffset.UTC)
+                            .toEpochMilli() : 0)
+                    .setParentId(file.getParentFolderId() != null ? file.getParentFolderId() : 0)
+                    .build();
 
-                               responseObserver.onNext(FileMetadataResponse.newBuilder().setSuccess(true).setFileInfo(fileInfo).build());
-                               responseObserver.onCompleted();
-                           }, error -> {
-                               LogUnity.error("獲取檔案元資料失敗: %s", error, error.getMessage());
-                               responseObserver.onNext(FileMetadataResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                               responseObserver.onCompleted();
-                           }
-                );
+                return FileMetadataResponse.newBuilder().setSuccess(true).setFileInfo(fileInfo).build();
+            });
+        
+        subscribeWithGrpcHandler(metadataMono, responseObserver);
     }
 
 
@@ -480,29 +476,27 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>特殊處理：對於資料夾的刪除，系統會遞歸處理所有子項目，
      * 確保整個目錄結構都被正確標記為已刪除狀態。
      *
-     * @param request 檔案刪除請求，包含檔案 ID 和用戶認證資訊
+     * @param request          檔案刪除請求，包含檔案 ID 和用戶認證資訊
      * @param responseObserver 檔案刪除回應觀察器，用於返回刪除操作結果
      */
     @Override
     public void deleteFile(DeleteFileRequest request, StreamObserver<DeleteFileResponse> responseObserver) {
         User user = new User();
         user.setId(request.getUserId());
-        tokenService
-                .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
-                .flatMap(userId -> permissionService.validateUserPermission(user, request.getFileId()))
-                .flatMap(file -> {
-                    FileService fileService = fileServiceStrategy.getFileService(file.getFileType());
-                    return fileService.removeFile(file, user);
-                })
-                .subscribe(result -> {
-                               responseObserver.onNext(DeleteFileResponse.newBuilder().setSuccess(true).setMessage("已移動到回收站").build());
-                               responseObserver.onCompleted();
-                           }, error -> {
-                               LogUnity.error("刪除失敗: %s", error, error.getMessage());
-                               responseObserver.onNext(DeleteFileResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                               responseObserver.onCompleted();
-                           }
-                );
+        
+        Mono<DeleteFileResponse> deleteMono = tokenService
+            .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
+            .flatMap(userId -> permissionService.validateUserPermission(user, request.getFileId()))
+            .flatMap(file -> {
+                FileService fileService = fileServiceStrategy.getFileService(file.getFileType());
+                return fileService.removeFile(file, user);
+            })
+            .map(result -> DeleteFileResponse.newBuilder()
+                .setSuccess(true)
+                .setMessage("已移動到回收站")
+                .build());
+        
+        subscribeWithGrpcHandler(deleteMono, responseObserver);
     }
 
 
@@ -530,15 +524,17 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>效能優化：為了提供高效的目錄瀏覽體驗，系統會一次性獲取
      * 整個目錄的所有內容，避免多次資料庫查詢。
      *
-     * @param request 資料夾列表獲取請求，包含資料夾 ID 和用戶認證資訊
+     * @param request          資料夾列表獲取請求，包含資料夾 ID 和用戶認證資訊
      * @param responseObserver 資料夾列表回應觀察器，用於返回檔案和資料夾列表
      */
     @Override
     public void listFolder(ListFolderRequest request, StreamObserver<ListFolderResponse> responseObserver) {
-        tokenService.validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN).flatMap(userId -> {
-            User user = new User();
-            user.setId(userId);
-            FileFilterDTO filterDTO = FileFilterDTO
+        Mono<ListFolderResponse> listMono = tokenService
+            .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
+            .flatMap(userId -> {
+                User user = new User();
+                user.setId(userId);
+                FileFilterDTO filterDTO = FileFilterDTO
                     .builder()
                     .folderId(request.getFolderId() == 0 ? null : request.getFolderId())
                     .pageSize(Integer.MAX_VALUE)
@@ -546,19 +542,22 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
                     .includeDeleted(false)
                     .build();
 
-            FileService fileService = fileServiceStrategy.getFileService(FileEnum.FOLDER);
-            return fileService.getUserFileList(user, filterDTO).map(PagedResponseDTO::getData);
-        }).subscribe(files -> {
-                         List<FileInfo> fileInfos = files.stream().map(this::convertUserFileListDTOToFileInfo).collect(Collectors.toList());
+                FileService fileService = fileServiceStrategy.getFileService(FileEnum.FOLDER);
+                return fileService.getUserFileList(user, filterDTO).map(PagedResponseDTO::getData);
+            })
+            .map(files -> {
+                List<FileInfo> fileInfos = files.stream()
+                    .map(this::convertUserFileListDTOToFileInfo)
+                    .collect(Collectors.toList());
 
-                         responseObserver.onNext(ListFolderResponse.newBuilder().setSuccess(true).addAllFiles(fileInfos).setTotalCount(fileInfos.size()).build());
-                         responseObserver.onCompleted();
-                     }, error -> {
-                         LogUnity.error("列出資料夾失敗: %s", error, error.getMessage());
-                         responseObserver.onNext(ListFolderResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                         responseObserver.onCompleted();
-                     }
-        );
+                return ListFolderResponse.newBuilder()
+                    .setSuccess(true)
+                    .addAllFiles(fileInfos)
+                    .setTotalCount(fileInfos.size())
+                    .build();
+            });
+        
+        subscribeWithGrpcHandler(listMono, responseObserver);
     }
 
 
@@ -590,33 +589,33 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      *   <li>自動更新目錄結構緩存</li>
      * </ul>
      *
-     * @param request 資料夾創建請求，包含資料夾名稱、上級目錄 ID 和用戶認證資訊
+     * @param request          資料夾創建請求，包含資料夾名稱、上級目錄 ID 和用戶認證資訊
      * @param responseObserver 資料夾創建回應觀察器，用於返回創建結果和新資料夾 ID
      */
     @Override
     public void createFolder(CreateFolderRequest request, StreamObserver<CreateFolderResponse> responseObserver) {
         Long parentId = request.getParentId() == 0 ? null : request.getParentId();
-        FileEditDTO fileEditDTO = FileEditDTO.builder().filename(request.getFolderName()).parentFolderId(parentId).build();
+        FileEditDTO fileEditDTO = FileEditDTO.builder()
+            .filename(request.getFolderName())
+            .parentFolderId(parentId)
+            .build();
 
-        tokenService.validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN).flatMap(userId -> {
-            FolderService folderService = (FolderService) fileServiceStrategy.getFileService(FileEnum.FOLDER);
-
-            User user = new User();
-            user.setId(userId);
-            return folderService.createFolder(fileEditDTO, user).doOnSuccess(v -> {
-                responseObserver.onNext(CreateFolderResponse
-                                                .newBuilder()
-                                                .setSuccess(true)
-                                                .setFolderId(Long.parseLong(fileEditDTO.getFileId()))
-                                                .setMessage("資料夾創建成功")
-                                                .build());
-                responseObserver.onCompleted();
-            }).doOnError(error -> {
-                LogUnity.error("創建資料夾失敗: %s", error, error.getMessage());
-                responseObserver.onNext(CreateFolderResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                responseObserver.onCompleted();
+        Mono<CreateFolderResponse> createMono = tokenService
+            .validateToken(request.getUserToken(), request.getUserId(), TokenEnum.JWT_AUTHORIZATION_TOKEN)
+            .flatMap(userId -> {
+                FolderService folderService = (FolderService) fileServiceStrategy.getFileService(FileEnum.FOLDER);
+                User user = new User();
+                user.setId(userId);
+                return folderService.createFolder(fileEditDTO, user)
+                    .map(v -> CreateFolderResponse
+                        .newBuilder()
+                        .setSuccess(true)
+                        .setFolderId(Long.parseLong(fileEditDTO.getFileId()))
+                        .setMessage("資料夾創建成功")
+                        .build());
             });
-        }).subscribe();
+        
+        subscribeWithGrpcHandler(createMono, responseObserver);
     }
 
 
@@ -647,27 +646,35 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * 但不會洩露具體的失敗原因（如用戶不存在或密碼錯誤），
      * 以防止惡意攻擊者進行用戶枚舉。
      *
-     * @param request 用戶認證請求，包含用戶名和密碼
+     * @param request          用戶認證請求，包含用戶名和密碼
      * @param responseObserver 認證結果回應觀察器，用於返回 JWT 令牌和用戶 ID
      */
     @Override
     public void authenticateUser(AuthenticationRequest request, StreamObserver<AuthenticationResponse> responseObserver) {
-        AuthRequestDTO authRequest = AuthRequestDTO.builder().username(request.getUsername()).password(request.getPassword()).build();
+        AuthRequestDTO authRequest = AuthRequestDTO.builder()
+            .username(request.getUsername())
+            .password(request.getPassword())
+            .build();
 
-        userService.login(authRequest, null).flatMap(jwtToken -> {
-            return tokenService.extractUserIdFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN).map(userId -> Tuples.of(jwtToken, userId));
-        }).subscribe(tokenAndUserId -> {
-                         String jwtToken = tokenAndUserId.getT1();
-                         Long userId = tokenAndUserId.getT2();
+        Mono<AuthenticationResponse> authMono = userService
+            .login(authRequest, null)
+            .flatMap(jwtToken -> tokenService
+                .extractUserInfoFromToken(jwtToken, TokenEnum.JWT_AUTHORIZATION_TOKEN)
+                .map(userInfo -> Tuples.of(jwtToken, userInfo)))
+            .map(tokenAndUserInfo -> {
+                String jwtToken = tokenAndUserInfo.getT1();
+                var userInfo = tokenAndUserInfo.getT2();
 
-                         responseObserver.onNext(AuthenticationResponse.newBuilder().setSuccess(true).setJwtToken(jwtToken).setUserId(userId).build());
-                         responseObserver.onCompleted();
-                     }, error -> {
-                         LogUnity.error("認證失敗: %s", error, error.getMessage());
-                         responseObserver.onNext(AuthenticationResponse.newBuilder().setSuccess(false).setErrorMessage(error.getMessage()).build());
-                         responseObserver.onCompleted();
-                     }
-        );
+                return AuthenticationResponse.newBuilder()
+                    .setSuccess(true)
+                    .setJwtToken(jwtToken)
+                    .setUserId(userInfo.getUserId())
+                    .setUsername(userInfo.getUsername() != null ? userInfo.getUsername() : "")
+                    .setRole(userInfo.getRole() != null ? userInfo.getRole() : "")
+                    .build();
+            });
+        
+        subscribeWithGrpcHandler(authMono, responseObserver);
     }
 
     // ==================== 輔助方法 ====================
@@ -691,6 +698,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * 確保返回的 FileInfo 物件完整可用。
      *
      * @param dto 檔案列表查詢結果 DTO
+     *
      * @return 轉換後的 gRPC FileInfo 物件
      */
     private FileInfo convertUserFileListDTOToFileInfo(UserFileListDTO dto) {
@@ -729,7 +737,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      *
      * <p>錯誤處理：當處理過程中發生錯誤時，會記錄詳細日誌並向客戶端返回錯誤訊息。
      *
-     * @param userFileDataBO 用戶檔案數據業務物件，包含檔案內容和元資料
+     * @param userFileDataBO   用戶檔案數據業務物件，包含檔案內容和元資料
      * @param responseObserver gRPC 回應觀察器，用於分塊傳輸檔案內容
      */
     private void handleFileContent(UserFileDataBO userFileDataBO, StreamObserver<FileContentResponse> responseObserver) {
@@ -804,7 +812,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * <p>效能考量：此方法采用同步方式進行分塊傳輸，適用於中等大小的檔案。
      * 對於非常大的檔案，建議使用流式處理方法。
      *
-     * @param data 要傳輸的檔案二進位數據
+     * @param data             要傳輸的檔案二進位數據
      * @param responseObserver gRPC 回應觀察器，用於傳輸分塊數據
      */
     private void sendContentInChunks(byte[] data, StreamObserver<FileContentResponse> responseObserver) {
@@ -846,6 +854,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * </ul>
      *
      * @param bytes 要轉換的位元組陣列
+     *
      * @return 十六進位表示的字串，使用小寫字母
      */
     private static String bytesToHex(byte[] bytes) {
@@ -878,13 +887,14 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      *   <li>自動處理權限檢查和檔案重複性驗證</li>
      * </ul>
      *
-     * @param userId 用戶唯一識別符
-     * @param token JWT 令牌，用於驗證用戶身份
-     * @param filename 檔案名稱
+     * @param userId         用戶唯一識別符
+     * @param token          JWT 令牌，用於驗證用戶身份
+     * @param filename       檔案名稱
      * @param parentFolderId 上級目錄 ID，可為 null 表示根目錄
-     * @param md5 檔案 MD5 校驗碼
-     * @param content 檔案二進位內容
-     * @param mimeType 檔案 MIME 類型
+     * @param md5            檔案 MD5 校驗碼
+     * @param content        檔案二進位內容
+     * @param mimeType       檔案 MIME 類型
+     *
      * @return 上傳結果的 Mono 包裝，包含上傳狀態和檔案 ID
      */
     private Mono<UploadResponseDTO> validateUserAndUpload(Long userId, String token, String filename, Long parentFolderId, String md5, byte[] content, String mimeType) {
@@ -921,6 +931,7 @@ public class FileProcessingGrpcService extends FileProcessingServiceGrpc.FilePro
      * 確保不同時區客戶端的時間一致性。
      *
      * @param file 用戶檔案元資料實體
+     *
      * @return 轉換後的 gRPC FileInfo 物件
      */
     private FileInfo convertToFileInfo(UserFileMetadata file) {

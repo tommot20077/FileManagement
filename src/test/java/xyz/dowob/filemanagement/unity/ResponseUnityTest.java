@@ -2,10 +2,14 @@ package xyz.dowob.filemanagement.unity;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -24,6 +28,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.response.WebSocketResponse;
+import xyz.dowob.filemanagement.exception.JwtAuthenticationException;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -533,5 +538,295 @@ class ResponseUnityTest {
         assertEquals(testPath, result.getPath());
         assertEquals(testMessage, result.getMessage());
         assertEquals("data", result.getData());
+    }
+
+    // ==================== gRPC 錯誤處理測試 ====================
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - ValidationException 映射到 INVALID_ARGUMENT")
+    void testHandleGrpcError_ValidationException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        ValidationException exception = new ValidationException(ValidationException.ErrorCode.NULL_DTO);
+        
+        // 執行測試
+        responseUnity.handleGrpcError(exception, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INVALID_ARGUMENT.getCode(), capturedError.getStatus().getCode());
+        assertTrue(capturedError.getStatus().getDescription().contains("驗證失敗"));
+    }
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - LimitationException 映射到 RESOURCE_EXHAUSTED")
+    void testHandleGrpcError_LimitationException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        LimitationException exception = new LimitationException(LimitationException.ErrorCode.USER_EXCEED_LIMIT, "請求頻率超限");
+        
+        // 執行測試
+        responseUnity.handleGrpcError(exception, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.RESOURCE_EXHAUSTED.getCode(), capturedError.getStatus().getCode());
+        assertTrue(capturedError.getStatus().getDescription().contains("資源限制"));
+    }
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - JwtAuthenticationException 映射到 UNAUTHENTICATED")
+    void testHandleGrpcError_JwtAuthenticationException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        JwtAuthenticationException exception = new JwtAuthenticationException("JWT令牌已過期");
+        
+        // 執行測試
+        responseUnity.handleGrpcError(exception, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.UNAUTHENTICATED.getCode(), capturedError.getStatus().getCode());
+        assertEquals("認證失敗", capturedError.getStatus().getDescription());
+    }
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - ProcessException 映射到 INTERNAL")
+    void testHandleGrpcError_ProcessException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        ProcessException exception = new ProcessException(ProcessException.ErrorCode.CREATE_STREAM_FAILED);
+        
+        // 執行測試
+        responseUnity.handleGrpcError(exception, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
+        assertTrue(capturedError.getStatus().getDescription().contains("處理錯誤"));
+    }
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - 未知異常映射到 INTERNAL")
+    void testHandleGrpcError_UnknownException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        RuntimeException exception = new RuntimeException("未知錯誤");
+        
+        // 執行測試
+        responseUnity.handleGrpcError(exception, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
+        assertEquals("內部服務錯誤", capturedError.getStatus().getDescription());
+    }
+
+    @Test
+    @DisplayName("gRPC 錯誤處理 - null 異常處理")
+    void testHandleGrpcError_NullException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        
+        // 執行測試
+        responseUnity.handleGrpcError(null, responseObserver);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
+        assertEquals("內部服務錯誤", capturedError.getStatus().getDescription());
+    }
+
+    @Test
+    @DisplayName("gRPC 訂閱處理 - 成功場景")
+    void testSubscribeWithGrpcHandler_Success() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        Mono<String> mono = Mono.just("成功結果");
+        
+        // 執行測試
+        responseUnity.subscribeWithGrpcHandler(mono, responseObserver);
+        
+        // 等待異步操作完成
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            fail("測試被中斷");
+        }
+        
+        // 驗證結果
+        verify(responseObserver).onNext("成功結果");
+        verify(responseObserver).onCompleted();
+        verify(responseObserver, never()).onError(any());
+    }
+
+    @Test
+    @DisplayName("gRPC 訂閱處理 - 錯誤場景")
+    void testSubscribeWithGrpcHandler_Error() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        ValidationException exception = new ValidationException(ValidationException.ErrorCode.FILE_TYPE_WITH_WRONG_REQUEST_PATH, "GENERAL", "ONLINE");
+        Mono<String> mono = Mono.error(exception);
+        
+        // 執行測試
+        responseUnity.subscribeWithGrpcHandler(mono, responseObserver);
+        
+        // 等待異步操作完成
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            fail("測試被中斷");
+        }
+        
+        // 驗證結果
+        verify(responseObserver, never()).onNext(any());
+        verify(responseObserver, never()).onCompleted();
+        
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INVALID_ARGUMENT.getCode(), capturedError.getStatus().getCode());
+    }
+
+    @Test
+    @DisplayName("gRPC 訂閱處理 - 帶轉換函數的成功場景")
+    void testSubscribeWithGrpcHandler_WithMapper_Success() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        Mono<Integer> mono = Mono.just(42);
+        
+        // 執行測試
+        responseUnity.subscribeWithGrpcHandler(mono, responseObserver, 
+            number -> "數字是: " + number);
+        
+        // 等待異步操作完成
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            fail("測試被中斷");
+        }
+        
+        // 驗證結果
+        verify(responseObserver).onNext("數字是: 42");
+        verify(responseObserver).onCompleted();
+        verify(responseObserver, never()).onError(any());
+    }
+
+    @Test
+    @DisplayName("gRPC 訂閱處理 - 轉換函數拋出異常")
+    void testSubscribeWithGrpcHandler_WithMapper_MapperException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        Mono<Integer> mono = Mono.just(42);
+        
+        // 執行測試
+        responseUnity.subscribeWithGrpcHandler(mono, responseObserver, 
+            number -> {
+                throw new IllegalArgumentException("轉換失敗");
+            });
+        
+        // 等待異步操作完成
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            fail("測試被中斷");
+        }
+        
+        // 驗證結果
+        verify(responseObserver, never()).onNext(any());
+        verify(responseObserver, never()).onCompleted();
+        
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
+    }
+
+    @Test
+    @DisplayName("gRPC 流式觀察者包裝 - onNext 異常處理")
+    void testWrapGrpcStreamObserver_OnNextException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        StreamObserver<Integer> streamHandler = mock(StreamObserver.class);
+        
+        // 配置 mock 拋出異常
+        doThrow(new RuntimeException("處理失敗")).when(streamHandler).onNext(any());
+        
+        // 執行測試
+        StreamObserver<Integer> wrapped = responseUnity.wrapGrpcStreamObserver(responseObserver, streamHandler);
+        wrapped.onNext(42);
+        
+        // 驗證結果
+        verify(streamHandler).onNext(42);
+        
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
+    }
+
+    @Test
+    @DisplayName("gRPC 流式觀察者包裝 - onError 處理")
+    void testWrapGrpcStreamObserver_OnError() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        StreamObserver<Integer> streamHandler = mock(StreamObserver.class);
+        ValidationException exception = new ValidationException(ValidationException.ErrorCode.INVALID_FILE_NAME);
+        
+        // 執行測試
+        StreamObserver<Integer> wrapped = responseUnity.wrapGrpcStreamObserver(responseObserver, streamHandler);
+        wrapped.onError(exception);
+        
+        // 驗證結果
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INVALID_ARGUMENT.getCode(), capturedError.getStatus().getCode());
+    }
+
+    @Test
+    @DisplayName("gRPC 流式觀察者包裝 - onCompleted 異常處理")
+    void testWrapGrpcStreamObserver_OnCompletedException() {
+        // 準備測試資料
+        StreamObserver<String> responseObserver = mock(StreamObserver.class);
+        StreamObserver<Integer> streamHandler = mock(StreamObserver.class);
+        
+        // 配置 mock 拋出異常
+        doThrow(new RuntimeException("完成處理失敗")).when(streamHandler).onCompleted();
+        
+        // 執行測試
+        StreamObserver<Integer> wrapped = responseUnity.wrapGrpcStreamObserver(responseObserver, streamHandler);
+        wrapped.onCompleted();
+        
+        // 驗證結果
+        verify(streamHandler).onCompleted();
+        
+        ArgumentCaptor<StatusRuntimeException> captor = ArgumentCaptor.forClass(StatusRuntimeException.class);
+        verify(responseObserver).onError(captor.capture());
+        
+        StatusRuntimeException capturedError = captor.getValue();
+        assertEquals(Status.INTERNAL.getCode(), capturedError.getStatus().getCode());
     }
 }

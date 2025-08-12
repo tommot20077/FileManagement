@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import xyz.dowob.filemanagement.grpc.interceptor.ApiKeyAuthInterceptor;
+import xyz.dowob.filemanagement.grpc.interceptor.GrpcExceptionInterceptor;
 import xyz.dowob.filemanagement.unity.LogUnity;
 
 /**
@@ -93,6 +94,20 @@ public class GrpcServerConfig {
     private final ApiKeyAuthInterceptor apiKeyAuthInterceptor;
     
     /**
+     * gRPC 異常攔截器實例，負責統一的異常處理。
+     * <p>
+     * 此攔截器提供 gRPC 服務的全局異常處理機制，將應用層異常
+     * 轉換為適當的 gRPC Status 碼，確保錯誤處理的一致性。
+     * <ul>
+     * <li>捕獲所有服務方法拋出的異常</li>
+     * <li>將異常映射到對應的 gRPC Status 碼</li>
+     * <li>記錄詳細的錯誤日誌</li>
+     * <li>返回安全的錯誤訊息給客戶端</li>
+     * </ul>
+     */
+    private final GrpcExceptionInterceptor grpcExceptionInterceptor;
+    
+    /**
      * 註冊全域 API Key 認證攔截器，建立 gRPC 服務的統一安全防護機制。
      * <p>
      * 此方法是 gRPC 伺服器安全配置的核心，透過 {@code @GrpcGlobalServerInterceptor}
@@ -140,5 +155,35 @@ public class GrpcServerConfig {
     public ApiKeyAuthInterceptor globalApiKeyInterceptor() {
         LogUnity.info("註冊 gRPC 服務端 API Key 認證攔截器");
         return apiKeyAuthInterceptor;
+    }
+    
+    /**
+     * 註冊全域異常處理攔截器，提供統一的錯誤處理機制。
+     * <p>
+     * 此方法將異常攔截器註冊為全域攔截器，確保所有 gRPC 服務
+     * 調用的異常都能被統一處理和轉換。
+     * <p>
+     * 異常處理的重要性：
+     * <ul>
+     * <li>提供一致的錯誤響應格式</li>
+     * <li>避免敏感信息洩漏</li>
+     * <li>確保錯誤日誌的完整記錄</li>
+     * <li>與 HTTP 錯誤處理保持一致</li>
+     * </ul>
+     * <p>
+     * 執行順序說明：
+     * <ul>
+     * <li>異常攔截器應在認證攔截器之後執行</li>
+     * <li>確保能捕獲所有服務層和業務層的異常</li>
+     * <li>提供最終的異常處理保障</li>
+     * </ul>
+     *
+     * @return 已配置的異常處理攔截器實例
+     */
+    @Bean
+    @GrpcGlobalServerInterceptor
+    public GrpcExceptionInterceptor globalExceptionInterceptor() {
+        LogUnity.info("註冊 gRPC 服務端異常處理攔截器");
+        return grpcExceptionInterceptor;
     }
 }

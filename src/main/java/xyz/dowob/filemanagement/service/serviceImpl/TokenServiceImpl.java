@@ -6,9 +6,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.annotation.RecordLevel;
+import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenProviderImpl;
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;
@@ -30,19 +32,19 @@ import xyz.dowob.filemanagement.service.serviceInterface.TokenService;
  * <pre>{@code
  * // 生成 JWT 令牌
  * Mono<String> jwtToken = tokenService.generateToken(user, TokenEnum.JWT_AUTHORIZATION_TOKEN);
- * 
+ *
  * // 驗證令牌
  * Mono<Long> userId = tokenService.validateToken(token, userId, TokenEnum.JWT_AUTHORIZATION_TOKEN);
- * 
+ *
  * // 撤銷令牌
  * Mono<Void> result = tokenService.revokeToken(userId, TokenEnum.JWT_AUTHORIZATION_TOKEN);
  * }</pre>
  *
  * @author yuan
  * @version 1.0
- * @since 1.0
  * @see TokenService
  * @see TokenStrategy
+ * @since 1.0
  */
 @Service
 @RecordLevel(LogLevelEnum.DEBUG)
@@ -52,6 +54,7 @@ public class TokenServiceImpl implements TokenService {
      * 令牌策略，根據令牌類型選擇相應的令牌提供者
      */
     private final TokenStrategy tokenStrategy;
+
 
     /**
      * 根據指定的令牌類型生成令牌。
@@ -65,15 +68,16 @@ public class TokenServiceImpl implements TokenService {
      * <strong>使用示例：</strong>
      * <pre>{@code
      * User user = getUserFromDatabase();
-     * 
+     *
      * generateToken(user, TokenEnum.JWT_AUTHORIZATION_TOKEN)
      *     .doOnSuccess(token -> log.info("令牌生成成功"))
      *     .doOnError(ex -> log.error("令牌生成失敗: {}", ex.getMessage()))
      *     .subscribe();
      * }</pre>
      *
-     * @param user 用戶對象，包含用戶 ID 和相關資訊，不可為 {@code null}
+     * @param user      用戶對象，包含用戶 ID 和相關資訊，不可為 {@code null}
      * @param tokenType 令牌類型，指定要生成的令牌種類，不可為 {@code null}
+     *
      * @return 包含令牌字串的 {@code Mono}
      */
     @Override
@@ -97,16 +101,17 @@ public class TokenServiceImpl implements TokenService {
      * <pre>{@code
      * String token = "eyJhbGciOiJIUzI1NiIs...";
      * Long expectedUserId = 123L;
-     * 
+     *
      * validateToken(token, expectedUserId, TokenEnum.JWT_AUTHORIZATION_TOKEN)
      *     .doOnSuccess(userId -> log.info("令牌驗證成功，用戶 ID: {}", userId))
      *     .doOnError(ex -> log.error("令牌驗證失敗: {}", ex.getMessage()))
      *     .subscribe();
      * }</pre>
      *
-     * @param token 要驗證的令牌字串，不可為 {@code null} 或空字串
-     * @param userId 預期的用戶 ID，用於驗證令牌歸屬，不可為 {@code null}
+     * @param token     要驗證的令牌字串，不可為 {@code null} 或空字串
+     * @param userId    預期的用戶 ID，用於驗證令牌歸屬，不可為 {@code null}
      * @param tokenType 令牌類型，指定要使用的驗證策略，不可為 {@code null}
+     *
      * @return 包含用戶 ID 的 {@code Mono}，驗證失敗時傳播異常
      */
     @Override
@@ -126,15 +131,16 @@ public class TokenServiceImpl implements TokenService {
      * <strong>使用示例：</strong>
      * <pre>{@code
      * Long userId = 123L;
-     * 
+     *
      * revokeToken(userId, TokenEnum.JWT_AUTHORIZATION_TOKEN)
      *     .doOnSuccess(() -> log.info("用戶令牌撤銷成功"))
      *     .doOnError(ex -> log.error("令牌撤銷失敗: {}", ex.getMessage()))
      *     .subscribe();
      * }</pre>
      *
-     * @param userId 要撤銷令牌的用戶 ID，不可為 {@code null}
+     * @param userId    要撤銷令牌的用戶 ID，不可為 {@code null}
      * @param tokenType 令牌類型，指定要撤銷的令牌種類，不可為 {@code null}
+     *
      * @return 空的 {@code Mono}，撤銷成功時完成
      */
     @Override
@@ -143,22 +149,40 @@ public class TokenServiceImpl implements TokenService {
         return tokenStrategy.getTokenProvider(tokenType).revokeToken(userId);
     }
 
+
     /**
-     * 從 JWT 令牌中提取使用者 ID，不需要預先提供使用者 ID 進行驗證。
-     * 
-     * <p>此方法專門用於認證場景，直接解析令牌內容獲取使用者資訊。
-     * 與 validateToken 不同的是，本方法不執行完整的驗證流程，
-     * 僅提取令牌中的使用者 ID 資訊。</p>
+     * 從 JWT 令牌中提取完整的使用者資訊。
      *
-     * @param token 要解析的 JWT 令牌字串
+     * <p>此方法解析 JWT 令牌並提取其中包含的所有使用者相關資訊，
+     * 包括使用者 ID、使用者名稱、角色、令牌過期時間和版本號。
+     * 這提供了比單純提取使用者 ID 更豐富的上下文資訊。</p>
+     *
+     * @param token     要解析的 JWT 令牌字串
      * @param tokenType 令牌類型，決定使用的解析策略
-     * @return 包含使用者 ID 的 Mono，解析失敗時傳播異常
+     *
+     * @return 包含完整使用者資訊的 Mono，解析失敗時傳播異常
      */
     @Override
-    public Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType) {
-        return tokenStrategy.getTokenProvider(tokenType).validateToken(token, null)
-                .onErrorMap(ex -> new ValidationException(
-                        ValidationException.ErrorCode.JWT_TOKEN_INVALID));
+    public Mono<UserInfoDto> extractUserInfoFromToken(String token, TokenEnum tokenType) {
+        if (tokenType != TokenEnum.JWT_AUTHORIZATION_TOKEN) {
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID, "只支援 JWT 令牌類型"));
+        }
+
+        return Mono.defer(() -> {
+            if (tokenStrategy.getTokenProvider(tokenType) instanceof JwtTokenProviderImpl jwtProvider) {
+                return jwtProvider.getClaimsFromToken(token).map(claims -> {
+                    UserInfoDto userInfo = new UserInfoDto();
+                    userInfo.setUserId(Long.parseLong(claims.getSubject()));
+                    userInfo.setUsername(claims.get("username", String.class));
+                    userInfo.setRole(claims.get("role", String.class));
+                    userInfo.setTokenExpiry(claims.getExpiration());
+                    userInfo.setTokenVersion(claims.get("version", String.class));
+                    return userInfo;
+                }).onErrorMap(ex -> new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID, "無法解析令牌資訊"));
+            } else {
+                return Mono.error(new ValidationException(ValidationException.ErrorCode.JWT_TOKEN_INVALID, "不支援的令牌提供者類型"));
+            }
+        });
     }
 
 
@@ -197,10 +221,10 @@ public class TokenServiceImpl implements TokenService {
      * <strong>使用示例：</strong>
      * <pre>{@code
      * Long tokenId = 123L;
-     * 
+     *
      * getById(tokenId)
      *     .doOnNext(token -> {
-     *         log.info("找到令牌: type={}, created={}", 
+     *         log.info("找到令牌: type={}, created={}",
      *                  token.getTokenType(), token.getCreatedAt());
      *     })
      *     .doOnComplete(() -> log.info("未找到指定 ID 的令牌"))
@@ -208,6 +232,7 @@ public class TokenServiceImpl implements TokenService {
      * }</pre>
      *
      * @param tokenId 令牌的唯一標識符，不可為 {@code null}
+     *
      * @return 包含令牌實體的 {@code Mono}，若未找到則為空
      */
     @Override
@@ -269,7 +294,7 @@ public class TokenServiceImpl implements TokenService {
      * getAllByParams("USER_ID", 123L, TokenEnum.JWT_AUTHORIZATION_TOKEN)
      *     .doOnNext(token -> log.info("用戶令牌: {}", token))
      *     .subscribe();
-     * 
+     *
      * // 查詢所有密碼重設令牌
      * getAllByParams("TOKEN_TYPE", TokenEnum.PASSWORD_RESET_TOKEN)
      *     .collectList()
@@ -279,6 +304,7 @@ public class TokenServiceImpl implements TokenService {
      *
      * @param type 查詢類型標識，指定查詢的分類方式，不可為 {@code null}
      * @param args 查詢參數陣列，根據查詢類型提供相應的參數值
+     *
      * @return 包含符合查詢條件的令牌實體的 {@code Flux}，目前實現為空流
      */
     @Override
@@ -314,16 +340,17 @@ public class TokenServiceImpl implements TokenService {
      * token.setId(123L);
      * token.setTokenType(TokenEnum.JWT_AUTHORIZATION_TOKEN);
      * token.setRevoked(true); // 撤銷令牌
-     * 
+     *
      * update(token)
-     *     .doOnSuccess(updatedToken -> 
+     *     .doOnSuccess(updatedToken ->
      *         log.info("令牌更新成功: {}", updatedToken.getId()))
-     *     .doOnError(ex -> 
+     *     .doOnError(ex ->
      *         log.error("令牌更新失敗: {}", ex.getMessage()))
      *     .subscribe();
      * }</pre>
      *
      * @param token 要更新的令牌實體對象，包含新的屬性值，不可為 {@code null}
+     *
      * @return 包含更新後令牌實體的 {@code Mono}，目前實現為空
      */
     @Override
@@ -363,16 +390,17 @@ public class TokenServiceImpl implements TokenService {
      * <strong>使用示例：</strong>
      * <pre>{@code
      * Token expiredToken = getExpiredToken();
-     * 
+     *
      * delete(expiredToken)
-     *     .doOnSuccess(() -> 
+     *     .doOnSuccess(() ->
      *         log.info("令牌刪除成功: {}", expiredToken.getId()))
-     *     .doOnError(ex -> 
+     *     .doOnError(ex ->
      *         log.error("令牌刪除失敗: {}", ex.getMessage()))
      *     .subscribe();
      * }</pre>
      *
      * @param token 要刪除的令牌實體對象，不可為 {@code null}
+     *
      * @return 表示刪除操作完成的空 {@code Mono}
      */
     @Override

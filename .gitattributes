@@ -1,0 +1,24 @@
+# 自動檢測文本文件並規範化行尾
+* text=auto
+
+# Java 源文件強制使用 LF
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.proto text eol=lf
+
+# Shell 腳本使用 LF
+*.sh text eol=lf
+mvnw text eol=lf
+
+# Windows 批處理保留 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二進制文件不處理
+*.jar binary
+*.class binary
+*.png binary
+*.jpg binary

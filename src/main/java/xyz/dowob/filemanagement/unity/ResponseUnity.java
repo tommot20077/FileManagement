@@ -2,6 +2,8 @@ package xyz.dowob.filemanagement.unity;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -14,12 +16,14 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.data.response.ApiResponseDTO;
 import xyz.dowob.filemanagement.data.response.WebSocketResponse;
+import xyz.dowob.filemanagement.exception.JwtAuthenticationException;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
 import xyz.dowob.filemanagement.exception.ValidationException;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * 基於反應式編程的統一響應處理工具介面，提供標準化的 API 和 WebSocket 響應格式建立機制。
@@ -390,5 +394,189 @@ public interface ResponseUnity {
      */
     default Mono<Void> sendErrorResponse(ServerWebExchange exchange, ObjectMapper objectMapper, ValidationException.ErrorCode error, Object... args) {
         return sendErrorResponse(exchange, objectMapper, String.format(error.getMessage(), args), error.getCode(), error.getHttpStatus());
+    }
+
+    /**
+     * 將 Mono 操作轉換為 gRPC 響應，提供統一的訂閱和錯誤處理機制。
+     *
+     * <p>此方法簡化了反應式流到 gRPC 響應的轉換過程：
+     * <ol>
+     *   <li>成功時：自動調用 onNext() 發送結果，然後調用 onCompleted() 結束流</li>
+     *   <li>失敗時：使用 handleGrpcError() 統一處理異常</li>
+     * </ol>
+     *
+     * <p>使用範例：
+     * <pre>{@code
+     * public void getFileMetadata(Request request, StreamObserver<Response> observer) {
+     *     Mono<Response> operation = service.processRequest(request);
+     *     subscribeWithGrpcHandler(operation, observer);
+     * }
+     * }</pre>
+     *
+     * @param <T> 操作結果的類型，必須與 gRPC 響應類型一致
+     * @param mono 要執行的反應式操作
+     * @param responseObserver gRPC 響應觀察者
+     */
+    default <T> void subscribeWithGrpcHandler(Mono<T> mono, StreamObserver<T> responseObserver) {
+        mono.subscribe(
+            result -> {
+                responseObserver.onNext(result);
+                responseObserver.onCompleted();
+            },
+            error -> handleGrpcError(error, responseObserver)
+        );
+    }
+
+    /**
+     * 統一處理 gRPC 操作中的錯誤，將各種異常轉換為適當的 gRPC Status。
+     *
+     * <p>此方法提供 gRPC 服務的標準化錯誤處理機制，將應用層異常映射到 gRPC 協議的 Status 碼：
+     * <ul>
+     *   <li>ValidationException → INVALID_ARGUMENT：參數驗證失敗</li>
+     *   <li>LimitationException → RESOURCE_EXHAUSTED：資源限制錯誤</li>
+     *   <li>JwtAuthenticationException → UNAUTHENTICATED：認證失敗</li>
+     *   <li>ProcessException → INTERNAL：內部處理錯誤</li>
+     *   <li>其他異常 → INTERNAL：未知內部錯誤</li>
+     * </ul>
+     *
+     * <p>錯誤處理同時會記錄適當級別的日誌，便於問題追蹤和除錯。
+     * 驗證和限制錯誤記錄為警告級別，其他錯誤記錄為錯誤級別。
+     *
+     * @param error 要處理的異常物件
+     * @param responseObserver gRPC 響應觀察者，用於發送錯誤響應
+     */
+    default void handleGrpcError(Throwable error, StreamObserver<?> responseObserver) {
+        Status status;
+        String errorMessage;
+
+        switch (error) {
+            case ValidationException ve -> {
+                errorMessage = String.format("驗證失敗: %s", ve.getMessage());
+                status = Status.INVALID_ARGUMENT.withDescription(errorMessage);
+                LogUnity.warn("gRPC 驗證錯誤: %s", ve.getMessage());
+            }
+            case LimitationException le -> {
+                errorMessage = String.format("資源限制: %s", le.getMessage());
+                status = Status.RESOURCE_EXHAUSTED.withDescription(errorMessage);
+                LogUnity.warn("gRPC 限制錯誤: %s", le.getMessage());
+            }
+            case JwtAuthenticationException ae -> {
+                errorMessage = "認證失敗";
+                status = Status.UNAUTHENTICATED.withDescription(errorMessage);
+                LogUnity.warn("gRPC 認證錯誤: %s", ae.getMessage());
+            }
+            case ProcessException pe -> {
+                errorMessage = String.format("處理錯誤: %s", pe.getMessage());
+                status = Status.INTERNAL.withDescription(errorMessage);
+                LogUnity.error("gRPC 處理錯誤: %s", pe, pe.getMessage());
+            }
+            case null, default -> {
+                errorMessage = "內部服務錯誤";
+                status = Status.INTERNAL.withDescription(errorMessage);
+
+                if (error != null) {
+                    LogUnity.error("gRPC 未知錯誤: %s", error, error.getMessage());
+                } else {
+                    LogUnity.error("gRPC 內部錯誤");
+                }
+            }
+        }
+
+        responseObserver.onError(status.asRuntimeException());
+    }
+
+    /**
+     * 將 Mono 操作轉換為 gRPC 響應，支援自定義的成功結果轉換。
+     * 
+     * <p>此方法提供更靈活的響應轉換機制，允許在發送響應前對結果進行轉換：
+     * <ul>
+     *   <li>適用於業務物件到 gRPC 訊息的轉換</li>
+     *   <li>支援複雜的響應建構邏輯</li>
+     *   <li>保持錯誤處理的一致性</li>
+     * </ul>
+     * 
+     * <p>使用範例：
+     * <pre>{@code
+     * public void listFiles(Request request, StreamObserver<FileListResponse> observer) {
+     *     Mono<List<File>> files = service.getFiles(request);
+     *     subscribeWithGrpcHandler(files, observer, 
+     *         fileList -> FileListResponse.newBuilder()
+     *             .addAllFiles(fileList)
+     *             .setTotal(fileList.size())
+     *             .build()
+     *     );
+     * }
+     * }</pre>
+     *
+     * @param <T> 操作結果的類型
+     * @param <R> gRPC 響應的類型
+     * @param mono 要執行的反應式操作
+     * @param responseObserver gRPC 響應觀察者
+     * @param successMapper 成功結果的轉換函數
+     */
+    default <T, R> void subscribeWithGrpcHandler(Mono<T> mono,
+                                                 StreamObserver<R> responseObserver,
+                                                 Function<T, R> successMapper) {
+        mono.subscribe(
+            result -> {
+                try {
+                    R response = successMapper.apply(result);
+                    responseObserver.onNext(response);
+                    responseObserver.onCompleted();
+                } catch (Exception e) {
+                    handleGrpcError(e, responseObserver);
+                }
+            },
+            error -> handleGrpcError(error, responseObserver)
+        );
+    }
+
+    /**
+     * 處理 gRPC 流式響應的統一錯誤處理包裝器。
+     * 
+     * <p>為流式 gRPC 響應提供錯誤處理包裝，確保任何操作異常都能被正確捕獲和處理。
+     * 特別適用於需要發送多個響應訊息的串流操作。
+     * 
+     * <p>使用範例：
+     * <pre>{@code
+     * public StreamObserver<UploadChunk> uploadFile(StreamObserver<UploadResult> observer) {
+     *     return wrapGrpcStreamObserver(observer, new StreamObserver<UploadChunk>() {
+     *         // 實現串流處理邏輯
+     *     });
+     * }
+     * }</pre>
+     *
+     * @param <T> 請求訊息的類型
+     * @param <R> 響應訊息的類型
+     * @param responseObserver 原始的響應觀察者
+     * @param streamHandler 串流處理邏輯
+     * @return 包裝後的串流觀察者，具有統一錯誤處理能力
+     */
+    default <T, R> StreamObserver<T> wrapGrpcStreamObserver(StreamObserver<R> responseObserver,
+                                                            StreamObserver<T> streamHandler) {
+        return new StreamObserver<T>() {
+            @Override
+            public void onNext(T value) {
+                try {
+                    streamHandler.onNext(value);
+                } catch (Exception e) {
+                    handleGrpcError(e, responseObserver);
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                handleGrpcError(t, responseObserver);
+            }
+
+            @Override
+            public void onCompleted() {
+                try {
+                    streamHandler.onCompleted();
+                } catch (Exception e) {
+                    handleGrpcError(e, responseObserver);
+                }
+            }
+        };
     }
 }

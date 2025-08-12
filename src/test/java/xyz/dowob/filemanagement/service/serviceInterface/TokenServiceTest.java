@@ -9,6 +9,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
+import xyz.dowob.filemanagement.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 
@@ -181,9 +182,9 @@ class TokenServiceTest {
                 }
                 return Mono.empty();
             }
-
+            
             @Override
-            public Mono<Long> extractUserIdFromToken(String token, TokenEnum tokenType) {
+            public Mono<UserInfoDto> extractUserInfoFromToken(String token, TokenEnum tokenType) {
                 if (token == null || token.trim().isEmpty()) {
                     return Mono.error(new IllegalArgumentException("憑證不能為空"));
                 }
@@ -191,12 +192,20 @@ class TokenServiceTest {
                     return Mono.error(new IllegalArgumentException("憑證類型不能為空"));
                 }
                 
-                // 從憑證中提取用戶ID - 假設憑證格式為 "tokentype_userId_timestamp"
+                // 從憑證中提取用戶資訊 - 憑證格式為 "jwt_authorization_token_userId_timestamp"
                 if (token.startsWith(tokenType.name().toLowerCase() + "_")) {
                     String[] parts = token.split("_");
-                    if (parts.length >= 3) {
+                    // jwt_authorization_token_1_1234567890 有5個部分
+                    if (parts.length >= 5) {
                         try {
-                            return Mono.just(Long.parseLong(parts[2]));
+                            Long userId = Long.parseLong(parts[3]); // userId 在索引 3
+                            UserInfoDto userInfo = new UserInfoDto();
+                            userInfo.setUserId(userId);
+                            userInfo.setUsername("testuser" + userId);
+                            userInfo.setRole(userId == 1L ? "ADMIN" : "USER");
+                            userInfo.setTokenExpiry(new java.util.Date(System.currentTimeMillis() + 86400000));
+                            userInfo.setTokenVersion("v1.0");
+                            return Mono.just(userInfo);
                         } catch (NumberFormatException e) {
                             return Mono.error(new IllegalArgumentException("憑證格式錯誤"));
                         }
@@ -316,6 +325,45 @@ class TokenServiceTest {
     }
 
     @Test
+    @DisplayName("一般測試 - extractUserInfoFromToken 方法基本功能")
+    void testExtractUserInfoFromToken_basicFunctionality() {
+        String validToken = "jwt_authorization_token_1_1234567890";
+        
+        StepVerifier.create(tokenService.extractUserInfoFromToken(validToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .assertNext(userInfo -> {
+                    assertNotNull(userInfo);
+                    assertEquals(1L, userInfo.getUserId());
+                    assertEquals("testuser1", userInfo.getUsername());
+                    assertEquals("ADMIN", userInfo.getRole());
+                    assertNotNull(userInfo.getTokenExpiry());
+                    assertEquals("v1.0", userInfo.getTokenVersion());
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("一般測試 - extractUserInfoFromToken 不同用戶角色")
+    void testExtractUserInfoFromToken_differentRoles() {
+        // 測試管理員
+        String adminToken = "jwt_authorization_token_1_1234567890";
+        StepVerifier.create(tokenService.extractUserInfoFromToken(adminToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .assertNext(userInfo -> {
+                    assertEquals("ADMIN", userInfo.getRole());
+                    assertTrue(userInfo.isAdmin());
+                })
+                .verifyComplete();
+        
+        // 測試普通用戶
+        String userToken = "jwt_authorization_token_2_1234567890";
+        StepVerifier.create(tokenService.extractUserInfoFromToken(userToken, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .assertNext(userInfo -> {
+                    assertEquals("USER", userInfo.getRole());
+                    assertFalse(userInfo.isAdmin());
+                })
+                .verifyComplete();
+    }
+
+    @Test
     @DisplayName("一般測試 - 接口方法簽名驗證")
     void testInterfaceMethodSignatures() {
         // 驗證 TokenService 特有方法
@@ -339,6 +387,13 @@ class TokenServiceTest {
             assertEquals(Mono.class, revokeMethod.getReturnType());
         } catch (NoSuchMethodException e) {
             fail("revokeToken 方法應該存在");
+        }
+        
+        try {
+            var extractUserInfoMethod = TokenService.class.getMethod("extractUserInfoFromToken", String.class, TokenEnum.class);
+            assertEquals(Mono.class, extractUserInfoMethod.getReturnType());
+        } catch (NoSuchMethodException e) {
+            fail("extractUserInfoFromToken 方法應該存在");
         }
     }
 
@@ -596,6 +651,38 @@ class TokenServiceTest {
     }
 
     @Test
+    @DisplayName("異常測試 - extractUserInfoFromToken 傳入 null 憑證")
+    void testExtractUserInfoFromToken_withNullToken() {
+        StepVerifier.create(tokenService.extractUserInfoFromToken(null, TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("異常測試 - extractUserInfoFromToken 傳入空憑證")
+    void testExtractUserInfoFromToken_withEmptyToken() {
+        StepVerifier.create(tokenService.extractUserInfoFromToken("", TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("異常測試 - extractUserInfoFromToken 傳入 null 憑證類型")
+    void testExtractUserInfoFromToken_withNullTokenType() {
+        StepVerifier.create(tokenService.extractUserInfoFromToken("valid-token", null))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("異常測試 - extractUserInfoFromToken 傳入無效憑證")
+    void testExtractUserInfoFromToken_withInvalidToken() {
+        StepVerifier.create(tokenService.extractUserInfoFromToken("invalid-token", TokenEnum.JWT_AUTHORIZATION_TOKEN))
+                .expectError(IllegalArgumentException.class)
+                .verify();
+    }
+
+    @Test
     @DisplayName("邊界測試 - 驗證接口完整性")
     void testInterfaceCompleteness() {
         // 驗證接口是 public 的
@@ -604,7 +691,7 @@ class TokenServiceTest {
         // 驗證接口是 interface
         assertTrue(TokenService.class.isInterface());
         
-        // 驗證 TokenService 特有方法數量（不包括繼承的）
+        // 驗證 TokenService 特有方法數量（不包括繼承的） - 現在是4個方法
         assertEquals(4, TokenService.class.getDeclaredMethods().length);
         
         // 驗證繼承關係

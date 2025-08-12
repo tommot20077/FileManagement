@@ -258,6 +258,8 @@ message AuthenticationResponse {
     string jwt_token = 2;
     int64 user_id = 3;
     string error_message = 4;
+    string username = 5;      // 用戶名稱
+    string role = 6;          // 用戶角色
 }
 
 // 權限請求
