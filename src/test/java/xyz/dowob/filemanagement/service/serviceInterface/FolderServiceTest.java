@@ -113,7 +113,7 @@ class FolderServiceTest {
             }
 
             @Override
-            public Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
+            public Mono<UserFileMetadata> createFolder(FileEditDTO fileEditDTO, User user) {
                 if (fileEditDTO == null) {
                     return Mono.error(new IllegalArgumentException("檔案夾數據不能為空"));
                 }
@@ -130,7 +130,14 @@ class FolderServiceTest {
                 }
                 
                 // 模擬創建邏輯
-                return Mono.empty();
+                UserFileMetadata newFolder = new UserFileMetadata();
+                newFolder.setId(1L); // 模擬生成的ID
+                newFolder.setFilename(fileEditDTO.getFilename());
+                newFolder.setUserId(user.getId());
+                newFolder.setUploadTime(LocalDateTime.now());
+                newFolder.setParentFolderId(fileEditDTO.getParentFolderId() != null ? fileEditDTO.getParentFolderId() : 0L);
+
+                return Mono.just(newFolder);
             }
 
             @Override
@@ -249,6 +256,7 @@ class FolderServiceTest {
     @DisplayName("一般測試 - createFolder 方法基本功能")
     void testCreateFolder_basicFunctionality() {
         StepVerifier.create(folderService.createFolder(createFolderDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -410,6 +418,7 @@ class FolderServiceTest {
         createFolderDTO.setFilename("RootFolder");
         
         StepVerifier.create(folderService.createFolder(createFolderDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -420,6 +429,7 @@ class FolderServiceTest {
         createFolderDTO.setFilename("SubFolder");
         
         StepVerifier.create(folderService.createFolder(createFolderDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -633,6 +643,7 @@ class FolderServiceTest {
         createFolderDTO.setFilename("a".repeat(1000));
         
         StepVerifier.create(folderService.createFolder(createFolderDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -642,6 +653,7 @@ class FolderServiceTest {
         createFolderDTO.setFilename("檔案夾測試🗂️📁");
         
         StepVerifier.create(folderService.createFolder(createFolderDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -768,6 +780,7 @@ class FolderServiceTest {
         userWithNullProps.setEmail(null);
 
         StepVerifier.create(folderService.createFolder(createFolderDTO, userWithNullProps))
+                .expectNextCount(1)
                 .verifyComplete(); // 應該仍然能夠執行，因為只檢查 user 不為 null
     }
 

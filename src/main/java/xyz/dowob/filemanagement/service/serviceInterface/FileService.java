@@ -88,4 +88,17 @@ public interface FileService extends FileCrudService, BaseFileService, Recoverab
         return Mono.empty();
     }
 
+    /**
+     * 複製檔案或資料夾到指定位置。
+     *
+     * @param sourceFile     要複製的源檔案
+     * @param targetParentId 目標父資料夾 ID
+     * @param newName        新檔案名稱
+     * @param user           執行操作的用戶
+     * @return 新創建的檔案元資料
+     */
+    default Mono<UserFileMetadata> copyFile(UserFileMetadata sourceFile, Long targetParentId, String newName, User user) {
+        return Mono.error(new UnsupportedOperationException("複製功能尚未實現"));
+    }
+
 }

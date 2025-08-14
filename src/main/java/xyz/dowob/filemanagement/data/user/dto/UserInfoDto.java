@@ -1,4 +1,4 @@
-package xyz.dowob.filemanagement.dto;
+package xyz.dowob.filemanagement.data.user.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

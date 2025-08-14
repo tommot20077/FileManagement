@@ -17,7 +17,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(exclude = {
     org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
     net.devh.boot.grpc.server.autoconfigure.GrpcServerAutoConfiguration.class,
-    net.devh.boot.grpc.server.autoconfigure.GrpcServerFactoryAutoConfiguration.class
+    net.devh.boot.grpc.server.autoconfigure.GrpcServerFactoryAutoConfiguration.class,
+    net.devh.boot.grpc.server.autoconfigure.GrpcServerMetricAutoConfiguration.class
 })
 public class FileManagementApplication {
     /**

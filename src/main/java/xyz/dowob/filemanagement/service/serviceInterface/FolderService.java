@@ -31,7 +31,7 @@ public interface FolderService extends BaseFileService {
      * @param user 執行建立的用戶
      * @return 建立完成信號的 Mono
      */
-    default Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
+    default Mono<UserFileMetadata> createFolder(FileEditDTO fileEditDTO, User user) {
         return Mono.empty();
     }
 

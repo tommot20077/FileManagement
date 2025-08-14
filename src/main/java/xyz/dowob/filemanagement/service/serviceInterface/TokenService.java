@@ -3,7 +3,7 @@ package xyz.dowob.filemanagement.service.serviceInterface;
 import reactor.core.publisher.Mono;
 import xyz.dowob.filemanagement.annotation.HideSensitive;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
-import xyz.dowob.filemanagement.dto.UserInfoDto;
+import xyz.dowob.filemanagement.data.user.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 

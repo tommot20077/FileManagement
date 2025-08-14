@@ -2,8 +2,8 @@ package xyz.dowob.filemanagement.grpc.interceptor;
 
 import io.grpc.*;
 import lombok.RequiredArgsConstructor;
+import net.devh.boot.grpc.server.interceptor.GrpcGlobalServerInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 import xyz.dowob.filemanagement.config.properties.GlobalProperties;
 import xyz.dowob.filemanagement.unity.LogUnity;
 
@@ -54,8 +54,8 @@ import xyz.dowob.filemanagement.unity.LogUnity;
  * @see ServerInterceptor
  * @since 1.0
  */
-@Component
 @RequiredArgsConstructor
+@GrpcGlobalServerInterceptor
 @ConditionalOnProperty(prefix = "global.webdav", name = "enabled", havingValue = "true")
 public class ApiKeyAuthInterceptor implements ServerInterceptor {
 

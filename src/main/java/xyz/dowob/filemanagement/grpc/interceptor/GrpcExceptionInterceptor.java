@@ -2,7 +2,7 @@ package xyz.dowob.filemanagement.grpc.interceptor;
 
 import io.grpc.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import net.devh.boot.grpc.server.interceptor.GrpcGlobalServerInterceptor;
 import xyz.dowob.filemanagement.exception.JwtAuthenticationException;
 import xyz.dowob.filemanagement.exception.LimitationException;
 import xyz.dowob.filemanagement.exception.ProcessException;
@@ -36,8 +36,8 @@ import xyz.dowob.filemanagement.unity.LogUnity;
  * @version 1.0
  * @since 1.0
  */
-@Component
 @RequiredArgsConstructor
+@GrpcGlobalServerInterceptor
 public class GrpcExceptionInterceptor implements ServerInterceptor {
 
     /**

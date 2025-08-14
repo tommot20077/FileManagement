@@ -232,6 +232,7 @@ class FolderFileServiceImplTest {
 
         // 執行測試
         StepVerifier.create(folderFileService.createFolder(fileEditDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
 
         // 驗證互動
@@ -735,6 +736,7 @@ class FolderFileServiceImplTest {
 
         // 執行測試
         StepVerifier.create(folderFileService.createFolder(fileEditDTO, testUser))
+                .expectNextCount(1)
                 .verifyComplete();
 
         // 驗證互動

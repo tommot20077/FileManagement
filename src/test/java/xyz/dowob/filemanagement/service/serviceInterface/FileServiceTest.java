@@ -842,13 +842,13 @@ class FileServiceTest {
         assertTrue(FileService.class.isInterface());
         
         // 驗證 FileService 特有方法數量
-        assertEquals(5, FileService.class.getDeclaredMethods().length);
+        assertEquals(6, FileService.class.getDeclaredMethods().length);
         
         // 驗證所有方法都是默認方法
         long defaultMethodCount = Arrays.stream(FileService.class.getDeclaredMethods())
                 .filter(java.lang.reflect.Method::isDefault)
                 .count();
-        assertEquals(5, defaultMethodCount);
+        assertEquals(6, defaultMethodCount);
         
         // 驗證繼承關係
         assertTrue(xyz.dowob.filemanagement.unity.FileCrudService.class.isAssignableFrom(FileService.class));

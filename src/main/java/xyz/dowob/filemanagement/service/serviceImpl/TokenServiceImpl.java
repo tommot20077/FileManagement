@@ -10,7 +10,7 @@ import xyz.dowob.filemanagement.component.provider.providerImplement.JwtTokenPro
 import xyz.dowob.filemanagement.component.strategy.TokenStrategy;
 import xyz.dowob.filemanagement.customenum.LogLevelEnum;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
-import xyz.dowob.filemanagement.dto.UserInfoDto;
+import xyz.dowob.filemanagement.data.user.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 import xyz.dowob.filemanagement.exception.ValidationException;

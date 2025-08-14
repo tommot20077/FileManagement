@@ -9,7 +9,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import xyz.dowob.filemanagement.customenum.TokenEnum;
-import xyz.dowob.filemanagement.dto.UserInfoDto;
+import xyz.dowob.filemanagement.data.user.dto.UserInfoDto;
 import xyz.dowob.filemanagement.entity.Token;
 import xyz.dowob.filemanagement.entity.User;
 

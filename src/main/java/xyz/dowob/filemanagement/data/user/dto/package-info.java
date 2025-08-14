@@ -11,6 +11,7 @@
  * <li>{@link xyz.dowob.filemanagement.data.user.dto.RegisterDTO} - 使用者註冊資料</li>
  * <li>{@link xyz.dowob.filemanagement.data.user.dto.ResetPasswordDTO} - 使用者密碼重設資料</li>
  * <li>{@link xyz.dowob.filemanagement.data.user.dto.UserEmailDTO} - 使用者電子信箱資料</li>
+ * <li>{@link xyz.dowob.filemanagement.data.user.dto.UserInfoDto} - 使用者資訊資料傳輸物件</li>
  * </ul>
  *
  * @author yuan

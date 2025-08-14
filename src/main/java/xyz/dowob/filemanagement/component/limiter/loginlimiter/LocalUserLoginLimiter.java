@@ -1,7 +1,6 @@
 package xyz.dowob.filemanagement.component.limiter.loginlimiter;
 
 import jakarta.annotation.PreDestroy;
-import lombok.extern.log4j.Log4j2;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
@@ -36,7 +35,6 @@ import java.time.Duration;
  * @see RedisUserLoginLimiter
  * @see xyz.dowob.filemanagement.component.strategy.UserLimiterStrategy
  */
-@Log4j2
 @Component
 @UserLimiterType(UserLimiterEnum.USER_LOGIN_LIMITER)
 @ConditionalOnProperty(prefix = "security.login", name = "limiter-provider", havingValue = "local")

@@ -700,7 +700,7 @@ public class UserServiceImpl implements UserService {
     @RecordLevel(LogLevelEnum.DEBUG)
     public Mono<User> getById(Long userId) {
         if (userId == null) {
-            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "空值的用戶ID"));
+            return Mono.error(new ValidationException(ValidationException.ErrorCode.USER_NOT_FOUND, "用戶ID不存在ˋ"));
         }
 
         if (Objects.equals(userId, 0L)) {

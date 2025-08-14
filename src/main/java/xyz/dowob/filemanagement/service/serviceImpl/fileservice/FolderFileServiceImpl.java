@@ -66,10 +66,10 @@ import java.util.zip.ZipOutputStream;
  *
  * @author yuan
  * @version 1.0
- * @since 1.0
  * @see AbstractFileService
  * @see FolderService
  * @see FileEnum#FOLDER
+ * @since 1.0
  */
 @Service
 @RecordLevel(LogLevelEnum.DEBUG)
@@ -123,24 +123,25 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * }
      * }</pre>
      *
-     * @param serverFileMetaRepository 伺服器檔案元資料資料庫操作介面
-     * @param userFileMetaRepository 用戶檔案元資料資料庫操作介面
-     * @param redisProvider Redis 緩存提供者，用於緩存管理
-     * @param gridFsProvider GridFS 儲存提供者，用於分散式檔案儲存
-     * @param transfersTasksManager 檔案傳輸任務管理器
-     * @param fileProperties 檔案相關設定屬性，包含下載路徑和緩衝區設定
-     * @param circuitBreakerConfig 斷路器設定，用於系統穩定性保護
-     * @param userRepository 用戶資料庫操作介面
-     * @param userOnlineFileRepository 用戶線上檔案資料庫操作介面
-     * @param entityOperations R2DBC 實體操作介面，用於非阻塞式資料庫操作
-     * @param fileTrashRecordRepository 檔案回收站記錄資料庫操作介面
-     * @param transactionalOperator 事務操作器，用於響應式事務管理
-     * @param rateLimiterConfig 限流器設定，用於控制請求頻率
+     * @param serverFileMetaRepository      伺服器檔案元資料資料庫操作介面
+     * @param userFileMetaRepository        用戶檔案元資料資料庫操作介面
+     * @param redisProvider                 Redis 緩存提供者，用於緩存管理
+     * @param gridFsProvider                GridFS 儲存提供者，用於分散式檔案儲存
+     * @param transfersTasksManager         檔案傳輸任務管理器
+     * @param fileProperties                檔案相關設定屬性，包含下載路徑和緩衝區設定
+     * @param circuitBreakerConfig          斷路器設定，用於系統穩定性保護
+     * @param userRepository                用戶資料庫操作介面
+     * @param userOnlineFileRepository      用戶線上檔案資料庫操作介面
+     * @param entityOperations              R2DBC 實體操作介面，用於非阻塞式資料庫操作
+     * @param fileTrashRecordRepository     檔案回收站記錄資料庫操作介面
+     * @param transactionalOperator         事務操作器，用於響應式事務管理
+     * @param rateLimiterConfig             限流器設定，用於控制請求頻率
      * @param userFIleShareRecordRepository 用戶檔案分享記錄資料庫操作介面
-     * @param objectMapper JSON 序列化工具，用於物件轉換
-     * @param cacheManager 緩存管理器，統一管理各種緩存操作
-     * @param folderListTreeProvider 檔案夾樹狀結構提供者（可選）
-     * @param fileScanProvider 檔案安全掃描提供者（可選）
+     * @param objectMapper                  JSON 序列化工具，用於物件轉換
+     * @param cacheManager                  緩存管理器，統一管理各種緩存操作
+     * @param folderListTreeProvider        檔案夾樹狀結構提供者（可選）
+     * @param fileScanProvider              檔案安全掃描提供者（可選）
+     *
      * @throws ProcessException 當無法創建臨時下載目錄時拋出
      */
     public FolderFileServiceImpl(ServerFileMetaRepository serverFileMetaRepository, UserFileMetaRepository userFileMetaRepository, RedisProvider redisProvider, GridFsProvider gridFsProvider, TransfersTasksManager transfersTasksManager, FileProperties fileProperties, CircuitBreakerConfig circuitBreakerConfig, UserRepository userRepository, UserOnlineFileRepository userOnlineFileRepository, R2dbcEntityOperations entityOperations, FileTrashRecordRepository fileTrashRecordRepository, TransactionalOperator transactionalOperator, RateLimiterConfig rateLimiterConfig, UserFIleShareRecordRepository userFIleShareRecordRepository, ObjectMapper objectMapper, CacheManager cacheManager,
@@ -192,11 +193,12 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * 建立時間、父資料夾關係等。支援資料夾分享功能，操作完成後清理相關快取。
      *
      * @param fileEditDTO 資料夾編輯資訊，包含資料夾名稱、父資料夾 ID 等
-     * @param user 當前操作的用戶
+     * @param user        當前操作的用戶
+     *
      * @return 表示建立操作完成的響應式信號
      */
     @Override
-    public Mono<Void> createFolder(FileEditDTO fileEditDTO, User user) {
+    public Mono<UserFileMetadata> createFolder(FileEditDTO fileEditDTO, User user) {
         return Mono.defer(() -> {
             UserFileMetadata folder = new UserFileMetadata();
             folder.setUserId(user.getId());
@@ -205,9 +207,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             folder.setLastAccessTime(LocalDateTime.now());
             folder.setUploadTime(LocalDateTime.now());
             folder.setFileType(FileEnum.FOLDER);
-            Mono<Void> action = userFileMetaRepository.save(folder).flatMap(newFolder -> {
-                fileEditDTO.setFileId(newFolder.getId().toString());
-
+            Mono<UserFileMetadata> action = userFileMetaRepository.save(folder).flatMap(newFolder -> {
                 if (folderListTreeProvider != null) {
                     try {
                         folderListTreeProvider.addFolder(user.getId(), folder);
@@ -216,15 +216,19 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
                     }
                 }
                 List<UserFileShareRecord> userFileShareRecords = new ArrayList<>();
-                fileEditDTO.getShareUsers().forEach(shareUserEditPO -> {
-                    userFileShareRecords.add(new UserFileShareRecord(shareUserEditPO.getUserId(), newFolder.getId()));
-                });
+
+                if (fileEditDTO.getShareUsers() != null && !fileEditDTO.getShareUsers().isEmpty()) {
+                    fileEditDTO.getShareUsers().forEach(shareUserEditPO -> {
+                        userFileShareRecords.add(new UserFileShareRecord(shareUserEditPO.getUserId(), newFolder.getId()));
+                    });
+                }
+
                 return userFIleShareRecordRepository
                         .saveAll(userFileShareRecords)
-                        .then(cleanUserListCache(user.getId(), newFolder.getParentFolderId()));
-
+                        .then(cleanUserListCache(user.getId(), newFolder.getParentFolderId()))
+                        .thenReturn(newFolder);
             });
-            return transactionalOperator.transactional(action).then();
+            return transactionalOperator.transactional(action);
         });
     }
 
@@ -237,7 +241,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * 支援遞迴更新所有子資料夾的相關屬性。
      *
      * @param fileEditBO 資料夾編輯業務物件
-     * @param user 執行編輯操作的用戶
+     * @param user       執行編輯操作的用戶
+     *
      * @return 表示編輯操作完成的響應式信號
      */
     @Override
@@ -335,7 +340,7 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * <p>注意：此方法執行邏輯刪除，不會立即從資料庫中移除檔案夾，而是標記為已刪除。</p>
      *
      * @param folder 要刪除的檔案夾元資料
-     * @param user 執行刪除操作的用戶
+     * @param user   執行刪除操作的用戶
      *
      * @return {@link reactor.core.publisher.Mono}<{@link Void}> 表示刪除操作的響應式完成信號
      */
@@ -366,7 +371,8 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * 下載完成後自動清理暫存檔案。
      *
      * @param rootFolder 要下載的根資料夾元資料
-     * @param user 執行下載操作的用戶
+     * @param user       執行下載操作的用戶
+     *
      * @return 包含 ZIP 壓縮檔資料的業務物件
      */
     @Override
@@ -412,142 +418,6 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
 
 
     /**
-     * 恢復資料夾及其所有子內容。
-     * <p>
-     * 恢復已刪除的資料夾，包括檢查父資料夾狀態、遞迴恢復所有子資料夾、
-     * 刪除回收站記錄、更新相關快取和資料夾樹狀結構。
-     *
-     * @param folder 要恢復的資料夾
-     * @param user 當前操作的用戶
-     * @return 恢復後的資料夾元資料
-     */
-    @Override
-    public Mono<UserFileMetadata> restoreFile(UserFileMetadata folder, User user) {
-        return Mono
-                .defer(() -> {
-                    if (!folder.getIsDeleted()) {
-                        return Mono.error(new ValidationException(ValidationException.ErrorCode.SOME_FILE_NOT_DELETED, folder.getId()));
-                    }
-
-                    folder.setIsDeleted(false);
-                    folder.setLastAccessTime(LocalDateTime.now());
-                    if (folder.getParentFolderId() != null) {
-                        return userFileMetaRepository.findById(folder.getParentFolderId().toString()).flatMap(parentFolder -> {
-                            if (parentFolder.getIsDeleted()) {
-                                folder.setParentFolderId(null);
-                            }
-                            return Mono.just(folder);
-                        });
-                    }
-                    return Mono.just(folder);
-                })
-                .then(Mono.defer(() -> findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(
-                        childFolderList -> {
-                            childFolderList.forEach(userFile -> userFile.setIsDeleted(false));
-                            return fileTrashRecordRepository
-                                    .deleteById(folder.getId())
-                                    .thenMany(userFileMetaRepository.saveAll(childFolderList))
-                                    .collectList()
-                                    .flatMap(userfileList -> {
-                                        Long[] parentFolderIds = userfileList
-                                                .stream()
-                                                .map(UserFileMetadata::getParentFolderId)
-                                                .distinct()
-                                                .toArray(Long[]::new);
-                                        return cleanUserListCache(userfileList.getFirst().getUserId(), parentFolderIds);
-                                    })
-                                    .then(Mono.defer(() -> {
-                                        if (folderListTreeProvider != null) {
-                                            try {
-                                                folderListTreeProvider.addFolders(user.getId(), childFolderList);
-                                            } catch (ProcessException | ValidationException e) {
-                                                return Mono.error(e);
-                                            }
-                                        }
-                                        return Mono.just(folder);
-                                    }));
-                        })));
-    }
-
-
-    /**
-     * 批量恢復多個資料夾。
-     * <p>
-     * 對指定的資料夾集合逐個執行恢復操作。
-     *
-     * @param folders 要恢復的資料夾集合
-     * @param user 當前操作的用戶
-     * @return 恢復結果的響應式流
-     */
-    @Override
-    public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> folders, User user) {
-        return Flux.fromIterable(folders).flatMap(folder -> restoreFile(folder, user));
-    }
-
-
-    /**
-     * 刪除資料夾及其所有內容。
-     * <p>
-     * 執行資料夾的刪除操作，包括遞迴查找所有子資料夾和檔案、
-     * 建立回收站記錄、標記為已刪除、清理相關快取和更新資料夾樹。
-     * 使用延遲雙刪模式確保快取一致性。
-     *
-     * @param folder 要刪除的資料夾
-     * @param user 當前操作的用戶
-     * @return 是否刪除成功
-     */
-    @Override
-    public Mono<Boolean> removeFile(UserFileMetadata folder, User user) {
-        return findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(toDeleteFolderList -> {
-            boolean isAnyDeleted = toDeleteFolderList.stream().anyMatch(UserFileMetadata::getIsDeleted);
-            if (isAnyDeleted) {
-                return Mono.just(false);
-            }
-
-            return Mono.defer(() -> {
-                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
-                FileTrashRecord fileTrashRecord = new FileTrashRecord(toDeleteFolderList.getFirst(), deleteTime);
-                toDeleteFolderList.forEach(userFile -> userFile.setIsDeleted(true));
-
-                Long[] parentFolderIds = toDeleteFolderList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
-                Long userId = toDeleteFolderList.getFirst().getUserId();
-
-                Mono<List<UserFileMetadata>> databaseOperation = fileTrashRecordRepository
-                        .insert(fileTrashRecord, entityOperations)
-                        .thenMany(userFileMetaRepository.saveAll(toDeleteFolderList))
-                        .collectList();
-
-                Mono<Void> cacheCleanupOperation = cleanUserListCache(userId, parentFolderIds).doOnSuccess(v -> {
-                    if (folderListTreeProvider != null) {
-                        try {
-                            folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
-                        } catch (Exception e) {
-                            throw new RuntimeException("更新檔案夾列表樹時發生錯誤", e);
-                        }
-                    }
-                });
-                return transactionalOperator.transactional(databaseOperation).then(cacheCleanupOperation).thenReturn(true).onErrorReturn(false);
-            });
-        });
-    }
-
-
-    /**
-     * 批量刪除多個資料夾。
-     * <p>
-     * 對指定的資料夾集合逐個執行刪除操作。
-     *
-     * @param folders 要刪除的資料夾集合
-     * @param user 當前操作的用戶
-     * @return 所有資料夾是否都刪除成功
-     */
-    @Override
-    public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
-        return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
-    }
-
-
-    /**
      * 響應式處理檔案夾遞迴壓縮的核心邏輯，支持複雜的檔案夾結構和多檔案類型。
      * <p>
      * 操作流程：
@@ -574,11 +444,11 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
      * </ul>
      * </p>
      *
-     * @param zipOutputStream 要寫入的ZIP壓縮輸出流
-     * @param folder 當前必需壓縮的檔案夾元資料
-     * @param parentPath 父目錄路徑，用於設定壓縮檔案的目錄結構
+     * @param zipOutputStream      要寫入的ZIP壓縮輸出流
+     * @param folder               當前必需壓縮的檔案夾元資料
+     * @param parentPath           父目錄路徑，用於設定壓縮檔案的目錄結構
      * @param zipEntryNameCountMap 用於處理重複檔案名稱的映射
-     * @param user 執行下載操作的用戶
+     * @param user                 執行下載操作的用戶
      *
      * @return 表示壓縮操作的響應式完成信號
      */
@@ -637,7 +507,147 @@ public class FolderFileServiceImpl extends AbstractFileService implements Folder
             }).then();
             return filesProcessing.then(foldersProcessing);
         }));
+    }    /**
+     * 恢復資料夾及其所有子內容。
+     * <p>
+     * 恢復已刪除的資料夾，包括檢查父資料夾狀態、遞迴恢復所有子資料夾、
+     * 刪除回收站記錄、更新相關快取和資料夾樹狀結構。
+     *
+     * @param folder 要恢復的資料夾
+     * @param user   當前操作的用戶
+     *
+     * @return 恢復後的資料夾元資料
+     */
+    @Override
+    public Mono<UserFileMetadata> restoreFile(UserFileMetadata folder, User user) {
+        return Mono
+                .defer(() -> {
+                    if (!folder.getIsDeleted()) {
+                        return Mono.error(new ValidationException(ValidationException.ErrorCode.SOME_FILE_NOT_DELETED, folder.getId()));
+                    }
+
+                    folder.setIsDeleted(false);
+                    folder.setLastAccessTime(LocalDateTime.now());
+                    if (folder.getParentFolderId() != null) {
+                        return userFileMetaRepository.findById(folder.getParentFolderId().toString()).flatMap(parentFolder -> {
+                            if (parentFolder.getIsDeleted()) {
+                                folder.setParentFolderId(null);
+                            }
+                            return Mono.just(folder);
+                        });
+                    }
+                    return Mono.just(folder);
+                })
+                .then(Mono.defer(() -> findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(
+                        childFolderList -> {
+                            childFolderList.forEach(userFile -> userFile.setIsDeleted(false));
+                            return fileTrashRecordRepository
+                                    .deleteById(folder.getId())
+                                    .thenMany(userFileMetaRepository.saveAll(childFolderList))
+                                    .collectList()
+                                    .flatMap(userfileList -> {
+                                        Long[] parentFolderIds = userfileList
+                                                .stream()
+                                                .map(UserFileMetadata::getParentFolderId)
+                                                .distinct()
+                                                .toArray(Long[]::new);
+                                        return cleanUserListCache(userfileList.getFirst().getUserId(), parentFolderIds);
+                                    })
+                                    .then(Mono.defer(() -> {
+                                        if (folderListTreeProvider != null) {
+                                            try {
+                                                folderListTreeProvider.addFolders(user.getId(), childFolderList);
+                                            } catch (ProcessException | ValidationException e) {
+                                                return Mono.error(e);
+                                            }
+                                        }
+                                        return Mono.just(folder);
+                                    }));
+                        })));
     }
+
+
+    /**
+     * 批量恢復多個資料夾。
+     * <p>
+     * 對指定的資料夾集合逐個執行恢復操作。
+     *
+     * @param folders 要恢復的資料夾集合
+     * @param user    當前操作的用戶
+     *
+     * @return 恢復結果的響應式流
+     */
+    @Override
+    public Flux<UserFileMetadata> restoreFile(Iterable<UserFileMetadata> folders, User user) {
+        return Flux.fromIterable(folders).flatMap(folder -> restoreFile(folder, user));
+    }
+
+
+    /**
+     * 刪除資料夾及其所有內容。
+     * <p>
+     * 執行資料夾的刪除操作，包括遞迴查找所有子資料夾和檔案、
+     * 建立回收站記錄、標記為已刪除、清理相關快取和更新資料夾樹。
+     * 使用延遲雙刪模式確保快取一致性。
+     *
+     * @param folder 要刪除的資料夾
+     * @param user   當前操作的用戶
+     *
+     * @return 是否刪除成功
+     */
+    @Override
+    public Mono<Boolean> removeFile(UserFileMetadata folder, User user) {
+        return findAllChildFolder(Collections.singletonList(folder.getId()), new ArrayList<>(List.of(folder))).flatMap(toDeleteFolderList -> {
+            boolean isAnyDeleted = toDeleteFolderList.stream().anyMatch(UserFileMetadata::getIsDeleted);
+            if (isAnyDeleted) {
+                return Mono.just(false);
+            }
+
+            return Mono.defer(() -> {
+                LocalDateTime deleteTime = LocalDateTime.now().plusDays(fileProperties.getBackup().getRetentionTime().toDays());
+                FileTrashRecord fileTrashRecord = new FileTrashRecord(toDeleteFolderList.getFirst(), deleteTime);
+                toDeleteFolderList.forEach(userFile -> userFile.setIsDeleted(true));
+
+                Long[] parentFolderIds = toDeleteFolderList.stream().map(UserFileMetadata::getParentFolderId).distinct().toArray(Long[]::new);
+                Long userId = toDeleteFolderList.getFirst().getUserId();
+
+                Mono<List<UserFileMetadata>> databaseOperation = fileTrashRecordRepository
+                        .insert(fileTrashRecord, entityOperations)
+                        .thenMany(userFileMetaRepository.saveAll(toDeleteFolderList))
+                        .collectList();
+
+                Mono<Void> cacheCleanupOperation = cleanUserListCache(userId, parentFolderIds).doOnSuccess(v -> {
+                    if (folderListTreeProvider != null) {
+                        try {
+                            folderListTreeProvider.deleteFolder(user.getId(), folder.getId());
+                        } catch (Exception e) {
+                            throw new RuntimeException("更新檔案夾列表樹時發生錯誤", e);
+                        }
+                    }
+                });
+                return transactionalOperator.transactional(databaseOperation).then(cacheCleanupOperation).thenReturn(true).onErrorReturn(false);
+            });
+        });
+    }
+
+
+    /**
+     * 批量刪除多個資料夾。
+     * <p>
+     * 對指定的資料夾集合逐個執行刪除操作。
+     *
+     * @param folders 要刪除的資料夾集合
+     * @param user    當前操作的用戶
+     *
+     * @return 所有資料夾是否都刪除成功
+     */
+    @Override
+    public Mono<Boolean> removeFile(Iterable<UserFileMetadata> folders, User user) {
+        return Flux.fromIterable(folders).flatMap(folder -> removeFile(folder, user)).all(Boolean::booleanValue);
+    }
+
+
+
 
 
     /**

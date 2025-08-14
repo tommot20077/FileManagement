@@ -1,6 +1,5 @@
 package xyz.dowob.filemanagement.component.aspect;
 
-import lombok.extern.log4j.Log4j2;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -33,7 +32,6 @@ import java.util.Optional;
  * @version 1.0
  * @since 1.0
  */
-@Log4j2
 @Aspect
 @Component
 @SuppressWarnings("all")
